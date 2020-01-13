@@ -20,7 +20,7 @@ class qwao:
     def __init__(self, n_qubits, MPI_communicator):
 
         self.n_qubits = n_qubits
-        self.size = n_qubits**2
+        self.size = 2**n_qubits
         self.comm = MPI_communicator
 
         """
@@ -47,6 +47,7 @@ class qwao:
         self.dummy_gammas = np.empty(1, dtype = np.float64)
         self.dummy_qualities = np.empty(1, dtype = np.float64)
         self.dummy_lambdas = np.empty(1, dtype = np.float64)
+
 
     def qualities(self, method, *args):
         """
@@ -100,6 +101,7 @@ class qwao:
                 self.final_state,
                 self.comm.py2f(),
                 0)
+        print(self.final_state)
 
     def destroy_plan(self):
         fqwao_mpi.qwao_state(
@@ -142,8 +144,8 @@ if __name__ == "__main__":
 
     comm = MPI.COMM_WORLD
 
-    p = 10
-    n_qubits = 4
+    p = 2
+    n_qubits = 3
 
     # random beta and gamma start anglels
     np.random.seed(1)
