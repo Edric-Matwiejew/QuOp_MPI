@@ -3,12 +3,22 @@ import fqwao_mpi
 import numpy as np
 from scipy.optimize import minimize
 
+"""
+To do:
+    Write functions to save state data using parallel hdf5.
+    Test on magnus.
+    Make non-editable variables private and write functions to retrive their values.
+    Produce Fortran makefile.
+    Create docs using sphinx
+    write README
+"""
+
 class qwao:
     """
     Handles the creation of a :class:`qwao` system distributed over an MPI communicator, \
     the evolution of this system and execution of the QWAO algorithm in parallel. \
     Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library \
-    'fqwao_mpi', which makes use of MPI enabled FFTW subroutines.
+    'fqwao_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
 
     :param n_qubits: The number of qubits, :math:`n`, total distributed system is of size :math:`n^2`.
     :type n_qubits: integer
@@ -66,6 +76,14 @@ class qwao:
         self.qualities = method(self.size, self.local_i, self.local_i_offset, *args)
 
     def graph(self, graph_array):
+        """
+        Given a 1D array representing the first row of a circulant matrix, \
+        this returns a 1D array of matrix eigenvalues corresponding to a \
+        a row-wise partitioning of that matrix over the active MPI communicator.
+
+        :param graph_array: The first row of a circulant matrix.
+        :type graph_array: float, array
+        """
 
         self.lambdas = np.zeros(self.local_o, np.complex)
 
@@ -76,6 +94,8 @@ class qwao:
 
     def plan(self):
         """
+        Calls FFTW subroutines which set up the ancillary data structures needed to \
+        efficiently perform 1D parallel Fourier and inverse Fourier transforms.
         """
         fqwao_mpi.qwao_state(
                 self.size,
@@ -90,6 +110,15 @@ class qwao:
 
 
     def evolve_state(self, betas, gammas):
+        """
+        Evolves the qwao initial state to the final state.
+
+        :param betas:
+        :type betas: float, array
+
+        :param gamma:
+        :type gamma: float, array
+        """
         fqwao_mpi.qwao_state(
                 self.size,
                 betas,
@@ -102,6 +131,9 @@ class qwao:
                 0)
 
     def destroy_plan(self):
+        """
+        Deallocates/frees ancillary arrays and pointers needed by FFTW.
+        """
         fqwao_mpi.qwao_state(
                 self.size,
                 self.dummy_betas,
@@ -114,26 +146,69 @@ class qwao:
                 -1)
 
     def expectation(self):
+        """
+        Returns the expectation of the qwao final state to all MPI processes.
+        """
         probs = np.abs(self.final_state[:self.local_i])**2
         local_expectation = np.dot(probs, self.qualities)
         return self.comm.allreduce(local_expectation, op = MPI.SUM)
 
     def objective(self, betas_gammas):
+        """
+        Objection funtion to minimise as part of the QWAO algorithm.
+
+        :param betas_gammas: Starting angles, an array of size :math:`2 \\times p`.
+        :type betas_gammas: float, array
+        """
         betas, gammas = np.split(betas_gammas, 2)
         self.evolve_state(betas, gammas)
         return self.expectation()
 
     def execute(self, betas_gammas, *args):
+        """
+        Execute the QWAO algorithm.
+
+        :param betas_gammas: Starting angles, an array of size :math:`2 \\times p`.
+        :type betas_gammas: float, array
+
+        :param args: Extra arguments to pass to the SciPy minimise function.
+        :type args: tuple, optional
+        """
         return minimize(self.objective, betas_gammas, *args)
 
 class qualities:
-
+    """
+    Functions for parallel distributed memory generation of the QWAO quality array.
+    """
     def integer(N, local_i, local_i_offset):
+        """
+        Produces the array [1, ..., N - 1] distributed of the active MPI communicator.
+
+        :param N: Size of the distrubted system.
+        :type N: integer
+
+        :param local_i: Number of local input QWAO state values, given by qwao.local_i.
+        :type local_i: integer
+
+        :param local_i_offset: Offset of the local QWAO state values relative to the \ 
+        zero index of the distributed array. Given by qwao.local_i_offset.
+        :type local_i_offset: integer.
+        """
         return np.asarray(range(local_i_offset, local_i_offset + local_i), dtype = np.float64)
 
 class graph_array:
+    """
+    Fuctions to generate arrays corresponding to the first row of a circulat graph \
+    adjacency matrix..
+    """
 
     def complete(N):
+        """
+        Returns an array corresponding to a complete graph of size N.
+
+        :param N: Number of graph nodes.
+        :type N: integer
+        """
         graph_array = np.ones(N, dtype = np.float64)
         graph_array[0] = 0
         return graph_array
