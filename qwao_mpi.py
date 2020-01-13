@@ -101,7 +101,6 @@ class qwao:
                 self.final_state,
                 self.comm.py2f(),
                 0)
-        print(self.final_state)
 
     def destroy_plan(self):
         fqwao_mpi.qwao_state(
