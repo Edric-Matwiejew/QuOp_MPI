@@ -1,17 +1,9 @@
 from mpi4py import MPI
-import fqwao_mpi
+import h5py
+import json
 import numpy as np
 from scipy.optimize import minimize
-
-"""
-To do:
-    Write functions to save state data using parallel hdf5.
-    Test on magnus.
-    Make non-editable variables private and write functions to retrive their values.
-    Produce Fortran makefile.
-    Create docs using sphinx
-    write README
-"""
+import fqwao_mpi
 
 class qwao:
     """
@@ -86,6 +78,7 @@ class qwao:
         :type graph_array: float, array
         """
 
+        self.graph_array = graph_array
         self.lambdas = np.zeros(self.local_o, np.complex)
 
         for i in range(self.local_o_offset, self.local_o_offset + self.local_o):
@@ -175,7 +168,51 @@ class qwao:
         :param args: Extra arguments to pass to the SciPy minimise function.
         :type args: tuple, optional
         """
-        return minimize(self.objective, betas_gammas, *args)
+        self.betas_gammas = betas_gammas
+        self.result = minimize(self.objective, betas_gammas, *args)
+        return self.result
+
+    def save(self, file_name, config_name, action = "a"):
+
+        fqwao_mpi.save_dist_complex(
+                file_name,
+                config_name + str("/"),
+                "final_state",
+                action,
+                self.size,
+                self.local_i_offset,
+                self.final_state[:self.local_i],
+                self.comm.py2f())
+
+        fqwao_mpi.save_dist_complex(
+                file_name,
+                config_name + str("/"),
+                "eigenvalues",
+                "a",
+                self.size,
+                self.local_i_offset,
+                self.lambdas,
+                self.comm.py2f())
+
+        fqwao_mpi.save_dist_real(
+                file_name,
+                config_name + str("/"),
+                "qualities",
+                "a",
+                self.size,
+                self.local_i_offset,
+                self.qualities,
+                self.comm.py2f())
+
+        if self.comm.Get_rank() == 0:
+            File = h5py.File(file_name + ".h5", "a")
+            config = File[config_name]
+            minimize_result = config.create_group("minimize_result")
+            for key in self.result.keys():
+                minimize_result.create_dataset(key, data = self.result.get(key))
+            File.create_dataset(config_name + "/initial_phases", data = self.betas_gammas)
+            File.create_dataset(config_name + "/graph_array", data = self.graph_array)
+            File.close()
 
 class qualities:
     """
@@ -232,6 +269,7 @@ if __name__ == "__main__":
 
     result = qwao.execute(x0)
 
+    qwao.save("example", "ex_cfg", action = "w")
     qwao.destroy_plan()
 
     if comm.Get_rank() == 0:
