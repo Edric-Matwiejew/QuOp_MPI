@@ -1,2 +1,6 @@
 *.so
 *.out
+build
+dist
+*egg*
+*.h5
