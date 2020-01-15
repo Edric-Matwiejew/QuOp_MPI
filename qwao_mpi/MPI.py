@@ -34,7 +34,7 @@ class qwao:
         of the distributed array.
         """
 
-        local_sizes = fqwao_mpi.mpi_local_size(self.size, comm.py2f())
+        local_sizes = fqwao_mpi.mpi_local_size(self.size, self.comm.py2f())
 
         self.alloc_local = local_sizes[0]
         self.local_i = local_sizes[1]
