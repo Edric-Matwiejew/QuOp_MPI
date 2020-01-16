@@ -33,6 +33,7 @@ From: pawsey/mpi-base:3.1.4
     cd
 
     pip3 --no-cache-dir install \
+    wheel \
     h5py \
     pillow \
     matplotlib \
@@ -47,7 +48,11 @@ From: pawsey/mpi-base:3.1.4
     cd qwao_mpi/src
     make
     cd ../
-    python3 setup.py install
+    python3 setup.py sdist bdist_wheel
+    cd dist
+    pip3 install qwao_mpi*.tar.gz
+    
+    cd
 
 %labels
     Edric Matwiejew
