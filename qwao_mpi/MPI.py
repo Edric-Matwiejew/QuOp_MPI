@@ -1,6 +1,5 @@
 from mpi4py import MPI
 import h5py
-import json
 import numpy as np
 from scipy.optimize import minimize
 import fqwao_mpi
