@@ -2,7 +2,7 @@ from mpi4py import MPI
 import h5py
 import numpy as np
 from scipy.optimize import minimize
-import fqwao_mpi
+import qwao_mpi.fqwao_mpi as fqwao_mpi
 
 class qwao:
     """
