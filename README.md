@@ -3,16 +3,16 @@ Python 3 module for parallel distributed memory simulation of the QWAO algorithm
 
 ## Build Requirements
 
-*FFTW compiled with the --enable-fortran, --enable-mpi and --enable-shared options.
-*HDF5 compiled with the --enable-fortran, --enable-parallel, and --enable-shared options.
++FFTW compiled with the --enable-fortran, --enable-mpi and --enable-shared options.
++HDF5 compiled with the --enable-fortran, --enable-parallel, and --enable-shared options.
 
 src/Makefile assumes that the include and lib directories contaning the FTW and HDf5 shared object libraries are located in /usr/.
 
 ## Python Dependencies
 
-*numpy
-*scipy
-*h5pyb
++numpy
++scipy
++h5pyb
 
 ## Installation on Unix-Like Systems
     cd qwao_mpi/src
