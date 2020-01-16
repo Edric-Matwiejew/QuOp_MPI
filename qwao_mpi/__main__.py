@@ -1,8 +1,6 @@
 from mpi4py import MPI
 import numpy as np
-from MPI import *
-from qualities import *
-from graph_array import *
+from qwao_mpi import *
 
 comm = MPI.COMM_WORLD
 
@@ -14,8 +12,8 @@ np.random.seed(1)
 x0 = np.random.rand(2*p)
 
 qwao = qwao(n_qubits, comm)
-qwao.graph(complete(qwao.size))
-qwao.qualities(integer)
+qwao.graph(graph_array.complete(qwao.size))
+qwao.qualities(qualities.integer)
 qwao.plan()
 
 result = qwao.execute(x0)
