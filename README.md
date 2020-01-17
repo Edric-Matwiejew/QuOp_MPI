@@ -1,5 +1,6 @@
 # qwao_mpi
 Python 3 module for parallel distributed memory simulation of the QWAO algorithm on circulant mixing graphs.
+https://arxiv.org/abs/1912.07353
 
 ## Build Requirements
 
