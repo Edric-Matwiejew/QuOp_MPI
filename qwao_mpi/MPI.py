@@ -169,7 +169,7 @@ class qwao:
         :type args: tuple, optional
         """
         self.gammas_ts = gammas_ts
-        self.result = minimize(self.objective, gammas_ts, bounds = Bounds(-np.pi, np.pi) **kwargs)
+        self.result = minimize(self.objective, gammas_ts, bounds = Bounds(-np.pi, np.pi), **kwargs)
         return self.result
 
     def save(self, file_name, config_name, action = "a"):
@@ -209,7 +209,10 @@ class qwao:
             config = File[config_name]
             minimize_result = config.create_group("minimize_result")
             for key in self.result.keys():
-                minimize_result.create_dataset(key, data = self.result.get(key))
+                try:
+                    minimize_result.create_dataset(key, data = self.result.get(key))
+                except:
+                    print("No native HDF5 type for " + str(type(self.result.get(key))) + ". Minimization result field " + key + "  not saved.")
             File.create_dataset(config_name + "/initial_phases", data = self.gammas_ts)
             File.create_dataset(config_name + "/graph_array", data = self.graph_array)
             File.close()
