@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import h5py
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds
 import qwao_mpi.fqwao_mpi as fqwao_mpi
 
 class qwao:
@@ -169,7 +169,7 @@ class qwao:
         :type args: tuple, optional
         """
         self.gammas_ts = gammas_ts
-        self.result = minimize(self.objective, gammas_ts, **kwargs)
+        self.result = minimize(self.objective, gammas_ts, bounds = Bounds(-np.pi, np.pi) **kwargs)
         return self.result
 
     def save(self, file_name, config_name, action = "a"):
