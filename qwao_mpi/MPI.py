@@ -44,8 +44,8 @@ class qwao:
         self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
         self.final_state = np.empty(self.alloc_local, np.complex128)
 
-        self.dummy_betas = np.empty(1, dtype = np.float64)
         self.dummy_gammas = np.empty(1, dtype = np.float64)
+        self.dummy_ts = np.empty(1, dtype = np.float64)
         self.dummy_qualities = np.empty(1, dtype = np.float64)
         self.dummy_lambdas = np.empty(1, dtype = np.float64)
 
@@ -92,8 +92,8 @@ class qwao:
         """
         fqwao_mpi.qwao_state(
                 self.size,
-                self.dummy_betas,
                 self.dummy_gammas,
+                self.dummy_ts,
                 self.dummy_qualities,
                 self.dummy_lambdas,
                 self.initial_state,
@@ -102,20 +102,20 @@ class qwao:
                 1)
 
 
-    def evolve_state(self, betas, gammas):
+    def evolve_state(self, gammas, ts):
         """
         Evolves the qwao initial state to the final state.
 
-        :param betas:
-        :type betas: float, array
+        :param gammas:
+        :type gammas: float, array
 
         :param gamma:
         :type gamma: float, array
         """
         fqwao_mpi.qwao_state(
                 self.size,
-                betas,
                 gammas,
+                ts,
                 self.qualities,
                 self.lambdas,
                 self.initial_state,
@@ -129,8 +129,8 @@ class qwao:
         """
         fqwao_mpi.qwao_state(
                 self.size,
-                self.dummy_betas,
                 self.dummy_gammas,
+                self.dummy_ts,
                 self.dummy_qualities,
                 self.dummy_lambdas,
                 self.initial_state,
@@ -146,29 +146,29 @@ class qwao:
         local_expectation = np.dot(probs, self.qualities)
         return self.comm.allreduce(local_expectation, op = MPI.SUM)
 
-    def objective(self, betas_gammas):
+    def objective(self, gammas_ts):
         """
         Objection funtion to minimise as part of the QWAO algorithm.
 
-        :param betas_gammas: Starting angles, an array of size :math:`2 \\times p`.
-        :type betas_gammas: float, array
+        :param gammas_ts: Starting angles, an array of size :math:`2 \\times p`.
+        :type gammas_ts: float, array
         """
-        betas, gammas = np.split(betas_gammas, 2)
-        self.evolve_state(betas, gammas)
+        gammas, ts = np.split(gammas_ts, 2)
+        self.evolve_state(gammas, ts)
         return self.expectation()
 
-    def execute(self, betas_gammas, *args):
+    def execute(self, gammas_ts, *args):
         """
         Execute the QWAO algorithm.
 
-        :param betas_gammas: Starting angles, an array of size :math:`2 \\times p`.
-        :type betas_gammas: float, array
+        :param gammas_ts: Starting angles, an array of size :math:`2 \\times p`.
+        :type gammas_ts: float, array
 
         :param args: Extra arguments to pass to the SciPy minimise function.
         :type args: tuple, optional
         """
-        self.betas_gammas = betas_gammas
-        self.result = minimize(self.objective, betas_gammas, *args)
+        self.gammas_ts = gammas_ts
+        self.result = minimize(self.objective, gammas_ts, *args)
         return self.result
 
     def save(self, file_name, config_name, action = "a"):
@@ -209,6 +209,6 @@ class qwao:
             minimize_result = config.create_group("minimize_result")
             for key in self.result.keys():
                 minimize_result.create_dataset(key, data = self.result.get(key))
-            File.create_dataset(config_name + "/initial_phases", data = self.betas_gammas)
+            File.create_dataset(config_name + "/initial_phases", data = self.gammas_ts)
             File.create_dataset(config_name + "/graph_array", data = self.graph_array)
             File.close()
