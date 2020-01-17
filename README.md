@@ -18,7 +18,6 @@ src/Makefile assumes that the include and lib directories contaning the FTW and 
     cd qwao_mpi/src
     make
     cd ../
-    python3 
     python3 setup.py sdist bdist_wheel
     pip3 install qsw_mpi-0.0.1.tar.gz
 
