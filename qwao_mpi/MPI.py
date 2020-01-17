@@ -50,7 +50,8 @@ class qwao:
         self.dummy_lambdas = np.empty(1, dtype = np.float64)
 
 
-    def qualities(self, method, *args):
+    def qualities(self, method, *args, **kwargs):
+
         """
         Sets the qualities in the QWAO algorithm. As the array of qualities is \
         equal to the size of the QWAO state, ideally the qualities should be \
@@ -65,7 +66,7 @@ class qwao:
         :param args: Extra arguments to pass to the quality function.
         :type args: array, optional
         """
-        self.qualities = method(self.size, self.local_i, self.local_i_offset, *args)
+        self.qualities = method(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
 
     def graph(self, graph_array):
         """
@@ -157,7 +158,7 @@ class qwao:
         self.evolve_state(gammas, ts)
         return self.expectation()
 
-    def execute(self, gammas_ts, *args):
+    def execute(self, gammas_ts, **kwargs):
         """
         Execute the QWAO algorithm.
 
@@ -168,7 +169,7 @@ class qwao:
         :type args: tuple, optional
         """
         self.gammas_ts = gammas_ts
-        self.result = minimize(self.objective, gammas_ts, *args)
+        self.result = minimize(self.objective, gammas_ts, **kwargs)
         return self.result
 
     def save(self, file_name, config_name, action = "a"):
