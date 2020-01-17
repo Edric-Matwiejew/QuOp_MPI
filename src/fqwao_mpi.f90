@@ -50,8 +50,8 @@ subroutine qwao_state(  N, &
                         alloc_local, &
                         local_i, &
                         local_o, &
-                        betas, &
                         gammas, &
+                        ts, &
                         qualities,  &
                         lambdas,  &
                         state, &
@@ -71,8 +71,8 @@ subroutine qwao_state(  N, &
     integer(sp), intent(in) :: alloc_local
     integer(sp), intent(in) :: local_i
     integer(sp), intent(in) :: local_o
-    real(dp), intent(in) :: betas(p)
     real(dp), intent(in) :: gammas(p)
+    real(dp), intent(in) :: ts(p)
     real(dp), intent(in) :: qualities(local_i)
     complex(dp), intent(in) :: lambdas(local_o)
     complex(dp), intent(in) :: state(alloc_local)
@@ -120,11 +120,11 @@ subroutine qwao_state(  N, &
 
         do i = 1, p
 
-            fdata(1:local_i) = exp(-complex(0,1d0) * gammas(i) * qualities) *fdata(1:local_i)
+            fdata(1:local_i) = exp(-complex(0,1d0) * ts(i) * qualities) *fdata(1:local_i)
 
             call fftw_mpi_execute_dft(plan_forward, fdata, fdata)
 
-            fdata(1:local_o) = exp(-complex(0,1d0) * betas(i) * lambdas) *fdata(1:local_o)/real(N,8)
+            fdata(1:local_o) = exp(-complex(0,1d0) * gammas(i) * lambdas) *fdata(1:local_o)/real(N,8)
 
             call fftw_mpi_execute_dft(plan_backward, fdata, fdata)
 
