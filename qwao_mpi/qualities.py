@@ -3,7 +3,7 @@ import numpy as np
 """
 Functions for parallel distributed memory generation of the QWAO quality array.
 """
-def integer(N, local_i, local_i_offset):
+def ordered_integers(N, local_i, local_i_offset):
     """
     Produces the array [1, ..., N - 1] distributed of the active MPI communicator.
 
@@ -18,3 +18,7 @@ def integer(N, local_i, local_i_offset):
     :type local_i_offset: integer.
     """
     return np.asarray(range(local_i_offset, local_i_offset + local_i), dtype = np.float64)
+
+def random_integers(N, local_i, local_i_offset):
+    np.random.seed(local_i_offset)
+    return np.random.randint(1, N + 1, size = local_i, dtype = np.float64)
