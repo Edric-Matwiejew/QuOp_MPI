@@ -12,7 +12,7 @@ src/Makefile assumes that the include and lib directories contaning the FTW and 
 
 + numpy
 + scipy
-+ h5pyb
++ h5py
 
 ## Installation on Unix-Like Systems
     cd qwao_mpi/src
