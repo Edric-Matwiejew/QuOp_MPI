@@ -1,6 +1,6 @@
 from mpi4py import MPI
 import numpy as np
-from qwao_mpi import *
+import qwao_mpi as qw
 
 comm = MPI.COMM_WORLD
 
@@ -11,16 +11,13 @@ n_qubits = 3
 np.random.seed(1)
 x0 = np.random.rand(2*p)
 
-qwao = qwao(n_qubits, comm)
-qwao.graph(graph_array.complete(qwao.size))
-qwao.qualities(qualities.integer)
+qwao = qw.MPI.qwao(n_qubits, comm)
+qwao.graph(qw.graph_array.complete(qwao.size))
+qwao.qualities(qw.qualities.integer)
 qwao.plan()
-
-result = qwao.execute(x0)
-
+qwao.execute(x0)
 qwao.save("example", "example_config", action = "w")
 qwao.destroy_plan()
 
 if comm.Get_rank() == 0:
-    print(result)
-
+    print(qwao.result)

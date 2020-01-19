@@ -170,7 +170,6 @@ class qwao:
         """
         self.gammas_ts = gammas_ts
         self.result = minimize(self.objective, gammas_ts, bounds = Bounds(-np.pi, np.pi), **kwargs)
-        return self.result
 
     def save(self, file_name, config_name, action = "a"):
 
