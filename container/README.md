@@ -1,6 +1,6 @@
-# qwao_mpi Singularity Containerisation
+# Singularity Containerisation
 
-This folder contains a definition file, qwao_mpi.def, which can be used to build a singularity container in which to run qwao_mpi. It is based on the docker file supported by the Pawsey Supercomputing Center and requires that MPICH version 3.1.4 is installed on the host system.
+qwao_mpi/container/qwao_mpi.def, can be used to build a singularity container in which to run qwao_mpi. It is based on the docker file supported by the Pawsey Supercomputing Center and requires that MPICH version 3.1.4 is installed on the host system.
 
 To build the container:
 
