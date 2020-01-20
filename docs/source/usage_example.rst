@@ -36,7 +36,10 @@ Define QWAO parameters, the depth of the circuit, p, the number of qubits, n_qub
     x0 = np.random.rand(2*p)
 
 Create a :class:`~qwao_mpi.MPI.qwao` object. This contains the methods needed to perform parallel simulation of the QWAO algorithm.
-qwao = qw.MPI.qwao(n_qubits, comm)
+
+.. code-block:: python
+
+    qwao = qw.MPI.qwao(n_qubits, comm)
 
 Define the circulant graph by passing a :mod:`~qwao_mpi.graph_array` to :meth:`~qwao_mpi.MPI.qwao.graph`.
 
