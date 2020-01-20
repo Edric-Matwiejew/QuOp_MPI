@@ -31,4 +31,4 @@ def random_integers(N, local_i, local_i_offset):
     """
 
     np.random.seed(local_i_offset)
-    return np.random.randint(1, N + 1, size = local_i, dtype = np.float64)
+    return np.random.randint(1, N + 1, size = local_i).astype(np.float64)
