@@ -25,3 +25,14 @@ Before importing qwao_mpi in a python script, ensure that the path to the FFTW a
 
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path to HDF5 lib>:<path to FFTW lib>
 
+## Documentaion
+If not already present, install sphinx, sphinx-rtd-theme and m2r. On systems using PIP:
+
+    pip3 install sphinx sphinx-rtd-theme m2r
+
+Navigate to qwao_mpi/docs and build the documentaion:
+
+    make html
+
+Documentaion will then be present in qwao_mpi/docs/build/html.
+
