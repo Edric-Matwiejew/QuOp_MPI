@@ -49,8 +49,7 @@ class qwao:
         self.dummy_qualities = np.empty(1, dtype = np.float64)
         self.dummy_lambdas = np.empty(1, dtype = np.float64)
 
-
-    def qualities(self, func, *args, **kwargs):
+    def set_qualities(self, func, *args, **kwargs):
 
         """
         Sets the qualities in the QWAO algorithm. As the array of qualities is
@@ -67,6 +66,7 @@ class qwao:
         :type args: array, optional
         """
         self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
+        self.qual_max = self.comm.allreduce(np.max(self.qualities), op = MPI.MAX)
 
     def graph(self, graph_array):
         """
@@ -156,7 +156,8 @@ class qwao:
         """
         gammas, ts = np.split(gammas_ts, 2)
         self.evolve_state(gammas, ts)
-        return self.expectation()
+        expectation = self.expectation()
+        return (self.qual_max - expectation)/np.float64(self.qual_max)
 
     def execute(self, gammas_ts, **kwargs):
         """
@@ -217,6 +218,8 @@ class qwao:
                 self.qualities,
                 self.comm.py2f())
 
+        self.comm.Barrier()
+
         if self.comm.Get_rank() == 0:
             File = h5py.File(file_name + ".h5", "a")
             config = File[config_name]
@@ -226,6 +229,6 @@ class qwao:
                     minimize_result.create_dataset(key, data = self.result.get(key))
                 except:
                     print("No native HDF5 type for " + str(type(self.result.get(key))) + ". Minimization result field " + key + "  not saved.")
-            File.create_dataset(config_name + "/initial_phases", data = self.gammas_ts)
-            File.create_dataset(config_name + "/graph_array", data = self.graph_array)
+            File.create_dataset(config_name + "/initial_phases", data = self.gammas_ts, dtype = np.float64)
+            File.create_dataset(config_name + "/graph_array", data = self.graph_array, dtype = np.float64)
             File.close()
