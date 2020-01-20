@@ -36,3 +36,6 @@ Navigate to qwao_mpi/docs and build the documentaion:
 
 Documentaion will then be present in qwao_mpi/docs/build/html.
 
+## Todo
+
++ Handle case of user saving a configuration with the same name as one already existing in a .h5 file.
