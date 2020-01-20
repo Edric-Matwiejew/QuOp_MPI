@@ -6,10 +6,12 @@ import qwao_mpi.fqwao_mpi as fqwao_mpi
 
 class qwao:
     """
-    Handles the creation of a :class:`qwao` system distributed over an MPI communicator, \
-    the evolution of this system and execution of the QWAO algorithm in parallel. \
-    Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library \
+    Handles the creation of a :class:`qwao` system distributed over an MPI communicator,
+    the evolution of this system and execution of the QWAO algorithm in parallel.
+    Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library
     'fqwao_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
+
+    All methods contained in :class:`qwao` must be called collectively (by each MPI process).
 
     :param n_qubits: The number of qubits, :math:`n`, total distributed system is of size :math:`n^2`.
     :type n_qubits: integer
@@ -24,14 +26,12 @@ class qwao:
         self.size = 2**n_qubits
         self.comm = MPI_communicator
 
-        """
-        When performing a parallel 1D-FFT using FFTW it may be the case that \
-        the transformed array is distributed on the MPI communicator differently \
-        from the input. fqwao.mpi_local_size determines the size needed at each \
-        MPI node to accomodate for this. Along with the number of actual array
-        elements stored at each node and their offset relative to the 0-index \
-        of the distributed array.
-        """
+        # When performing a parallel 1D-FFT using FFTW it may be the case that
+        # the transformed array is distributed on the MPI communicator differently
+        # from the input. fqwao.mpi_local_size determines the size needed at each
+        # MPI node to accomodate for this. Along with the number of actual array
+        # elements stored at each node and their offset relative to the 0-index
+        # of the distributed array.
 
         local_sizes = fqwao_mpi.mpi_local_size(self.size, self.comm.py2f())
 
@@ -50,28 +50,28 @@ class qwao:
         self.dummy_lambdas = np.empty(1, dtype = np.float64)
 
 
-    def qualities(self, method, *args, **kwargs):
+    def qualities(self, func, *args, **kwargs):
 
         """
-        Sets the qualities in the QWAO algorithm. As the array of qualities is \
-        equal to the size of the QWAO state, ideally the qualities should be \
-        generated in parallel. As such :method:`qwao.qualities` accepts a function \
-        whose first three arguments are the size of the distributed qwao state, \
-        the number of locally stored stored input elements and the offset of these \
+        Sets the qualities in the QWAO algorithm. As the array of qualities is
+        equal to the size of the QWAO state, ideally the qualities should be
+        generated in parallel. As such :meth:`~qwao.qualities` accepts a function
+        whose first three arguments are the size of the distributed qwao state,
+        the number of locally stored stored input elements and the offset of these
         elements relative to the 0-index of the distributed array.
 
-        :param method: Function with which to generate the local qualities.
+        :param func: Function with which to generate the local qualities.
         :method type: callable
 
         :param args: Extra arguments to pass to the quality function.
         :type args: array, optional
         """
-        self.qualities = method(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
+        self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
 
     def graph(self, graph_array):
         """
-        Given a 1D array representing the first row of a circulant matrix, \
-        this returns a 1D array of matrix eigenvalues corresponding to a \
+        Given a 1D array representing the first row of a circulant matrix,
+        this returns a 1D array of matrix eigenvalues corresponding to a
         a row-wise partitioning of that matrix over the active MPI communicator.
 
         :param graph_array: The first row of a circulant matrix.
@@ -88,7 +88,7 @@ class qwao:
 
     def plan(self):
         """
-        Calls FFTW subroutines which set up the ancillary data structures needed to \
+        Calls FFTW subroutines which set up the ancillary data structures needed to
         efficiently perform 1D parallel Fourier and inverse Fourier transforms.
         """
         fqwao_mpi.qwao_state(
@@ -172,6 +172,20 @@ class qwao:
         self.result = minimize(self.objective, gammas_ts, bounds = Bounds(-np.pi, np.pi), **kwargs)
 
     def save(self, file_name, config_name, action = "a"):
+
+        """
+        Write the final state, eigenvalues, qualities and execution results
+        of the current configuration to a HDf5 file.
+
+        :param file_name: Name of the file on disc.
+        :type file_name: string
+
+        :param file_name: Name of the saved configuration in the HDf5 file.
+        :type file_name: string
+
+        :param action: "a": append to an existing file or create a. "w": overwrite the file if it exists.
+        :type action: string, optional
+        """
 
         fqwao_mpi.save_dist_complex(
                 file_name,
