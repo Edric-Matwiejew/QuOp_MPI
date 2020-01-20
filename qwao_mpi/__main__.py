@@ -13,7 +13,7 @@ x0 = np.random.rand(2*p)
 
 qwao = qw.MPI.qwao(n_qubits, comm)
 qwao.graph(qw.graph_array.complete(qwao.size))
-qwao.qualities(qw.qualities.integer)
+qwao.qualities(qw.qualities.ordered_integers)
 qwao.plan()
 qwao.execute(x0)
 qwao.save("example", "example_config", action = "w")

@@ -48,7 +48,7 @@ Define the solution qualities by passing a :mod:`~qwao_mpi.quality` method to :m
 
 .. code-block:: python
 
-    qwao.qualities(qw.qualities.integer)
+    qwao.qualities(qw.qualities.ordered_integers)
 
 The QWAO algorithm may then be executed. Note that :meth:`~qwao_mpi.MPI.plan` and :meth:`~qwao_mpi.MPI.destory_plan()` are necessary to create and free ancillary arrays and pointers used by external libraries.
 
