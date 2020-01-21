@@ -3,6 +3,8 @@ Modules
 
 MPI
 ---
+.. note::
+    All methods contained in :mod:`~qwao_mpi.MPI` must be called collectively (by each MPI process).
 
 .. automodule:: qwao_mpi.MPI
     :members:
@@ -22,7 +24,7 @@ Methods to generate arrays corresponding to the first row of a circulat graph ad
 qualities
 ---------
 
-When passed to :meth:`~qwao_mpi.MPI.qwao.qualities`, these methods create an array of qualities distributed over the MPI communicator associated with the :class:`~qwao_mpi.MPI.qwao` object.
+When passed to :meth:`~qwao_mpi.MPI.qwao.set_qualities`, these methods create an array of qualities distributed over the MPI communicator associated with the :class:`~qwao_mpi.MPI.qwao` object.
 
 .. automodule:: qwao_mpi.qualities
     :members:

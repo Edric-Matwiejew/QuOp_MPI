@@ -47,13 +47,13 @@ Define the circulant graph by passing a :mod:`~qwao_mpi.graph_array` to :meth:`~
 
     qwao.graph(qw.graph_array.complete(qwao.size))
 
-Define the solution qualities by passing a :mod:`~qwao_mpi.quality` method to :meth:`~qwao_mpi.MPI.qualities`
+Define the solution qualities by passing a :mod:`~qwao_mpi.quality` method to :meth:`~qwao_mpi.MPI.qwao.set_qualities`
 
 .. code-block:: python
 
-    qwao.qualities(qw.qualities.ordered_integers)
+    qwao.qualities(qw.set_qualities.ordered_integers)
 
-The QWAO algorithm may then be executed. Note that :meth:`~qwao_mpi.MPI.plan` and :meth:`~qwao_mpi.MPI.destory_plan()` are necessary to create and free ancillary arrays and pointers used by external libraries.
+The QWAO algorithm may then be executed. Note that :meth:`~qwao_mpi.MPI.qwao.plan` and :meth:`~qwao_mpi.MPI.qwao.destory_plan` are necessary to create and free ancillary arrays and pointers used by external libraries.
 
 .. code-block:: python
 
@@ -61,7 +61,7 @@ The QWAO algorithm may then be executed. Note that :meth:`~qwao_mpi.MPI.plan` an
     qwao.execute(x0)
     qwao.destroy_plan()
 
-Simulation results can then be saved to disc as a HDF5 file using :meth:`~qwao_mpi.MPI.save`. This file type can be accessed in python using the `h5py <https://www.h5py.org/>` module.
+Simulation results can then be saved to disc as a HDF5 file using :meth:`~qwao_mpi.MPI.qwao.save`. This file type can be accessed in python using the `h5py <https://www.h5py.org/>`_ module.
 
 .. code-block:: python
 

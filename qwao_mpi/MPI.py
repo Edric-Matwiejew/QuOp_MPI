@@ -6,12 +6,10 @@ import qwao_mpi.fqwao_mpi as fqwao_mpi
 
 class qwao:
     """
-    Handles the creation of a :class:`qwao` system distributed over an MPI communicator,
-    the evolution of this system and execution of the QWAO algorithm in parallel.
+    The :class:`qwao` class provides for the instantiation a QWAO configuration 
+    distributed over an MPI communicator and the execution of the QWAO algorithm in parallel.
     Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library
     'fqwao_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
-
-    All methods contained in :class:`qwao` must be called collectively (by each MPI process).
 
     :param n_qubits: The number of qubits, :math:`n`, total distributed system is of size :math:`n^2`.
     :type n_qubits: integer
@@ -57,7 +55,8 @@ class qwao:
         generated in parallel. As such :meth:`~qwao.qualities` accepts a function
         whose first three arguments are the size of the distributed qwao state,
         the number of locally stored stored input elements and the offset of these
-        elements relative to the 0-index of the distributed array.
+        elements relative to the 0-index of the distributed array. Example quality
+        functions are included in :mod:`~qwao_mpi.qualities`.
 
         :param func: Function with which to generate the local qualities.
         :method type: callable
@@ -66,7 +65,7 @@ class qwao:
         :type args: array, optional
         """
         self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
-        self.qual_max = self.comm.allreduce(np.max(self.qualities), op = MPI.MAX)
+        self.max_quality = self.comm.allreduce(np.max(self.qualities), op = MPI.MAX)
 
     def graph(self, graph_array):
         """
@@ -105,13 +104,13 @@ class qwao:
 
     def evolve_state(self, gammas, ts):
         """
-        Evolves the qwao initial state to the final state.
+        Evolves the qwao.initial_state to the qwao.final_state.
 
-        :param gammas:
+        :param gammas: Quality-proportional phase shifts.
         :type gammas: float, array
 
-        :param gamma:
-        :type gamma: float, array
+        :param ts: Continous-time quantum walk times.
+        :type ts: float, array
         """
         fqwao_mpi.qwao_state(
                 self.size,
@@ -157,7 +156,7 @@ class qwao:
         gammas, ts = np.split(gammas_ts, 2)
         self.evolve_state(gammas, ts)
         expectation = self.expectation()
-        return (self.qual_max - expectation)/np.float64(self.qual_max)
+        return (self.max_quality - expectation)/np.float64(self.max_quality)
 
     def execute(self, gammas_ts, **kwargs):
         """
@@ -184,8 +183,54 @@ class qwao:
         :param file_name: Name of the saved configuration in the HDf5 file.
         :type file_name: string
 
-        :param action: "a": append to an existing file or create a. "w": overwrite the file if it exists.
+        :param action: "a": append to an existing file or create a new file. "w": overwrite the file if it exists.
         :type action: string, optional
+
+        Data it saved into a .h5 file with the following structure.
+
+        ::
+
+            file_name.h5
+            ├── config_name
+            │   ├── final_state
+            │   ├── eigenvalues
+            │   ├── qualitites
+            │   ├── minimize_results
+            │   │   ├── result_field_1
+            │   │   ├── result_field_2
+            │   │   ├── result_field_3
+            │   │   ├── ...
+
+        Multiple configurations with a unique config_name can be stored in the same .h5 file.
+        HDF5 files are supported in python by the `h5py <https://www.h5py.org/>`_ package. With it,
+        a saved configuration can be accessed as follows:
+
+        .. code-block:: python
+
+            import h5py
+
+            f = h5py.File(file_name + ".h5", "r")
+            final_state = np.array(f[config_name]['final_state']).view(np.complex128)
+            eigenvalues = np.array(f[config_name]['eigenvalues']).view(np.complex128)
+            qualities = np.array(f[config_name]['qualities']).view(np.float64)
+
+            minimize_result = {}
+            for key in f[config_name]['minimize_result'].keys():
+                minimize_result[key] = np.array(f[config_name]['minimize_result'][key])
+
+        .. warning::
+            The final_state, eigenvalues and qualities datasets are saved using Fortran
+            subroutines which make use of parallel HDF5.
+
+            The complex values of the final_state and eigenvalues arrays are saved as a
+            compound datatype consisting of contiguous double precision reals. This is
+            equivalent to the np.complex128 numpy datatype. To access this data without a
+            loss of precision in python the user must set the **view** of the numpy array
+            to np.complex128, rather than casting it to np.complex128 using the dtype keyword.
+
+            Similarly the qualities array, which is saved as an array of double precision
+            reals, should have its view set to np.float64.
+
         """
 
         fqwao_mpi.save_dist_complex(
