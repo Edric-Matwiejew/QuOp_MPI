@@ -1,12 +1,13 @@
 from mpi4py import MPI
 import h5py
 import numpy as np
+import sys
 from scipy.optimize import minimize, Bounds
 import qwao_mpi.fqwao_mpi as fqwao_mpi
 
 class qwao:
     """
-    The :class:`qwao` class provides for the instantiation a QWAO configuration 
+    The :class:`qwao` class provides for the instantiation a QWAO configuration
     distributed over an MPI communicator and the execution of the QWAO algorithm in parallel.
     Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library
     'fqwao_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
@@ -273,7 +274,8 @@ class qwao:
                 try:
                     minimize_result.create_dataset(key, data = self.result.get(key))
                 except:
-                    print("No native HDF5 type for " + str(type(self.result.get(key))) + ". Minimization result field " + key + "  not saved.")
+                    print("No native HDF5 type for " + str(type(self.result.get(key))) + ". Minimization result field " + key + "  not saved.",
+                            file = sys.stderr)
             File.create_dataset(config_name + "/initial_phases", data = self.gammas_ts, dtype = np.float64)
             File.create_dataset(config_name + "/graph_array", data = self.graph_array, dtype = np.float64)
             File.close()
