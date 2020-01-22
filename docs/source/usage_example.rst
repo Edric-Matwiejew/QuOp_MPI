@@ -26,7 +26,7 @@ Next, set up the MPI environment by creating an MPI communicator object.
 
     comm = MPI.COMM_WORLD
 
-Define QWAO parameters, the depth of the circuit, p, the number of qubits, n_qubits, and an array of starting angles of size 2p, x0. x0 defines the starting angles of the :math:`\vec{\gamma}` and :math:`\vec{t}` arrays.
+Define QWAO parameters, the depth of the circuit, p, the number of qubits, n_qubits, and an array of starting angles of size 2p, x0, which defines the starting angles of the :math:`\vec{\gamma}` and :math:`\vec{t}` arrays.
 
 .. code-block:: python
 
@@ -47,13 +47,13 @@ Define the circulant graph by passing a :mod:`~qwao_mpi.graph_array` to :meth:`~
 
     qwao.graph(qw.graph_array.complete(qwao.size))
 
-Define the solution qualities by passing a :mod:`~qwao_mpi.quality` method to :meth:`~qwao_mpi.MPI.qwao.set_qualities`
+Define the solution qualities by passing a :mod:`~qwao_mpi.qualities` method to :meth:`~qwao_mpi.MPI.qwao.set_qualities`
 
 .. code-block:: python
 
     qwao.qualities(qw.set_qualities.ordered_integers)
 
-The QWAO algorithm may then be executed. Note that :meth:`~qwao_mpi.MPI.qwao.plan` and :meth:`~qwao_mpi.MPI.qwao.destory_plan` are necessary to create and free ancillary arrays and pointers used by external libraries.
+The QWAO algorithm may then be executed. Note that :meth:`~qwao_mpi.MPI.qwao.plan` and :meth:`~qwao_mpi.MPI.qwao.destroy_plan` are necessary to create and free ancillary arrays and pointers used by external libraries.
 
 .. code-block:: python
 
