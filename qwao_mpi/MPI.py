@@ -40,13 +40,38 @@ class qwao:
         self.local_o = local_sizes[3]
         self.local_o_offset = local_sizes[4]
 
-        self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
         self.final_state = np.empty(self.alloc_local, np.complex128)
 
         self.dummy_gammas = np.empty(1, dtype = np.float64)
         self.dummy_ts = np.empty(1, dtype = np.float64)
         self.dummy_qualities = np.empty(1, dtype = np.float64)
         self.dummy_lambdas = np.empty(1, dtype = np.float64)
+
+    def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
+        """
+        Sets the initial state used in the QWAO algorithm. 
+        """
+
+        if name == "equal":
+            self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+        elif name == "localized":
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            if self.comm.Get_rank() == 0:
+                self.initial_state[0] = 1.0
+        elif name == "split":
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            if self.comm.Get_rank() == 0:
+                self.initial_state[0:2] = 1.0/np.sqrt(2.0)
+        elif vertices is not None:
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            total_verticies = comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
+            for vertex in vertices:
+                self.initial_state[vertex] = 1.0/np.sqrt(total_verticies)
+        elif state is not None:
+            self.initial_state[:] = np.array(state, np.complex128)
+            if not normalized:
+                nomalization = comm.allreduce(np.sum(np.multiply(np.conjugate(state), state)), op = MPI.SUM)
+                self.initial_state = self.initial_state/np.sqrt(normalized)
 
     def set_qualities(self, func, *args, **kwargs):
 
