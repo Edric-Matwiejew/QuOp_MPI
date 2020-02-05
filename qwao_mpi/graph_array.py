@@ -10,3 +10,9 @@ def complete(N):
     graph_array = np.ones(N, dtype = np.float64)
     graph_array[0] = 0
     return graph_array
+
+def circle(N):
+    graph_array = np.zeros(N, dtype = np.float64)
+    graph_array[1] = 1
+    graph_array[N - 1] = 1
+    return graph_array
