@@ -20,7 +20,6 @@ From: pawsey/mpi-base:3.1.4
     ./configure --enable-fortran --enable-shared --enable-parallel --prefix=/usr/
     make && make install
     cd
-	rm -r hdf5*
 
     wget http://www.fftw.org/fftw-3.3.8.tar.gz
     tar -xvf fftw*
@@ -28,7 +27,6 @@ From: pawsey/mpi-base:3.1.4
     ./configure --enable-mpi --enable-fortran --enable-shared --prefix=/usr/
     make && make install
     cd
-	rm -r fftw*
 
     pip3 --no-cache-dir install \
     wheel \
@@ -50,7 +48,6 @@ From: pawsey/mpi-base:3.1.4
     cd dist
     pip3 install qwao_mpi*.tar.gz
     cd
-	rm -r qwao_mpi
 
 %labels
     Edric Matwiejew
