@@ -1,8 +1,8 @@
 from mpi4py import MPI
 import h5py
 import numpy as np
+from scipy.optimize import basinhopping
 import sys
-from scipy.optimize import minimize, Bounds
 import qwao_mpi.fqwao_mpi as fqwao_mpi
 
 class qwao:
@@ -149,28 +149,38 @@ class qwao:
 
     def objective(self, gammas_ts):
         """
-        Objection funtion to minimise as part of the QWAO algorithm.
+        Objection funtion to minimise as part of the QWAO algorithm. The NLOpt module
+        requires that a gradient variable be included, even if the optimizers being
+        used are gradient free, which is the case for those used in QWAO_MPI.
 
         :param gammas_ts: Starting angles, an array of size :math:`2 \\times p`.
         :type gammas_ts: float, array
+
+        :param grad: Placeholder gradient variable for the NLOpt library, unused.
+        :type grad: None
         """
         gammas, ts = np.split(gammas_ts, 2)
         self.evolve_state(gammas, ts)
         expectation = self.expectation()
         return (self.max_quality - expectation)/np.float64(self.max_quality)
 
-    def execute(self, gammas_ts, **kwargs):
+    def execute(self, gammas_ts):
         """
         Execute the QWAO algorithm.
 
         :param gammas_ts: Starting angles, an array of size :math:`2 \\times p`.
         :type gammas_ts: float, array
-
-        :param args: Extra arguments to pass to the SciPy minimise function.
-        :type args: tuple, optional
         """
+
         self.gammas_ts = gammas_ts
-        self.result = minimize(self.objective, gammas_ts, bounds = Bounds(-np.pi, np.pi), **kwargs)
+
+        self.result = basinhopping(
+                self.objective,
+                gammas_ts,
+                stepsize = 0.01,
+                niter = 100,
+                seed = self.size,
+                minimizer_kwargs = {'method':'Nelder-Mead'})
 
     def save(self, file_name, config_name, action = "a"):
 
@@ -231,9 +241,7 @@ class qwao:
 
             Similarly the qualities array, which is saved as an array of double precision
             reals, should have its view set to np.float64.
-
         """
-
         fqwao_mpi.save_dist_complex(
                 file_name,
                 config_name + str("/"),
@@ -274,6 +282,7 @@ class qwao:
                 try:
                     minimize_result.create_dataset(key, data = self.result.get(key))
                 except:
+                    none = None
                     print("No native HDF5 type for " + str(type(self.result.get(key))) + ". Minimization result field " + key + "  not saved.",
                             file = sys.stderr)
             File.create_dataset(config_name + "/initial_phases", data = self.gammas_ts, dtype = np.float64)
