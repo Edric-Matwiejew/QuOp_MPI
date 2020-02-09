@@ -4,165 +4,9 @@ import numpy as np
 from scipy.optimize import basinhopping
 import sys
 import qwao_mpi.fqwao_mpi as fqwao_mpi
+import qwao_mpi.fMPI as fMPI
 
-class qwao:
-    """
-    The :class:`qwao` class provides for the instantiation a QWAO configuration
-    distributed over an MPI communicator and the execution of the QWAO algorithm in parallel.
-    Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library
-    'fqwao_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
-
-    :param n_qubits: The number of qubits, :math:`n`, total distributed system is of size :math:`n^2`.
-    :type n_qubits: integer
-
-    :param MPI_communicator: An MPI communicator provided via MPI4Py.
-    :type MPI_communicator: MPI communicator.
-    """
-
-    def __init__(self, n_qubits, MPI_communicator):
-
-        self.n_qubits = n_qubits
-        self.size = 2**n_qubits
-        self.comm = MPI_communicator
-
-        # When performing a parallel 1D-FFT using FFTW it may be the case that
-        # the transformed array is distributed on the MPI communicator differently
-        # from the input. fqwao.mpi_local_size determines the size needed at each
-        # MPI node to accomodate for this. Along with the number of actual array
-        # elements stored at each node and their offset relative to the 0-index
-        # of the distributed array.
-
-        local_sizes = fqwao_mpi.mpi_local_size(self.size, self.comm.py2f())
-
-        self.alloc_local = local_sizes[0]
-        self.local_i = local_sizes[1]
-        self.local_i_offset = local_sizes[2]
-        self.local_o = local_sizes[3]
-        self.local_o_offset = local_sizes[4]
-
-        self.final_state = np.empty(self.alloc_local, np.complex128)
-
-        self.dummy_gammas = np.empty(1, dtype = np.float64)
-        self.dummy_ts = np.empty(1, dtype = np.float64)
-        self.dummy_qualities = np.empty(1, dtype = np.float64)
-        self.dummy_lambdas = np.empty(1, dtype = np.float64)
-
-    def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
-        """
-        Sets the initial state used in the QWAO algorithm. 
-        """
-
-        if name == "equal":
-            self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
-        elif name == "localized":
-            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
-            if self.comm.Get_rank() == 0:
-                self.initial_state[0] = 1.0
-        elif name == "split":
-            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
-            if self.comm.Get_rank() == 0:
-                self.initial_state[0:2] = 1.0/np.sqrt(2.0)
-        elif vertices is not None:
-            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
-            total_verticies = comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
-            for vertex in vertices:
-                self.initial_state[vertex] = 1.0/np.sqrt(total_verticies)
-        elif state is not None:
-            self.initial_state[:] = np.array(state, np.complex128)
-            if not normalized:
-                nomalization = comm.allreduce(np.sum(np.multiply(np.conjugate(state), state)), op = MPI.SUM)
-                self.initial_state = self.initial_state/np.sqrt(normalized)
-
-    def set_qualities(self, func, *args, **kwargs):
-
-        """
-        Sets the qualities in the QWAO algorithm. As the array of qualities is
-        equal to the size of the QWAO state, ideally the qualities should be
-        generated in parallel. As such :meth:`~qwao.qualities` accepts a function
-        whose first three arguments are the size of the distributed qwao state,
-        the number of locally stored stored input elements and the offset of these
-        elements relative to the 0-index of the distributed array. Example quality
-        functions are included in :mod:`~qwao_mpi.qualities`.
-
-        :param func: Function with which to generate the local qualities.
-        :method type: callable
-
-        :param args: Extra arguments to pass to the quality function.
-        :type args: array, optional
-        """
-        self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
-        self.max_quality = self.comm.allreduce(np.max(self.qualities), op = MPI.MAX)
-
-    def graph(self, graph_array):
-        """
-        Given a 1D array representing the first row of a circulant matrix,
-        this returns a 1D array of matrix eigenvalues corresponding to a
-        a row-wise partitioning of that matrix over the active MPI communicator.
-
-        :param graph_array: The first row of a circulant matrix.
-        :type graph_array: float, array
-        """
-
-        self.graph_array = graph_array
-        self.lambdas = np.zeros(self.local_o, np.complex)
-
-        for i in range(self.local_o_offset, self.local_o_offset + self.local_o):
-            for j in range(len(graph_array)):
-                self.lambdas[i - self.local_o_offset] = self.lambdas[i - self.local_o_offset] \
-                        + np.exp((2.0j*np.pi*i)/float(len(graph_array)))**(j)*graph_array[j]
-
-    def plan(self):
-        """
-        Calls FFTW subroutines which set up the ancillary data structures needed to
-        efficiently perform 1D parallel Fourier and inverse Fourier transforms.
-        """
-        fqwao_mpi.qwao_state(
-                self.size,
-                self.dummy_gammas,
-                self.dummy_ts,
-                self.dummy_qualities,
-                self.dummy_lambdas,
-                self.initial_state,
-                self.final_state,
-                self.comm.py2f(),
-                1)
-
-
-    def evolve_state(self, gammas, ts):
-        """
-        Evolves the qwao.initial_state to the qwao.final_state.
-
-        :param gammas: Quality-proportional phase shifts.
-        :type gammas: float, array
-
-        :param ts: Continous-time quantum walk times.
-        :type ts: float, array
-        """
-        fqwao_mpi.qwao_state(
-                self.size,
-                gammas,
-                ts,
-                self.qualities,
-                self.lambdas,
-                self.initial_state,
-                self.final_state,
-                self.comm.py2f(),
-                0)
-
-    def destroy_plan(self):
-        """
-        Deallocates/frees ancillary arrays and pointers needed by FFTW.
-        """
-        fqwao_mpi.qwao_state(
-                self.size,
-                self.dummy_gammas,
-                self.dummy_ts,
-                self.dummy_qualities,
-                self.dummy_lambdas,
-                self.initial_state,
-                self.final_state,
-                self.comm.py2f(),
-                -1)
+class system(object):
 
     def expectation(self):
         """
@@ -206,6 +50,54 @@ class qwao:
                 niter = 100,
                 seed = self.size,
                 minimizer_kwargs = {'method':'Nelder-Mead'})
+
+    def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
+        """
+        Sets the initial state used in the QWAO algorithm.
+        """
+
+        if name == "equal":
+            self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+        elif name == "localized":
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            if self.comm.Get_rank() == 0:
+                self.initial_state[0] = 1.0
+        elif name == "split":
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            if self.comm.Get_rank() == 0:
+                self.initial_state[0:2] = 1.0/np.sqrt(2.0)
+        elif vertices is not None:
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            total_verticies = comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
+            for vertex in vertices:
+                self.initial_state[vertex] = 1.0/np.sqrt(total_verticies)
+        elif state is not None:
+            self.initial_state[:] = np.array(state, np.complex128)
+            if not normalized:
+                nomalization = comm.allreduce(np.sum(np.multiply(np.conjugate(state), state)), op = MPI.SUM)
+                self.initial_state = self.initial_state/np.sqrt(normalized)
+
+    def set_qualities(self, func, *args, **kwargs):
+
+        """
+        Sets the qualities in the QWAO algorithm. As the array of qualities is
+        equal to the size of the QWAO state, ideally the qualities should be
+        generated in parallel. As such :meth:`~qwao.qualities` accepts a function
+        whose first three arguments are the size of the distributed qwao state,
+        the number of locally stored stored input elements and the offset of these
+        elements relative to the 0-index of the distributed array. Example quality
+        functions are included in :mod:`~qwao_mpi.qualities`.
+
+        :param func: Function with which to generate the local qualities.
+        :method type: callable
+
+        :param args: Extra arguments to pass to the quality function.
+        :type args: array, optional
+        """
+        self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
+        self.max_quality = self.comm.allreduce(np.max(self.qualities), op = MPI.MAX)
+
+
 
     def save(self, file_name, config_name, action = "a"):
 
@@ -313,3 +205,229 @@ class qwao:
             File.create_dataset(config_name + "/initial_phases", data = self.gammas_ts, dtype = np.float64)
             File.create_dataset(config_name + "/graph_array", data = self.graph_array, dtype = np.float64)
             File.close()
+
+
+class qaoa(system):
+
+    def __init__(self, Hc, comm):
+
+        self.size = Hc.shape[0]
+        self.n_qubits = np.log(self.size)/np.log(2.0)
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.precision = "dp"
+
+        self.partition_table = self.generate_partition_table(self.size, self.comm)
+
+        self.local_i = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
+        self.local_i_offset = self.partition_table[self.rank] - 1
+
+        self.Hc_row_starts, self.Hc_col_indexes, self.Hc_values = self.csr_local_slice(
+                Hc,
+                self.partition_table,
+                self.comm)
+
+        self.Hc_num_rec_inds, self.Hc_rec_disps, self.Hc_num_send_inds, self.Hc_send_disps = fMPI.rec_a(
+                   self.size,
+                   self.Hc_row_starts,
+                   self.Hc_col_indexes,
+                   self.partition_table,
+                   self.comm.py2f())
+
+        self.Hc_local_col_inds, self.Hc_rhs_send_inds = fMPI.rec_b(
+                self.size,
+                np.sum(self.Hc_num_send_inds),
+                self.Hc_row_starts,
+                self.Hc_col_indexes,
+                self.Hc_num_rec_inds,
+                self.Hc_rec_disps,
+                self.Hc_num_send_inds,
+                self.Hc_send_disps,
+                self.partition_table,
+                self.comm.py2f())
+
+        self.one_norms, self.p = fMPI.one_norm_series(
+                self.size,
+                self.Hc_row_starts,
+                self.Hc_col_indexes,
+                -I * self.Hc_values,
+                self.Hc_num_rec_inds,
+                self.Hc_rec_disps,
+                self.Hc_num_send_inds,
+                self.Hc_send_disps,
+                self.Hc_local_col_inds,
+                self.Hc_rhs_send_inds,
+                self.partition_table,
+                self.comm.py2f())
+
+    def generate_partition_table(self, N, MPI_communicator):
+
+        flock = MPI_communicator.Get_size()
+
+        partition_table = np.zeros(flock + 1, dtype = np.int32)
+        for i in range(flock + 1):
+            partition_table[i] = i * N / flock + 1
+
+        remainder = N - partition_table[flock]
+
+        for i in range(remainder):
+            partition_table[flock - i % flock : flock + 1] += 1
+
+        return partition_table
+
+    def csr_local_slice(self, Hc, partition_table, MPI_communicator):
+
+        rank = MPI_communicator.Get_rank()
+
+        lb = partition_table[rank] - 1
+        ub = partition_table[rank + 1] - 1
+
+        Hc_row_starts = Hc.indptr[lb:ub + 1]
+        Hc_col_indexes = Hc.indices[Hc_row_starts[0]:Hc_row_starts[-1]] + 1
+        Hc_values = Hc.data[Hc_row_starts[0]:Hc_row_starts[-1]]
+        Hc_row_starts += 1
+
+        return Hc_row_starts, Hc_col_indexes, Hc_values
+
+    def evolve_state(self, gammas, ts):
+
+        self.final_state = self.initial_state
+
+        for gamma, t in zip(gammas, ts):
+
+            self.final_state = np.multiply(np.exp(-I * gamma * self.qualities), self.final_state)
+
+            self.final_state = fMPI.step(
+                    self.size,
+                    self.local_i,
+                    self.Hc_row_starts,
+                    self.Hc_col_indexes,
+                    -I * t * self.Hc_values,
+                    self.Hc_num_rec_inds,
+                    self.Hc_rec_disps,
+                    self.Hc_num_send_inds,
+                    self.Hc_send_disps,
+                    self.Hc_local_col_inds,
+                    self.Hc_rhs_send_inds,
+                    t,
+                    self.final_state,
+                    self.partition_table,
+                    self.p,
+                    self.one_norms,
+                    self.comm.py2f(),
+                    self.precision)
+
+
+class qwao(system):
+    """
+    The :class:`qwao` class provides for the instantiation a QWAO configuration
+    distributed over an MPI communicator and the execution of the QWAO algorithm in parallel.
+    Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library
+    'fqwao_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
+
+    :param n_qubits: The number of qubits, :math:`n`, total distributed system is of size :math:`n^2`.
+    :type n_qubits: integer
+
+    :param MPI_communicator: An MPI communicator provided via MPI4Py.
+    :type MPI_communicator: MPI communicator.
+    """
+
+    def __init__(self, n_qubits, MPI_communicator):
+
+        self.n_qubits = n_qubits
+        self.size = 2**n_qubits
+        self.comm = MPI_communicator
+
+        # When performing a parallel 1D-FFT using FFTW it may be the case that
+        # the transformed array is distributed on the MPI communicator differently
+        # from the input. fqwao.mpi_local_size determines the size needed at each
+        # MPI node to accomodate for this. Along with the number of actual array
+        # elements stored at each node and their offset relative to the 0-index
+        # of the distributed array.
+
+        local_sizes = fqwao_mpi.mpi_local_size(self.size, self.comm.py2f())
+
+        self.alloc_local = local_sizes[0]
+        self.local_i = local_sizes[1]
+        self.local_i_offset = local_sizes[2]
+        self.local_o = local_sizes[3]
+        self.local_o_offset = local_sizes[4]
+
+        self.final_state = np.empty(self.alloc_local, np.complex128)
+
+        self.dummy_gammas = np.empty(1, dtype = np.float64)
+        self.dummy_ts = np.empty(1, dtype = np.float64)
+        self.dummy_qualities = np.empty(1, dtype = np.float64)
+        self.dummy_lambdas = np.empty(1, dtype = np.float64)
+
+    def graph(self, graph_array):
+        """
+        Given a 1D array representing the first row of a circulant matrix,
+        this returns a 1D array of matrix eigenvalues corresponding to a
+        a row-wise partitioning of that matrix over the active MPI communicator.
+
+        :param graph_array: The first row of a circulant matrix.
+        :type graph_array: float, array
+        """
+
+        self.graph_array = graph_array
+        self.lambdas = np.zeros(self.local_o, np.complex)
+
+        for i in range(self.local_o_offset, self.local_o_offset + self.local_o):
+            for j in range(len(graph_array)):
+                self.lambdas[i - self.local_o_offset] = self.lambdas[i - self.local_o_offset] \
+                        + np.exp((2.0j*np.pi*i)/float(len(graph_array)))**(j)*graph_array[j]
+
+    def plan(self):
+        """
+        Calls FFTW subroutines which set up the ancillary data structures needed to
+        efficiently perform 1D parallel Fourier and inverse Fourier transforms.
+        """
+        fqwao_mpi.qwao_state(
+                self.size,
+                self.dummy_gammas,
+                self.dummy_ts,
+                self.dummy_qualities,
+                self.dummy_lambdas,
+                self.initial_state,
+                self.final_state,
+                self.comm.py2f(),
+                1)
+
+
+    def evolve_state(self, gammas, ts):
+        """
+        Evolves the qwao.initial_state to the qwao.final_state.
+
+        :param gammas: Quality-proportional phase shifts.
+        :type gammas: float, array
+
+        :param ts: Continous-time quantum walk times.
+        :type ts: float, array
+        """
+        fqwao_mpi.qwao_state(
+                self.size,
+                gammas,
+                ts,
+                self.qualities,
+                self.lambdas,
+                self.initial_state,
+                self.final_state,
+                self.comm.py2f(),
+                0)
+
+    def destroy_plan(self):
+        """
+        Deallocates/frees ancillary arrays and pointers needed by FFTW.
+        """
+        fqwao_mpi.qwao_state(
+                self.size,
+                self.dummy_gammas,
+                self.dummy_ts,
+                self.dummy_qualities,
+                self.dummy_lambdas,
+                self.initial_state,
+                self.final_state,
+                self.comm.py2f(),
+                -1)
+
