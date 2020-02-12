@@ -21,7 +21,7 @@ project = 'QWAO_MPI'
 copyright = '2020, Edric Matwiejew, Sam Marsh'
 author = 'Edric Matwiejew, Sam Marsh'
 
-autodoc_mock_imports = ["mpi4py", "qwao_mpi.fqwao_mpi"]
+autodoc_mock_imports = ["mpi4py", "qwao_mpi.fqwao_mpi", "qwao_mpi.fMPI"]
 
 # The full version, including alpha/beta/rc tags
 release = 'alpha'
