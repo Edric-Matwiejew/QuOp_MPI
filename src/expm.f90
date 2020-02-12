@@ -275,7 +275,6 @@ module Expm
         allocate(c_array(size(ms_and_ps, 1)))
 
         do i = 1, size(ms_and_ps, 1)
-
             c_array(i) = ms_and_ps(i, 1)*ceiling(alpha_array(ms_and_ps(i,2)) &
                         /theta(ms_and_ps(i,1)), kind=qp)
 
@@ -349,6 +348,7 @@ module Expm
             (2*1*(theta(m_max)/real(m_max,dp))*(p_max + 3)*p_max)) then
 
             m_temp_1 = ceiling(real(t,qp)*real(A_norm,qp)/theta(1), kind = qp)
+            m_star = m_temp_1
 
             do m = 2, m_max
 
@@ -509,6 +509,7 @@ module Expm
         C(lb:ub) = B(lb:ub)
 
         start = MPI_wtime()
+
         do i = 1, s
 
             norm_start = MPI_wtime()

@@ -323,8 +323,6 @@ subroutine step(M_rows, &
         integer :: lb, ub
         integer :: lb_elements, ub_elements
 
-        real(8) :: start, finish
-
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
         lb = partition_table(rank + 1)
@@ -346,8 +344,6 @@ subroutine step(M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
         M%RHS_send_inds(1:size(M_RHS_send_inds)) => M_RHS_send_inds
 
-        start = MPI_wtime()
-
         call Expm_Multiply( M, &
                             rho0_v, &
                             t, &
@@ -357,6 +353,5 @@ subroutine step(M_rows, &
                             one_norm_series = one_norm_array, &
                             p = p, &
                             target_precision = target_precision)
-        finish = MPI_wtime()
 
 end subroutine step
