@@ -12,16 +12,31 @@ endif
 
 EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
 
-LIB = -L/usr/
-INCLUDE = -I/usr/
+LIB = -L/usr/lib
+INCLUDE = -I/usr/include
 
+OBJDIR := obj
 PYDIR := ../qwao_mpi
+
+$(shell mkdir -p $(OBJDIR))
+
+$(OBJDIR)/%.o: %.f90
+	$(FC) $(FCFLAGS) -I$(OBJDIR) -J$(OBJDIR) -c $< -o $@ -fPIC
 
 %.o: %.mod
 
-$(PYDIR)/fqwao_mpi$(EXT_SUFFIX): fqwao_mpi.f90
+$(PYDIR)/fqwao_mpi$(EXT_SUFFIX): fqwao_mpi.f90 $(PYDIR)/fMPI$(EXT_SUFFIX)
 	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="$(FCFLAGS)" -c $(LIB) -lhdf5_fortran -lfftw3 -lfftw3_mpi $(INCLUDE) -m fqwao_mpi fqwao_mpi.f90
 	mv fqwao_mpi$(EXT_SUFFIX) $(PYDIR)
 
+$(PYDIR)/fMPI$(EXT_SUFFIX):  $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o one_norms.o expm.o) $(PYDIR)/fMPI$(EXT_SUFFIX) fMPI.f90
+	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -c fMPI.pyf iso_precisions.f90 sparse.f90 one_norms.f90 expm.f90 -m fMPI fMPI.f90
+	mv fMPI$(EXT_SUFFIX) $(PYDIR)
+
+$(OBJDIR)/expm.o: $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o one_norms.o) expm.f90
+$(OBJDIR)/one_norms.o: $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o) one_norms.f90
+$(OBJDIR)/sparse.o: $(addprefix $(OBJDIR)/, iso_precisions.o) sparse.f90
+$(OBJDIR)/iso_precisions.o: iso_precisions.f90
+
 clean:
-	rm $(PYDIR)/*.so
+	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
