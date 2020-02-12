@@ -16,14 +16,16 @@ endif
 ifeq ($(DEBUG),TRUE)
 	FCFLAGS = -O0 -g -fcheck=array-temps,bounds,do,mem,pointer,recursion -Wall -Wextra -Wconversion -pedantic
 else
-	#FCFLAGS = -O3 -ffast-math -funroll-loops -mtune=native
-	FCFLAGS = -O0 -g -fcheck=array-temps,bounds,do,mem,pointer,recursion -Wall -Wextra -Wconversion -pedantic
+	FCFLAGS = -O3 -ffast-math -funroll-loops -mtune=native
 endif
 
 EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
 
+LIB = -L/usr/local/lib/ -L/home/edric/parallel-hdf5/lib/
+INCLUDE = -I/usr/local/include/ -I/home/edric/parallel-hdf5/include/
+
 OBJDIR := obj
-PYDIR := ../
+PYDIR := ../qwao_mpi
 
 $(shell mkdir -p $(OBJDIR))
 
@@ -32,25 +34,18 @@ $(OBJDIR)/%.o: %.f90
 
 %.o: %.mod
 
-# fMPI f2py shared object library.
+$(PYDIR)/fqwao_mpi$(EXT_SUFFIX): fqwao_mpi.f90 $(PYDIR)/fMPI$(EXT_SUFFIX)
+	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="$(FCFLAGS)" -c $(LIB) -lhdf5_fortran -lfftw3 -lfftw3_mpi $(INCLUDE) -m fqwao_mpi fqwao_mpi.f90
+	mv fqwao_mpi$(EXT_SUFFIX) $(PYDIR)
+
 $(PYDIR)/fMPI$(EXT_SUFFIX):  $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o one_norms.o expm.o) $(PYDIR)/fMPI$(EXT_SUFFIX) fMPI.f90
 	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -c fMPI.pyf iso_precisions.f90 sparse.f90 one_norms.f90 expm.f90 -m fMPI fMPI.f90
 	mv fMPI$(EXT_SUFFIX) $(PYDIR)
 
-# Compile fortran subroutines.
 $(OBJDIR)/expm.o: $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o one_norms.o) expm.f90
 $(OBJDIR)/one_norms.o: $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o) one_norms.f90
 $(OBJDIR)/sparse.o: $(addprefix $(OBJDIR)/, iso_precisions.o) sparse.f90
 $(OBJDIR)/iso_precisions.o: iso_precisions.f90
 
-####
-
 clean:
-	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod
-
-veryclean:
 	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
-
-#python3 -m numpy.f2py --f90exec="mpifort" --f90flags="-Iobj/" -c fMPI.pyf iso_precisions.f90 sparse.f90 one_norms.f90 expm.f90 -m fMPI fMPI.f90
-#python3 -m numpy.f2py fMPI.f90 -m fMPI -h fMPI.pyf
-
