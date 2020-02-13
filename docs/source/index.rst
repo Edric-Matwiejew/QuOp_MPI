@@ -1,4 +1,4 @@
-Welcome to QWAO_MPI's documentation!
+Welcome to QuOp_MPI's documentation!
 ====================================
 
 .. toctree::
@@ -6,8 +6,8 @@ Welcome to QWAO_MPI's documentation!
    :caption: Contents:
 
    Readme <readme_link>
-   usage_example
-   qwao_mpi
    Containerisation <container_link>
+   usage_example
+   quop_mpi
 
 * :ref:`genindex`

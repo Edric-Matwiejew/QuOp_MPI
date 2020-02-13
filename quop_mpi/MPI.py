@@ -4,8 +4,8 @@ import numpy as np
 from scipy.optimize import basinhopping, Bounds
 import sys
 import os
-import qwao_mpi.fqwao_mpi as fqwao_mpi
-import qwao_mpi.fMPI as fMPI
+import quop_mpi.fqwao_mpi as fqwao_mpi
+import quop_mpi.fMPI as fMPI
 
 I = np.complex(0,1)
 

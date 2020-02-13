@@ -17,11 +17,11 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'QWAO_MPI'
+project = 'QuOp_MPI'
 copyright = '2020, Edric Matwiejew, Sam Marsh'
 author = 'Edric Matwiejew, Sam Marsh'
 
-autodoc_mock_imports = ["mpi4py", "qwao_mpi.fqwao_mpi", "qwao_mpi.fMPI"]
+autodoc_mock_imports = ["mpi4py", "quop_mpi.fqwao_mpi", "quop_mpi.fMPI"]
 
 # The full version, including alpha/beta/rc tags
 release = 'alpha'
