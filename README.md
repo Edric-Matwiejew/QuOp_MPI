@@ -1,8 +1,9 @@
 # qwao_mpi
-Python 3 module for parallel distributed memory simulation of the QWAO (Quantum Walk Assisted Optimization) algorithm on circulant mixing graphs. See https://arxiv.org/abs/1912.07353 for the theoretical background.
+Python 3 module for parallel distributed memory simulation of QWAO (Quantum Walk Assisted Optimization algorithm) and QAOA (Quantum Approximate Optimization Algorithm) on circulant and arbitrary mixing graphs. See https://arxiv.org/abs/1912.07353 for the theoretical background.
 
 ## Build Requirements
 
++ An MPI implementation compiled with the --enabled-shared options.
 + FFTW compiled with the --enable-fortran, --enable-mpi and --enable-shared options.
 + HDF5 compiled with the --enable-fortran, --enable-parallel, and --enable-shared options.
 
@@ -15,6 +16,7 @@ src/Makefile assumes that the include and lib directories contaning the FTW and 
 + h5py
 
 ## Installation on Unix-Like Systems
+
     cd qwao_mpi/src
     make
     cd ../
