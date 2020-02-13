@@ -8,10 +8,10 @@ import subprocess
 from setuptools import find_packages, setup, Command
 
 # Package meta-data.
-NAME = 'qwao_mpi'
-DESCRIPTION = 'A framework for simulation of the QWAO algorithm.'
-URL = 'https://github.com/Edric-Matwiejew/qwao_mpi'
-EMAIL = '21469154@student.uwa.edu.au'
+NAME = 'quop_mpi'
+DESCRIPTION = 'A framework for simulation of the QAOA algorithms.'
+URL = 'https://github.com/Edric-Matwiejew/QuOp_MPI'
+EMAIL = 'Edric.Matwiejew@research.uwa.au'
 AUTHOR = 'Edric Matwiejew'
 REQUIRES_PYTHON = '>=3.6.0'
 VERSION = '0.0.1'
@@ -45,7 +45,7 @@ setup(
         url = URL,
         packages = find_packages(),
         package_data = {
-            'qwao_mpi': ['*' + EXTENSION],
+            'quop_mpi': ['*' + EXTENSION],
             },
         install_requires = REQUIRED,
         extras_require = EXTRAS,
