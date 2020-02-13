@@ -6,7 +6,6 @@ dist
 *.h5
 __pycache__
 *.swp
-updated
 experiments
 src/obj
 *.sif

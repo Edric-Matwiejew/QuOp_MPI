@@ -70,7 +70,7 @@ class system(object):
         local_expectation = np.dot(self.probabilities, self.qualities)
         return self.comm.allreduce(local_expectation, op = MPI.SUM)
 
-    def objective(self, gammas_ts):
+    def objective(self, gammas_ts, stop):
         """
         Objection funtion to minimise as part of the QWAO algorithm.
 
@@ -79,13 +79,14 @@ class system(object):
 
         """
 
-        # Ensure all ranks are working with the same initial gammas_ts.
-        gammas_ts = self.comm.bcast(gammas_ts, root = 0)
+        self.stop = self.comm.bcast(stop, root = 0)
 
-        gammas, ts = np.split(gammas_ts, 2)
-        self.evolve_state(gammas, ts)
-        expectation = self.expectation()
-        return (np.abs(self.max_quality) - expectation)/np.abs(self.max_quality)
+        if not self.stop:
+            self.gammas_ts = self.comm.bcast(gammas_ts, root = 0)
+            gammas, ts = np.split(self.gammas_ts, 2)
+            self.evolve_state(gammas, ts)
+            expectation = self.expectation()
+            return (np.abs(self.max_quality) - expectation)/np.abs(self.max_quality)
 
     def execute(self, gammas_ts, seed = 0):
         """
@@ -99,18 +100,28 @@ class system(object):
 
         bounds = Bounds(0, np.inf)
 
-        self.result = basinhopping(
-                self.objective,
-                gammas_ts,
-                stepsize = 0.1,
-                niter = 100,
-                seed = seed,
-                minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds})
-
+        self.stop = False
+        if self.comm.Get_rank() == 0:
+            self.result = basinhopping(
+                    self.objective,
+                    gammas_ts,
+                    stepsize = 0.1,
+                    niter = 100,
+                    seed = 1,
+                    minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds,'args':(self.stop,)})
+            self.stop = True
+            self.objective(gammas_ts, self.stop)
+        else:
+            while not self.stop:
+                self.objective(gammas_ts,self.stop)
 
         if self.log:
             self.state_success(self.quality_cutoff, self.success_target)
             self.log_update()
+
+    def print_result(self):
+        if self.comm.Get_rank() == 0:
+            print(self.result)
 
     def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
         """
@@ -156,6 +167,7 @@ class system(object):
         :type args: array, optional
         """
         self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
+
         if sign == "negative":
             self.max_quality = self.comm.allreduce(np.min(self.qualities), op = MPI.MIN)
         else:

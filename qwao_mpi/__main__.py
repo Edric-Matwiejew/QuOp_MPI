@@ -6,7 +6,7 @@ import qwao_mpi as qw
 comm = MPI.COMM_WORLD
 
 p = 3
-n_qubits = 2
+n_qubits = 7
 
 np.random.seed(2)
 
@@ -15,26 +15,20 @@ def x0(p):
 
 qwao = qw.MPI.qwao(n_qubits, comm)
 qwao.log_success("log", "qwao", action = "w")
-qwao.set_graph(qw.graph_array.circle(qwao.size))
+qwao.set_graph(qw.graph_array.complete(qwao.size))
 qwao.set_initial_state(name="equal")
 qwao.set_qualities(qw.qualities.random_floats)
 qwao.plan()
 qwao.execute(x0(p))
 qwao.save("qwao", "example_config", action = "w")
 qwao.destroy_plan()
-
-if comm.Get_rank() == 0:
-    print(qwao.result)
+qwao.print_result()
 
 hyper_cube = nx.to_scipy_sparse_matrix(nx.hypercube_graph(n_qubits))
-
 qaoa = qw.MPI.qaoa(hyper_cube,comm)
 qaoa.log_success("log", "qaoa", action = "a")
 qaoa.set_initial_state(name = "equal")
 qaoa.set_qualities(qw.qualities.random_floats)
 qaoa.execute(x0(p))
 qaoa.save("qaoa", "example_config", action = "w")
-
-if comm.Get_rank() == 0:
-    print(qaoa.result)
-
+qaoa.print_result()
