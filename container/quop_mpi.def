@@ -40,13 +40,13 @@ From: pawsey/mpi-base:3.1.4
     scipy \
     pandas \
 
-    git clone https://github.com/Edric-Matwiejew/qwao_mpi
-    cd qwao_mpi/src
+    git clone https://github.com/Edric-Matwiejew/quop_mpi
+    cd quop_mpi/src
     make
     cd ../
     python3 setup.py sdist bdist_wheel
     cd dist
-    pip3 install qwao_mpi*.tar.gz
+    pip3 install quop_mpi*.tar.gz
     cd
 
 %labels
