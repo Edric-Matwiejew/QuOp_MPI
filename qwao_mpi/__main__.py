@@ -5,8 +5,8 @@ import qwao_mpi as qw
 
 comm = MPI.COMM_WORLD
 
-p = 4
-n_qubits = 3
+p = 3
+n_qubits = 2
 
 np.random.seed(2)
 
@@ -16,7 +16,7 @@ def x0(p):
 qwao = qw.MPI.qwao(n_qubits, comm)
 qwao.log_success("log", "qwao", action = "w")
 qwao.set_graph(qw.graph_array.circle(qwao.size))
-qwao.set_initial_state(name="split")
+qwao.set_initial_state(name="equal")
 qwao.set_qualities(qw.qualities.random_floats)
 qwao.plan()
 qwao.execute(x0(p))
