@@ -79,6 +79,9 @@ class system(object):
 
         """
 
+        # Ensure all ranks are working with the same initial gammas_ts.
+        gammas_ts = self.comm.bcast(gammas_ts, root = 0)
+
         gammas, ts = np.split(gammas_ts, 2)
         self.evolve_state(gammas, ts)
         expectation = self.expectation()
@@ -103,6 +106,7 @@ class system(object):
                 niter = 100,
                 seed = seed,
                 minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds})
+
 
         if self.log:
             self.state_success(self.quality_cutoff, self.success_target)
