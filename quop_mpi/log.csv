@@ -1,3 +1,0 @@
-label,qubits,p,quality_cutoff,success_probability,success,quality_cutoff,objective_function,state_norm
-qwao,7,3,0.9,0.6973532159132863,True,0.9,0.08649286567524511,1.0000000000002505
-qaoa,7,3,0.9,0.24369046318800164,False,0.9,0.29829012242694186,0.9999999999999998
