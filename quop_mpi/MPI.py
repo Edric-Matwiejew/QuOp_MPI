@@ -4,8 +4,9 @@ import numpy as np
 from scipy.optimize import basinhopping, Bounds
 import sys
 import os
-import quop_mpi.fqwao_mpi as fqwao_mpi
+import quop_mpi.fqwoa_mpi as fqwoa_mpi
 import quop_mpi.fMPI as fMPI
+from time import time
 
 I = np.complex(0,1)
 
@@ -39,32 +40,42 @@ class system(object):
 
     self.qualities must be defined by local_i, local_i_offset and be of size local_i.
 
-    QWAO_MPI contains two :class:`system` subclasses: :class:`qaoa` and :class:`qwao`.
+    QWAO_MPI contains two :class:`system` subclasses: :class:`qaoa` and :class:`qwoa`.
     """
     def __init__(self):
 
-        # set variables used by state_success.
+        # set default variables used by state_success.
         self.quality_cutoff = 0.9
         self.success_target = 2.0/3.0
 
     def get_probabilities(self):
         """
-        Calculate the probability distributed of the current self.final_state.
+        Calculate :math:`\langle s_i|\\vec{\gamma}, \\vec{t} \\rangle`.
+
+        :return: Probability vector corresponding the the local `self.final_state` partition.
+        :rtype: array, float
         """
         self.probabilities = np.abs(self.final_state[:self.local_i])**2
         return self.probabilities
 
     def get_state_norm(self):
         """
-        Calculate the norm of the current self.final_state. The value is returned
-        to each MPI rank and can be used to check for state validity.
+        Calculate :math:`\langle \\vec{\gamma}, \\vec{t}|\\vec{\gamma}, \\vec{t} \\rangle`.
+        The result is returned to each MPI rank and and should be equal to 1 within the limits of
+        machine double precision. This is used to check for state validity.
+
+        :return: Norm of the current `self.final_state`.
+        :rtype: float
         """
         self.state_norm = self.comm.allreduce(np.sum(self.probabilities), op = MPI.SUM)
         return self.state_norm
 
     def expectation(self):
         """
-        Returns the expectation of the qwao final state to all MPI processes.
+        Calculate :math:`\langle \\vec{\gamma}, \\vec{t}|Q|\\vec{\gamma}, \\vec{t} \\rangle`
+
+        :return: The expectation value of the quality matrix operator, returned to all MPI nodes.
+        :rtype: float
         """
         self.get_probabilities()
         local_expectation = np.dot(self.probabilities, self.qualities)
@@ -72,12 +83,17 @@ class system(object):
 
     def objective(self, gammas_ts, stop):
         """
-        Objection funtion to minimise as part of the QWAO algorithm.
+        :math:`f(\\vec{\gamma}, \\vec{t}) = \\frac{q_{max} - \langle \\vec{\gamma}, \\v{t}|Q|\\vec{\gamma}, \\vec{t}}{q_{max}}` \
+        - the function minimised by the calssical optimizer.
 
-        :param gammas_ts: Starting angles, an array of size :math:`2 \\times p`.
+
+        :param gammas_ts: An array of length :math:`2 p`, :math:`(\\vec{\gamma},\\vec{t})`.
         :type gammas_ts: float, array
 
         """
+
+        # Durring optimization the root processes controls parallel evalution
+        # through passing of the self.stop parameter.
 
         self.stop = self.comm.bcast(stop, root = 0)
 
@@ -92,9 +108,10 @@ class system(object):
         """
         Execute the QWAO algorithm.
 
-        :param gammas_ts: Starting angles, an array of size :math:`2 \\times p`.
+        :param gammas_ts: An array of length :math:`2 p`, :math:`(\\vec{\gamma},\\vec{t})`.
         :type gammas_ts: float, array
         """
+        self.time = time()
         self.gammas_ts = gammas_ts
         self.p = len(gammas_ts)//2
 
@@ -115,19 +132,43 @@ class system(object):
             while not self.stop:
                 self.objective(gammas_ts,self.stop)
 
+        self.time = time() - self.time
+
         if self.log:
             self.state_success(self.quality_cutoff, self.success_target)
             self.log_update()
 
     def print_result(self):
+        """
+        Print the optimization result to screen.
+        """
         if self.comm.Get_rank() == 0:
             print(self.result)
 
     def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
         """
-        Sets the initial state used in the QWAO algorithm.
-        """
+        Set :math:`|s\\rangle. This can be done in several mutually exclusive ways:`
 
+        * `name` keyword.
+            * 'equal' - an equal superposition accross all :math:`|s_i\\rangle`.
+            * 'localized' - :math:`|s_1\\rangle = 1`.
+            * 'split' - :math:`|s_1\\rangle = \\frac{1}{2} and |s_2\\rangle = \\frac{1}{2}`.
+        * `vertices` keyword.
+            * Pass an MPI rank specific array of unique :math:`i \in \{\mathbb{Z}^+ | \\text{local_i} \leq i < \\text{local_i + local_i_offset}\}`. :math:`|s\\rangle` will be initialized as an equal superposition across the specified :math:`|s_i\\rangle`.
+        * `state` keyword.
+            * Fully specify :math:`|s\\rangle`. Pass an MPI rank specific array of :math:`x_i \in \{\mathbb{R} | x_i \geq 0, \\text{local_i} \leq i < \\text{local_i + local_i_offset}\}. If keyword `normalized` is True, this state will be normalized.
+
+        :param name: Name of a pre-defined initial state.
+        :type name: str, optional
+
+        :param verticies: Specify an equal superposition over a set of :math:`|s_i\\rangle`.
+        :type verticies: array, integer, optional
+
+        :state: Initialize :math:`|s\\rangle` in a user-defined generalized state.
+        :param: array, float, optional
+
+        :state normalized: If normalized is True and an argument to `state`is specified, normalize the input state.l
+        """
         if name == "equal":
             self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
         elif name == "localized":
@@ -154,11 +195,11 @@ class system(object):
         """
         Sets the qualities in the QWAO algorithm. As the array of qualities is
         equal to the size of the QWAO state, ideally the qualities should be
-        generated in parallel. As such :meth:`~qwao.qualities` accepts a function
-        whose first three arguments are the size of the distributed qwao state,
+        generated in parallel. As such :meth:`~qwoa.qualities` accepts a function
+        whose first three arguments are the size of the distributed qwoa state,
         the number of locally stored stored input elements and the offset of these
         elements relative to the 0-index of the distributed array. Example quality
-        functions are included in :mod:`~qwao_mpi.qualities`.
+        functions are included in :mod:`~qwoa_mpi.qualities`.
 
         :param func: Function with which to generate the local qualities.
         :type func: callable
@@ -256,7 +297,7 @@ class system(object):
         :param verbose: If True, print current :math:`p`, repitition number and optimization results.
         :type verbose: boolean, optional, default = True
 
-        :param filename: Name of .h5 file in which to :meth:`~qwao.system.save` the evolved system.
+        :param filename: Name of .h5 file in which to :meth:`~qwoa.system.save` the evolved system.
         :type filename: string, optional, default = None
 
         :param label: If filename is specified, evolved systems will be saved as 'filename/label_p_repetition'.
@@ -338,7 +379,7 @@ class system(object):
             else:
                 self.logfile = open(filename + ".csv", "w")
                 self.logfile.write(
-                        'label,qubits,p,quality_cutoff,success_probability,success,quality_cutoff,objective_function,state_norm\n')
+                        'label,qubits,p,quality_cutoff,success_probability,success,quality_cutoff,objective_function,state_norm,time\n')
 
     def log_update(self):
         """
@@ -348,7 +389,7 @@ class system(object):
 
         if self.comm.Get_rank() == 0:
 
-            self.logfile.write('{},{},{},{},{},{},{},{},{}\n'.format(
+            self.logfile.write('{},{},{},{},{},{},{},{},{},{}\n'.format(
                 self.label,
                 self.n_qubits,
                 self.p,
@@ -357,7 +398,8 @@ class system(object):
                 self.success,
                 self.quality_cutoff,
                 self.result['fun'],
-                self.state_norm))
+                self.state_norm,
+                self.time))
 
             self.logfile.flush()
 
@@ -456,7 +498,7 @@ class system(object):
 
         self.config_name = self.comm.bcast(self.config_name, root = 0)
 
-        fqwao_mpi.save_dist_complex(
+        fqwoa_mpi.save_dist_complex(
                 file_name,
                 self.config_name + str("/"),
                 "final_state",
@@ -466,7 +508,7 @@ class system(object):
                 self.final_state[:self.local_i],
                 self.comm.py2f())
 
-        fqwao_mpi.save_dist_real(
+        fqwoa_mpi.save_dist_real(
                 file_name,
                 self.config_name + str("/"),
                 "qualities",
@@ -485,9 +527,9 @@ class qaoa(system):
     parallel. Evolution of the QAOA system involves high-precision approximation
     of the action of the time-evolution operator on the QAOA state vector. This allows
     for use of arbitrary mixing operators, :math:`H_c`, but is less effcient than
-    :class:`qwao` which makes use of a fast Fourier transfrom instead. If the user
+    :class:`qwoa` which makes use of a fast Fourier transfrom instead. If the user
     wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing
-    operator use of the :class:`qwao` class is recommend.
+    operator use of the :class:`qwoa` class is recommend.
 
     :param Hc: Arbitrary :math:`N \\times N` mixing operator, :math:`H_c`.
     :type Hc: SciPy sparse CSR matrix
@@ -615,12 +657,12 @@ class qaoa(system):
                     self.comm.py2f(),
                     self.precision)
 
-class qwao(system):
+class qwoa(system):
     """
-    The :class:`qwao` class provides for the instantiation a QWAO configuration
+    The :class:`qwoa` class provides for the instantiation a QWAO configuration
     distributed over an MPI communicator and the execution of the QWAO algorithm in parallel.
-    Evolution of the :class:`qwao` state occurs via calls to the compiled Fortran library
-    'fqwao_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
+    Evolution of the :class:`qwoa` state occurs via calls to the compiled Fortran library
+    'fqwoa_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
 
     :param n_qubits: The number of qubits, :math:`n`, total distributed system is of size :math:`n^2`.
     :type n_qubits: integer
@@ -638,12 +680,12 @@ class qwao(system):
 
         # When performing a parallel 1D-FFT using FFTW it may be the case that
         # the transformed array is distributed on the MPI communicator differently
-        # from the input. fqwao.mpi_local_size determines the size needed at each
+        # from the input. fqwoa.mpi_local_size determines the size needed at each
         # MPI node to accomodate for this. Along with the number of actual array
         # elements stored at each node and their offset relative to the 0-index
         # of the distributed array.
 
-        local_sizes = fqwao_mpi.mpi_local_size(self.size, self.comm.py2f())
+        local_sizes = fqwoa_mpi.mpi_local_size(self.size, self.comm.py2f())
 
         self.alloc_local = local_sizes[0]
         self.local_i = local_sizes[1]
@@ -681,7 +723,7 @@ class qwao(system):
         Calls FFTW subroutines which set up the ancillary data structures needed to
         efficiently perform 1D parallel Fourier and inverse Fourier transforms.
         """
-        fqwao_mpi.qwao_state(
+        fqwoa_mpi.qwoa_state(
                 self.size,
                 self.dummy_gammas,
                 self.dummy_ts,
@@ -694,7 +736,7 @@ class qwao(system):
 
     def evolve_state(self, gammas, ts):
         """
-        Evolves the qwao.initial_state to the qwao.final_state.
+        Evolves the qwoa.initial_state to the qwoa.final_state.
 
         :param gammas: Quality-proportional phase shifts.
         :type gammas: float, array
@@ -702,7 +744,7 @@ class qwao(system):
         :param ts: Continous-time quantum walk times.
         :type ts: float, array
         """
-        fqwao_mpi.qwao_state(
+        fqwoa_mpi.qwoa_state(
                 self.size,
                 gammas,
                 ts,
@@ -717,7 +759,7 @@ class qwao(system):
         """
         Deallocates/frees ancillary arrays and pointers needed by FFTW.
         """
-        fqwao_mpi.qwao_state(
+        fqwoa_mpi.qwoa_state(
                 self.size,
                 self.dummy_gammas,
                 self.dummy_ts,
@@ -752,7 +794,7 @@ class qwao(system):
                 config_name,
                 action)
 
-        fqwao_mpi.save_dist_complex(
+        fqwoa_mpi.save_dist_complex(
                 file_name,
                 self.config_name + str("/"),
                 "eigenvalues",
