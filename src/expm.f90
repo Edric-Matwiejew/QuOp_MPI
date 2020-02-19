@@ -1,5 +1,5 @@
-!   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
-!   Copyright (C) 2019 Edric Matwiejew
+!   QuOp_MPI - A framework for parallel quantum approximation optimization algorithms.
+!   Copyright (C) 2020 Edric Matwiejew
 !
 !   This program is free software: you can redistribute it and/or modify
 !   it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 !>  @brief Action of the complex matrix exponential on a vector parallalized
 !>  using MPI.
 !
-!>  @deatils This module implements Algorithms 3.2 and 5.2 as described in
+!>  @deatils This module implements Algorithms 3.2  as described in
 !>  "Computing the action of the matrix exponential with an application to
 !>  exponential integrators" by Awad H. Al-Mohy and Nicholas J, Higham,
 !>  DOI: 10.1137/100788860.
@@ -39,7 +39,7 @@ module Expm
 
     private
 
-    public :: Expm_Multiply!, Expm_Multiply_Series
+    public :: Expm_Multiply
 
     integer, parameter :: RHV = 2, m_max = 55, p_max = 8
 
@@ -573,211 +573,5 @@ module Expm
         deallocate(A_temp%values)
 
     end subroutine Expm_Multiply
-
-    !subroutine Expm_Multiply_Series(    A, &
-    !                                    B, &
-    !                                    t0, &
-    !                                    tq, &
-    !                                    steps, &
-    !                                    partition_table, &
-    !                                    X, &
-    !                                    mpi_communicator, &
-    !                                    one_norm_series_in, &
-    !                                    p_ex, &
-    !                                    target_precision)
-
-    !    real(dp), intent(in) :: t0, tq
-    !    type(CSR), intent(inout) :: A
-    !    complex(dp), intent(in), dimension(:) :: B
-    !    integer, intent(in) :: steps
-    !    integer, dimension(:), intent(in) :: partition_table
-    !    complex(dp), dimension(:,:), intent(out) :: X
-    !    integer, intent(in) :: mpi_communicator
-    !    real(dp), dimension(p_max + 1), optional, intent(inout) :: one_norm_series_in
-    !    integer, optional, intent(inout) :: p_ex
-    !    character(len=2), optional, intent(in) :: target_precision
-
-    !    real(dp), dimension(p_max + 1) :: one_norm_series
-    !    integer :: p_in
-
-    !    integer :: q
-
-    !    complex(dp), dimension(:), allocatable :: Z, F
-    !    complex(dp), dimension(:,:), allocatable :: K
-    !    real(dp) :: h
-
-    !    character(len=2) :: set_target_precision
-    !    real(qp) :: tol
-    !    real(qp) :: c_1, c_2
-
-    !    integer :: m_star, s, m_hat
-    !    integer :: d, j, r, d_tilde, p
-
-    !    ! MPI ENVIRONMENT
-    !    integer :: rank
-    !    integer :: ierr
-
-    !    integer :: i, kay, indx, lb, ub
-
-    !    call mpi_comm_rank(MPI_communicator, rank, ierr)
-
-    !    if (present(target_precision)) then
-    !        if (target_precision == "sp") then
-    !            set_target_precision = target_precision
-    !            tol = tol_sp
-    !        elseif (target_precision == "dp") then
-    !            set_target_precision = target_precision
-    !            tol = tol_dp
-    !        endif
-    !    else
-    !        set_target_precision = "dp"
-    !        tol = tol_dp
-    !    endif
-
-    !    lb = partition_table(rank + 1)
-    !    ub = partition_table(rank + 2) - 1
-
-    !    allocate(Z(ub - lb + 1))
-    !    allocate(F(ub - lb + 1))
-
-    !    if (present(one_norm_series_in) .and. present(p_ex)) then
-    !        one_norm_series = one_norm_series_in
-    !        p_in = p_ex
-    !    else
-    !        p_in =0
-    !    endif
-
-    !    call Expm_Multiply( A, &
-    !                        B, &
-    !                        t0, &
-    !                        partition_table, &
-    !                        X(:,1), &
-    !                        mpi_communicator, &
-    !                        one_norm_series = one_norm_series, &
-    !                        p = p_in, &
-    !                        target_precision = set_target_precision)
-
-    !    if (steps == 0) return
-
-    !    q = steps
-    !    h = (tq - t0)/real(q, dp)
-
-    !    call Parameters(A, &
-    !                    tq - t0, &
-    !                    set_target_precision, &
-    !                    partition_table, &
-    !                    m_star, &
-    !                    s, &
-    !                    mpi_communicator, &
-    !                    one_norm_series = one_norm_series, &
-    !                    p = p_in)
-
-    !    if (q <= s) then
-
-    !        do kay = 1, q
-
-    !            call Expm_Multiply( A, &
-    !                                X(:,kay), &
-    !                                h, &
-    !                                partition_table, &
-    !                                X(:,kay + 1), &
-    !                                MPI_communicator, &
-    !                                one_norm_series = one_norm_series, &
-    !                                p = p_in, &
-    !                                target_precision = set_target_precision)
-
-    !        enddo
-
-    !        return
-
-    !    endif
-
-    !    d = floor(real(q)/real(s))
-    !    j = floor(real(q)/real(d))
-    !    r = q - d*j
-    !    d_tilde = d
-
-    !    call C_m(   A, &
-    !                real(d, dp), &
-    !                set_target_precision, &
-    !                partition_table, &
-    !                m_star, &
-    !                s, &
-    !                mpi_communicator, &
-    !                one_norm_series = one_norm_series, &
-    !                p_in = p_in)
-
-    !    Z = X(:, 1)
-
-    !    allocate(K(ub - lb + 1, m_star + 1))
-
-    !    K = 0
-
-    !    do i = 1, j + 1
-
-    !        if (i > j) then
-    !           d_tilde = r
-    !        endif
-
-    !        K(:, 1) = Z
-    !        k(:,2:m_star+1) = 0
-
-    !        m_hat = 0
-
-    !        do kay = 1, d_tilde
-
-    !            F = Z
-
-    !            c_1 = Infinity_Norm(Z, MPI_communicator)
-
-    !            do p = 1, m_star
-
-    !                if (p > m_hat) then
-
-    !                    call SpMV_series(   A, &
-    !                                        K(:, p), &
-    !                                        partition_table, &
-    !                                        1, &
-    !                                        p, &
-    !                                        m_star, &
-    !                                        rank, &
-    !                                        K(:, p + 1), &
-    !                                        MPI_communicator)
-
-    !                    K(:, p + 1) = h*K(:, p+1)/real(p,dp)
-
-    !                endif
-
-    !                F = F + (real(kay,dp)**real(p, dp))*K(:,p+1)
-
-    !                c_2 = (real(kay,qp)**real(p, dp)) &
-    !                        *Infinity_Norm(K(:,p + 1), MPI_communicator)
-
-    !                indx = p
-
-    !                if ((c_1 + c_2) <= &
-    !                    (tol*Infinity_Norm(F, MPI_communicator))) then
-
-    !                    exit
-
-    !                endif
-
-    !                c_1 = c_2
-
-    !            enddo
-
-    !            m_hat = max(m_hat, indx)
-
-    !            X(:, kay + (i - 1)*d + 1) =  F
-
-    !        enddo
-
-    !        if (i <= j) then
-    !            Z = X(:, i*d + 1)
-    !        endif
-
-    !    enddo
-
-    !end subroutine Expm_Multiply_Series
 
 end module Expm
