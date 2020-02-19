@@ -1,4 +1,5 @@
 numpy
+networkx
 mpi4py
 scipy
 h5py
