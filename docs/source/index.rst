@@ -7,8 +7,9 @@ Welcome to QuOp_MPI's documentation!
 
    Readme <readme_link>
    Containerisation <container_link>
-   Symbols
+   symbols
    usage_example
    quop_mpi
+   cite
 
 * :ref:`genindex`
