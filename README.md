@@ -7,7 +7,7 @@
 
 Python 3 module for parallel distributed memory simulation of Quantum Approximate Optimization Algorithms on arbitrary mixing graphs. See https://arxiv.org/abs/1804.08227 and https://arxiv.org/abs/1912.07353 for the theoretical background.
 
-QuOp_MPI's complete documenation can be found at "quop-mpi.readthedocs.io".
+QuOp_MPI's complete documenation can be found at https://quop-mpi.readthedocs.io.
 
 ## General Dependencies
 
