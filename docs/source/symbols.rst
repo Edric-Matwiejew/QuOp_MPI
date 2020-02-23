@@ -62,4 +62,4 @@ where :math:`P_{\text{success}} = \sum_{\tilde{q}_i > \tilde{q}_\text{cutoff}} p
 
 .. note::
 
-    The optimization result, accessed by :meth:`~quop_mpi.MPI.system.print_result` and saved to the .h5 file via :meth:`~quop_mpi.MPI.system.save`, also has a `success` output. This refers to the the convergence of the optimization process.
+    The optimization result, accessed by :meth:`~quop_mpi.MPI.system.print_result` also has a `success` output. This refers to the the convergence of the optimization process.
