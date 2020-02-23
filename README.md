@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/quop-mpi/badge/?version=latest)](https://quop-mpi.readthedocs.io/en/latest/?badge=latest)
+
 # QuOp_MPI
 
 ## Introduction
