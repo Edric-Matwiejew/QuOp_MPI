@@ -7,10 +7,10 @@ def ordered_integers(N, local_i, local_i_offset, seed = None):
     :param N: Size of the distrubted system.
     :type N: integer
 
-    :param local_i: Number of local input QWAO state values, given by qwao.local_i.
+    :param local_i: Number of local input QWAO state values, given by system.local_i.
     :type local_i: integer
 
-    :param local_i_offset: Offset of the local QWAO state values relative to the zero index of the distributed array. Given by qwao.local_i_offset.
+    :param local_i_offset: Offset of the local QWAO state values relative to the zero index of the distributed array. Given by system.local_i_offset.
     :type local_i_offset: integer.
     """
 
@@ -20,13 +20,13 @@ def random_integers(N, local_i, local_i_offset, seed = 0):
     """
     Random integers evenly distributed between :math:`(1, N)`.
 
-    :param N: Size of the distrubted system.
+    :param N: Size of the distributed system.
     :type N: integer
 
-    :param local_i: Number of local input QWAO state values, given by qwao.local_i.
+    :param local_i: Number of local input QWAO state values, given by system.local_i.
     :type local_i: integer
 
-    :param local_i_offset: Offset of the local QWAO state values relative to the zero index of the distributed array. Given by qwao.local_i_offset.
+    :param local_i_offset: Offset of the local QWAO state values relative to the zero index of the distributed array. Given by system.local_i_offset.
     :type local_i_offset: integer
 
     :param seed: Integer to pass to np.random.seed(local_i_offset + seed).
@@ -39,13 +39,13 @@ def random_floats(N, local_i, local_i_offset, seed = 0, low = 0.0, high = 1.0):
     """
     Random floats evenly distributed between :math:`[low, high]`.
 
-    :param N: Size of the distrubted system.
+    :param N: Size of the distributed system.
     :type N: integer
 
-    :param local_i: Number of local input QWAO state values, given by qwao.local_i.
+    :param local_i: Number of local input QWAO state values, given by system.local_i.
     :type local_i: integer
 
-    :param local_i_offset: Offset of the local QWAO state values relative to the zero index of the distributed array. Given by qwao.local_i_offset.
+    :param local_i_offset: Offset of the local QWAO state values relative to the zero index of the distributed array. Given by system.local_i_offset.
     :type local_i_offset: integer
 
     :param seed: Integer to pass to np.random.seed(local_i_offset + seed).

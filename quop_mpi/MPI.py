@@ -147,7 +147,7 @@ class system(object):
 
     def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
         """
-        Set :math:`| s \\rangle`. This can be done in several mutually exclusive ways:`
+        Set :math:`| s \\rangle`. This can be done in several mutually exclusive ways:
 
         * `name` keyword.
             * 'equal' - an equal superposition accross all :math:`|s_i\\rangle`.
