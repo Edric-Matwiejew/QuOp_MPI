@@ -12,8 +12,8 @@ endif
 
 EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
 
-LIB = -L/usr/lib
-INCLUDE = -I/usr/include
+LIB = -L/usr/local/lib
+INCLUDE = -I/usr/local/include
 
 OBJDIR := obj
 PYDIR := ../quop_mpi

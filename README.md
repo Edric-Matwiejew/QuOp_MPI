@@ -10,7 +10,7 @@ Python 3 module for parallel distributed memory simulation of Quantum Approximat
 + FFTW configured with --enable-fortran, --enable-mpi and --enable-shared.
 + HDF5 configured with --enable-fortran, --enable-parallel, and --enable-shared.
 
-src/Makefile assumes that the include and lib directories contaning the FTW and HDf5 shared object libraries are located in /usr/, this file may need to be modified for your system.
+src/Makefile assumes that the include and lib directories contaning the FTW and HDf5 shared object libraries are located in /usr/local, this file may need to be modified for your system.
 
 ## Python Dependencies
 
@@ -62,14 +62,14 @@ FFTW and HDF5 as provided by the Ubuntu app repository have not been built with 
     wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.6/src/hdf5-1.10.6.tar.gz
     tar -xvf hdf5-1.10.6.tar.gz
     cd hdf5-1.10.6
-    ./configure --enable-fortran --enable-shared --enable-parallel --prefix=/usr/
+    ./configure --enable-fortran --enable-shared --enable-parallel --prefix=/usr/local
     make && make install
     cd
 
     wget http://www.fftw.org/fftw-3.3.8.tar.gz
     tar -xvf fftw-3.3.8.tar.gz
     cd fftw-3.3.8
-    ./configure --enable-mpi --enable-fortran --enable-shared --prefix=/usr/
+    ./configure --enable-mpi --enable-fortran --enable-shared --prefix=/usr/local
     make && make install
     cd
 

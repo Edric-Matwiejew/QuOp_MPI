@@ -1,11 +1,17 @@
 # Singularity Containerisation
 
-qwao_mpi/container/qwao_mpi.def, can be used to build a singularity container in which to run qwao_mpi. It is based on the docker file supported by the Pawsey Supercomputing Center and requires that MPICH version 3.1.4 is installed on the host system.
+quop_mpi/container/quop_mpi.def, can be used to build a singularity container in which to run quop_mpi on the Pawsey Supercomputing Center's Magnus system.
 
-To build the container:
+The requires that the container is built on a system on which you have adminstraive rights:
 
-    sudo singularity build qwao_mpi.sif <path to>/qwao_mpi.def
+    sudo singularity build quop_mpi.sif <path to>/quop_mpi.def
 
-And to run a python script using qwao_mpi:
+quop_mpi.sif should then be copied to your group directory in the Pawsey file system.
 
-	mpiexec -N <number of processes> singularity exec <path to>/qwao_mpi.sif python3 <pyhton script>.py
+And to run a python script using quop_mpi, the singularity module whould first be imported:
+
+    module load singularity
+
+Then:
+
+	srun -N <number of processes> singularity exec <path to>/quop_mpi.sif python3 <pyhton script>.py
