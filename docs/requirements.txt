@@ -2,3 +2,4 @@ numpy
 networkx
 scipy
 h5py
+m2r
