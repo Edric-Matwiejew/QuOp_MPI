@@ -1,7 +1,4 @@
-[![Documentation Status](https://readthedocs.org/projects/quop-mpi/badge/?version=latest)](https://quop-mpi.readthedocs.io/en/latest/?badge=latest)
-
-
-[![DOI](https://zenodo.org/badge/233372703.svg)](https://zenodo.org/badge/latestdoi/233372703)
+[![Documentation Status](https://readthedocs.org/projects/quop-mpi/badge/?version=latest)](https://quop-mpi.readthedocs.io/en/latest/?badge=latest) [![DOI](https://zenodo.org/badge/233372703.svg)](https://zenodo.org/badge/latestdoi/233372703)
 
 
 # QuOp_MPI
