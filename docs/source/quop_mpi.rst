@@ -14,7 +14,7 @@ MPI
 graph_array
 ------------
 
-Methods to generate arrays corresponding to the first row of a circulat graph adjacency matrix. These may be passed to :meth:`~quop_mpi.MPI.qwao.graph` to produce an array of graph eigenvalues distributed over the MPI communicator associated with the :class:`~quop_mpi.MPI.qwao` object.
+Methods to generate arrays corresponding to the first row of a circulant graph adjacency matrix. These may be passed to :meth:`~quop_mpi.MPI.qwao.graph` to produce an array of graph eigenvalues distributed over the MPI communicator associated with the :class:`~quop_mpi.MPI.qwao` object.
 
 .. automodule:: quop_mpi.graph_array
     :members:
