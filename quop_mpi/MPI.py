@@ -328,7 +328,7 @@ class system(object):
                 self.gammas_ts = param_func(p, seed = i)
 
                 if qual_func is not None:
-                    self.set_qualities(qual_func, seed = i, **args, **kwargs)
+                    self.set_qualities(qual_func, seed = i, *args, **kwargs)
                 if state_func is not None:
                     self.initial_state = state_func(p, seed = i)
 
