@@ -168,7 +168,7 @@ Working With HDF5 Files
 
 HDF5 is a highly portable data format widely used in scientific computing. For comprehensive information on working with this format see the HDF5 documentation, or most applicably, the documentation for its python interface h5py.
 
-The following is an example covering how to access simulation data saved via :meth:`~quop_mpi.MPI.system,save`. The final distribution of the first QAOA example will be imported as a numpy array and its probability distribution visualized using Matplotlib. This may be carried out in an interactive python environment.
+The following is an example covering how to access simulation data saved via :meth:`~quop_mpi.MPI.system.save`. The final distribution of the first QAOA example will be imported as a numpy array and its probability distribution visualized using Matplotlib. This may be carried out in an interactive python environment.
 
 First, import the required modules:
 
