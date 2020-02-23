@@ -189,9 +189,7 @@ Load the final state into a numpy array:
 
 .. code-block:: python
 
-
-
-final_state = np.array(f['example_config/final_state']).view(dtype = np.complex128)
+    final_state = np.array(f['example_config/final_state']).view(dtype = np.complex128)
 
 .. note::
     The use of *view* ensures precision is not lost durring a datatype conversion.
