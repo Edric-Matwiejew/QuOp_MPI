@@ -1,0 +1,4 @@
+numpy
+networkx
+scipy
+h5py
