@@ -34,8 +34,8 @@ class system(object):
     self.final_state and self.initial_state must be distributed over an MPI
     communicator and described by the following variables:
 
-    * local_i: The number of array indicies stored at a given rank.
-    * local_i_offset: the offset of those local indcies in the globally distributed array
+    * local_i: The number of array indices stored at a given rank.
+    * local_i_offset: the offset of those local indices in the globally distributed array
     * alloc_local: The size of the local array partition. This may be greater than local_i, but the local array partition must be fully defined by the first local_i values.
 
     self.qualities must be defined by local_i, local_i_offset and be of size local_i.
@@ -50,7 +50,7 @@ class system(object):
 
     def get_probabilities(self):
         """
-        Calculate :math:`\langle s_i|\\vec{\gamma}, \\vec{t} \\rangle`.
+        :math:`\\vec{p} = ( \langle s_i|\\vec{\gamma}, \\vec{t} \\rangle` ), i=0,N-1
 
         :return: Probability vector corresponding the the local `self.final_state` partition.
         :rtype: array, float
@@ -60,7 +60,7 @@ class system(object):
 
     def get_state_norm(self):
         """
-        Calculate :math:`\langle \\vec{\gamma}, \\vec{t}|\\vec{\gamma}, \\vec{t} \\rangle`.
+        Check that :math:`\langle \\vec{\gamma}, \\vec{t}|\\vec{\gamma}, \\vec{t} \\rangle = 1`.
         The result is returned to each MPI rank and and should be equal to 1 within the limits of
         machine double precision. This is used to check for state validity.
 
@@ -72,7 +72,7 @@ class system(object):
 
     def expectation(self):
         """
-        Calculate :math:`\langle \\vec{\gamma}, \\vec{t}|Q|\\vec{\gamma}, \\vec{t} \\rangle`
+        :math:`\langle Q \\rangle =  angle \\vec{\gamma}, \\vec{t}|Q|\\vec{\gamma}, \\vec{t} \\rangle`
 
         :return: The expectation value of the quality matrix operator, returned to all MPI nodes.
         :rtype: float
@@ -83,7 +83,7 @@ class system(object):
 
     def objective(self, gammas_ts, stop):
         """
-        :math:`f(\\vec{\gamma}, \\vec{t}) = \\frac{q_{max} - \langle \\vec{\gamma}, \\v{t}|Q|\\vec{\gamma}, \\vec{t}}{q_{max}}` \
+        :math:`f(\\vec{\gamma}, \\vec{t}) = \\frac{q_{max} - \langle \\vec{\gamma}, \\vec{t} | Q |\\vec{\gamma}, \\vec{t}}{q_{max}} \\rangle` \
         - the function minimised by the calssical optimizer.
 
 
@@ -106,7 +106,7 @@ class system(object):
 
     def execute(self, gammas_ts, seed = 0):
         """
-        Execute the QWAO algorithm.
+        Execute the QAOA-like algorithm.
 
         :param gammas_ts: An array of length :math:`2 p`, :math:`(\\vec{\gamma},\\vec{t})`.
         :type gammas_ts: float, array
@@ -140,23 +140,23 @@ class system(object):
 
     def print_result(self):
         """
-        Print the optimization result to screen.
+        Print the optimization result.
         """
         if self.comm.Get_rank() == 0:
             print(self.result)
 
     def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
         """
-        Set :math:`|s\\rangle. This can be done in several mutually exclusive ways:`
+        Set :math:`| s \\rangle`. This can be done in several mutually exclusive ways:`
 
         * `name` keyword.
             * 'equal' - an equal superposition accross all :math:`|s_i\\rangle`.
-            * 'localized' - :math:`|s_1\\rangle = 1`.
-            * 'split' - :math:`|s_1\\rangle = \\frac{1}{2} and |s_2\\rangle = \\frac{1}{2}`.
+            * 'localized' - :math:`|s_0\\rangle = 1`.
+            * 'split' - :math:`| s_0 \\rangle, | s_2 \\rangle = \\frac{1}{2}`.
         * `vertices` keyword.
-            * Pass an MPI rank specific array of unique :math:`i \in \{\mathbb{Z}^+ | \\text{local_i} \leq i < \\text{local_i + local_i_offset}\}`. :math:`|s\\rangle` will be initialized as an equal superposition across the specified :math:`|s_i\\rangle`.
+            * Pass an MPI rank specific array of unique :math:`i` such that :math:`\\text{local_i} \leq i < \\text{local_i + local_i_offset}`. :math:`| s \\rangle` will be initialized as an equal superposition across the specified :math:`| s_i \\rangle`.
         * `state` keyword.
-            * Fully specify :math:`|s\\rangle`. Pass an MPI rank specific array of :math:`x_i \in \{\mathbb{R} | x_i \geq 0, \\text{local_i} \leq i < \\text{local_i + local_i_offset}\}. If keyword `normalized` is True, this state will be normalized.
+            * Fully specify :math:`|s\\rangle`. Pass an MPI rank specific array of :math:`x_i \in \mathbb{C}` such that :math:`x_i    \geq 0' and  :math:``\\text{local_i} \leq i < \\text{local_i + local_i_offset}`. If keyword `normalized` is True, this state will be normalized.
 
         :param name: Name of a pre-defined initial state.
         :type name: str, optional
@@ -193,15 +193,14 @@ class system(object):
 
     def set_qualities(self, func, sign = "positive", *args, **kwargs):
         """
-        Sets the qualities in the QWAO algorithm. As the array of qualities is
-        equal to the size of the QWAO state, ideally the qualities should be
+        Sets the local, :math:`q_i`. Ideally each local partition of :math:`\\vec{q}` should be
         generated in parallel. As such :meth:`~qwoa.qualities` accepts a function
         whose first three arguments are the size of the distributed qwoa state,
         the number of locally stored stored input elements and the offset of these
         elements relative to the 0-index of the distributed array. Example quality
         functions are included in :mod:`~qwoa_mpi.qualities`.
 
-        :param func: Function with which to generate the local qualities.
+        :param func: Function with which to generate the local :math:`q_i`.
         :type func: callable
 
         :param args: Extra arguments to pass to the quality function.
@@ -259,6 +258,7 @@ class system(object):
             filename = None,
             label = 'test',
             save_action = "a",
+            *args,
             **kwargs):
 
         """
@@ -308,6 +308,9 @@ class system(object):
 
         :param kwargs: Keyword arguments to pass to the :meth:`~system.set_qualities` method.
         :type kwargs: dictionary, optional
+
+        .. note::
+            The `param_func`, qual_func` and `state_func` must have the keyword argument 'seed'. This allows for a repeatable variation if :math:`(\\vec{\gamma}, \\vec{t}), q_i` and :math:`| s \\rangle` with each repetition at the same :math:`p`.
         """
 
         first = True
@@ -325,7 +328,7 @@ class system(object):
                 self.gammas_ts = param_func(p, seed = i)
 
                 if qual_func is not None:
-                    self.set_qualities(qual_func, seed = i)
+                    self.set_qualities(qual_func, seed = i, **args, **kwargs)
                 if state_func is not None:
                     self.initial_state = state_func(p, seed = i)
 
@@ -361,7 +364,7 @@ class system(object):
         :param action: "a", append. "w", over-write.
         :type action: string, optional, default = "a"
 
-        One called, addtional calls to :meth:`~system.log_update` will save the following information:
+        Once called, addtional calls to :meth:`~system.log_update` will save the following information:
 
         * label: User-defined system label.
         * qubits: Number of qubits.
@@ -369,6 +372,7 @@ class system(object):
         * quality_cutoff: As defined by :meth:`~system.state_success`.
         * objective_function: Final result of objective function minimization.
         * state_norm: Norm of the final state. This should always equal 1 (within the limits of double precision accuracy).
+        * time: In-program simultion time.
         """
         self.label = label
         self.log = True
@@ -467,7 +471,7 @@ class system(object):
 
         if self.comm.Get_rank() == 0:
 
-            File = h5py.File(file_name + ".h5", "a")
+            File = h5py.File(file_name + ".h5", action)
 
             # If the config_name already exists in the target file, add an underscore.
             duplicate = True
@@ -502,7 +506,7 @@ class system(object):
                 file_name,
                 self.config_name + str("/"),
                 "final_state",
-                action,
+                "a",
                 self.size,
                 self.local_i_offset,
                 self.final_state[:self.local_i],
@@ -526,22 +530,22 @@ class qaoa(system):
     distributed over an MPI communicator and the execution of this algorithm in
     parallel. Evolution of the QAOA system involves high-precision approximation
     of the action of the time-evolution operator on the QAOA state vector. This allows
-    for use of arbitrary mixing operators, :math:`H_c`, but is less effcient than
-    :class:`qwoa` which makes use of a fast Fourier transfrom instead. If the user
+    for use of arbitrary mixing operators, :math:`W`, but is less efficient than
+    :class:`qwoa` which makes use of a fast Fourier transform instead. If the user
     wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing
     operator use of the :class:`qwoa` class is recommend.
 
-    :param Hc: Arbitrary :math:`N \\times N` mixing operator, :math:`H_c`.
-    :type Hc: SciPy sparse CSR matrix
+    :param W: Arbitrary :math:`N \\times N` mixing operator, :math:`W`.
+    :type W: SciPy sparse CSR matrix
 
     :param comm: MPI communicator objected created by mpi4py.
     :type comm: MPI communicator
     """
-    def __init__(self, Hc, comm):
+    def __init__(self, W, comm):
 
         super().__init__()
 
-        self.size = Hc.shape[0]
+        self.size = W.shape[0]
         self.n_qubits = int(np.log(self.size)/np.log(2.0))
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -554,41 +558,41 @@ class qaoa(system):
 
         self.alloc_local = self.local_i
 
-        self.Hc_row_starts, self.Hc_col_indexes, self.Hc_values = self._csr_local_slice(
-                Hc,
+        self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
+                W,
                 self.partition_table,
                 self.comm)
 
-        self.Hc_num_rec_inds, self.Hc_rec_disps, self.Hc_num_send_inds, self.Hc_send_disps = fMPI.rec_a(
+        self.W_num_rec_inds, self.W_rec_disps, self.W_num_send_inds, self.W_send_disps = fMPI.rec_a(
                    self.size,
-                   self.Hc_row_starts,
-                   self.Hc_col_indexes,
+                   self.W_row_starts,
+                   self.W_col_indexes,
                    self.partition_table,
                    self.comm.py2f())
 
-        self.Hc_local_col_inds, self.Hc_rhs_send_inds = fMPI.rec_b(
+        self.W_local_col_inds, self.W_rhs_send_inds = fMPI.rec_b(
                 self.size,
-                np.sum(self.Hc_num_send_inds),
-                self.Hc_row_starts,
-                self.Hc_col_indexes,
-                self.Hc_num_rec_inds,
-                self.Hc_rec_disps,
-                self.Hc_num_send_inds,
-                self.Hc_send_disps,
+                np.sum(self.W_num_send_inds),
+                self.W_row_starts,
+                self.W_col_indexes,
+                self.W_num_rec_inds,
+                self.W_rec_disps,
+                self.W_num_send_inds,
+                self.W_send_disps,
                 self.partition_table,
                 self.comm.py2f())
 
         self.one_norms, self.num_norms = fMPI.one_norm_series(
                 self.size,
-                self.Hc_row_starts,
-                self.Hc_col_indexes,
-                -I * self.Hc_values,
-                self.Hc_num_rec_inds,
-                self.Hc_rec_disps,
-                self.Hc_num_send_inds,
-                self.Hc_send_disps,
-                self.Hc_local_col_inds,
-                self.Hc_rhs_send_inds,
+                self.W_row_starts,
+                self.W_col_indexes,
+                -I * self.W_values,
+                self.W_num_rec_inds,
+                self.W_rec_disps,
+                self.W_num_send_inds,
+                self.W_send_disps,
+                self.W_local_col_inds,
+                self.W_rhs_send_inds,
                 self.partition_table,
                 self.comm.py2f())
 
@@ -607,19 +611,19 @@ class qaoa(system):
 
         return partition_table
 
-    def _csr_local_slice(self, Hc, partition_table, MPI_communicator):
+    def _csr_local_slice(self, W, partition_table, MPI_communicator):
 
         rank = MPI_communicator.Get_rank()
 
         lb = partition_table[rank] - 1
         ub = partition_table[rank + 1] - 1
 
-        Hc_row_starts = Hc.indptr[lb:ub + 1]
-        Hc_col_indexes = Hc.indices[Hc_row_starts[0]:Hc_row_starts[-1]] + 1
-        Hc_values = Hc.data[Hc_row_starts[0]:Hc_row_starts[-1]]
-        Hc_row_starts += 1
+        W_row_starts = W.indptr[lb:ub + 1]
+        W_col_indexes = W.indices[W_row_starts[0]:W_row_starts[-1]] + 1
+        W_values = W.data[W_row_starts[0]:W_row_starts[-1]]
+        W_row_starts += 1
 
-        return Hc_row_starts, Hc_col_indexes, Hc_values
+        return W_row_starts, W_col_indexes, W_values
 
     def evolve_state(self, gammas, ts):
         """
@@ -628,7 +632,7 @@ class qaoa(system):
         :param gammas: Quality-proportional phase shifts.
         :type gammas: float, array
 
-        :param ts: Continous-time quantum walk times.
+        :param ts: Continuous-time quantum walk times.
         :type ts: float, array
         """
         self.final_state = self.initial_state
@@ -640,15 +644,15 @@ class qaoa(system):
             self.final_state = fMPI.step(
                     self.size,
                     self.local_i,
-                    self.Hc_row_starts,
-                    self.Hc_col_indexes,
-                    -I * self.Hc_values,
-                    self.Hc_num_rec_inds,
-                    self.Hc_rec_disps,
-                    self.Hc_num_send_inds,
-                    self.Hc_send_disps,
-                    self.Hc_local_col_inds,
-                    self.Hc_rhs_send_inds,
+                    self.W_row_starts,
+                    self.W_col_indexes,
+                    -I * self.W_values,
+                    self.W_num_rec_inds,
+                    self.W_rec_disps,
+                    self.W_num_send_inds,
+                    self.W_send_disps,
+                    self.W_local_col_inds,
+                    self.W_rhs_send_inds,
                     t,
                     self.final_state,
                     self.partition_table,
@@ -681,7 +685,7 @@ class qwoa(system):
         # When performing a parallel 1D-FFT using FFTW it may be the case that
         # the transformed array is distributed on the MPI communicator differently
         # from the input. fqwoa.mpi_local_size determines the size needed at each
-        # MPI node to accomodate for this. Along with the number of actual array
+        # MPI node to accommodate for this. Along with the number of actual array
         # elements stored at each node and their offset relative to the 0-index
         # of the distributed array.
 
@@ -703,7 +707,7 @@ class qwoa(system):
     def set_graph(self, graph_array):
         """
         Given a 1D array representing the first row of a circulant matrix,
-        this returns a 1D array of matrix eigenvalues corresponding to a
+        this returns a 1D array of matrix eigenvalues corresponding to
         a row-wise partitioning of that matrix over the active MPI communicator.
 
         :param graph_array: The first row of a circulant matrix.
@@ -741,7 +745,7 @@ class qwoa(system):
         :param gammas: Quality-proportional phase shifts.
         :type gammas: float, array
 
-        :param ts: Continous-time quantum walk times.
+        :param ts: Continuous-time quantum walk times.
         :type ts: float, array
         """
         fqwoa_mpi.qwoa_state(
@@ -773,12 +777,12 @@ class qwoa(system):
     def save(self, file_name, config_name, action = "a"):
         """
         Save a QWAO system as described by :meth:`system.save`. This also saves the
-        eigenvalues of the circlant mixing operator.
+        eigenvalues of the circulant mixing operator.
 
         :param file_name: Name of the file on disc.
         :type file_name: string
 
-        :param file_name: Name of the saved configuration in the HDf5 file.
+        :param file_name: Name of the saved configuration in the HDF5 file.
         :type file_name: string
 
         :param action: "a": append to an existing file or create a new file. "w": overwrite the file if it exists.
