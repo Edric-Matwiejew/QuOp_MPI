@@ -181,7 +181,7 @@ class system(object):
                 self.initial_state[0:2] = 1.0/np.sqrt(2.0)
         elif vertices is not None:
             self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
-            total_verticies = comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
+            total_verticies = self.comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
             for vertex in vertices:
                 self.initial_state[vertex] = 1.0/np.sqrt(total_verticies)
         elif state is not None:
