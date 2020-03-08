@@ -18,7 +18,7 @@ VERSION = '0.0.2'
 
 # What packages are required for this module to be exeuted?
 REQUIRED = [
-        'numpy', 'scipy', 'mpi4py', 'h5py']
+        'numpy', 'scipy', 'mpi4py', 'h5py', 'networkx']
 
 # What packages are optional?
 EXTRAS = {}
