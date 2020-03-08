@@ -17,7 +17,7 @@ program complex_write
     character(len = 128) :: file_name, group_name, dataset_name
 
     integer(dp) :: N
-    integer(sp) :: local_i = 5, local_i_offset
+    integer(sp) :: local_i, local_i_offset
 
     complex(dp) :: complex_array(5)
 
@@ -35,10 +35,13 @@ program complex_write
 
     call MPI_comm_size(MPI_COMM_WORLD, flock, ierr)
     call MPI_comm_rank(MPI_COMM_WORLD, rank, ierr)
+    
+    local_i = 5
+    N = flock * local_i
 
-    N = flock * 5
+    local_i_offset = local_i * (rank)
 
-    local_i_offset = local_i * (rank - 1)
+    write(*,*) rank, local_i, local_i_offset, N
 
     do i = 1, local_i
         complex_array(i) = cmplx(i, i, dp)
@@ -54,6 +57,7 @@ program complex_write
                             complex_array, &
                             MPI_COMM_WORLD)
 
+    write(*,*) "DONE"
     call MPI_finalize(ierr)
 
 end program complex_write
