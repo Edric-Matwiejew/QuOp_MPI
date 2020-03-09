@@ -4,7 +4,7 @@ def ordered_integers(N, local_i, local_i_offset, seed = None):
     """
     The array [1, ..., N].
 
-    :param N: Size of the distrubted system.
+    :param N: Size of the distributed system.
     :type N: integer
 
     :param local_i: Number of local input QWAO state values, given by system.local_i.
