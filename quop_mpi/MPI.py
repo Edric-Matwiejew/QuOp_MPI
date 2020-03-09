@@ -13,7 +13,7 @@ I = np.complex(0,1)
 class system(object):
     """
     Provides a framework for the simulation of a QAOA-like algorithm
-    in parallel using MPI. To do so this class must be used to form a
+    in parallel using MPI. To do so, this class must be used to form a
     subclass containing an 'evolve_state' method:
 
     .. code-block:: python
@@ -62,8 +62,7 @@ class system(object):
     def get_state_norm(self):
         """
         Check that :math:`\langle \\vec{\gamma}, \\vec{t}|\\vec{\gamma}, \\vec{t} \\rangle = 1`.
-        The result is returned to each MPI rank and and should be equal to 1 within the limits of
-        machine double precision. This is used to check for state validity.
+        The result is returned to each MPI rank and should be equal to 1 within the limits of double machine precision. This is used to check for state validity.
 
         :return: Norm of the current `self.final_state`.
         :rtype: float
@@ -93,8 +92,8 @@ class system(object):
 
         """
 
-        # Durring optimization the root processes controls parallel evalution
-        # through passing of the self.stop parameter.
+        # During optimization the root processes controls parallel evaluation
+        # through the passing of the self.stop parameter.
 
         self.stop = self.comm.bcast(stop, root = 0)
 
@@ -162,7 +161,7 @@ class system(object):
         :param name: Name of a pre-defined initial state.
         :type name: str, optional
 
-        :param verticies: Specify an equal superposition over a set of :math:`|s_i\\rangle`.
+        :param vertices: Specify an equal superposition over a set of :math:`|s_i\\rangle`.
         :type verticies: array, integer, optional
 
         :state: Initialize :math:`|s\\rangle` in a user-defined generalized state.
@@ -194,12 +193,8 @@ class system(object):
 
     def set_qualities(self, func, sign = "positive", *args, **kwargs):
         """
-        Sets the local, :math:`q_i`. Ideally each local partition of :math:`\\vec{q}` should be
-        generated in parallel. As such :meth:`~qwoa.qualities` accepts a function
-        whose first three arguments are the size of the distributed qwoa state,
-        the number of locally stored stored input elements and the offset of these
-        elements relative to the 0-index of the distributed array. Example quality
-        functions are included in :mod:`~qwoa_mpi.qualities`.
+        Sets the local, :math:`q_i`. Ideally, each local partition of :math:`\\vec{q}` should be generated in parallel. As such :meth:`~qwoa.qualities` accepts a function whose first three arguments are the size of the distributed qwoa state,
+        the number of locally stored input elements and the offset of these elements relative to the 0-index of the distributed array. Example quality functions are included in :mod:`~qwoa_mpi.qualities`.
 
         :param func: Function with which to generate the local :math:`q_i`.
         :type func: callable
@@ -216,12 +211,12 @@ class system(object):
 
     def state_success(self, quality_cutoff, success_target):
         """
-        A rough method for judging the effectiveness of an QAOA algorithm.
+        A rough method for judging the effectiveness of a QAOA algorithm.
 
-        :param quality_cutoff: Between 0 and 1. 0.9 corresponds to seeking solutions with a quality in the top 10%.
+        :param quality_cutoff: Between 0 and 1. 0.9 corresponds to seeking solutions with quality in the top 10%.
         :type quality_cutoff: float
 
-        :param success_target: Target cummulative chance of measuring a result above the quality_cutoff.
+        :param success_target: Target cumulative chance of measuring a result above the quality_cutoff.
 
         :return: success, success_probability
         :rtype: boolean, float
@@ -422,7 +417,7 @@ class system(object):
         :param action: "a": append to an existing file or create a new file. "w": overwrite the file if it exists.
         :type action: string, optional
 
-        Data it saved into a .h5 file with the following structure.
+        Data is saved into a .h5 file with the following structure.
 
         ::
 
@@ -459,12 +454,10 @@ class system(object):
             subroutines which make use of parallel HDF5.
 
             The complex values of the final_state array are saved as a
-            compound datatype consisting of contiguous double precision reals. This is
-            equivalent to the np.complex128 numpy datatype. To access this data without a
-            loss of precision in python the user must set the **view** of the numpy array
-            to np.complex128, rather than casting it to np.complex128 using the dtype keyword.
+            compound datatype consisting of contiguous double precision reals. This is equivalent to the np.complex128 NumPy datatype. To access this data without a
+            loss of precision in python, the user must set the **view** of the NumPy array to np.complex128, rather than casting it to np.complex128 using the dtype keyword.
 
-            Similarly the qualities array, which is saved as an array of double precision
+            Similarly, the qualities array, which is saved as an array of double-precision
             reals, should have its view set to np.float64.
         """
 
@@ -527,14 +520,9 @@ class system(object):
 
 class qaoa(system):
     """
-    Subclass of :class:`system`, this provides for the instantiation of a QAOA system
-    distributed over an MPI communicator and the execution of this algorithm in
-    parallel. Evolution of the QAOA system involves high-precision approximation
-    of the action of the time-evolution operator on the QAOA state vector. This allows
-    for use of arbitrary mixing operators, :math:`W`, but is less efficient than
-    :class:`qwoa` which makes use of a fast Fourier transform instead. If the user
-    wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing
-    operator use of the :class:`qwoa` class is recommend.
+    Subclass of :class:`system`, this provides for the instantiation of a QAOA system distributed over an MPI communicator and the execution of this algorithm in parallel. Evolution of the QAOA system involves high-precision approximation of the action of the time-evolution operator on the QAOA state vector. This allows
+    for the use of arbitrary mixing operators, :math:`W`, but is less efficient than
+    :class:`qwoa` which makes use of a fast Fourier transform instead. If the user wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing operator use of the :class:`qwoa` class is recommended.
 
     :param W: Arbitrary :math:`N \\times N` mixing operator, :math:`W`.
     :type W: SciPy sparse CSR matrix
@@ -669,7 +657,7 @@ class qwoa(system):
     Evolution of the :class:`qwoa` state occurs via calls to the compiled Fortran library
     'fqwoa_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
 
-    :param n_qubits: The number of qubits, :math:`n`, total distributed system is of size :math:`n^2`.
+    :param n_qubits: The number of qubits, :math:`n`, the total distributed system is of size :math:`n^2`.
     :type n_qubits: integer
 
     :param MPI_communicator: An MPI communicator provided via MPI4Py.
@@ -686,7 +674,7 @@ class qwoa(system):
         # When performing a parallel 1D-FFT using FFTW it may be the case that
         # the transformed array is distributed on the MPI communicator differently
         # from the input. fqwoa.mpi_local_size determines the size needed at each
-        # MPI node to accommodate for this. Along with the number of actual array
+        # MPI node to accommodate for this. Along with the number of the actual array
         # elements stored at each node and their offset relative to the 0-index
         # of the distributed array.
 
@@ -777,8 +765,7 @@ class qwoa(system):
 
     def save(self, file_name, config_name, action = "a"):
         """
-        Save a QWAO system as described by :meth:`system.save`. This also saves the
-        eigenvalues of the circulant mixing operator.
+        Save a QWAO system as described by :meth:`system.save`. This also saves the eigenvalues of the circulant mixing operator.
 
         :param file_name: Name of the file on disc.
         :type file_name: string
@@ -790,7 +777,7 @@ class qwoa(system):
         :type action: string, optional
 
         .. warning::
-            Information given in :meth:`~system.save` corresponding to correctly loading complex valued data from a .h5 file created by QWAO_MPI
+            Information given in :meth:`~system.save` corresponding to correctly loading complex-valued data from a .h5 file created by QWAO_MPI
             also applies to the saved eigenvalues.
         """
 
