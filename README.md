@@ -89,7 +89,7 @@ Install the python dependencies:
 Clone, build and install QuOp_MPI:
 
     git clone https://github.com/Edric-Matwiejew/QuOP_mpi
-    cd QuOp_mpi/src
+    cd QuOp_MPI/src
     make
     cd ../
     python3 setup.py sdist bdist_wheel
@@ -100,7 +100,7 @@ Clone, build and install QuOp_MPI:
 Alternatively:
 
     git clone https://github.com/Edric-Matwiejew/QuOP_mpi
-    cd QuOp_mpi/src
+    cd QuOp_MPI/src
     make
     cd ../
     python3 setup.py develop
