@@ -178,4 +178,4 @@ Finally, check for successful installation by:
 
 ## Contact Information
 
-QuOa_MPI is under development. If you encounter a bug, please submit an issue via github, or email me at edric.matwiejew@research.uwa.edu.au.
+QuOp_MPI is under development. If you encounter a bug, please submit an issue via github, or email me at edric.matwiejew@research.uwa.edu.au.
