@@ -72,7 +72,7 @@ class system(object):
 
     def expectation(self):
         """
-        :math:`\langle Q \\rangle =  angle \\vec{\gamma}, \\vec{t}|Q|\\vec{\gamma}, \\vec{t} \\rangle`
+        :math:`\\langle Q \\rangle =  angle \\vec{\gamma}, \\vec{t}|Q|\\vec{\gamma}, \\vec{t} \\rangle`
 
         :return: The expectation value of the quality matrix operator, returned to all MPI nodes.
         :rtype: float
