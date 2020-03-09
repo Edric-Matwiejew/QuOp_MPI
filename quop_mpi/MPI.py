@@ -47,6 +47,7 @@ class system(object):
         # set default variables used by state_success.
         self.quality_cutoff = 0.9
         self.success_target = 2.0/3.0
+        self.log = False
 
     def get_probabilities(self):
         """
