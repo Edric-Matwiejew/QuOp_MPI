@@ -53,9 +53,13 @@ Navigate to QuOp_MPI/docs and build the documentaion:
 
 Documentaion will then be present in QuOp_MPI/docs/build/html.
 
+## Detailed installation on Windows
+
+QuOp_MPI has been developed for Unix-like systems. While, in prinicple, it is prefectly possible to install QuOp_MPI on a Windows system, this is not currently supported. If you wish to run QuOp_MPI on Windows 10 it is advised that the user install the Linux Subsystem for windows, choose Ubuntu as the installed Linux distribution and proceed with the installation method detailed below.
+
 ## Detailed installation on Ubuntu 18.04.4
 
-The following processes successfully installed QuOP_MPI on Ubuntu 18.04.4, this as not been tested on other systems, but the processes should be generally applicable with minor modifications.
+The following processes successfully installed QuOP_MPI on Ubuntu 18.04.4, this as not been tested on other Linux distros,, but the processes should be generally applicable with minor modifications.
 
 Install MPICH and build applications:
 
@@ -102,6 +106,75 @@ Alternatively:
     python3 setup.py develop
 
 Will install QuOp_MPI with reference to the QuOp_MPI source folder. This is useful if you wish to debug or modify the package.
+
+Finally, check for successul installtion by:
+
+    mpiexec -N 2 python3 -m quop_mpi
+
+## Detailed Installation on MacOS X
+
+The following installation method uses the 'Homebrew' package manager. This can be installed via the following terminal command:
+
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+
+You will be prompted for your user password on installing the homebrew dependencies and on installing homebrew itself.
+
+Next, install the GNU compiler collection, python3 + pip3, MPI, and utilities required to download and configure QuOp_MPI's dependencies.
+
+    brew install gcc python wget pkg-config mpich
+
+Download, extract and install parallel-HDF5.
+
+    wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.6/src/hdf5-1.10.6.tar.gz
+    tar -xvf hdf5-1.10.6.tar.gz
+    cd hdf5-1.10.6
+    export CC=mpicc
+    export FC=mpif90
+    ./configure --enable-fortran --enable-shared --enable-parallel --prefix=/usr/local
+    make
+    sudo make install
+    cd
+
+Download, extract and install FFTW.
+
+    wget http://www.fftw.org/fftw-3.3.8.tar.gz
+    tar -xvf fftw-3.3.8.tar.gz
+    cd fftw-3.3.8
+    ./configure --enable-mpi --enable-fortran --enable-shared --prefix=/usr/local
+    make
+    sudo make install
+    cd
+
+Finally, we can clone and install QuOp_mpi.
+
+    git clone https://github.com/Edric-Matwiejew/QuOP_mpi
+    cd QuOp_mpi/src
+    make
+    (Note: entered into makefile and altered LIB and INCLUDE to go to /usr/local/libor /usr/local/include. I think is can be done in the terminal however)
+    cd ../
+    python3 setup.py sdist bdist_wheel
+    cd dist
+    pip3 install quop_mpi*.tar.gz
+    cd
+
+Alternatively:
+
+    git clone https://github.com/Edric-Matwiejew/QuOP_mpi
+    cd QuOp_mpi/src
+    make
+    cd ../
+    python3 setup.py develop
+
+Will install QuOp_MPI with reference to the QuOp_MPI source folder. This is useful if you wish to debug or modify the package.
+
+Finally, check for successul installtion by:
+
+    mpiexec -N 2 python3 -m quop_mpi
+
+
+Finally, check for successul installtion by:
+
+    mpiexec -N 2 python3 -m quop_mpi
 
 ## Contact Information
 
