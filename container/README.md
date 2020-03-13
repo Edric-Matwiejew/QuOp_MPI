@@ -1,6 +1,6 @@
 # Singularity Containerisation
 
-On Pawsey an up to date container for QuOp_MPI should be contained in $MYGROUP/QuOp_MPI. Please check that your scripts point the name of the most recent container. These follow the convention quop_mpi_DDMMYYYY.sif.
+On Pawsey an up to date container for QuOp_MPI should be located in $MYGROUP/QuOp_MPI. Please check that your scripts point the name of the most recent container. These follow the naming convention quop_mpi_DDMMYYYY.sif.
 
 ## Building Containers
 
