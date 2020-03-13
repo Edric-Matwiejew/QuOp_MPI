@@ -205,9 +205,17 @@ class system(object):
         self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
 
         if sign == "negative":
-            self.max_quality = self.comm.allreduce(np.min(self.qualities), op = MPI.MIN)
+            if len(self.qualities) == 0:
+                local_max = np.finfo(np.float64).max
+            else:
+                local_max = np.min(self.qualities)
+            self.max_quality = self.comm.allreduce(local_max, op = MPI.MIN)
         else:
-            self.max_quality = self.comm.allreduce(np.max(self.qualities), op = MPI.MAX)
+            if len(self.qualities) == 0:
+                local_max = np.finfo(np.float64).min
+            else:
+                local_max = np.max(self.qualities)
+            self.max_quality = self.comm.allreduce(local_max, op = MPI.MAX)
 
     def state_success(self, quality_cutoff, success_target):
         """
