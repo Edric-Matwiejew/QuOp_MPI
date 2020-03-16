@@ -169,15 +169,24 @@ class system(object):
 
         :state normalized: If normalized is True and an argument to `state`is specified, normalize the input state.l
         """
+
+        # In some cases rank 0 might have no local indicies.
+        if self.local_i > 0:
+            rank = self.comm.Get_rank()
+        else:
+            rank = self.comm.Get_size()
+
+        self.lowest_rank = self.comm.allreduce(rank, op = MPI.MIN)
+
         if name == "equal":
             self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
         elif name == "localized":
             self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
-            if self.comm.Get_rank() == 0:
+            if self.comm.Get_rank() == self.lowest_rank:
                 self.initial_state[0] = 1.0
         elif name == "split":
             self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
-            if self.comm.Get_rank() == 0:
+            if self.comm.Get_rank() == self.lowest_rank:
                 self.initial_state[0:2] = 1.0/np.sqrt(2.0)
         elif vertices is not None:
             self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
