@@ -4,7 +4,7 @@ Definitions and Numerical Methods
 Mathematical Framework
 ----------------------
 
-The following assumes that the reader is Familiar with QAOA algorithms and aims to simply detail notation used throughout this documentation and some of the mathematical particulars of the simulation processes. This sections draws from "Efficient quantum walks over exponentially large sets of combinatorial objects for optimisation" by Sam Marsh and Jingbo Wang, but the notation has been generalized to apply to both QAOA and its walk-assisted variant.
+The following assumes that the reader is familiar with QAOA algorithms and aims to only detail notation used throughout this document and some of the mathematical particulars of the simulation processes. This section draws from "Efficient quantum walks over exponentially large sets of combinatorial objects for optimisation" by Sam Marsh and Jingbo Wang. However, the notation has been generalised to apply to both QAOA and its walk-assisted variant.
 
 In the QAOA framework the system evolves as:
 
@@ -18,7 +18,7 @@ In the QAOA framework the system evolves as:
 #. :math:`U_Q(\gamma)` applies a phase shift to each :math:`|s_i\rangle` proportional to :math:`\gamma` and the solution quality :math:`q_i \in \mathbb{R}`.
 
 
-#. :math:`U_W(t)` couples the :math:`|s_i\rangle` to form an topology over which the state probabilities are mixed. In QuOp_MPI this is conceptualized as a *continuous-times qunatum walk*.
+#. :math:`U_W(t)` couples the :math:`|s_i\rangle` to form a topology over which the state probabilities are mixed. In QuOp_MPI this is conceptualised as a *continuous-times quantum walk*.
 
 #. The set of :math:`2p` parameters :math:`\vec{\gamma} = (\gamma_1,...\gamma_p)` and :math:`\vec{t} = (t_1,...,t_p)` are varied by a classical optimizer in order to maximize the average measured solutions and quality. A higher choice of :math:`p` leads to better solutions at the cost of a deeper circuit.
 
@@ -44,7 +44,7 @@ QuOp_MPI consists of two simulation classes, :class:`~quop_mpi.MPI.qaoa` and :cl
 
 * QWOA: :math:`W` is defined as a *circulant* Hermitian adjacency matrix. :math:`U_W | s \rangle` is calculated using a fast Fourier transform (FFT) and the analytical solution for the eigenvalues of a circulant matrix. FFT capabilities are provided by the Fastest Fourier Transform in the West.
 
-As FFT provides the most computationally efficient method in the vast majority of cases. If :math:`W` is circulant, the :class:`~quop_mpi.MPI.qwoa` class should be used.
+FFT provides the most computationally efficient method in the vast majority of cases. If :math:`W` is circulant, the :class:`~quop_mpi.MPI.qwoa` class should be used.
 
 Success Metrics
 ---------------
@@ -62,4 +62,4 @@ where :math:`P_{\text{success}} = \sum_{\tilde{q}_i > \tilde{q}_\text{cutoff}} p
 
 .. note::
 
-    The optimization result, accessed by :meth:`~quop_mpi.MPI.system.print_result` also has a `success` output. This refers to the the convergence of the optimization process.
+    The optimisation result, accessed by :meth:`~quop_mpi.MPI.system.print_result` also has a `success` parameter. This refers to the convergence of the optimisation process.
