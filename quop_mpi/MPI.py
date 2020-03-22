@@ -7,6 +7,7 @@ import os
 import quop_mpi.fqwoa_mpi as fqwoa_mpi
 import quop_mpi.fMPI as fMPI
 from time import time
+import json
 
 I = np.complex(0,1)
 
@@ -44,10 +45,10 @@ class system(object):
     """
     def __init__(self):
 
-        # set default variables used by state_success.
-        self.quality_cutoff = 0.9
-        self.success_target = 2.0/3.0
         self.log = False
+
+    def set_quality_cutoff(self, quality_cutoff):
+        self.quality_cutoff = quality_cutoff
 
     def get_probabilities(self):
         """
@@ -102,7 +103,7 @@ class system(object):
             gammas, ts = np.split(self.gammas_ts, 2)
             self.evolve_state(gammas, ts)
             expectation = self.expectation()
-            return (np.abs(self.max_quality) - expectation)/np.abs(self.max_quality)
+            return expectation
 
     def execute(self, gammas_ts, seed = 0):
         """
@@ -134,8 +135,12 @@ class system(object):
 
         self.time = time() - self.time
 
+        # Renaming dictionary key to prevent ambiguity in the context of QuOp_MPI.
+        if self.comm.Get_rank() == 0:
+            self.result["lowest_optimization_result"]["optimization_success"] = self.result["lowest_optimization_result"]["success"]
+
         if self.log:
-            self.state_success(self.quality_cutoff, self.success_target)
+            self.state_cutoff_pass(self.quality_cutoff)
             self.log_update()
 
     def print_result(self):
@@ -200,7 +205,7 @@ class system(object):
                 normalization = self.comm.allreduce(np.sum(np.multiply(np.conjugate(state), state)), op = MPI.SUM)
                 self.initial_state = self.initial_state/np.sqrt(normalization)
 
-    def set_qualities(self, func, sign = "positive", *args, **kwargs):
+    def set_qualities(self, func, *args, **kwargs):
         """
         Sets the local, :math:`q_i`. Ideally, each local partition of :math:`\\vec{q}` should be generated in parallel. As such :meth:`~qwoa.qualities` accepts a function whose first three arguments are the size of the distributed qwoa state,
         the number of locally stored input elements and the offset of these elements relative to the 0-index of the distributed array. Example quality functions are included in :mod:`~qwoa_mpi.qualities`.
@@ -213,51 +218,40 @@ class system(object):
         """
         self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
 
-        if sign == "negative":
-            if len(self.qualities) == 0:
-                local_max = np.finfo(np.float64).max
-            else:
-                local_max = np.min(self.qualities)
-            self.max_quality = self.comm.allreduce(local_max, op = MPI.MIN)
+        if len(self.qualities) == 0:
+            local_max = np.finfo(np.float64).min
         else:
-            if len(self.qualities) == 0:
-                local_max = np.finfo(np.float64).min
-            else:
-                local_max = np.max(self.qualities)
-            self.max_quality = self.comm.allreduce(local_max, op = MPI.MAX)
+            local_max = np.max(self.qualities)
 
-    def state_success(self, quality_cutoff, success_target):
+        self.max_quality = self.comm.allreduce(local_max, op = MPI.MAX)
+
+        # Default set to the highest quality solution.
+        self.quality_cutoff = 0.1
+
+    def state_cutoff_pass(self, quality_cutoff):
         """
         A rough method for judging the effectiveness of a QAOA algorithm.
 
         :param quality_cutoff: Between 0 and 1. 0.9 corresponds to seeking solutions with quality in the top 10%.
         :type quality_cutoff: float
 
-        :param success_target: Target cumulative chance of measuring a result above the quality_cutoff.
+        :return: cutoff_pass_probability
+        :rtype: float
 
-        :return: success, success_probability
-        :rtype: boolean, float
-
-        With 'quality_cutoff = 0.9', 'success_target = 2/3' and return values of 'True', 0.7 and 5'. The algorithm
-        has succeeded in having a greater than :math:`\\frac{2}{3}` chance of measuring a state corresponding to a solution
-        in the top 10%.
+        With 'quality_cutoff = 0.9' and return value of 0.7. The algorithm
+        has succeeded in having a greater than 70% chance of measuring a state corresponding to a solution
+        in the bottom 10%.
         """
         self.quality_cutoff = quality_cutoff
-        self.success_target = success_target
-        self.success_probability = 0.0
+        self.cutoff_pass_probability = 0.0
 
         for i, prob in enumerate(self.probabilities):
-            if self.qualities[i]/self.max_quality >= self.quality_cutoff:
-                self.success_probability += prob
+            if self.qualities[i]/self.max_quality <= self.quality_cutoff:
+                self.cutoff_pass_probability += prob
 
-        self.success_probability = self.comm.allreduce(self.success_probability, op = MPI.SUM)
+        self.cutoff_pass_probability = self.comm.allreduce(self.cutoff_pass_probability, op = MPI.SUM)
 
-        if self.success_probability >= self.success_target:
-            self.success = True
-        else:
-            self.success = False
-
-        return self.success, self.success_probability
+        return self.cutoff_pass_probability
 
     def benchmark(
             self,
@@ -266,7 +260,6 @@ class system(object):
             param_func,
             qual_func = None,
             state_func = None,
-            early_stopping = False,
             verbose = True,
             filename = None,
             label = 'test',
@@ -303,9 +296,6 @@ class system(object):
 
         :param state_func: Method to generate a distributed inital state, compatible with :meth:`~system.set_initial_state`.
         :type state_func: callable, optional, default = None
-
-        :param early_stopping: If True, stop repeated evaluation for a given :math:`p` if :meth:`~system.state_success` returns 'self.success' as True.
-        :type early_stopping: boolean, optional, default = False
 
         :param verbose: If True, print current :math:`p`, repitition number and optimization results.
         :type verbose: boolean, optional, default = True
@@ -355,16 +345,13 @@ class system(object):
                     if verbose:
                         print(self.result)
 
-                if early_stopping and (self.success_probability >= self.success_target):
-                    break
-
                 if filename is not None:
                     if first:
                         self.save(filename, label + '_' + str(p) + '_' + str(i), action = save_action)
                     else:
                         self.save(filename, label + '_' + str(p) + '_' + str(i), action = "a")
 
-    def log_success(self, filename, label, action = "a"):
+    def log_results(self, filename, label, action = "a"):
         """
         Creates a .csv in which to save key QAOA results after a call to :meth:`~system.execute`.
 
@@ -382,10 +369,12 @@ class system(object):
         * label: User-defined system label.
         * qubits: Number of qubits.
         * p: :math:`p`.
-        * quality_cutoff: As defined by :meth:`~system.state_success`.
+        * quality_cutoff: As defined by :meth:`~system.state_cutoff_pass`.
+        * cutoff_pass_probability: As defined by :meth:`~system.state_cutoff_pass`
         * objective_function: Final result of objective function minimization.
+        * optimization_success: If the minimizer converged to its target tolerances.
         * state_norm: Norm of the final state. This should always equal 1 (within the limits of double precision accuracy).
-        * time: In-program simultion time.
+        * simulation_time: In-program simultion time.
         """
         self.label = label
         self.log = True
@@ -396,25 +385,24 @@ class system(object):
             else:
                 self.logfile = open(filename + ".csv", "w")
                 self.logfile.write(
-                        'label,qubits,p,quality_cutoff,success_probability,success,quality_cutoff,objective_function,state_norm,time\n')
+                        'label,qubits,p,quality_cutoff,cutoff_pass_probability,objective_function,optimization_success,state_norm,simulation_time\n')
 
     def log_update(self):
         """
-        Update a .csv log of QAOA algorithm performance, instantiated by :meth:`~system.log_success`.
+        Update a .csv log of QAOA algorithm performance, instantiated by :meth:`~system.log_results`.
         """
         self.state_norm = self.get_state_norm()
 
         if self.comm.Get_rank() == 0:
 
-            self.logfile.write('{},{},{},{},{},{},{},{},{},{}\n'.format(
+            self.logfile.write('{},{},{},{},{},{},{},{},{}\n'.format(
                 self.label,
                 self.n_qubits,
                 self.p,
                 self.quality_cutoff,
-                self.success_probability,
-                self.success,
-                self.quality_cutoff,
+                self.cutoff_pass_probability,
                 self.result['fun'],
+                self.result['lowest_optimization_result']['optimization_success'],
                 self.state_norm,
                 self.time))
 
@@ -443,11 +431,8 @@ class system(object):
             │   ├── final_state
             │   ├── eigenvalues
             │   ├── qualitites
-            │   ├── minimize_results
-            │   │   ├── result_field_1
-            │   │   ├── result_field_2
-            │   │   ├── result_field_3
-            │   │   ├── ...
+
+        The minimization result is saved in the 'minimize_result' attribute of 'config_name' as a formatted string.
 
         Multiple configurations with a unique config_name can be stored in the same .h5 file.
         HDF5 files are supported in python by the `h5py <https://www.h5py.org/>`_ package. With it,
@@ -457,14 +442,14 @@ class system(object):
 
             import h5py
 
+            config_name = "my_simulation"
+
             f = h5py.File(file_name + ".h5", "r")
             final_state = np.array(f[config_name]['final_state']).view(np.complex128)
             eigenvalues = np.array(f[config_name]['eigenvalues']).view(np.complex128)
             qualities = np.array(f[config_name]['qualities']).view(np.float64)
 
-            minimize_result = {}
-            for key in f[config_name]['minimize_result'].keys():
-                minimize_result[key] = np.array(f[config_name]['minimize_result'][key])
+            print(f["my_simulation"].attrs["minimize_result"])
 
         .. warning::
             The final_state and qualities datasets are saved using Fortran
@@ -493,20 +478,7 @@ class system(object):
                     duplicate = False
 
             config = File.create_group(self.config_name)
-            minimize_result = config.create_group("minimize_result")
-
-            for key in self.result.keys():
-
-                try:
-
-                    minimize_result.create_dataset(key, data = self.result.get(key))
-                except:
-
-                    if verbose:
-                        print("No native HDF5 type for " + \
-                                str(type(self.result.get(key))) + \
-                                ". Minimization result field " + \
-                                key + "  not saved.", file = sys.stderr)
+            config.attrs["minimize_result"] = str(self.result)
 
             File.create_dataset(self.config_name + "/initial_phases", data = self.gammas_ts, dtype = np.float64)
             File.close()

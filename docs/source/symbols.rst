@@ -20,19 +20,22 @@ In the QAOA framework the system evolves as:
 
 #. :math:`U_W(t)` couples the :math:`|s_i\rangle` to form a topology over which the state probabilities are mixed. In QuOp_MPI this is conceptualised as a *continuous-times quantum walk*.
 
-#. The set of :math:`2p` parameters :math:`\vec{\gamma} = (\gamma_1,...\gamma_p)` and :math:`\vec{t} = (t_1,...,t_p)` are varied by a classical optimizer in order to maximize the average measured solutions and quality. A higher choice of :math:`p` leads to better solutions at the cost of a deeper circuit.
+#. The set of :math:`2p` parameters :math:`\vec{\gamma} = (\gamma_1,...\gamma_p)` and :math:`\vec{t} = (t_1,...,t_p)` are varied by a classical optimizer in order to minimize the average measured solutions and quality. A higher choice of :math:`p` leads to better solutions at the cost of a deeper circuit.
 
 * :math:`U_Q(\gamma) = \exp(-i\gamma Q)` where :math:`Q \in \mathbb{R}^{N \times N}` is a diagonal operator defined by :math:`\vec{q}=\{q_i\}` such that :math:`\langle \vec{\gamma}, \vec{t} | Q | \vec{\gamma}, \vec{t} \rangle = \sum_{i=0}^{N - 1} p_i q_i` where :math:`p_i` is the probability associated with state :math:`| s_i \rangle`.
 
 * :math:`U_W(t) = \exp(-itW)`, where :math:`W \in \mathbb{R}^{N \times N}` is a Hermitian adjacency matrix describing a graph topology such that :math:`W_{ij} > 0` if and only if there is an edge between states (or *verticies*) :math:`| s_i \rangle` and :math:`| s_j \rangle`. Elsewhere in literature :math:`W` is also referred to as the *mixing operator*.
 
-QAOA-like algorithms seek to minimise the :meth:`~quop_mpi.MPI.objective` function,
+QAOA-like algorithms seek to minimise the :meth:`~quop_mpi.MPI.system.objective` function,
 
 .. math::
 
-    f(\vec{\gamma}, \vec{t}) = \frac{q_{max} - \langle \vec{\gamma}, \vec{t} | Q | \vec{\gamma}, \vec{t} \rangle}{q_{max}},
+    f(\vec{\gamma}, \vec{t}) = \langle \vec{\gamma}, \vec{t} | Q | \vec{\gamma}, \vec{t} \rangle.
 
-where :math:`q_{max}` corresponds to the highest quality solution. This is achieved by passing :math:`f(\vec{\gamma}, \vec{t})` to a classical optimizer. QuOp_MPI uses the SciPy basinhopping technique, with L-BFGS-B as the underlying optimization algorithm with bounds :math:`\gamma_i, t_i > 0`. A lower :math:`f(\vec{\gamma}, \vec{t})` corresponds to a greater probability or measuring a high quality solution.
+:math:`f(\vec{\gamma}, \vec{t})` is the expectation value of operator :math:`Q`.  This is achieved by passing :math:`f(\vec{\gamma}, \vec{t})` to a classical optimizer. QuOp_MPI uses the SciPy basinhopping technique, with L-BFGS-B as the underlying optimization algorithm with bounds :math:`\gamma_i, t_i > 0`. A lower :math:`f(\vec{\gamma}, \vec{t})` corresponds to a greater probability or measuring a high quality solution.
+
+.. note::
+    As QuOp_MPI seeks to minimize the :math:`f(\vec{\gamma}, \vec{t})`, it follows a convention where 'lower' values in :math:`\vec{q}` correspond to higher quality solutions. In this context, one may optimize for 'higher' values in :math:`\vec{q}` by inverting the sign of each :math:`\{q_i\}`.
 
 
 QAOA vs QWOA
@@ -46,20 +49,15 @@ QuOp_MPI consists of two simulation classes, :class:`~quop_mpi.MPI.qaoa` and :cl
 
 FFT provides the most computationally efficient method in the vast majority of cases. If :math:`W` is circulant, the :class:`~quop_mpi.MPI.qwoa` class should be used.
 
-Success Metrics
----------------
+Quality Cutoff
+--------------
 
-When comparing different QAOA-like algorithm a lower :math:`f(\vec{\gamma}, \vec{t})` is indicative of better performance. However this does not provide information about the minimum :math:`q_i` we are likely to measure. For this reason QuOp_MPI introduces the following success metric,
+The concept of quality cutoff provides a means of quantifying the likelihood of measuring a solution with :math:`q_i` below some maximum threshold in :math:`\{q_i\}`.
 
 .. math::
 
-    \text{success} = \left\{ \begin{array}{ c c}
-        \text{True}, & P_{\text{success}} > P_{\text{target}}  \\
-        \text{False}, & \text{otherwise}
-    \end{array} \right.
+    P_{\text{cutoff}} = \sum_{\tilde{q}_i < \tilde{q}_{\text{cutoff}}} p_i
 
-where :math:`P_{\text{success}} = \sum_{\tilde{q}_i > \tilde{q}_\text{cutoff}} p_i` with :math:`\tilde{q}_\text{cutoff}` being the minimum acceptable :math:`\tilde{q}_i = \frac{q_i}{q_\text{max}}`. :math:`P_\text{target}` defines the minimum desired value of :math:`P_\text{success}`. The package defaults are :math:`\tilde{q}_\text{cutoff} = 0.9` and :math:`P_\text{target} = 2/3`. These can be re-defined via :meth:`~quop_mpi.MPI.system.state_success`.
+Where :math:`\tilde{q}_i \in \frac{\{q_i\}}{\text{max}\{q_i\}}` and :math:`q_{\text{cutoff}}` is a user defined parameter between 0 and 1.  :math:`q_{\text{cutoff}}` is specified by :meth:`~quop_mpi.MPI.system.set_quality_cutoff`, defaulting to 0.1 otherwise.
 
-.. note::
 
-    The optimisation result, accessed by :meth:`~quop_mpi.MPI.system.print_result` also has a `success` parameter. This refers to the convergence of the optimisation process.

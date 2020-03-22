@@ -24,7 +24,7 @@ author = 'Edric Matwiejew, Sam Marsh'
 autodoc_mock_imports = ["mpi4py", "quop_mpi.fqwoa_mpi", "quop_mpi.fMPI"]
 
 # The full version, including alpha/beta/rc tags
-release = 'alpha'
+release = '1.0.0'
 
 
 # -- General configuration ---------------------------------------------------

@@ -105,7 +105,7 @@ To set up real-time logging of the QAOA or QWOA results a log file must be defin
 
 .. code-block:: python
 
-    qaoa.log_success("log", "qaoa", action = "a")
+    qaoa.log_results("log", "qaoa", action = "a")
 
 When the QAOA is executed the :meth:`n, p, \tilde{q}_\text{cutoff}`, the final value of :math:`f(\vec{\gamma},\vec{t}), \langle \vec{\gamma}, \vec{t} | \vec{\gamma}, \vec{t} \rangle` and, the in-program simulation time will be saved to log.csv with the identifier "qaoa". The same log file can be used for multiple simulations.
 
@@ -122,7 +122,7 @@ Simulation then proceeds as with the QWOA, excluding class to :meth:`~quop_mpi.M
 Automated Benchmarking
 ----------------------
 
-It is often the case that one wishes to see how a given system responds as a function of :math:`p`. To assist with this QuOp_MPI provides the :meth:`~quop_mpi.MPI.system.benchmark` method. Note that :meth:`~quop_mpi.MPI.system.log_success` can be used to log the results for each value of :meth:`p` and repetition.
+It is often the case that one wishes to see how a given system responds as a function of :math:`p`. To assist with this QuOp_MPI provides the :meth:`~quop_mpi.MPI.system.benchmark` method. Note that :meth:`~quop_mpi.MPI.system.log_results` can be used to log the results for each value of :meth:`p` and repetition.
 
 .. note:: 
     `param_func`,`qual_func and `state_func` each require an integer `seed` keyword argument.
@@ -148,7 +148,7 @@ It is often the case that one wishes to see how a given system responds as a fun
         hypercube = nx.to_scipy_sparse_matrix(nx.hypercube_graph(qubits))
         qaoa = qw.MPI.qaoa(hypercube,comm)
         qaoa.set_initial_state(name = "equal")
-        qaoa.log_success("benchmark_example","qaoa_equal",action="a")
+        qaoa.log_results("benchmark_example","qaoa_equal",action="a")
         qaoa.set_qualities(qw.qualities.random_floats)
         qaoa.benchmark(
                 ps,
