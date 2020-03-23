@@ -39,6 +39,7 @@ From: pawsey/mpi-base:3.1.4
     pandas \
     scipy \
     pandas \
+    pandas-datareader \
 
     git clone https://github.com/Edric-Matwiejew/quop_mpi
     cd quop_mpi/src
