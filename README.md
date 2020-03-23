@@ -72,14 +72,14 @@ FFTW and HDF5, as provided by the Ubuntu app repository, have not been built wit
     tar -xvf hdf5-1.10.6.tar.gz
     cd hdf5-1.10.6
     ./configure --enable-fortran --enable-shared --enable-parallel --prefix=/usr/local
-    make && make install
+    make && sudo make install
     cd
 
     wget http://www.fftw.org/fftw-3.3.8.tar.gz
     tar -xvf fftw-3.3.8.tar.gz
     cd fftw-3.3.8
     ./configure --enable-mpi --enable-fortran --enable-shared --prefix=/usr/local
-    make && make install
+    make && sudo make install
     cd
 
 Install the python dependencies:
