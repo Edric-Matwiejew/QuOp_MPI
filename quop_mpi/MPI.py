@@ -21,7 +21,7 @@ class system(object):
 
         class(system):
 
-            def __init__(self, n_qubits, MPI_communicator):
+            def __init__(self, sys_size, MPI_communicator):
 
                 ...
 
@@ -397,7 +397,7 @@ class system(object):
 
             self.logfile.write('{},{},{},{},{},{},{},{},{}\n'.format(
                 self.label,
-                self.n_qubits,
+                self.sys_size,
                 self.p,
                 self.quality_cutoff,
                 self.cutoff_pass_probability,
@@ -524,7 +524,7 @@ class qaoa(system):
         super().__init__()
 
         self.size = W.shape[0]
-        self.n_qubits = int(np.log(self.size)/np.log(2.0))
+        self.sys_size = int(np.log(self.size)/np.log(2.0))
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.precision = "dp"
@@ -646,18 +646,23 @@ class qwoa(system):
     Evolution of the :class:`qwoa` state occurs via calls to the compiled Fortran library
     'fqwoa_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
 
-    :param n_qubits: The number of qubits, :math:`n`, the total distributed system is of size :math:`n^2`.
-    :type n_qubits: integer
+    :param sys_size: The number of qubits or dimension of the system operators. 
+    :type sys_size: integer
 
     :param MPI_communicator: An MPI communicator provided via MPI4Py.
     :type MPI_communicator: MPI communicator.
+
+    :param qubits: If qubits is True, sys_size is the number of qubits, producing a system of size :math:`2^n`. Otherwise sys_size is equal to :math:`n`, allowing for simulations with a non-integer number of qubits.
     """
-    def __init__(self, n_qubits, MPI_communicator):
+    def __init__(self, sys_size, MPI_communicator, qubits = True):
 
         super().__init__()
 
-        self.n_qubits = n_qubits
-        self.size = 2**n_qubits
+        self.sys_size = sys_size
+        if qubits:
+            self.size = 2**sys_size
+        else:
+            self.size = sys_size
         self.comm = MPI_communicator
 
         # When performing a parallel 1D-FFT using FFTW it may be the case that
