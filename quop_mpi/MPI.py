@@ -385,7 +385,7 @@ class system(object):
             else:
                 self.logfile = open(filename + ".csv", "w")
                 self.logfile.write(
-                        'label,qubits,p,quality_cutoff,cutoff_pass_probability,objective_function,optimization_success,state_norm,simulation_time\n')
+                        'label,qubits,system_size,p,quality_cutoff,cutoff_pass_probability,objective_function,optimization_success,state_norm,simulation_time\n')
 
     def log_update(self):
         """
@@ -395,8 +395,9 @@ class system(object):
 
         if self.comm.Get_rank() == 0:
 
-            self.logfile.write('{},{},{},{},{},{},{},{},{}\n'.format(
+            self.logfile.write('{},{},{},{},{},{},{},{},{},{}\n'.format(
                 self.label,
+                self.n_qubits,
                 self.sys_size,
                 self.p,
                 self.quality_cutoff,
@@ -524,7 +525,7 @@ class qaoa(system):
         super().__init__()
 
         self.size = W.shape[0]
-        self.sys_size = int(np.log(self.size)/np.log(2.0))
+        self.n_qubits = np.log(self.size)/np.log(2.0)
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.precision = "dp"
@@ -661,8 +662,10 @@ class qwoa(system):
         self.sys_size = sys_size
         if qubits:
             self.size = 2**sys_size
+            self.n_qubits = sys_size
         else:
             self.size = sys_size
+            self.n_qubits = np.log(self.size)/np.log(2.0)
         self.comm = MPI_communicator
 
         # When performing a parallel 1D-FFT using FFTW it may be the case that
