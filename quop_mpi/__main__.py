@@ -15,7 +15,7 @@ def x0(p):
 
 qwoa = qu.MPI.qwoa(n_qubits, comm)
 qwoa.log_results("log", "qwoa", action = "w")
-qwoa.set_graph(qu.graph_array.complete(qwoa.size))
+qwoa.set_graph(qu.graph_array.complete(qwoa.system_size))
 qwoa.set_initial_state(name="equal")
 qwoa.set_qualities(qu.qualities.random_floats)
 qwoa.plan()

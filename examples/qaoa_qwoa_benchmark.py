@@ -13,7 +13,7 @@ for qubits in range(2,4):
     hypercube = nx.to_scipy_sparse_matrix(nx.hypercube_graph(qubits))
     qaoa = qw.MPI.qaoa(hypercube,comm)
     qaoa.set_initial_state(name = "equal")
-    qaoa.log_success("benchmark_example","qaoa_equal",action="a")
+    qaoa.log_results("benchmark_example","qaoa_equal",action="a")
     qaoa.set_qualities(qw.qualities.random_floats)
     qaoa.benchmark(
             range(1,3),
@@ -26,8 +26,8 @@ for qubits in range(2,4):
 for qubits in range(2,4):
     qwoa = qw.MPI.qwoa(qubits,comm)
     qwoa.set_initial_state(name="equal")
-    qwoa.log_success("qwoa_complete_equal","equal",action="a")
-    qwoa.set_graph(qw.graph_array.complete(qwoa.size))
+    qwoa.log_results("qwoa_complete_equal","equal",action="a")
+    qwoa.set_graph(qw.graph_array.complete(qwoa.system_size))
     qwoa.plan()
     qwoa.benchmark(
             range(1,3),

@@ -21,7 +21,7 @@ class system(object):
 
         class(system):
 
-            def __init__(self, sys_size, MPI_communicator):
+            def __init__(self, system_size, MPI_communicator):
 
                 ...
 
@@ -184,17 +184,17 @@ class system(object):
         self.lowest_rank = self.comm.allreduce(rank, op = MPI.MIN)
 
         if name == "equal":
-            self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
         elif name == "localized":
-            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
             if self.comm.Get_rank() == self.lowest_rank:
                 self.initial_state[0] = 1.0
         elif name == "split":
-            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
             if self.comm.Get_rank() == self.lowest_rank:
                 self.initial_state[0:2] = 1.0/np.sqrt(2.0)
         elif vertices is not None:
-            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.size))
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
             total_verticies = self.comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
             for vertex in vertices:
                 self.initial_state[vertex] = 1.0/np.sqrt(total_verticies)
@@ -216,7 +216,7 @@ class system(object):
         :param args: Extra arguments to pass to the quality function.
         :type args: array, optional
         """
-        self.qualities = func(self.size, self.local_i, self.local_i_offset, *args, **kwargs)
+        self.qualities = func(self.system_size, self.local_i, self.local_i_offset, *args, **kwargs)
 
         if len(self.qualities) == 0:
             local_max = np.finfo(np.float64).min
@@ -398,7 +398,7 @@ class system(object):
             self.logfile.write('{},{},{},{},{},{},{},{},{},{}\n'.format(
                 self.label,
                 self.n_qubits,
-                self.sys_size,
+                self.system_size,
                 self.p,
                 self.quality_cutoff,
                 self.cutoff_pass_probability,
@@ -491,7 +491,7 @@ class system(object):
                 self.config_name + str("/"),
                 "final_state",
                 "a",
-                self.size,
+                self.system_size,
                 self.local_i_offset,
                 self.final_state[:self.local_i],
                 self.comm.py2f())
@@ -501,7 +501,7 @@ class system(object):
                 self.config_name + str("/"),
                 "qualities",
                 "a",
-                self.size,
+                self.system_size,
                 self.local_i_offset,
                 self.qualities,
                 self.comm.py2f())
@@ -524,13 +524,13 @@ class qaoa(system):
 
         super().__init__()
 
-        self.size = W.shape[0]
-        self.n_qubits = np.log(self.size)/np.log(2.0)
+        self.system_size = W.shape[0]
+        self.n_qubits = np.log(self.system_size)/np.log(2.0)
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.precision = "dp"
 
-        self.partition_table = self._generate_partition_table(self.size, self.comm)
+        self.partition_table = self._generate_partition_table(self.system_size, self.comm)
 
         self.local_i = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
         self.local_i_offset = self.partition_table[self.rank] - 1
@@ -543,14 +543,14 @@ class qaoa(system):
                 self.comm)
 
         self.W_num_rec_inds, self.W_rec_disps, self.W_num_send_inds, self.W_send_disps = fMPI.rec_a(
-                   self.size,
+                   self.system_size,
                    self.W_row_starts,
                    self.W_col_indexes,
                    self.partition_table,
                    self.comm.py2f())
 
         self.W_local_col_inds, self.W_rhs_send_inds = fMPI.rec_b(
-                self.size,
+                self.system_size,
                 np.sum(self.W_num_send_inds),
                 self.W_row_starts,
                 self.W_col_indexes,
@@ -562,7 +562,7 @@ class qaoa(system):
                 self.comm.py2f())
 
         self.one_norms, self.num_norms = fMPI.one_norm_series(
-                self.size,
+                self.system_size,
                 self.W_row_starts,
                 self.W_col_indexes,
                 -I * self.W_values,
@@ -621,7 +621,7 @@ class qaoa(system):
             self.final_state = np.multiply(np.exp(-I * gamma * self.qualities), self.final_state)
 
             self.final_state = fMPI.step(
-                    self.size,
+                    self.system_size,
                     self.local_i,
                     self.W_row_starts,
                     self.W_col_indexes,
@@ -647,25 +647,25 @@ class qwoa(system):
     Evolution of the :class:`qwoa` state occurs via calls to the compiled Fortran library
     'fqwoa_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
 
-    :param sys_size: The number of qubits or dimension of the system operators. 
-    :type sys_size: integer
+    :param system_size: The number of qubits or dimension of the system operators. 
+    :type system_size: integer
 
     :param MPI_communicator: An MPI communicator provided via MPI4Py.
     :type MPI_communicator: MPI communicator.
 
-    :param qubits: If qubits is True, sys_size is the number of qubits, producing a system of size :math:`2^n`. Otherwise sys_size is equal to :math:`n`, allowing for simulations with a non-integer number of qubits.
+    :param qubits: If qubits is True, system_size is the number of qubits, producing a system of size :math:`2^n`. Otherwise system_size is equal to :math:`n`, allowing for simulations with a non-integer number of qubits.
     """
-    def __init__(self, sys_size, MPI_communicator, qubits = True):
+    def __init__(self, system_size, MPI_communicator, qubits = True):
 
         super().__init__()
 
-        self.sys_size = sys_size
+        self.system_size = system_size
         if qubits:
-            self.size = 2**sys_size
-            self.n_qubits = sys_size
+            self.system_size = 2**system_size
+            self.n_qubits = system_size
         else:
-            self.size = sys_size
-            self.n_qubits = np.log(self.size)/np.log(2.0)
+            self.system_size = system_size
+            self.n_qubits = np.log(self.system_size)/np.log(2.0)
         self.comm = MPI_communicator
 
         # When performing a parallel 1D-FFT using FFTW it may be the case that
@@ -675,7 +675,7 @@ class qwoa(system):
         # elements stored at each node and their offset relative to the 0-index
         # of the distributed array.
 
-        local_sizes = fqwoa_mpi.mpi_local_size(self.size, self.comm.py2f())
+        local_sizes = fqwoa_mpi.mpi_local_size(self.system_size, self.comm.py2f())
 
         self.alloc_local = local_sizes[0]
         self.local_i = local_sizes[1]
@@ -714,7 +714,7 @@ class qwoa(system):
         efficiently perform 1D parallel Fourier and inverse Fourier transforms.
         """
         fqwoa_mpi.qwoa_state(
-                self.size,
+                self.system_size,
                 self.dummy_gammas,
                 self.dummy_ts,
                 self.dummy_qualities,
@@ -735,7 +735,7 @@ class qwoa(system):
         :type ts: float, array
         """
         fqwoa_mpi.qwoa_state(
-                self.size,
+                self.system_size,
                 gammas,
                 ts,
                 self.qualities,
@@ -750,7 +750,7 @@ class qwoa(system):
         Deallocates/frees ancillary arrays and pointers needed by FFTW.
         """
         fqwoa_mpi.qwoa_state(
-                self.size,
+                self.system_size,
                 self.dummy_gammas,
                 self.dummy_ts,
                 self.dummy_qualities,
@@ -788,7 +788,7 @@ class qwoa(system):
                 self.config_name + str("/"),
                 "eigenvalues",
                 "a",
-                self.size,
+                self.system_size,
                 self.local_i_offset,
                 self.lambdas,
                 self.comm.py2f())
