@@ -138,6 +138,8 @@ class system(object):
         # Renaming dictionary key to prevent ambiguity in the context of QuOp_MPI.
         if self.comm.Get_rank() == 0:
             self.result["lowest_optimization_result"]["optimization_success"] = self.result["lowest_optimization_result"]["success"]
+            self.result["lowest_optimization_result"].pop("success")
+
 
         if self.log:
             self.state_cutoff_pass(self.quality_cutoff)
@@ -264,6 +266,7 @@ class system(object):
             filename = None,
             label = 'test',
             save_action = "a",
+            param_persist = False,
             *args,
             **kwargs):
 
@@ -309,6 +312,9 @@ class system(object):
         :param save_action: Action taken durring first .5 file write. "a", append. "w", over-write.
         :type save_action: string, optional, default = "a"
 
+        :param param_persist: If True the optimized :math:`\\beta` and :math`\gamma` values which achieved the lowest objective function value  for all repeats at :math:`p` will be used as starting parameters for :math:`p + 1`.
+        :type param_persist: boolean, optional
+
         :param kwargs: Keyword arguments to pass to the :meth:`~system.set_qualities` method.
         :type kwargs: dictionary, optional
 
@@ -317,6 +323,10 @@ class system(object):
         """
 
         first = True
+
+        if param_persist:
+            best_result = np.finfo(dtype=np.float64).max
+            result = None
 
         for p in ps:
 
@@ -328,7 +338,10 @@ class system(object):
 
                 np.random.seed(i)
 
-                self.gammas_ts = param_func(p, seed = i)
+                if (not param_persist) or (p == 1):
+                    self.gammas_ts = param_func(p, seed = i)
+                else:
+                    self.gammas_ts = np.append(previous_params, param_func(1, seed = i))
 
                 if qual_func is not None:
                     self.set_qualities(qual_func, seed = i, *args, **kwargs)
@@ -341,6 +354,17 @@ class system(object):
 
                 self.execute(self.gammas_ts)
 
+                if param_persist:
+
+                    if self.rank == 0:
+                        result = self.result['fun']
+
+                    result = self.comm.bcast(result, root = 0)
+
+                    if result < best_result:
+                        best_result = result
+                        best_params = self.gammas_ts
+
                 if self.comm.Get_rank() == 0:
                     if verbose:
                         print(self.result)
@@ -350,6 +374,9 @@ class system(object):
                         self.save(filename, label + '_' + str(p) + '_' + str(i), action = save_action)
                     else:
                         self.save(filename, label + '_' + str(p) + '_' + str(i), action = "a")
+
+            if param_persist:
+                previous_params = best_params
 
     def log_results(self, filename, label, action = "a"):
         """
@@ -647,7 +674,7 @@ class qwoa(system):
     Evolution of the :class:`qwoa` state occurs via calls to the compiled Fortran library
     'fqwoa_mpi', which makes use of MPI enabled FFTW (Fastest Fourier Transform in the West).
 
-    :param system_size: The number of qubits or dimension of the system operators. 
+    :param system_size: The number of qubits or dimension of the system operators.
     :type system_size: integer
 
     :param MPI_communicator: An MPI communicator provided via MPI4Py.
@@ -660,13 +687,16 @@ class qwoa(system):
         super().__init__()
 
         self.system_size = system_size
+
         if qubits:
             self.system_size = 2**system_size
             self.n_qubits = system_size
         else:
             self.system_size = system_size
             self.n_qubits = np.log(self.system_size)/np.log(2.0)
+
         self.comm = MPI_communicator
+        self.rank = self.comm.Get_rank()
 
         # When performing a parallel 1D-FFT using FFTW it may be the case that
         # the transformed array is distributed on the MPI communicator differently
