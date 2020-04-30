@@ -262,16 +262,16 @@ class system(object):
             param_func,
             qual_func = None,
             state_func = None,
+            param_persist = False,
             verbose = True,
             filename = None,
             label = 'test',
             save_action = "a",
-            param_persist = False,
             *args,
             **kwargs):
 
         """
-        A convience method provided for users who wish to see how a QAOA algorithm
+        This provides an easy method by which to study how a QAOA algorithm
         performs with increases to the circuit depth, :math:`p`.
 
         :param ps: List of :math:`p` values.
@@ -280,9 +280,8 @@ class system(object):
         :param repeats: The number of repeats at each value of :math:`p`.
         :type repeats: integer
 
-        The following three parameters allow the user to specify functions to generate
-        unique starting conditions with each repeat. Of these `param_func` is required
-        as :math:`(\\vec{\gamma},\\vec{t})` grows with :math:`p`.
+        The following four parameters specify the starting conditions for each repeat and :math:`p`.
+        Of these `param_func` is required as :math:`(\\vec{\gamma},\\vec{t})` grows with :math:`p`.
 
         :param param_func: Method returning starting :math:`(\\vec{\gamma},\\vec{t})`.
         :type param_func: callable
@@ -300,6 +299,11 @@ class system(object):
         :param state_func: Method to generate a distributed inital state, compatible with :meth:`~system.set_initial_state`.
         :type state_func: callable, optional, default = None
 
+        :param param_persist: If True the optimized :math:`\\beta` and :math`\gamma` values which achieved the lowest objective function value  for all repeats at :math:`p` will be used as starting parameters for :math:`p + 1`.
+        :type param_persist: boolean, optional
+
+        The following parameters specify the output behaviours.
+
         :param verbose: If True, print current :math:`p`, repitition number and optimization results.
         :type verbose: boolean, optional, default = True
 
@@ -311,10 +315,6 @@ class system(object):
 
         :param save_action: Action taken durring first .5 file write. "a", append. "w", over-write.
         :type save_action: string, optional, default = "a"
-
-        :param param_persist: If True the optimized :math:`\\beta` and :math`\gamma` values which achieved the lowest objective function value  for all repeats at :math:`p` will be used as starting parameters for :math:`p + 1`.
-        :type param_persist: boolean, optional
-
         :param kwargs: Keyword arguments to pass to the :meth:`~system.set_qualities` method.
         :type kwargs: dictionary, optional
 
