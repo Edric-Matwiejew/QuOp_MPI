@@ -324,24 +324,27 @@ class system(object):
 
         first = True
 
-        if param_persist:
-            best_result = np.finfo(dtype=np.float64).max
-            result = None
-
         for p in ps:
+
+            if param_persist:
+                best_p_result = np.finfo(dtype=np.float64).max
+                result = None
 
             if verbose:
                 if self.comm.Get_rank() == 0:
                     print('Starting p = ' + str(p) + ':')
 
             for i  in range(1, repeats + 1):
+                print(repeats,i)
 
                 np.random.seed(i)
 
                 if (not param_persist) or (p == 1):
                     self.gammas_ts = param_func(p, seed = i)
                 else:
-                    self.gammas_ts = np.append(previous_params, param_func(1, seed = i))
+                    gammas, ts = np.split(previous_params, 2)
+                    gamma, t = param_func(1, seed = i)
+                    self.gammas_ts = np.append(np.append(gammas, gamma), np.append(ts, t))
 
                 if qual_func is not None:
                     self.set_qualities(qual_func, seed = i, *args, **kwargs)
@@ -361,9 +364,9 @@ class system(object):
 
                     result = self.comm.bcast(result, root = 0)
 
-                    if result < best_result:
-                        best_result = result
-                        best_params = self.gammas_ts
+                    if result < best_p_result:
+                        best_p_result = result
+                        best_p_params = self.gammas_ts
 
                 if self.comm.Get_rank() == 0:
                     if verbose:
@@ -376,7 +379,7 @@ class system(object):
                         self.save(filename, label + '_' + str(p) + '_' + str(i), action = "a")
 
             if param_persist:
-                previous_params = best_params
+                previous_params = best_p_params
 
     def log_results(self, filename, label, action = "a"):
         """
