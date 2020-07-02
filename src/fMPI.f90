@@ -11,6 +11,7 @@ subroutine rec_a(   M_rows, &
                     M_num_send_inds, &
                     M_send_disps)
 
+        use :: iso_precisions
         use :: Sparse
 
         implicit none
@@ -53,7 +54,7 @@ subroutine rec_a(   M_rows, &
         M%num_send_inds(1:size(M_num_send_inds)) => M_num_send_inds
         M%send_disps(1:size(M_send_disps)) => M_send_disps
 
-        call Reconcile_Communications_A(M, partition_table, MPI_communicator)
+        call Reconcile_Communications(M, partition_table, MPI_communicator)
 
 end subroutine rec_a
 
@@ -73,6 +74,7 @@ subroutine rec_b(   M_rows, &
                     M_local_col_inds, &
                     M_RHS_send_inds)
 
+        use :: iso_precisions
         use :: Sparse
 
         implicit none
@@ -82,12 +84,12 @@ subroutine rec_b(   M_rows, &
         integer, intent(in) :: M_n_row_starts
         integer, intent(in) :: num_send
         integer, dimension(M_n_row_starts), target, intent(in) :: M_row_starts
+        integer, intent(in) :: flock
         integer, dimension(M_nnz), target, intent(in) :: M_col_indexes
         integer, dimension(flock), target, intent(in) :: M_rec_disps
         integer, dimension(flock), target, intent(in) :: M_num_send_inds
         integer, dimension(flock), target, intent(in) :: M_num_rec_inds
         integer, dimension(flock), target, intent(in) :: M_send_disps
-        integer, intent(in) :: flock
         integer, dimension(flock + 1), intent(in) :: partition_table
         integer, intent(in) :: MPI_communicator
         integer, dimension(M_nnz), target, intent(out) :: M_local_col_inds
@@ -120,7 +122,7 @@ subroutine rec_b(   M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
         M%RHS_send_inds(1:size(M_RHS_send_inds)) => M_RHS_send_inds
 
-        call Reconcile_Communications_B(M, partition_table, MPI_communicator)
+        call Reconcile_Communications(M, partition_table, MPI_communicator)
 
 end subroutine rec_b
 
@@ -145,6 +147,7 @@ subroutine one_norm_series( M_rows, &
                             one_norm_array, &
                             p)
 
+        use :: iso_precisions
         use :: Sparse
         use :: One_Norms
         use :: MPI
@@ -160,17 +163,17 @@ subroutine one_norm_series( M_rows, &
         integer, intent(in) :: M_sends
         integer, dimension(M_n_row_starts), target, intent(in) :: M_row_starts
         integer, dimension(M_n_col_indexes), target, intent(in) :: M_col_indexes
-        complex(8), dimension(M_n_values), target, intent(in) :: M_values
+        complex(dp), dimension(M_n_values), target, intent(in) :: M_values
+        integer, intent(in) :: flock
         integer, dimension(flock), target, intent(in) :: M_num_rec_inds
         integer, dimension(flock), target, intent(in) :: M_rec_disps
         integer, dimension(flock), target, intent(in) :: M_num_send_inds
         integer, dimension(flock), target, intent(in) :: M_send_disps
         integer, dimension(M_n_local_col_indexes), target, intent(in) :: M_local_col_inds
         integer, dimension(M_sends), target, intent(in) :: M_RHS_send_inds
-        integer, intent(in) :: flock
         integer, dimension(flock + 1), intent(in) :: partition_table
         integer, intent(in) :: MPI_communicator
-        real(8), dimension(9), intent(out) :: one_norm_array
+        real(dp), dimension(9), intent(out) :: one_norm_array
         integer, intent(out) :: p
 
         type(CSR) :: M
@@ -188,7 +191,7 @@ subroutine one_norm_series( M_rows, &
         integer, parameter :: l = 3
         integer, parameter :: pmax = 8
 
-        real(8), dimension(9) :: alphas
+        real(dp), dimension(9) :: alphas
 
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
@@ -243,13 +246,6 @@ subroutine one_norm_series( M_rows, &
 
             alphas(i) = one_norm_array(i)**(1_dp/real(i,8))
 
-            if (i >= 3) then
-                if((abs((alphas(i - 1) - alphas(i))/alphas(i))/alphas(i) < 0.05)) then
-                    p = i - 1
-                    exit
-                endif
-            endif
-
         enddo
 
         deallocate(M_T%values, M_T%row_starts, M_T%local_col_inds, M_T%col_indexes, &
@@ -284,6 +280,7 @@ subroutine step(M_rows, &
                 target_precision, &
                 M_n_row_starts)
 
+        use :: iso_precisions
         use :: Sparse
         use :: Expm
 
@@ -299,21 +296,21 @@ subroutine step(M_rows, &
         integer, intent(in) :: M_sends
         integer, dimension(M_n_row_starts), target, intent(in) :: M_row_starts
         integer, dimension(M_n_col_indexes), target, intent(in) :: M_col_indexes
-        complex(8), dimension(M_n_values), target, intent(in) :: M_values
+        complex(dp), dimension(M_n_values), target, intent(in) :: M_values
+        integer, intent(in) :: flock
         integer, dimension(flock), target, intent(in) :: M_num_rec_inds
         integer, dimension(flock), target, intent(in) :: M_rec_disps
         integer, dimension(flock), target, intent(in) :: M_num_send_inds
         integer, dimension(flock), target, intent(in) :: M_send_disps
         integer, dimension(M_n_local_col_indexes), target, intent(in) :: M_local_col_inds
         integer, dimension(M_sends), target, intent(in) :: M_RHS_send_inds
-        real(8), intent(in) :: t
-        complex(8), dimension(n_rho0_v), intent(in) :: rho0_v
-        integer, intent(in) :: flock
+        real(dp), intent(in) :: t
+        complex(dp), dimension(n_rho0_v), intent(in) :: rho0_v
         integer, dimension(flock + 1), intent(in) :: partition_table
         integer, intent(inout) :: p
-        real(8), dimension(9), intent(inout) :: one_norm_array
+        real(dp), dimension(9), intent(inout) :: one_norm_array
         integer, intent(in) :: MPI_communicator
-        complex(8), dimension(n_rhot_v), intent(out) :: rhot_v
+        complex(dp), dimension(n_rhot_v), intent(out) :: rhot_v
         character(len=2), intent(in) :: target_precision
 
         type(CSR) :: M
@@ -322,6 +319,8 @@ subroutine step(M_rows, &
 
         integer :: lb, ub
         integer :: lb_elements, ub_elements
+
+        real(dp) :: start, finish
 
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
@@ -344,6 +343,8 @@ subroutine step(M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
         M%RHS_send_inds(1:size(M_RHS_send_inds)) => M_RHS_send_inds
 
+
+        start = MPI_wtime()
         call Expm_Multiply( M, &
                             rho0_v, &
                             t, &
@@ -353,5 +354,6 @@ subroutine step(M_rows, &
                             one_norm_series = one_norm_array, &
                             p = p, &
                             target_precision = target_precision)
+        finish = MPI_wtime()
 
 end subroutine step

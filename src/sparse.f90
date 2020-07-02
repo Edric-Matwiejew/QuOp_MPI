@@ -1,4 +1,6 @@
 !   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+
+
 !   Copyright (C) 2019 Edric Matwiejew
 !
 !   This program is free software: you can redistribute it and/or modify
@@ -22,7 +24,7 @@
 module Sparse
 
     use :: ISO_Precisions
-    use :: mpi
+    use :: MPI
 
     implicit none
 
@@ -37,20 +39,394 @@ module Sparse
         integer :: rows
         integer :: columns
         character(len=2) :: structure
-        integer, dimension(:), pointer :: row_starts
-        integer, dimension(:), pointer :: col_indexes
-        complex(dp), dimension(:), pointer :: values
+        integer, dimension(:), pointer :: row_starts => null()
+        integer, dimension(:), pointer :: col_indexes => null()
+        complex(dp), dimension(:), pointer :: values => null()
 
-        integer, dimension(:), pointer :: local_col_inds
-        integer, dimension(:), pointer :: RHS_send_inds
-        integer, dimension(:), pointer :: num_send_inds
-        integer, dimension(:), pointer :: send_disps
-        integer, dimension(:), pointer :: num_rec_inds
-        integer, dimension(:), pointer :: rec_disps
+        integer, dimension(:), pointer :: local_col_inds => null()
+        integer, dimension(:), pointer :: RHS_send_inds => null()
+        integer, dimension(:), pointer :: num_send_inds => null()
+        integer, dimension(:), pointer :: send_disps => null()
+        integer, dimension(:), pointer :: num_rec_inds => null()
+        integer, dimension(:), pointer :: rec_disps => null()
 
     end type CSR
 
+    !
+    !>  @brief Compressed Co-ordinates spase matrix derived type.
+    !
+
+    type, public :: COO
+
+        integer :: rows
+        integer :: columns
+        integer :: nnz = 0
+        integer, dimension(:), pointer :: row_indexes => null()
+        integer, dimension(:), pointer :: col_indexes => null()
+        complex(dp), dimension(:), pointer :: values => null()
+
+    end type COO
+
+    !
+    !>  @brief Sparse matrix accumulator, used in COO sum.
+    !
+
+    type, private :: SPA
+        complex(dp), dimension(:), allocatable :: w
+        integer, dimension(:), allocatable :: b
+        integer, dimension(:), allocatable :: LS
+        integer :: LS_ind = 1
+    end type SPA
+
     contains
+
+    !
+    !   Function: Kronecker_Delta
+    !
+    !>  @brief Kronecker delta function of integers i and j.
+    !
+    !>  @details This function is equal to 1 if i = j and 0 otherwise.
+
+    function Kronecker_Delta(i, j)
+
+        integer :: Kronecker_Delta
+        integer, intent(in) :: i, j
+
+        Kronecker_Delta = int((real((i+j)-abs(i-j)))/(real((i+j)+abs(i-j))))
+
+    end function Kronecker_Delta
+
+    !
+    !   Subroutine: Prefix_Sum
+    !
+    !>  @brief Prefix sum of an integer array.
+    !
+    !>  @details Perfroms an in-place prefix (or cumulative) sum on an integer
+    !>  array.
+    !>
+    !>> Prefix_Sum([1,2,3]) -> [1,3,6]
+
+    subroutine Prefix_Sum(array)
+
+            integer, dimension(:), intent(inout) :: array
+
+            integer :: i
+
+            do i = 2, size(array, 1)
+                array(i) = array(i - 1) + array(i)
+            enddo
+
+    end subroutine Prefix_Sum
+
+    !
+    ! COO (Compressed Co-ordiantes) subroutines.
+    !
+
+    !> @brief Convert a COO matrix to a CSR matrix.
+
+    subroutine COO_to_CSR(A, B, partition_table, MPI_communicator)
+
+        type(COO), intent(inout) :: A
+        type(CSR), intent(inout) :: B
+        integer, dimension(:), intent(in) :: partition_table
+        integer, intent(in) :: MPI_communicator
+
+        integer :: lower_bound, upper_bound
+
+        integer :: rank, flock, ierr
+        integer, dimension(:), allocatable :: nnz_per_rank, nnz_per_rank_temp
+
+        integer :: i
+
+        call mpi_comm_rank(MPI_communicator, rank, ierr)
+        call mpi_comm_size(MPI_communicator, flock, ierr)
+
+        lower_bound = partition_table(rank + 1)
+        upper_bound = partition_table(rank + 2) - 1
+
+        B%rows = A%rows
+        B%columns = A%columns
+
+        allocate(B%row_starts(lower_bound:upper_bound + 1))
+        allocate(B%col_indexes(A%nnz))
+        allocate(B%values(A%nnz))
+
+        B%row_starts = 0
+
+        i = 1
+        do i = 1, A%nnz
+            B%values(i) = A%values(i)
+            B%col_indexes(i) = A%col_indexes(i)
+            B%row_starts(A%row_indexes(i) + 1) = B%row_starts(A%row_indexes(i) + 1) + 1
+        enddo
+
+        allocate(nnz_per_rank(flock + 1))
+        allocate(nnz_per_rank_temp(flock + 1))
+
+        nnz_per_rank_temp = 0
+
+        nnz_per_rank_temp(rank + 2) = A%nnz
+
+        if (rank == 0) then
+            nnz_per_rank_temp(1) = 1
+        endif
+
+        call mpi_allreduce( nnz_per_rank_temp, &
+                            nnz_per_rank, &
+                            flock + 1, &
+                            MPI_INTEGER, &
+                            MPI_SUM, &
+                            MPI_communicator, &
+                            ierr)
+
+        do i = 2, rank + 2
+            nnz_per_rank(i) = nnz_per_rank(i) + nnz_per_rank(i - 1)
+        enddo
+
+        B%row_starts(lower_bound) = nnz_per_rank(rank + 1)
+
+        call prefix_sum(B%row_starts)
+
+    end subroutine COO_to_CSR
+
+    !
+    !> @brief Sparse matrix gather, used in COO sum.
+    !
+
+    subroutine Gather_SPA(row_spa, A, current_row)
+
+        type(SPA), intent(inout) :: row_spa
+        type(COO), intent(inout) :: A
+        integer, intent(in) :: current_row
+        real(dp) :: x
+        integer :: starting_nnz
+        integer :: i
+
+        starting_nnz = A%nnz
+
+        do i = 1, row_spa%LS_ind - 1
+            if (abs(row_spa%w(row_spa%LS(i))) > epsilon(x)) then
+                A%nnz = A%nnz + 1
+                !A%row_indexes(A%nnz) = current_row
+                A%col_indexes(A%nnz) = row_spa%LS(i)
+                A%values(A%nnz) = row_spa%w(row_spa%LS(i))
+            endif
+        enddo
+
+        A%row_indexes(starting_nnz + 1: A%nnz) = current_row
+
+        row_spa%LS_ind = 1
+
+    end subroutine Gather_SPA
+
+    !
+    !> @brief Scatter elements of a sparse matrix, used in COO matrix sum.
+    !
+
+    subroutine Scatter_SPA(row_spa, value, col_index, current_row)
+
+        type(SPA), intent(inout) :: row_spa
+        complex(dp), intent(in) :: value
+        integer, intent(in) :: col_index
+        integer, intent(in) :: current_row
+
+        if (row_spa%b(col_index) < current_row) then
+            row_spa%w(col_index) = value
+            row_spa%b(col_index) = current_row
+            row_spa%LS(row_spa%LS_ind) = col_index
+            row_spa%LS_ind = row_spa%LS_ind + 1
+        else
+            row_spa%w(col_index) = row_spa%w(col_index) + value
+        endif
+
+    end subroutine Scatter_SPA
+
+    !
+    !> @brief Allocate COO arrays prior to a matrix sum.
+    !
+
+    subroutine COO_Allocate_Sum(A, B, local_rows, C)
+
+        type(COO), intent(in) :: A
+        type(COO), intent(in) :: B
+        integer, intent(in) :: local_rows
+        type(COO), intent(inout) :: C
+
+        integer(qp) :: dense_dim
+
+        integer :: estimated_nnz
+
+        estimated_nnz = A%nnz + B%nnz
+
+        dense_dim = int(A%columns,qp)*int(local_rows,qp)
+
+        if (estimated_nnz > dense_dim) then
+            estimated_nnz = A%columns*local_rows
+        endif
+
+        allocate(C%row_indexes(estimated_nnz))
+        allocate(C%col_indexes(estimated_nnz))
+        allocate(C%values(estimated_nnz))
+
+    end subroutine COO_Allocate_Sum
+
+    !> @brief Deallocate a COO matrix.
+
+    subroutine COO_Deallocate(A)
+
+        type(COO), intent(inout) :: A
+
+        deallocate(A%row_indexes)
+        deallocate(A%col_indexes)
+        deallocate(A%values)
+
+        A%nnz = 0
+        A%rows = 0
+        A%columns = 0
+
+    end subroutine COO_Deallocate
+
+    !> @brief Copy COO matrix A to B, deallocate A.
+
+    subroutine COO_Move(A,B)
+
+        type(COO), intent(inout) :: A
+        type(COO), intent(inout) :: B
+
+        allocate(B%row_indexes(A%nnz))
+        allocate(B%col_indexes(A%nnz))
+        allocate(B%values(A%nnz))
+
+        B%rows = A%rows
+        B%columns = A%columns
+        B%nnz = A%nnz
+        B%row_indexes = A%row_indexes(1:A%nnz)
+        B%col_indexes = A%col_indexes(1:A%nnz)
+        B%values = A%values(1:A%nnz)
+
+        call COO_Deallocate(A)
+
+    end subroutine COO_Move
+
+    !> @brief Sum distributed COO matrices, A + B = C.
+
+    subroutine COO_Sum(A, B, C, partition_table, MPI_communicator)
+
+        type(COO), intent(inout) :: A
+        type(COO), intent(inout) :: B
+        type(COO), intent(inout) :: C
+        integer, dimension(:), intent(in) :: partition_table
+        integer, intent(in) :: MPI_communicator
+
+        type(SPA) :: row_spa
+
+        integer :: ka, kb
+        integer :: i
+
+        ! MPI
+        integer :: rank
+        integer :: ierr
+
+        call MPI_comm_rank(MPI_communicator, rank, ierr)
+
+        allocate(row_spa%w(A%columns))
+        allocate(row_spa%b(A%columns))
+        allocate(row_spa%LS(A%columns))
+
+        row_spa%b = 0
+        row_spa%LS = 0
+
+        ka = 1
+        kb = 1
+
+        do i = partition_table(rank + 1), partition_table(rank + 2) - 1
+            do while (ka <= A%nnz)
+                if (A%row_indexes(ka) /= i) exit
+                call scatter_spa(row_spa, A%values(ka), A%col_indexes(ka), i)
+                ka = ka + 1
+            enddo
+            do while (kb <= B%nnz)
+                if (B%row_indexes(kb) /= i) exit
+                call scatter_spa(row_spa, B%values(kb), B%col_indexes(kb), i)
+                kb = kb + 1
+            enddo
+            call Gather_SPA(row_spa, C, i)
+            row_spa%LS_ind = 1
+        enddo
+
+        C%rows = A%rows
+        C%columns = A%columns
+
+    end subroutine COO_Sum
+
+    !> @brief Transpose a CSR matrix.
+
+    subroutine CSR_Transpose(A, A_D)
+
+        type(CSR), intent(in) :: A
+        type(CSR), intent(out) :: A_D
+
+        integer, dimension(:), allocatable :: A_D_row_indexes
+        integer :: nnz
+
+        integer :: A_D_row_ind, A_D_col_ind
+        complex(dp) val
+
+        integer :: i, j
+
+        nnz = size(A%col_indexes,1)
+
+        A_D%rows = A%rows
+        A_D%columns = A%columns
+
+        allocate(A_D%row_starts(A%rows + 1))
+        allocate(A_D%col_indexes(nnz))
+        allocate(A_D%values(nnz))
+
+        A_D%row_starts = 0
+        A_D%row_starts(1) = 1
+        A_D%col_indexes = 0
+        A_D%values = A%values
+
+        allocate(A_D_row_indexes(nnz))
+
+        A_D_row_indexes = A%col_indexes
+
+        do i = 1, A%rows
+            do j = A%row_starts(i), A%row_starts(i + 1) - 1
+                A_D%col_indexes(j) = i
+                A_D%row_starts(A%col_indexes(j) + 1) = A_D%row_starts(A%col_indexes(j) + 1) + 1
+            enddo
+        enddo
+
+        call prefix_sum(A_D%row_starts)
+
+        do i = 2, nnz
+
+            A_D_row_ind = A_D_row_indexes(i)
+            A_D_col_ind = A_D%col_indexes(i)
+            val = A_D%values(i)
+
+            j = i - 1
+
+            do while (j >= 1)
+
+                if (A_D_row_indexes(j) <= A_D_row_ind) exit
+                    A_D_row_indexes(j + 1) = A_D_row_indexes(j)
+                    A_D%col_indexes(j + 1) = A_D%col_indexes(j)
+                    A_D%values(j + 1) = A_D%values(j)
+                    j = j - 1
+            enddo
+
+            A_D_row_indexes(j + 1) = A_D_row_ind
+            A_D%col_indexes(j + 1) = A_D_col_ind
+            A_D%values(j + 1) = val
+
+        enddo
+
+        deallocate(A_D_row_indexes)
+
+    end subroutine CSR_Transpose
 
     !
     ! Subroutine: Generate_Partition_Table
@@ -106,6 +482,8 @@ module Sparse
         partition_table(flock + 1) = rows + 1
 
     end subroutine Generate_Partition_Table
+
+    !> @brief Distribute complex array v row-wise over an MPI communicator.
 
     subroutine Distribute_Dense_Vector( v, &
                                         partition_table, &
@@ -382,7 +760,9 @@ module Sparse
 
     end subroutine Gather_Dense_Vector
 
-    subroutine Scatter_Dense_Maxtrix(   A, &
+    !> @brief Distribute a 2 x 2 complex matrix row-wise over a MPI communicator.
+
+    subroutine Scatter_Dense_Matrix(   A, &
                                         partition_table, &
                                         root, &
                                         A_local, &
@@ -475,7 +855,9 @@ module Sparse
 
         call mpi_barrier(MPI_communicator, ierr)
 
-    end subroutine Scatter_Dense_Maxtrix
+    end subroutine Scatter_Dense_Matrix
+
+    !> @brief Gather a row-wise distributed 2 x 2 complex array to MPI rank root.
 
     subroutine Gather_Dense_Matrix( A_local, &
                                     partition_table, &
@@ -581,6 +963,9 @@ module Sparse
 
     end subroutine Gather_Dense_Matrix
 
+    !> @brief Merge sort a CSR matrix A by an array of column indexes,
+    !> used to form the conjugate transpose of A.
+
 
     subroutine Merge_Dagger(column_indexes, &
                             row_indexes, &
@@ -650,6 +1035,9 @@ module Sparse
         enddo
 
     end subroutine Merge_Dagger
+    
+    !> @brief Insertion sort a CSR matrix A by an array of column indexes,
+    !> used to form the conjugate transpose of A.
 
     subroutine Insertion_Sort_Dagger(   column_indexes, &
                                         row_indexes, &
@@ -688,6 +1076,9 @@ module Sparse
         enddo
 
     end subroutine Insertion_Sort_Dagger
+
+    !> @brief Merge sort a CSR matrix A by an array of column indexes,
+    !> used to form the conjugate transpose of A.
 
     recursive subroutine Merge_Sort_Dagger( column_indexes, &
                                             row_indexes, &
@@ -735,6 +1126,8 @@ module Sparse
         endif
 
     end subroutine Merge_Sort_Dagger
+
+    !> @brief Returns the distributed conjugate transpose of CSR matrix A.
 
     subroutine CSR_Dagger(A, partition_table, A_T, MPI_communicator)
 
@@ -955,6 +1348,9 @@ module Sparse
 
     end subroutine CSR_Dagger
 
+    !> @briefs Determines which unique vector/matrix elements need to be communicated
+    !> between MPI process during sparse matrix multiplication.
+
     subroutine Reconcile_Communications(A, &
                                         partition_table, &
                                         MPI_communicator)
@@ -969,16 +1365,15 @@ module Sparse
         integer, dimension(:), allocatable :: RHS_rec_inds
         integer :: node
 
-        integer, dimension(:), allocatable :: mapping_offsets
-
         integer :: i, j
-
-        !real(dp) :: start, finish
 
         !MPI ENVIRONMENT
         integer :: rank
         integer :: flock
         integer :: ierr
+
+        integer, dimension(:), allocatable :: requires
+        integer :: ind
 
         call mpi_comm_size( mpi_communicator, &
                             flock, &
@@ -988,8 +1383,13 @@ module Sparse
                             rank, &
                             ierr)
 
+
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
+
+        allocate(requires(partition_table(flock + 1) - 1))
+
+        requires = 0
 
         lb_elements = lbound(A%col_indexes, 1)
         ub_elements = ubound(A%col_indexes, 1)
@@ -997,13 +1397,17 @@ module Sparse
         ! Determine the number of unique RHS indexes to recieve from each node
         ! and their total.
 
-        allocate(A%num_rec_inds(flock))
-        A%num_rec_inds = 0
+        if (.not. associated(A%num_rec_inds)) then
+            allocate(A%num_rec_inds(flock))
+        endif
 
-        !allocate(RHS_rec_inds(0))
+        A%num_rec_inds = 0
 
         total_rec_inds = 0
 
+        ind = 1
+
+        node = 0
         do i = lb_elements, ub_elements
 
             if ((A%col_indexes(i) < lb) .or. (A%col_indexes(i) > ub)) then
@@ -1017,15 +1421,28 @@ module Sparse
 
                     enddo
 
-                    A%num_rec_inds(node) = A%num_rec_inds(node) + 1
-                    total_rec_inds = total_rec_inds + 1
+                    if (requires(A%col_indexes(i)) == 0) then
+                        requires(A%col_indexes(i)) = 1
+                        A%num_rec_inds(node) = A%num_rec_inds(node) + 1
+                        total_rec_inds = total_rec_inds + 1
+                    endif
 
+            endif
+        enddo
+
+        ind = 0
+        do i = 1, size(requires)
+            if (requires(i) /= 0) then
+                requires(i) = requires(i) + ind
+                ind = ind + 1
             endif
         enddo
 
         ! Calculate the offset of the external elements in the 1D receive buffer.
 
-        allocate(A%rec_disps(flock))
+        if (.not. associated(A%rec_disps)) then
+            allocate(A%rec_disps(flock))
+        endif
 
         A%rec_disps = 0
         do i = 2, flock
@@ -1036,23 +1453,20 @@ module Sparse
         ! indexes pointing to external RHS vector elements such that their
         ! access occurs with the same efficiency as the local RHS elements.
 
-        allocate(A%local_col_inds(lb_elements:ub_elements))
+        if (.not. associated(A%local_col_inds)) then
+            allocate(A%local_col_inds(lb_elements:ub_elements))
+        endif
+
         do i = lb_elements, ub_elements
             A%local_col_inds(i) = A%col_indexes(i)
         enddo
 
-        !deallocate(RHS_rec_inds)
         allocate(RHS_rec_inds(total_rec_inds))
         RHS_rec_inds = 0
-
-        allocate(mapping_offsets(flock))
-        mapping_offsets = 1
 
         do i = lb_elements, ub_elements
 
             if ((A%local_col_inds(i) < lb) .or. (A%local_col_inds(i) > ub)) then
-
-                !if (.not. any(A%local_col_inds(i) == RHS_rec_inds)) then
 
                     do j = flock, 1, -1
 
@@ -1063,17 +1477,16 @@ module Sparse
 
                     enddo
 
-                    RHS_rec_inds(A%rec_disps(node) + mapping_offsets(node)) = A%local_col_inds(i)
+                    RHS_rec_inds(requires(A%local_col_inds(i))) = A%local_col_inds(i)
 
-                    A%local_col_inds(i) = ub + A%rec_disps(node) &
-                        + mapping_offsets(node)
-
-                    mapping_offsets(node) = mapping_offsets(node) + 1
+                    A%local_col_inds(i) = ub + requires(A%local_col_inds(i))
 
             endif
         enddo
 
-        allocate(A%num_send_inds(flock))
+        if (.not. associated(A%num_send_inds)) then
+            allocate(A%num_send_inds(flock))
+        endif
 
         call MPI_alltoall(  A%num_rec_inds, &
                             1, &
@@ -1084,8 +1497,13 @@ module Sparse
                             MPI_communicator, &
                             ierr)
 
-        allocate(A%RHS_send_inds(sum(A%num_send_inds)))
-        allocate(A%send_disps(flock))
+        if (.not. associated(A%RHS_send_inds)) then
+            allocate(A%RHS_send_inds(sum(A%num_send_inds)))
+        endif
+
+        if (.not. associated(A%send_disps)) then
+            allocate(A%send_disps(flock))
+        endif
 
         ! Calculate the offset of the local send elements in the 1D send buffer.
 
@@ -1178,9 +1596,11 @@ module Sparse
 
             do j = 1, B_col
 
+                !$omp parallel do
                 do i = 1, num_send
                     send_values(i) = B_resize(A%RHS_send_inds(i), j)
                 enddo
+                !$omp end parallel do
 
                 call MPI_alltoallv( send_values, &
                                     A%num_send_inds, &
@@ -1199,6 +1619,7 @@ module Sparse
 
             C_local = 0
 
+            !$omp parallel do
             do i = lb, ub
                 do j = A%row_starts(i), A%row_starts(i + 1) - 1
                     do k = 1, B_col
@@ -1207,6 +1628,7 @@ module Sparse
                     enddo
                 enddo
             enddo
+            !$omp end parallel do
 
             if (l < n) then
                 B_resize(lb:ub,:) = C_local
@@ -1267,11 +1689,6 @@ module Sparse
         ! MPI environment
         integer :: ierr
 
-        real(dp), save :: start_calc, finish_calc, start_comm, finish_comm, calc, comm, start_guff, finish_guff, guff
-        real(dp), save :: start_send, end_send, send
-
-        start_guff = MPI_wtime()
-
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
 
@@ -1302,23 +1719,16 @@ module Sparse
                 deallocate(rec_values)
                 deallocate(send_values)
             endif
-            !write(*,*) "calc", calc, "comm", comm, "sum", calc + comm, "guff", guff, "Allreduce + calc", send + calc, "ALL", send
             return
         endif
 
         u_resize(lb:ub) = u_local
 
-        finish_guff = MPI_wtime()
-
-        guff = guff + finish_guff - start_guff
-
-        start_comm = MPI_wtime()
-
+        !$omp parallel do
         do i = 1, num_send
             send_values(i) = u_resize(A%RHS_send_inds(i))
         enddo
-
-        start_send = MPI_wtime()
+        !$omp end parallel do
 
         call MPI_alltoallv( send_values, &
                             A%num_send_inds, &
@@ -1331,19 +1741,12 @@ module Sparse
                             MPI_communicator, &
                             ierr)
 
-        end_send = MPI_wtime()
-        send = send + end_send - start_send
-
-        finish_comm = MPI_wtime()
-
         u_resize(lb_resize:ub_resize) = rec_values
-
-        comm = comm + finish_comm - start_comm
-
-        start_calc = MPI_wtime()
 
         v_local = 0
 
+
+        !$omp parallel do
         do i = lb, ub
             do j = A%row_starts(i), A%row_starts(i + 1) - 1
 
@@ -1352,176 +1755,17 @@ module Sparse
 
             enddo
         enddo
-
-        finish_calc = MPI_wtime()
-
-        calc = calc + finish_calc - start_calc
+        !$omp end parallel do
 
         if (current_it == max_it) then
             deallocate(u_resize)
             deallocate(rec_values)
             deallocate(send_values)
-            !write(*,*) "calc", calc, "comm", comm, "sum", calc + comm, "guff", guff
-            !write(*,*) "AllReduce", send
         endif
 
     end subroutine SpMV_Series
 
-    subroutine Reconcile_Communications_A(A, &
-                                        partition_table, &
-                                        MPI_communicator)
-
-        type(CSR), intent(inout) :: A
-        integer, dimension(:), intent(in) :: partition_table
-        integer, intent(in) :: MPI_communicator
-
-        integer :: lb, ub, lb_elements, ub_elements
-
-        integer :: node
-
-        integer :: i, j
-
-        !MPI ENVIRONMENT
-        integer :: rank
-        integer :: flock
-        integer :: ierr
-
-        call mpi_comm_size( mpi_communicator, flock, ierr)
-
-        call mpi_comm_rank( mpi_communicator, rank, ierr)
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2) - 1
-
-        lb_elements = lbound(A%col_indexes, 1)
-        ub_elements = ubound(A%col_indexes, 1)
-
-        ! Determine the number of unique RHS indexes to recieve from each node
-        ! and their total.
-
-        A%num_rec_inds = 0
-
-        do i = lb_elements, ub_elements
-
-            if ((A%col_indexes(i) < lb) .or. (A%col_indexes(i) > ub)) then
-
-                    do j = flock, 1, -1
-
-                        if (A%col_indexes(i) >= partition_table(j)) then
-                            node = j
-                            exit
-                        endif
-
-                    enddo
-
-                    A%num_rec_inds(node) = A%num_rec_inds(node) + 1
-
-            endif
-        enddo
-
-        ! Calculate the offset of the external elements in the 1D receive buffer.
-
-        A%rec_disps = 0
-        do i = 2, flock
-            A%rec_disps(i) = A%rec_disps(i - 1) + A%num_rec_inds(i - 1)
-        enddo
-
-        call MPI_alltoall(  A%num_rec_inds, &
-                            1, &
-                            MPI_integer, &
-                            A%num_send_inds, &
-                            1, &
-                            MPI_integer, &
-                            MPI_communicator, &
-                            ierr)
-
-        A%send_disps = 0
-        do i = 2, flock
-            A%send_disps(i) = A%send_disps(i - 1) + A%num_send_inds(i - 1)
-        enddo
-
-    end subroutine Reconcile_Communications_A
-
-    subroutine Reconcile_Communications_B(A, &
-                                        partition_table, &
-                                        MPI_communicator)
-
-        type(CSR), intent(inout) :: A
-        integer, dimension(:), intent(in) :: partition_table
-        integer, intent(in) :: MPI_communicator
-
-        integer :: lb, ub, lb_elements, ub_elements
-
-        integer, dimension(:), allocatable :: RHS_rec_inds
-        integer :: node
-
-        integer, dimension(:), allocatable :: mapping_offsets
-
-        integer :: i, j
-
-        integer :: rank
-        integer :: flock
-        integer :: ierr
-
-        call mpi_comm_size( mpi_communicator, &
-                            flock, &
-                            ierr)
-
-        call mpi_comm_rank( mpi_communicator, &
-                            rank, &
-                            ierr)
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2) - 1
-
-        lb_elements = lbound(A%col_indexes, 1)
-        ub_elements = ubound(A%col_indexes, 1)
-
-        do i = lb_elements, ub_elements
-            A%local_col_inds(i) = A%col_indexes(i)
-        enddo
-
-        allocate(RHS_rec_inds(sum(A%num_rec_inds)))
-        RHS_rec_inds = 0
-
-        allocate(mapping_offsets(flock))
-        mapping_offsets = 1
-
-        do i = lb_elements, ub_elements
-
-            if ((A%local_col_inds(i) < lb) .or. (A%local_col_inds(i) > ub)) then
-
-                    do j = flock, 1, -1
-
-                        if (A%local_col_inds(i) >= partition_table(j)) then
-                            node = j
-                            exit
-                        endif
-
-                    enddo
-
-                    RHS_rec_inds(A%rec_disps(node) + mapping_offsets(node)) = A%local_col_inds(i)
-
-                    A%local_col_inds(i) = ub + A%rec_disps(node) &
-                        + mapping_offsets(node)
-
-                    mapping_offsets(node) = mapping_offsets(node) + 1
-
-            endif
-        enddo
-
-        call MPI_alltoallv( RHS_rec_inds, &
-                            A%num_rec_inds, &
-                            A%rec_disps, &
-                            MPI_integer, &
-                            A%RHS_send_inds, &
-                            A%num_send_inds, &
-                            A%send_disps, &
-                            MPI_integer, &
-                            MPI_communicator, &
-                            ierr)
-
-    end subroutine Reconcile_Communications_B
+    !> @brief Sort the rows of a distributed CSR matrix.
 
     subroutine Merge_CSR(   column_indexes, &
                             values, &
@@ -1583,6 +1827,8 @@ module Sparse
 
     end subroutine Merge_CSR
 
+    !> @brief Sort the rows of a distributed CSR matrix.
+
     subroutine Insertion_Sort_CSR(   column_indexes, &
                                         values)
 
@@ -1614,6 +1860,8 @@ module Sparse
         enddo
 
     end subroutine Insertion_Sort_CSR
+
+    !> @brief Sort the rows of a distributed CSR matrix.
 
     recursive subroutine Merge_Sort_CSR( column_indexes, &
                                             values, &

@@ -155,6 +155,8 @@ module One_Norms
         integer :: ierr
         integer :: MASTER = 0
 
+        ind_best = 0
+
         call mpi_comm_size(mpi_communicator, flock, ierr)
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
