@@ -32,7 +32,9 @@ def random_integers(N, local_i, local_i_offset, seed = 0):
     :param seed: Integer to pass to np.random.seed(local_i_offset + seed).
     :type seed: integer, optional, default = 0
     """
-    np.random.seed(local_i_offset + seed)
+    np.random.seed(seed)
+    for i in range(local_i_offset):
+        x = np.random.randint(1, N + 1)
     return np.random.randint(1, N + 1, size = local_i).astype(np.float64)
 
 def random_floats(N, local_i, local_i_offset, seed = 0, low = 0.0, high = 1.0):
@@ -58,7 +60,9 @@ def random_floats(N, local_i, local_i_offset, seed = 0, low = 0.0, high = 1.0):
     :type low: float, optional, default = 1.0
 
     """
-    np.random.seed(local_i_offset + seed)
+    np.random.seed(seed)
+    for i in range(local_i_offset):
+        x = np.random.random()
     return np.random.uniform(low = low, high = high, size = local_i)
 
 def portfolio(
