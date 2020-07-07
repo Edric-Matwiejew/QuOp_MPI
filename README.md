@@ -59,7 +59,7 @@ QuOp_MPI has been developed for Unix-like systems. While, in principle, it is pe
 
 ## Detailed installation on Ubuntu 18.04.4
 
-The following processes successfully installed QuOP_MPI on Ubuntu 18.04.4, this as not been tested on other Linux distros,, but the processes should generally be applicable with minor modifications.
+The following processes successfully installed QuOP_MPI on Ubuntu 18.04.4, this as not been tested on other Linux distros, but the processes should generally be applicable with minor modifications.
 
 Install MPICH and build applications:
 
@@ -110,6 +110,18 @@ Will install QuOp_MPI with reference to the QuOp_MPI source folder. This is usef
 Finally, check for successful installation by:
 
     mpiexec -N 2 python3 -m quop_mpi
+
+If QuOp_MPI is unable to find the HDF5 or FFTW shared object libraries.
+
+    nano ~/.bashrc
+    
+Move to the bottom of the file and add:
+
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:usr/local/lib
+
+Then exit Nano (saving changes) and finally,
+
+    source ~/.bashrc   
 
 ## Detailed Installation on MacOS X
 
@@ -166,11 +178,6 @@ Alternatively:
     python3 setup.py develop
 
 Will install QuOp_MPI with reference to the QuOp_MPI source folder. This is useful if you wish to debug or modify the package.
-
-Finally, check for successful installation by:
-
-    mpiexec -N 2 python3 -m quop_mpi
-
 
 Finally, check for successful installation by:
 
