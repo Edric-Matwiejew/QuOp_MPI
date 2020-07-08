@@ -117,7 +117,7 @@ If QuOp_MPI is unable to find the HDF5 or FFTW shared object libraries.
     
 Move to the bottom of the file and add:
 
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:usr/local/lib
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
 Then exit Nano (saving changes) and finally,
 
