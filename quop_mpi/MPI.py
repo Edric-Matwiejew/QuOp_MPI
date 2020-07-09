@@ -335,7 +335,6 @@ class system(object):
                     print('Starting p = ' + str(p) + ':')
 
             for i  in range(1, repeats + 1):
-                print(repeats,i)
 
                 np.random.seed(i)
 
