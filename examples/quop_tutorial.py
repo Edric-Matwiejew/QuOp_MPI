@@ -56,7 +56,7 @@ But don't worry about this, for now, we will discuss MPI another time.
 comm = MPI.COMM_WORLD
 
 """
-We now define our QAOA simulation parameters.
+We now define our QWOA simulation parameters.
 
 'n_qubits' defines the number of qubits we will be simulating. Due to the 
 quantum property of superposition, n qubits can represent 2^n possible 
