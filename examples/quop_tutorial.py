@@ -124,7 +124,8 @@ the adjacency matrix:
     G = 1 0 1
         1 1 0
 
-Where the row 'i' corresponds to vertex 'i' of the graph and a '1' indicates an edge between vertex 'i' and 'j'. 
+Where the row 'i' corresponds to vertex 'i' of the graph and a '1' indicates 
+an edge between vertex 'i' and 'j'. 
 
 Importantly, the first row of the adjacency matrix completely specifies the
 graph. For the same complete graph this is:
@@ -156,10 +157,10 @@ we can instead use "name = 'localized'".
 qwoa.set_initial_state(name="equal")
 
 """
-We will now set the qualities over which we are optimizing. In actual application, these would be computed in 'quantum parallel',
-with every possible solution calculated in a single step. However, if we
-measure the quantum system after doing so it would collapse into a single
-(maybe not very good) state. QWOA is a method for increasing our 
+We will now set the qualities over which we are optimizing. In actual application, 
+these would be computed in 'quantum parallel', with every possible solution calculated 
+in the same step. However, if we measure the quantum system after doing so it would 
+collapse into a single (maybe not very good) state. QWOA is a method for increasing our 
 chances of measuring a good solution.
 
 For our simulations, we can see the best quality solution simply by looking
@@ -173,7 +174,8 @@ If we want to minimise, or:
 
 If we want to maximise.
 
-But for the problems we want QWOA to solve, the array of qualities would too large to fit in a classical computer's memory!
+But for the problems we want QWOA to solve, the array of qualities would too large to 
+fit in a classical computer's memory!
 
 For this example, the qualities will be random numbers between 0 and 1,
 if QWOA works it should be able to pick out the smaller or larger values.
@@ -261,7 +263,9 @@ Some things to consider are:
     4. Does it matter if we change the graph used for the CTQW?
             
             e.g. An edge can be removed from each graph vertex of the complete graph like so:
-                complete_graph[1] = 0             
+                complete_graph[1] = 0    
+                
+    5. How many qubits can you own computer reasonably simulate?
 
 Good luck!                
 """
