@@ -163,7 +163,7 @@ class system(object):
         * `vertices` keyword.
             * Pass an MPI rank specific array of unique :math:`i` such that :math:`\\text{local_i} \leq i < \\text{local_i + local_i_offset}`. :math:`| s \\rangle` will be initialized as an equal superposition across the specified :math:`| s_i \\rangle`.
         * `state` keyword.
-            * Fully specify :math:`|s\\rangle`. Pass an MPI rank specific array of :math:`x_i \in \mathbb{C}` such that :math:`x_i    \geq 0' and  :math:``\\text{local_i} \leq i < \\text{local_i + local_i_offset}`. If keyword `normalized` is True, this state will be normalized.
+            * Fully specify :math:`|s\\rangle`. Pass an MPI rank specific array of :math:`x_i \in \mathbb{C}` such that :math:`x_i    \geq 0' and  :math:`\\text{local_i} \leq i < \\text{local_i + local_i_offset}`. If keyword `normalized` is True, this state will be normalized.
 
         :param name: Name of a pre-defined initial state.
         :type name: str, optional
