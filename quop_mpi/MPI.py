@@ -84,7 +84,7 @@ class system(object):
 
     def objective(self, gammas_ts, stop):
         """
-        :math:`f(\\vec{\gamma}, \\vec{t}) = \\frac{q_{max} - \langle \\vec{\gamma}, \\vec{t} | Q |\\vec{\gamma}, \\vec{t} \\rangle}{q_{max}}` \
+        :math:`f(\\vec{\gamma}, \\vec{t}) = \langle \\vec{\gamma}, \\vec{t} | Q |\\vec{\gamma}, \\vec{t} \\rangle` \
         - the function minimised by the calssical optimizer.
 
 
