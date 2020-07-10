@@ -18,10 +18,10 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'QuOp_MPI'
-copyright = '2020, Edric Matwiejew, Sam Marsh'
-author = 'Edric Matwiejew, Sam Marsh'
+copyright = '2020, Edric Matwiejew'
+author = 'Edric Matwiejew'
 
-autodoc_mock_imports = ["mpi4py", "quop_mpi.fqwoa_mpi", "quop_mpi.fMPI"]
+autodoc_mock_imports = ["mpi4py", "h5py", "quop_mpi.fqwoa_mpi", "quop_mpi.fMPI"]
 
 # The full version, including alpha/beta/rc tags
 release = '1.0.0'
@@ -32,7 +32,7 @@ release = '1.0.0'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc', 'm2r']
+extensions = ['sphinx.ext.autodoc']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
