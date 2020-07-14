@@ -139,7 +139,7 @@ describing the 1st row of our graph, passing it to 'qwoa.set_graph'. This
 array must of size 1 x 2^n_qubits.
 """
 
-complete_graph = np.ones(n_qubits**2)
+complete_graph = np.ones(2**n_qubits)
 complete_graph[0] = 0 
 
 qwoa.set_graph(complete_graph)
