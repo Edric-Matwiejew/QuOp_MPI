@@ -9,7 +9,8 @@ to create a list of qualities relating to the specific problem you would
 like to optimise. This function requires specific inputs for it
 to be compatible with the MPI operations used by QuOp_MPI.
 
-To start, we will need to consider how QuOp_MPI distributes the qualities over an MPI communicator. For example, if we have a list of integer qualities:
+To start, we will need to consider how QuOp_MPI distributes the qualities over an MPI communicator. 
+For example, if we have a list of integer qualities:
 
    q_global = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
@@ -33,9 +34,11 @@ With that in mind, all QuOp_MPI quality methods must have the following signatur
 
 * 'local_i_offset' is the offset of the local quality array indexes, relative to 'q_global'.
  
-* 'seed' is a number used to set the seed for any random number generation used by the quality function. If the quality function does not use random number generation, this is euqal to 'None'.
+* 'seed' is a number used to set the seed for any random number generation used by the 
+quality function. If the quality function does not use random number generation, this is euqal to 'None'.
 
-For example, consider the following quality method, which produces a list of ordered integers, following the pattern shown above.
+For example, consider the following quality method, which produces a list of ordered integers, 
+following the pattern shown above.
 """
 
 import numpy as np
@@ -50,8 +53,9 @@ def ordered_integers_A(N, local_i, local_i_offset, seed = None):
 """
 The above function creates q_global at each MPI rank and then returns the slice needed at that rank. 
 
-However, this approach is computationally inefficient as each rank creates all of q_global, when it only needs a slice of the array. The function shown below creates only the qualities needed at each rank, such that q_global only ever exists  over the
-MPI communicator.
+However, this approach is computationally inefficient as each rank creates all of q_global, 
+when it only needs a slice of the array. The function shown below creates only the qualities 
+needed at each rank, such that q_global only ever exists  over the MPI communicator.
 
 """
 
@@ -60,7 +64,8 @@ def ordered_integers_B(N, local_i, local_i_offset, seed = None):
     return np.asarray(range(local_i_offset, local_i_offset + local_i), dtype = np.float64)
 
 """
-It may also be the case that creating the qualities at run-time is too time-consuming. In that case, we can create the qualities ahead of time and save them to disk.
+It may also be the case that creating the qualities at run-time is too time-consuming. 
+In that case, we can create the qualities ahead of time and save them to disk.
 """
 
 def create_and_save_integer_qualities(N):
@@ -82,12 +87,16 @@ def ordered_integers_C(N, local_i, local_i_offset, seed = None):
     return q_global[local_i_offset:local_i_offset + local_i]
 
 """
-The specific method you choose will depend on the computational requirements of your simulation. For instance, while 'ordered_integers_B' is the most efficient approach here,
+The specific method you choose will depend on the computational requirements of your simulation. 
+For instance, while 'ordered_integers_B' is the most efficient approach here,
 creating the qualities as independent slices might not always be possible. 
 
-Try implementing a QWOA simulation using these quality functions; the results should be the same in each instance. After this, you can use these functions as a starting point for your quality functions.
+Try implementing a QWOA simulation using these quality functions; the results should be 
+the same in each instance. After this, you can use these functions as a 
+starting point for your quality functions.
 
-Remember to import the required python modules (e.g. quop_mpi). If you would like to use the quality functions you've written in another python script you can import them as a module via:
+Remember to import the required python modules (e.g. quop_mpi). If you would like to 
+use the quality functions you've written in another python script you can import them as a module via:
 
     import 3_quop_qualities as quop_qualities
 
