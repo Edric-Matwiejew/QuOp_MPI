@@ -543,8 +543,8 @@ class qaoa(system):
     for the use of arbitrary mixing operators, :math:`W`, but is less efficient than
     :class:`qwoa` which makes use of a fast Fourier transform instead. If the user wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing operator use of the :class:`qwoa` class is recommended.
 
-    :param W: Arbitrary :math:`N \\times N` mixing operator, :math:`W`.
-    :type W: SciPy sparse CSR matrix
+    :param W: Arbitrary :math:`N \\times N` mixing operator, :math:`W`, or list of :math:`N \\times N` mixing operators, in order of application.
+    :type W: SciPy sparse CSR matrix, or list of SciPy sparse CSR matrices.
 
     :param comm: MPI communicator objected created by mpi4py.
     :type comm: MPI communicator
@@ -553,7 +553,11 @@ class qaoa(system):
 
         super().__init__()
 
-        self.system_size = W.shape[0]
+        if type(W) is list:
+            self.system_size = W[0].shape[0]
+        else:
+            self.system_size = W.shape[0]
+
         self.n_qubits = np.log(self.system_size)/np.log(2.0)
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -566,43 +570,114 @@ class qaoa(system):
 
         self.alloc_local = self.local_i
 
-        self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
-                W,
-                self.partition_table,
-                self.comm)
+        if type(W) is list:
 
-        self.W_num_rec_inds, self.W_rec_disps, self.W_num_send_inds, self.W_send_disps = fMPI.rec_a(
-                   self.system_size,
-                   self.W_row_starts,
-                   self.W_col_indexes,
-                   self.partition_table,
-                   self.comm.py2f())
+            self.W_row_starts = []
+            self.W_col_indexes = []
+            self.W_values = []
+            self.W_num_rec_inds = []
+            self.W_rec_disps = []
+            self.W_num_send_inds = []
+            self.W_send_disps = []
+            self.W_local_col_inds = []
+            self.W_rhs_send_inds = []
+            self.one_norms = []
+            self.num_norms = []
 
-        self.W_local_col_inds, self.W_rhs_send_inds = fMPI.rec_b(
-                self.system_size,
-                np.sum(self.W_num_send_inds),
-                self.W_row_starts,
-                self.W_col_indexes,
-                self.W_num_rec_inds,
-                self.W_rec_disps,
-                self.W_num_send_inds,
-                self.W_send_disps,
-                self.partition_table,
-                self.comm.py2f())
+            for w in W:
 
-        self.one_norms, self.num_norms = fMPI.one_norm_series(
-                self.system_size,
-                self.W_row_starts,
-                self.W_col_indexes,
-                -I * self.W_values,
-                self.W_num_rec_inds,
-                self.W_rec_disps,
-                self.W_num_send_inds,
-                self.W_send_disps,
-                self.W_local_col_inds,
-                self.W_rhs_send_inds,
-                self.partition_table,
-                self.comm.py2f())
+                w_row_starts, w_col_indexes, w_values = self._csr_local_slice(
+                        w,
+                        self.partition_table,
+                        self.comm)
+
+                self.W_row_starts.append(w_row_starts)
+                self.W_col_indexes.append(w_col_indexes)
+                self.W_values.append(w_values)
+
+                w_num_rec_inds, w_rec_disps, w_num_send_inds, w_send_disps = fMPI.rec_a(
+                           self.system_size,
+                           w_row_starts,
+                           w_col_indexes,
+                           self.partition_table,
+                           self.comm.py2f())
+
+                self.W_num_rec_inds.append(w_num_rec_inds)
+                self.W_rec_disps.append(w_rec_disps)
+                self.W_num_send_inds.append(w_num_send_inds)
+                self.W_send_disps.append(w_send_disps)
+
+                w_local_col_inds, w_rhs_send_inds = fMPI.rec_b(
+                        self.system_size,
+                        np.sum(self.W_num_send_inds),
+                        w_row_starts,
+                        w_col_indexes,
+                        w_num_rec_inds,
+                        w_rec_disps,
+                        w_num_send_inds,
+                        w_send_disps,
+                        self.partition_table,
+                        self.comm.py2f())
+
+                self.W_local_col_inds.append(w_local_col_inds)
+                self.W_rhs_send_inds.append(w_rhs_send_inds)
+
+                one_norms, num_norms = fMPI.one_norm_series(
+                        self.system_size,
+                        w_row_starts,
+                        w_col_indexes,
+                        -I * w_values,
+                        w_num_rec_inds,
+                        w_rec_disps,
+                        w_num_send_inds,
+                        w_send_disps,
+                        w_local_col_inds,
+                        w_rhs_send_inds,
+                        self.partition_table,
+                        self.comm.py2f())
+
+                self.one_norms.append(one_norms)
+                self.num_norms.append(num_norms)
+
+        else:
+
+            self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
+                    W,
+                    self.partition_table,
+                    self.comm)
+
+            self.W_num_rec_inds, self.W_rec_disps, self.W_num_send_inds, self.W_send_disps = fMPI.rec_a(
+                       self.system_size,
+                       self.W_row_starts,
+                       self.W_col_indexes,
+                       self.partition_table,
+                       self.comm.py2f())
+
+            self.W_local_col_inds, self.W_rhs_send_inds = fMPI.rec_b(
+                    self.system_size,
+                    np.sum(self.W_num_send_inds),
+                    self.W_row_starts,
+                    self.W_col_indexes,
+                    self.W_num_rec_inds,
+                    self.W_rec_disps,
+                    self.W_num_send_inds,
+                    self.W_send_disps,
+                    self.partition_table,
+                    self.comm.py2f())
+
+            self.one_norms, self.num_norms = fMPI.one_norm_series(
+                    self.system_size,
+                    self.W_row_starts,
+                    self.W_col_indexes,
+                    -I * self.W_values,
+                    self.W_num_rec_inds,
+                    self.W_rec_disps,
+                    self.W_num_send_inds,
+                    self.W_send_disps,
+                    self.W_local_col_inds,
+                    self.W_rhs_send_inds,
+                    self.partition_table,
+                    self.comm.py2f())
 
     def _generate_partition_table(self, N, MPI_communicator):
 
@@ -626,9 +701,9 @@ class qaoa(system):
         lb = partition_table[rank] - 1
         ub = partition_table[rank + 1] - 1
 
-        W_row_starts = W.indptr[lb:ub + 1]
-        W_col_indexes = W.indices[W_row_starts[0]:W_row_starts[-1]] + 1
-        W_values = W.data[W_row_starts[0]:W_row_starts[-1]]
+        W_row_starts = W.indptr[lb:ub + 1].copy()
+        W_col_indexes = W.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
+        W_values = W.data[W_row_starts[0]:W_row_starts[-1]].copy()
         W_row_starts += 1
 
         return W_row_starts, W_col_indexes, W_values
@@ -645,29 +720,59 @@ class qaoa(system):
         """
         self.final_state = self.initial_state
 
-        for gamma, t in zip(gammas, ts):
+        if type(self.one_norms) is list:
 
-            self.final_state = np.multiply(np.exp(-I * gamma * self.qualities), self.final_state)
+            for gamma, t in zip(gammas, ts):
 
-            self.final_state = fMPI.step(
-                    self.system_size,
-                    self.local_i,
-                    self.W_row_starts,
-                    self.W_col_indexes,
-                    -I * self.W_values,
-                    self.W_num_rec_inds,
-                    self.W_rec_disps,
-                    self.W_num_send_inds,
-                    self.W_send_disps,
-                    self.W_local_col_inds,
-                    self.W_rhs_send_inds,
-                    t,
-                    self.final_state,
-                    self.partition_table,
-                    self.num_norms,
-                    self.one_norms,
-                    self.comm.py2f(),
-                    self.precision)
+                self.final_state = np.multiply(np.exp(-I * gamma * self.qualities), self.final_state)
+
+                for i in range(len(self.num_norms)):
+
+                    self.final_state = fMPI.step(
+                            self.system_size,
+                            self.local_i,
+                            self.W_row_starts[i],
+                            self.W_col_indexes[i],
+                            -I * self.W_values[i],
+                            self.W_num_rec_inds[i],
+                            self.W_rec_disps[i],
+                            self.W_num_send_inds[i],
+                            self.W_send_disps[i],
+                            self.W_local_col_inds[i],
+                            self.W_rhs_send_inds[i],
+                            t,
+                            self.final_state,
+                            self.partition_table,
+                            self.num_norms[i],
+                            self.one_norms[i],
+                            self.comm.py2f(),
+                            self.precision)
+
+        else:
+
+            for gamma, t in zip(gammas, ts):
+
+                self.final_state = np.multiply(np.exp(-I * gamma * self.qualities), self.final_state)
+
+                self.final_state = fMPI.step(
+                        self.system_size,
+                        self.local_i,
+                        self.W_row_starts,
+                        self.W_col_indexes,
+                        -I * self.W_values,
+                        self.W_num_rec_inds,
+                        self.W_rec_disps,
+                        self.W_num_send_inds,
+                        self.W_send_disps,
+                        self.W_local_col_inds,
+                        self.W_rhs_send_inds,
+                        t,
+                        self.final_state,
+                        self.partition_table,
+                        self.num_norms,
+                        self.one_norms,
+                        self.comm.py2f(),
+                        self.precision)
 
 class qwoa(system):
     """
