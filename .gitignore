@@ -10,5 +10,4 @@ __pycache__
 experiments
 src/obj
 *.sif
-benchmarks
 *.swp
