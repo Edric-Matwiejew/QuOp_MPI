@@ -401,9 +401,11 @@ class system(object):
         * quality_cutoff: As defined by :meth:`~system.state_cutoff_pass`.
         * cutoff_pass_probability: As defined by :meth:`~system.state_cutoff_pass`
         * objective_function: Final result of objective function minimization.
+        * objective_evaluations: Number of objective function evalutions needed durring optimisation.
         * optimization_success: If the minimizer converged to its target tolerances.
         * state_norm: Norm of the final state. This should always equal 1 (within the limits of double precision accuracy).
         * simulation_time: In-program simultion time.
+        * MPI_nodes: Number of mpi processes.
         """
         self.label = label
         self.log = True
@@ -414,7 +416,7 @@ class system(object):
             else:
                 self.logfile = open(filename + ".csv", "w")
                 self.logfile.write(
-                        'label,qubits,system_size,p,quality_cutoff,cutoff_pass_probability,objective_function,optimization_success,state_norm,simulation_time\n')
+                        'label,qubits,system_size,p,quality_cutoff,cutoff_pass_probability,objective_function,objective_evaluations,optimization_success,state_norm,simulation_time,MPI_nodes\n')
 
     def log_update(self):
         """
@@ -432,9 +434,11 @@ class system(object):
                 self.quality_cutoff,
                 self.cutoff_pass_probability,
                 self.result['fun'],
+                self.result['nfev'],
                 self.result['lowest_optimization_result']['optimization_success'],
                 self.state_norm,
-                self.time))
+                self.time,
+                self.comm.size))
 
             self.logfile.flush()
 
