@@ -426,7 +426,7 @@ class system(object):
 
         if self.comm.Get_rank() == 0:
 
-            self.logfile.write('{},{},{},{},{},{},{},{},{},{}\n'.format(
+            self.logfile.write('{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(
                 self.label,
                 self.n_qubits,
                 self.system_size,
@@ -439,6 +439,9 @@ class system(object):
                 self.state_norm,
                 self.time,
                 self.comm.size))
+
+            print(self.comm.size,flush=True)
+            print(self.time,flush=True)
 
             self.logfile.flush()
 
