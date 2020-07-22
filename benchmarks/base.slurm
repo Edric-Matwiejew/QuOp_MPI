@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=NAME_PLACEHOLDER
+#SBATCH --job-name=QuOp_MPI
 #SBATCH --partition=workq
 #SBATCH --nodes=NODES_PLACEHOLDER
 #SBATCH --time=TIME_PLACEHOLDER
