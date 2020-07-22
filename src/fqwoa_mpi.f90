@@ -120,13 +120,13 @@ subroutine qwoa_state(  N, &
 
         do i = 1, p
 
-            fdata(1:local_i) = exp(-complex(0,1d0) * ts(i) * qualities) *fdata(1:local_i)
-
             call fftw_mpi_execute_dft(plan_forward, fdata, fdata)
 
             fdata(1:local_o) = exp(-complex(0,1d0) * gammas(i) * lambdas) *fdata(1:local_o)/real(N,8)
 
             call fftw_mpi_execute_dft(plan_backward, fdata, fdata)
+
+            fdata(1:local_i) = exp(-complex(0,1d0) * ts(i) * qualities) *fdata(1:local_i)
 
         enddo
     endif
