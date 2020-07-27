@@ -299,7 +299,7 @@ class system(object):
         :param state_func: Method to generate a distributed inital state, compatible with :meth:`~system.set_initial_state`.
         :type state_func: callable, optional, default = None
 
-        :param param_persist: If True the optimized :math:`\\beta` and :math`\gamma` values which achieved the lowest objective function value  for all repeats at :math:`p` will be used as starting parameters for :math:`p + 1`.
+        :param param_persist: If `True` the optimized :math:`(\\vec{\gamma},\\vec{t})` values which achieved the lowest objective function value  for all repeats at :math:`p` will be used as starting parameters for :math:`p + 1`.
         :type param_persist: boolean, optional
 
         The following parameters specify the output behaviours.
