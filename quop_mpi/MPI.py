@@ -2,6 +2,7 @@ from mpi4py import MPI
 import h5py
 import numpy as np
 from scipy.optimize import basinhopping, Bounds
+from scipy import sparse
 import sys
 import os
 import quop_mpi.fqwoa_mpi as fqwoa_mpi
@@ -702,15 +703,25 @@ class qaoa(system):
         return partition_table
 
     def _csr_local_slice(self, W, partition_table, MPI_communicator):
+    
+        if (sparse.issparse(W) and not sparse.isspmatrix_csr(W)):
+            W_temp = W.tocsr()
+        elif not sparse.issparse(W):
+            try:
+                W_temp = sparse.csr_matrix(W)
+            except:
+                print("Unable to convert input operator to csr_matrix.")
+        else:
+            W_temp = W
 
         rank = MPI_communicator.Get_rank()
 
         lb = partition_table[rank] - 1
         ub = partition_table[rank + 1] - 1
 
-        W_row_starts = W.indptr[lb:ub + 1].copy()
-        W_col_indexes = W.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
-        W_values = W.data[W_row_starts[0]:W_row_starts[-1]].copy()
+        W_row_starts = W_temp.indptr[lb:ub + 1].copy()
+        W_col_indexes = W_temp.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
+        W_values = W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
         W_row_starts += 1
 
         return W_row_starts, W_col_indexes, W_values
