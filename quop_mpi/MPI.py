@@ -953,5 +953,5 @@ class qwoa(system):
                 "a",
                 self.system_size,
                 self.local_o_offset,
-                self.lambdas[:self.local_o_offset],
+                self.lambdas[:self.local_o],
                 self.comm.py2f())
