@@ -127,7 +127,7 @@ class system(object):
                     stepsize = 0.1,
                     niter = 100,
                     seed = 1,
-                    minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds,'args':(self.stop,)})
+                    minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds,'args':(self.stop,),'tol':0.001})
             self.stop = True
             self.objective(gammas_ts, self.stop)
         else:
@@ -440,9 +440,6 @@ class system(object):
                 self.state_norm,
                 self.time,
                 self.comm.size))
-
-            print(self.comm.size,flush=True)
-            print(self.time,flush=True)
 
             self.logfile.flush()
 
