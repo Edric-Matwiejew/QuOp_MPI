@@ -130,8 +130,6 @@ class system(object):
 
         bounds = Bounds(lbs, ubs)
 
-        print(lbs, ubs)
-
         self.stop = False
         if self.comm.Get_rank() == 0:
             self.result = basinhopping(
@@ -550,7 +548,7 @@ class system(object):
                 "a",
                 self.system_size,
                 self.local_i_offset,
-                self.qualities,
+                self.qualities[:self.local_i],
                 self.comm.py2f())
 
         self.comm.Barrier()
@@ -954,6 +952,6 @@ class qwoa(system):
                 "eigenvalues",
                 "a",
                 self.system_size,
-                self.local_i_offset,
-                self.lambdas,
+                self.local_o_offset,
+                self.lambdas[:self.local_o_offset],
                 self.comm.py2f())
