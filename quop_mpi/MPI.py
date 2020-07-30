@@ -117,17 +117,30 @@ class system(object):
         self.gammas_ts = gammas_ts
         self.p = len(gammas_ts)//2
 
-        bounds = Bounds(0, np.inf)
+        lbs = []
+        ubs = []
+
+        for var in range(self.p):
+            lbs.append(0)
+            ubs.append(2*np.pi)
+
+        for var in range(self.p):
+            lbs.append(0)
+            ubs.append(np.inf)
+
+        bounds = Bounds(lbs, ubs)
+
+        print(lbs, ubs)
 
         self.stop = False
         if self.comm.Get_rank() == 0:
             self.result = basinhopping(
                     self.objective,
                     gammas_ts,
-                    stepsize = 0.1,
-                    niter = 100,
+                    stepsize = 0.001,
+                    niter = 10,
                     seed = 1,
-                    minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds,'args':(self.stop,),'tol':0.001})
+                    minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds,'args':(self.stop,),'tol':0.0001})
             self.stop = True
             self.objective(gammas_ts, self.stop)
         else:
