@@ -1,14 +1,14 @@
 from mpi4py import MPI
 import h5py
 import numpy as np
-from scipy.optimize import basinhopping, Bounds
+from scipy.optimize import Bounds, minimize
 from scipy import sparse
 import sys
 import os
 import quop_mpi.fqwoa_mpi as fqwoa_mpi
 import quop_mpi.fMPI as fMPI
 from time import time
-import json
+import csv
 
 I = np.complex(0,1)
 
@@ -47,6 +47,28 @@ class system(object):
     def __init__(self):
 
         self.log = False
+
+        # Set-up the default optimiser.
+
+        self.stop = False
+
+        bounds = Bounds(0, np.inf)
+
+        self.optimiser = minimize
+        self.optimiser_args = {
+                'method':'L-BFGS-B',
+                'bounds':bounds,
+                'args':(self.stop,),
+                'options':{'ftol':1.0e-10}
+                }
+
+        self.optimiser_log = ['fun','nfev','success']
+
+    def set_optimiser(self, optimiser, optimiser_args, optimiser_log):
+
+        self.optimiser = optimiser
+        self.optimiser_args = optimiser_args
+        self.optimiser_log = optimiser_log
 
     def set_quality_cutoff(self, quality_cutoff):
         self.quality_cutoff = quality_cutoff
@@ -117,28 +139,10 @@ class system(object):
         self.gammas_ts = gammas_ts
         self.p = len(gammas_ts)//2
 
-        lbs = []
-        ubs = []
-
-        for var in range(self.p):
-            lbs.append(0)
-            ubs.append(2*np.pi)
-
-        for var in range(self.p):
-            lbs.append(0)
-            ubs.append(np.inf)
-
-        bounds = Bounds(lbs, ubs)
-
         self.stop = False
+
         if self.comm.Get_rank() == 0:
-            self.result = basinhopping(
-                    self.objective,
-                    gammas_ts,
-                    stepsize = 0.001,
-                    niter = 10,
-                    seed = 1,
-                    minimizer_kwargs = {'method':'L-BFGS-B','bounds':bounds,'args':(self.stop,),'tol':0.0001})
+            self.result = self.optimiser(self.objective,gammas_ts,**self.optimiser_args)
             self.stop = True
             self.objective(gammas_ts, self.stop)
         else:
@@ -146,12 +150,6 @@ class system(object):
                 self.objective(gammas_ts,self.stop)
 
         self.time = time() - self.time
-
-        # Renaming dictionary key to prevent ambiguity in the context of QuOp_MPI.
-        if self.comm.Get_rank() == 0:
-            self.result["lowest_optimization_result"]["optimization_success"] = self.result["lowest_optimization_result"]["success"]
-            self.result["lowest_optimization_result"].pop("success")
-
 
         if self.log:
             self.state_cutoff_pass(self.quality_cutoff)
@@ -234,10 +232,13 @@ class system(object):
 
         if len(self.qualities) == 0:
             local_max = np.finfo(np.float64).min
+            local_min_mag = np.finfo(np.float64).min
         else:
             local_max = np.max(self.qualities)
+            local_min_mag = np.min(np.abs(self.qualities))
 
         self.max_quality = self.comm.allreduce(local_max, op = MPI.MAX)
+        self.min_mag_quality = self.comm.allreduce(local_min_mag, op = MPI.MIN)
 
         # Default set to the highest quality solution.
         self.quality_cutoff = 0.1
@@ -381,7 +382,7 @@ class system(object):
 
                 if self.comm.Get_rank() == 0:
                     if verbose:
-                        print(self.result)
+                        print(self.result,flush=True)
 
                 if filename is not None:
                     if first:
@@ -421,14 +422,20 @@ class system(object):
         """
         self.label = label
         self.log = True
+        self.n_log_fields = 9
 
         if self.comm.Get_rank() == 0:
             if (os.path.exists(filename + ".csv") and action == "a"):
-                self.logfile = open(filename + ".csv", "a")
+                self.logfile = open(filename + ".csv", "a", newline='')
+                self.logfile_csv = csv.writer(self.logfile)
             else:
+                headings = ['label','qubits','system_size','p','quality_cutoff','cutoff_pass_probability','state_norm','simulation_time','MPI_nodes']
+                for optimiser_log in self.optimiser_log:
+                    headings.append(optimiser_log)
+
                 self.logfile = open(filename + ".csv", "w")
-                self.logfile.write(
-                        'label,qubits,system_size,p,quality_cutoff,cutoff_pass_probability,objective_function,objective_evaluations,optimization_success,state_norm,simulation_time,MPI_nodes\n')
+                self.logfile_csv = csv.writer(self.logfile)
+                self.logfile_csv.writerow(headings)
 
     def log_update(self):
         """
@@ -438,19 +445,22 @@ class system(object):
 
         if self.comm.Get_rank() == 0:
 
-            self.logfile.write('{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(
-                self.label,
-                self.n_qubits,
-                self.system_size,
-                self.p,
-                self.quality_cutoff,
-                self.cutoff_pass_probability,
-                self.result['fun'],
-                self.result['nfev'],
-                self.result['lowest_optimization_result']['optimization_success'],
-                self.state_norm,
-                self.time,
-                self.comm.size))
+            log_output = [
+                    self.label,
+                    self.n_qubits,
+                    self.system_size,
+                    self.p,
+                    self.quality_cutoff,
+                    self.cutoff_pass_probability,
+                    self.state_norm,
+                    self.time,
+                    self.comm.size
+                    ]
+
+            for optimiser_log in self.optimiser_log:
+                log_output.append(self.result[optimiser_log])
+
+            self.logfile_csv.writerow(log_output)
 
             self.logfile.flush()
 
@@ -863,13 +873,18 @@ class qwoa(system):
         :type graph_array: float, array
         """
 
-        self.graph_array = graph_array
-        self.lambdas = np.zeros(self.local_o, np.complex)
+        self.graph_array = np.array(graph_array, dtype = np.float64)
 
-        for i in range(self.local_o_offset, self.local_o_offset + self.local_o):
-            for j in range(len(graph_array)):
-                self.lambdas[i - self.local_o_offset] = self.lambdas[i - self.local_o_offset] \
-                        + np.exp((2.0j*np.pi*i)/float(len(graph_array)))**(j)*graph_array[j]
+        self.lambdas = fqwoa_mpi.graph_eigenvalues(self.graph_array,self.local_o,self.local_o_offset)
+
+        self.lambdas_1 = np.zeros(self.local_o, np.complex)
+#
+#        for i in range(self.local_o_offset, self.local_o_offset + self.local_o):
+#            for j in range(len(graph_array)):
+#                self.lambdas_1[i - self.local_o_offset] = self.lambdas_1[i - self.local_o_offset] \
+#                        + np.exp((2.0j*np.pi*i)/float(len(graph_array)))**(j)*graph_array[j]
+#
+#        print(np.max(self.lambdas_1 - self.lambdas),flush=True)
 
     def plan(self):
         """
