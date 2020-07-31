@@ -41,7 +41,7 @@ subroutine mpi_local_size(  N, &
     local_i = local_i_temp
     local_i_offset = local_i_offset_temp
     local_o = local_o_temp
-    local_o_offset = local_i_offset_temp
+    local_o_offset = local_o_offset_temp
 
 end subroutine mpi_local_size
 
