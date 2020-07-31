@@ -944,7 +944,7 @@ class qwoa(system):
         super().save(
                 file_name,
                 config_name,
-                action)
+               action)
 
         fqwoa_mpi.save_dist_complex(
                 file_name,
@@ -955,3 +955,5 @@ class qwoa(system):
                 self.local_o_offset,
                 self.lambdas[:self.local_o],
                 self.comm.py2f())
+
+        self.comm.Barrier()
