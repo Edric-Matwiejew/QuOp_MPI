@@ -419,5 +419,40 @@ subroutine save_dist_real(  file_name, &
     CALL h5close_f(error)
 
     call MPI_barrier(MPI_communicator, ierr)
-    
+
 end subroutine save_dist_real
+
+subroutine graph_eigenvalues(   system_size, &
+                                graph_array, &
+                                local_o, &
+                                local_o_offset, &
+                                lambdas)
+
+    use, intrinsic :: iso_fortran_env, only: sp => real32, dp => real64
+
+    integer(sp), intent(in) :: system_size
+    real(dp), dimension(system_size), intent(in) :: graph_array
+    integer(sp), intent(in) :: local_o
+    integer(sp), intent(in) :: local_o_offset
+    complex(dp), dimension(local_o), intent(out) :: lambdas
+
+    complex(dp) :: pi_coef, pi_coef_i
+    real(dp) :: inv_system_size
+
+    integer(sp) :: i, j
+
+    lambdas = 0.0_dp
+
+    pi_coef = complex(0.0_dp,8.0_dp*atan(1.0_dp)/real(system_size,dp))
+
+    do i = local_o_offset + 1, local_o_offset + local_o
+        pi_coef_i = exp(pi_coef*(i - 1))
+        do j = 1, system_size
+            lambdas(i - local_o_offset) = lambdas(i - local_o_offset) &
+                + (pi_coef_i**(j-1))*graph_array(j)
+        enddo
+    enddo
+
+end subroutine graph_eigenvalues
+
+
