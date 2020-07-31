@@ -232,13 +232,10 @@ class system(object):
 
         if len(self.qualities) == 0:
             local_max = np.finfo(np.float64).min
-            local_min_mag = np.finfo(np.float64).min
         else:
             local_max = np.max(self.qualities)
-            local_min_mag = np.min(np.abs(self.qualities))
 
         self.max_quality = self.comm.allreduce(local_max, op = MPI.MAX)
-        self.min_mag_quality = self.comm.allreduce(local_min_mag, op = MPI.MIN)
 
         # Default set to the highest quality solution.
         self.quality_cutoff = 0.1
