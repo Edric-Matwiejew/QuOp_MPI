@@ -70,9 +70,6 @@ class system(object):
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
 
-    def set_quality_cutoff(self, quality_cutoff):
-        self.quality_cutoff = quality_cutoff
-
     def get_probabilities(self):
         """
         :math:`\\vec{p} = ( \langle s_i|\\vec{\gamma}, \\vec{t} \\rangle` ), i=0,N-1
@@ -152,7 +149,6 @@ class system(object):
         self.time = time() - self.time
 
         if self.log:
-            self.state_cutoff_pass(self.quality_cutoff)
             self.log_update()
 
     def print_result(self):
@@ -229,41 +225,6 @@ class system(object):
         :type args: array, optional
         """
         self.qualities = func(self.system_size, self.local_i, self.local_i_offset, *args, **kwargs)
-
-        if len(self.qualities) == 0:
-            local_max = np.finfo(np.float64).min
-        else:
-            local_max = np.max(self.qualities)
-
-        self.max_quality = self.comm.allreduce(local_max, op = MPI.MAX)
-
-        # Default set to the highest quality solution.
-        self.quality_cutoff = 0.1
-
-    def state_cutoff_pass(self, quality_cutoff):
-        """
-        A rough method for judging the effectiveness of a QAOA algorithm.
-
-        :param quality_cutoff: Between 0 and 1. 0.9 corresponds to seeking solutions with quality in the top 10%.
-        :type quality_cutoff: float
-
-        :return: cutoff_pass_probability
-        :rtype: float
-
-        With 'quality_cutoff = 0.9' and return value of 0.7. The algorithm
-        has succeeded in having a greater than 70% chance of measuring a state corresponding to a solution
-        in the bottom 10%.
-        """
-        self.quality_cutoff = quality_cutoff
-        self.cutoff_pass_probability = 0.0
-
-        for i, prob in enumerate(self.probabilities):
-            if self.qualities[i]/self.max_quality <= self.quality_cutoff:
-                self.cutoff_pass_probability += prob
-
-        self.cutoff_pass_probability = self.comm.allreduce(self.cutoff_pass_probability, op = MPI.SUM)
-
-        return self.cutoff_pass_probability
 
     def benchmark(
             self,
@@ -408,8 +369,6 @@ class system(object):
         * label: User-defined system label.
         * qubits: Number of qubits.
         * p: :math:`p`.
-        * quality_cutoff: As defined by :meth:`~system.state_cutoff_pass`.
-        * cutoff_pass_probability: As defined by :meth:`~system.state_cutoff_pass`
         * objective_function: Final result of objective function minimization.
         * objective_evaluations: Number of objective function evalutions needed durring optimisation.
         * optimization_success: If the minimizer converged to its target tolerances.
@@ -419,14 +378,14 @@ class system(object):
         """
         self.label = label
         self.log = True
-        self.n_log_fields = 9
+        self.n_log_fields = 7
 
         if self.comm.Get_rank() == 0:
             if (os.path.exists(filename + ".csv") and action == "a"):
                 self.logfile = open(filename + ".csv", "a", newline='')
                 self.logfile_csv = csv.writer(self.logfile)
             else:
-                headings = ['label','qubits','system_size','p','quality_cutoff','cutoff_pass_probability','state_norm','simulation_time','MPI_nodes']
+                headings = ['label','qubits','system_size','p','state_norm','simulation_time','MPI_nodes']
                 for optimiser_log in self.optimiser_log:
                     headings.append(optimiser_log)
 
@@ -447,8 +406,6 @@ class system(object):
                     self.n_qubits,
                     self.system_size,
                     self.p,
-                    self.quality_cutoff,
-                    self.cutoff_pass_probability,
                     self.state_norm,
                     self.time,
                     self.comm.size
