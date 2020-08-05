@@ -5,12 +5,12 @@ import quop_mpi as qu
 comm = MPI.COMM_WORLD
 
 p = 3
-n_qubits = 7
+n_qubits = 12
 
-np.random.seed(2)
+rng = np.random.RandomState(1)
 
 def x0(p):
-    return np.random.uniform(low = 0, high = 2*np.pi, size = 2 * p)
+    return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)
 
 qwoa = qu.MPI.qwoa(n_qubits, comm)
 qwoa.log_results("log", "qwoa", action = "w")

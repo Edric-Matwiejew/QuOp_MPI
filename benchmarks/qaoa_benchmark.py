@@ -4,8 +4,10 @@ from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
 
+rng = np.random.RandomState(1)
+
 def x0(p,seed):
-    return np.random.uniform(low = 0, high = 2*np.pi, size = 2*p)
+    return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)
 
 for qubits in range(18,32):
     qaoa = qw.MPI.qaoa(qubits,comm)

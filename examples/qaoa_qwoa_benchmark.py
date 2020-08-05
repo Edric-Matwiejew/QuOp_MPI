@@ -4,11 +4,12 @@ from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
 
+rng = np.random.RandomState(1)
 
 def x0(p,seed):
-    return np.random.uniform(low = 0, high = 1, size = 2*p)
+    return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)
 
-for qubits in range(2,4):
+for qubits in range(7,12):
     qaoa = qw.MPI.qaoa(qubits,comm)
     qaoa.set_initial_state(name = "equal")
     qaoa.log_results("benchmark_example","qaoa_equal",action="a")
@@ -21,7 +22,7 @@ for qubits in range(2,4):
             filename = "qaoa_equal",
             label = "qaoa_" + str(qubits))
 
-for qubits in range(2,4):
+for qubits in range(7,12):
     qwoa = qw.MPI.qwoa(qubits,comm)
     qwoa.set_initial_state(name="equal")
     qwoa.log_results("qwoa_complete_equal","equal",action="a")
