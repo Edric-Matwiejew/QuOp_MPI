@@ -849,8 +849,8 @@ class qwoa(system):
         """
 
         if graph_array is None:
-            graph_array = np.ones(self.system_size, dtype = np.float64)
-            graph_array[0] = 0
+            self.graph_array = np.ones(self.system_size, dtype = np.float64)
+            self.graph_array[0] = 0
         else:
             self.graph_array = np.array(graph_array, dtype = np.float64)
 
