@@ -49,15 +49,3 @@ QuOp_MPI consists of two simulation classes, :class:`~quop_mpi.MPI.qaoa` and :cl
 
 FFT provides the most computationally efficient method in the vast majority of cases. If :math:`W` is circulant, the :class:`~quop_mpi.MPI.qwoa` class should be used.
 
-Quality Cutoff
---------------
-
-The concept of quality cutoff provides a means of quantifying the likelihood of measuring a solution with :math:`q_i` below some maximum threshold in :math:`\{q_i\}`.
-
-.. math::
-
-    P_{\text{cutoff}} = \sum_{\tilde{q}_i < \tilde{q}_{\text{cutoff}}} p_i
-
-Where :math:`\tilde{q}_i \in \frac{\{q_i\}}{\text{max}\{q_i\}}` and :math:`q_{\text{cutoff}}` is a user defined parameter between 0 and 1.  :math:`q_{\text{cutoff}}` is specified by :meth:`~quop_mpi.MPI.system.set_quality_cutoff`, defaulting to 0.1 otherwise.
-
-

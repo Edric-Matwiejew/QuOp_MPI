@@ -7,6 +7,7 @@ import sys
 import os
 import quop_mpi.fqwoa_mpi as fqwoa_mpi
 import quop_mpi.fMPI as fMPI
+import quop_mpi.mixers_mpi as mixers_mpi
 from time import time
 import csv
 
@@ -47,31 +48,19 @@ class system(object):
     def __init__(self):
 
         self.log = False
+        self.graph_set = False
 
         # Set-up the default optimiser.
-
         self.stop = False
-
-        bounds = Bounds(0, np.inf)
-
-        self.optimiser = minimize
-        self.optimiser_args = {
-                'method':'L-BFGS-B',
-                'bounds':bounds,
-                'args':(self.stop,),
-                'options':{'ftol':1.0e-10}
-                }
-
-        self.optimiser_log = ['fun','nfev','success']
+        self.set_optimiser( minimize,
+                {'method':'BFGS','args':(self.stop,)},
+                            ['fun','nfev','success'])
 
     def set_optimiser(self, optimiser, optimiser_args, optimiser_log):
 
         self.optimiser = optimiser
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
-
-    def set_quality_cutoff(self, quality_cutoff):
-        self.quality_cutoff = quality_cutoff
 
     def get_probabilities(self):
         """
@@ -141,6 +130,9 @@ class system(object):
 
         self.stop = False
 
+        if not self.graph_set:
+            self.set_graph()
+
         if self.comm.Get_rank() == 0:
             self.result = self.optimiser(self.objective,gammas_ts,**self.optimiser_args)
             self.stop = True
@@ -152,7 +144,6 @@ class system(object):
         self.time = time() - self.time
 
         if self.log:
-            self.state_cutoff_pass(self.quality_cutoff)
             self.log_update()
 
     def print_result(self):
@@ -230,44 +221,6 @@ class system(object):
         """
         self.qualities = func(self.system_size, self.local_i, self.local_i_offset, *args, **kwargs)
 
-        if len(self.qualities) == 0:
-            local_max = np.finfo(np.float64).min
-            local_min_mag = np.finfo(np.float64).min
-        else:
-            local_max = np.max(self.qualities)
-            local_min_mag = np.min(np.abs(self.qualities))
-
-        self.max_quality = self.comm.allreduce(local_max, op = MPI.MAX)
-        self.min_mag_quality = self.comm.allreduce(local_min_mag, op = MPI.MIN)
-
-        # Default set to the highest quality solution.
-        self.quality_cutoff = 0.1
-
-    def state_cutoff_pass(self, quality_cutoff):
-        """
-        A rough method for judging the effectiveness of a QAOA algorithm.
-
-        :param quality_cutoff: Between 0 and 1. 0.9 corresponds to seeking solutions with quality in the top 10%.
-        :type quality_cutoff: float
-
-        :return: cutoff_pass_probability
-        :rtype: float
-
-        With 'quality_cutoff = 0.9' and return value of 0.7. The algorithm
-        has succeeded in having a greater than 70% chance of measuring a state corresponding to a solution
-        in the bottom 10%.
-        """
-        self.quality_cutoff = quality_cutoff
-        self.cutoff_pass_probability = 0.0
-
-        for i, prob in enumerate(self.probabilities):
-            if self.qualities[i]/self.max_quality <= self.quality_cutoff:
-                self.cutoff_pass_probability += prob
-
-        self.cutoff_pass_probability = self.comm.allreduce(self.cutoff_pass_probability, op = MPI.SUM)
-
-        return self.cutoff_pass_probability
-
     def benchmark(
             self,
             ps,
@@ -334,11 +287,14 @@ class system(object):
         .. note::
             The `param_func`, qual_func` and `state_func` must have the keyword argument 'seed'. This allows for a repeatable variation if :math:`(\\vec{\gamma}, \\vec{t}), q_i` and :math:`| s \\rangle` with each repetition at the same :math:`p`.
         """
-
+        
+        # param persist and qual func warning.
         first = True
 
-        for p in ps:
+        itter = 0
 
+        previous_params = None
+        for p in ps:
             if param_persist:
                 best_p_result = np.finfo(dtype=np.float64).max
                 result = None
@@ -349,19 +305,19 @@ class system(object):
 
             for i  in range(1, repeats + 1):
 
-                np.random.seed(i)
+                np.random.seed(i + itter)
 
-                if (not param_persist) or (p == 1):
-                    self.gammas_ts = param_func(p, seed = i)
+                if (not param_persist) or first:
+                    self.gammas_ts = param_func(p, seed = i + itter)
                 else:
                     gammas, ts = np.split(previous_params, 2)
-                    gamma, t = param_func(1, seed = i)
+                    gamma, t = param_func(1,seed = i + itter)
                     self.gammas_ts = np.append(np.append(gammas, gamma), np.append(ts, t))
 
                 if qual_func is not None:
-                    self.set_qualities(qual_func, seed = i, *args, **kwargs)
+                    self.set_qualities(qual_func, seed = i + itter, *args, **kwargs)
                 if state_func is not None:
-                    self.initial_state = state_func(p, seed = i)
+                    self.initial_state = state_func(p, seed = i + itter)
 
                 if verbose:
                     if self.comm.Get_rank() == 0:
@@ -369,16 +325,23 @@ class system(object):
 
                 self.execute(self.gammas_ts)
 
+                itter += 1
+
                 if param_persist:
 
                     if self.rank == 0:
                         result = self.result['fun']
+                        x = self.result['x']
+                    else:
+                        result = None
+                        x = None
 
                     result = self.comm.bcast(result, root = 0)
+                    x = self.comm.bcast(x, root = 0)
 
                     if result < best_p_result:
                         best_p_result = result
-                        best_p_params = self.gammas_ts
+                        best_p_params = x
 
                 if self.comm.Get_rank() == 0:
                     if verbose:
@@ -392,6 +355,7 @@ class system(object):
 
             if param_persist:
                 previous_params = best_p_params
+                first = False
 
     def log_results(self, filename, label, action = "a"):
         """
@@ -411,8 +375,6 @@ class system(object):
         * label: User-defined system label.
         * qubits: Number of qubits.
         * p: :math:`p`.
-        * quality_cutoff: As defined by :meth:`~system.state_cutoff_pass`.
-        * cutoff_pass_probability: As defined by :meth:`~system.state_cutoff_pass`
         * objective_function: Final result of objective function minimization.
         * objective_evaluations: Number of objective function evalutions needed durring optimisation.
         * optimization_success: If the minimizer converged to its target tolerances.
@@ -422,14 +384,14 @@ class system(object):
         """
         self.label = label
         self.log = True
-        self.n_log_fields = 9
+        self.n_log_fields = 7
 
         if self.comm.Get_rank() == 0:
             if (os.path.exists(filename + ".csv") and action == "a"):
                 self.logfile = open(filename + ".csv", "a", newline='')
                 self.logfile_csv = csv.writer(self.logfile)
             else:
-                headings = ['label','qubits','system_size','p','quality_cutoff','cutoff_pass_probability','state_norm','simulation_time','MPI_nodes']
+                headings = ['label','qubits','system_size','p','state_norm','simulation_time','MPI_nodes']
                 for optimiser_log in self.optimiser_log:
                     headings.append(optimiser_log)
 
@@ -450,8 +412,6 @@ class system(object):
                     self.n_qubits,
                     self.system_size,
                     self.p,
-                    self.quality_cutoff,
-                    self.cutoff_pass_probability,
                     self.state_norm,
                     self.time,
                     self.comm.size
@@ -575,32 +535,98 @@ class qaoa(system):
     :param comm: MPI communicator objected created by mpi4py.
     :type comm: MPI communicator
     """
-    def __init__(self, W, comm):
+    def __init__(self, n_qubits, MPI_communicator):
 
         super().__init__()
 
-        if type(W) is list:
-            self.system_size = W[0].shape[0]
-        else:
-            self.system_size = W.shape[0]
-
-        self.n_qubits = np.log(self.system_size)/np.log(2.0)
-        self.comm = comm
+        self.n_qubits = n_qubits
+        self.system_size = 2**n_qubits
+        self.comm = MPI_communicator
         self.rank = self.comm.Get_rank()
         self.precision = "dp"
+        self.graph_set = False
 
         self.partition_table = self._generate_partition_table(self.system_size, self.comm)
+
+        self.lb = self.partition_table[self.rank] - 1
+        self.ub = self.partition_table[self.rank + 1] - 1
 
         self.local_i = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
         self.local_i_offset = self.partition_table[self.rank] - 1
 
         self.alloc_local = self.local_i
 
-        if type(W) is list:
+    def _generate_partition_table(self, N, MPI_communicator):
 
-            self.W_row_starts = []
-            self.W_col_indexes = []
-            self.W_values = []
+        flock = MPI_communicator.Get_size()
+
+        partition_table = np.zeros(flock + 1, dtype = np.int32)
+        for i in range(flock + 1):
+            partition_table[i] = i * N / flock + 1
+
+        remainder = N - partition_table[flock]
+
+        for i in range(remainder):
+            partition_table[flock - i % flock : flock + 1] += 1
+
+        return partition_table
+
+    def _csr_local_slice(self, W, MPI_communicator):
+
+        if (sparse.issparse(W) and not sparse.isspmatrix_csr(W)):
+            W_temp = W.tocsr()
+        elif not sparse.issparse(W):
+            try:
+                W_temp = sparse.csr_matrix(W)
+            except:
+                print("Unable to convert input operator to csr_matrix.")
+        else:
+            W_temp = W
+
+        W_row_starts = W_temp.indptr[self.lb:self.ub + 1].copy()
+        W_col_indexes = W_temp.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
+        W_values = W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
+        W_row_starts += 1
+
+        return W_row_starts, W_col_indexes, W_values
+
+    def set_graph(self, scipy_csr = None, method = mixers_mpi.hypercube):
+
+        if scipy_csr is not None:
+
+            W = scipy_csr
+
+            if type(W) is list:
+
+                self.W_row_starts = []
+                self.W_col_indexes = []
+                self.W_values = []
+
+                for w in W:
+
+                    w_row_starts, w_col_indexes, w_values = self._csr_local_slice(
+                            w,
+                            self.comm)
+
+                    self.W_row_starts.append(w_row_starts)
+                    self.W_col_indexes.append(w_col_indexes)
+                    self.W_values.append(w_values)
+
+            else:
+
+                self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
+                        W,
+                        self.comm)
+
+        else:
+
+            self.W_row_starts, self.W_col_indexes, self.W_values = method(
+                    self.n_qubits,
+                    self.lb + 1,
+                    self.ub + 1)
+
+        if type(self.W_row_starts[0]) is list:
+
             self.W_num_rec_inds = []
             self.W_rec_disps = []
             self.W_num_send_inds = []
@@ -610,16 +636,7 @@ class qaoa(system):
             self.one_norms = []
             self.num_norms = []
 
-            for w in W:
-
-                w_row_starts, w_col_indexes, w_values = self._csr_local_slice(
-                        w,
-                        self.partition_table,
-                        self.comm)
-
-                self.W_row_starts.append(w_row_starts)
-                self.W_col_indexes.append(w_col_indexes)
-                self.W_values.append(w_values)
+            for w_row_starts, w_col_indexes, w_values in zip(self.W_row_starts, self.W_col_indexes, self.W_values):
 
                 w_num_rec_inds, w_rec_disps, w_num_send_inds, w_send_disps = fMPI.rec_a(
                            self.system_size,
@@ -667,11 +684,6 @@ class qaoa(system):
 
         else:
 
-            self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
-                    W,
-                    self.partition_table,
-                    self.comm)
-
             self.W_num_rec_inds, self.W_rec_disps, self.W_num_send_inds, self.W_send_disps = fMPI.rec_a(
                        self.system_size,
                        self.W_row_starts,
@@ -705,44 +717,7 @@ class qaoa(system):
                     self.partition_table,
                     self.comm.py2f())
 
-    def _generate_partition_table(self, N, MPI_communicator):
-
-        flock = MPI_communicator.Get_size()
-
-        partition_table = np.zeros(flock + 1, dtype = np.int32)
-        for i in range(flock + 1):
-            partition_table[i] = i * N / flock + 1
-
-        remainder = N - partition_table[flock]
-
-        for i in range(remainder):
-            partition_table[flock - i % flock : flock + 1] += 1
-
-        return partition_table
-
-    def _csr_local_slice(self, W, partition_table, MPI_communicator):
-    
-        if (sparse.issparse(W) and not sparse.isspmatrix_csr(W)):
-            W_temp = W.tocsr()
-        elif not sparse.issparse(W):
-            try:
-                W_temp = sparse.csr_matrix(W)
-            except:
-                print("Unable to convert input operator to csr_matrix.")
-        else:
-            W_temp = W
-
-        rank = MPI_communicator.Get_rank()
-
-        lb = partition_table[rank] - 1
-        ub = partition_table[rank + 1] - 1
-
-        W_row_starts = W_temp.indptr[lb:ub + 1].copy()
-        W_col_indexes = W_temp.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
-        W_values = W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
-        W_row_starts += 1
-
-        return W_row_starts, W_col_indexes, W_values
+        self.graph_set = True
 
     def evolve_state(self, gammas, ts):
         """
@@ -760,7 +735,7 @@ class qaoa(system):
 
             for gamma, t in zip(gammas, ts):
 
-                self.final_state = np.multiply(np.exp(-I * gamma * self.qualities), self.final_state)
+                self.final_state = np.multiply(np.exp(-I * np.abs(gamma) * self.qualities), self.final_state)
 
                 for i in range(len(self.num_norms)):
 
@@ -776,7 +751,7 @@ class qaoa(system):
                             self.W_send_disps[i],
                             self.W_local_col_inds[i],
                             self.W_rhs_send_inds[i],
-                            t,
+                            np.abs(t),
                             self.final_state,
                             self.partition_table,
                             self.num_norms[i],
@@ -788,7 +763,7 @@ class qaoa(system):
 
             for gamma, t in zip(gammas, ts):
 
-                self.final_state = np.multiply(np.exp(-I * gamma * self.qualities), self.final_state)
+                self.final_state = np.multiply(np.exp(-I * np.abs(gamma) * self.qualities), self.final_state)
 
                 self.final_state = fMPI.step(
                         self.system_size,
@@ -802,7 +777,7 @@ class qaoa(system):
                         self.W_send_disps,
                         self.W_local_col_inds,
                         self.W_rhs_send_inds,
-                        t,
+                        np.abs(t),
                         self.final_state,
                         self.partition_table,
                         self.num_norms,
@@ -863,7 +838,7 @@ class qwoa(system):
         self.dummy_qualities = np.empty(1, dtype = np.float64)
         self.dummy_lambdas = np.empty(1, dtype = np.float64)
 
-    def set_graph(self, graph_array):
+    def set_graph(self, graph_array = None):
         """
         Given a 1D array representing the first row of a circulant matrix,
         this returns a 1D array of matrix eigenvalues corresponding to
@@ -873,18 +848,14 @@ class qwoa(system):
         :type graph_array: float, array
         """
 
-        self.graph_array = np.array(graph_array, dtype = np.float64)
+        if graph_array is None:
+            graph_array = np.ones(self.system_size, dtype = np.float64)
+            graph_array[0] = 0
+        else:
+            self.graph_array = np.array(graph_array, dtype = np.float64)
 
         self.lambdas = fqwoa_mpi.graph_eigenvalues(self.graph_array,self.local_o,self.local_o_offset)
-
-        self.lambdas_1 = np.zeros(self.local_o, np.complex)
-#
-#        for i in range(self.local_o_offset, self.local_o_offset + self.local_o):
-#            for j in range(len(graph_array)):
-#                self.lambdas_1[i - self.local_o_offset] = self.lambdas_1[i - self.local_o_offset] \
-#                        + np.exp((2.0j*np.pi*i)/float(len(graph_array)))**(j)*graph_array[j]
-#
-#        print(np.max(self.lambdas_1 - self.lambdas),flush=True)
+        self.graph_set = True
 
     def plan(self):
         """
@@ -914,8 +885,8 @@ class qwoa(system):
         """
         fqwoa_mpi.qwoa_state(
                 self.system_size,
-                gammas,
-                ts,
+                np.abs(gammas),
+                np.abs(ts),
                 self.qualities,
                 self.lambdas,
                 self.initial_state,
