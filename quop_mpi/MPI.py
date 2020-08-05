@@ -53,7 +53,7 @@ class system(object):
         # Set-up the default optimiser.
         self.stop = False
         self.set_optimiser( minimize,
-                {'method':'BFGS','args':(self.stop,)},
+                {'method':'BFGS','args':(self.stop,),'tol':1e-3},
                             ['fun','nfev','success'])
 
     def set_optimiser(self, optimiser, optimiser_args, optimiser_log):
@@ -126,6 +126,9 @@ class system(object):
         """
         self.time = time()
         self.gammas_ts = gammas_ts
+
+        self.gammas_ts = self.comm.bcast(self.gammas_ts, root = 0)
+
         self.p = len(gammas_ts)//2
 
         self.stop = False
@@ -134,12 +137,12 @@ class system(object):
             self.set_graph()
 
         if self.comm.Get_rank() == 0:
-            self.result = self.optimiser(self.objective,gammas_ts,**self.optimiser_args)
+            self.result = self.optimiser(self.objective,self.gammas_ts,**self.optimiser_args)
             self.stop = True
-            self.objective(gammas_ts, self.stop)
+            self.objective(self.gammas_ts, self.stop)
         else:
             while not self.stop:
-                self.objective(gammas_ts,self.stop)
+                self.objective(self.gammas_ts,self.stop)
 
         self.time = time() - self.time
 
@@ -308,11 +311,23 @@ class system(object):
                 np.random.seed(i + itter)
 
                 if (not param_persist) or first:
-                    self.gammas_ts = param_func(p, seed = i + itter)
+
+                    if self.rank == 0:
+                        self.gammas_ts = param_func(p, seed = i + itter)
+                    else:
+                        self.gammas_ts = None
+
+                    self.gammas_ts = self.comm.bcast(self.gammas_ts, root = 0)
+
                 else:
                     gammas, ts = np.split(previous_params, 2)
-                    gamma, t = param_func(1,seed = i + itter)
-                    self.gammas_ts = np.append(np.append(gammas, gamma), np.append(ts, t))
+                    if self.rank == 0:
+                        gamma_t = param_func(1,seed = i + itter)
+                    else:
+                        gamma_t = None
+
+                    self.gamma_t = self.comm.bcast(self.gamma_t, root = 0)
+                    self.gammas_ts = np.append(np.append(gammas, gamma_t[0]), np.append(ts, gamma_t[1]))
 
                 if qual_func is not None:
                     self.set_qualities(qual_func, seed = i + itter, *args, **kwargs)
@@ -731,13 +746,13 @@ class qaoa(system):
         """
         self.final_state = self.initial_state
 
-        if type(self.one_norms) is list:
+        if type(self.one_norms[0]) is list:
 
             for gamma, t in zip(gammas, ts):
 
                 self.final_state = np.multiply(np.exp(-I * np.abs(gamma) * self.qualities), self.final_state)
 
-                for i in range(len(self.num_norms)):
+                for i in range(len(self.one_norms)):
 
                     self.final_state = fMPI.step(
                             self.system_size,
