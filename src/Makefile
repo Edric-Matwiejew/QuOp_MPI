@@ -25,6 +25,10 @@ $(OBJDIR)/%.o: %.f90
 
 %.o: %.mod
 
+$(PYDIR)/mixers_mpi$(EXT_SUFFIX):  mixers_mpi.f90 $(PYDIR)/fqwoa_mpi$(EXT_SUFFIX)
+	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="$(FCFLAGS)" -c -m mixers_mpi mixers_mpi.f90
+	mv mixers_mpi$(EXT_SUFFIX) $(PYDIR)
+
 $(PYDIR)/fqwoa_mpi$(EXT_SUFFIX): fqwoa_mpi.f90 $(PYDIR)/fMPI$(EXT_SUFFIX)
 	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="$(FCFLAGS)" -c $(LIB) -lhdf5_fortran -lfftw3 -lfftw3_mpi $(INCLUDE) -m fqwoa_mpi fqwoa_mpi.f90
 	mv fqwoa_mpi$(EXT_SUFFIX) $(PYDIR)
@@ -37,10 +41,6 @@ $(OBJDIR)/expm.o: $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o one_norms.o)
 $(OBJDIR)/one_norms.o: $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o) one_norms.f90
 $(OBJDIR)/sparse.o: $(addprefix $(OBJDIR)/, iso_precisions.o) sparse.f90
 $(OBJDIR)/iso_precisions.o: iso_precisions.f90
-
-$(PYDIR)/mixers_mpi$(EXT_SUFFIX):  mixers_mpi.f90 $(PYDIR)/mixers_mpi$(EXT_SUFFIX) mixers_mpi.f90
-	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -c -m mixers_mpi mixers_mpi.f90
-	mv mixers_mpi$(EXT_SUFFIX) $(PYDIR)
 
 clean:
 	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
