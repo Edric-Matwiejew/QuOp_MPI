@@ -623,7 +623,7 @@ class qaoa(system):
             self.W_row_starts, self.W_col_indexes, self.W_values = method(
                     self.n_qubits,
                     self.lb + 1,
-                    self.ub + 1)
+                    self.ub)
 
         if type(self.W_row_starts[0]) is list:
 
