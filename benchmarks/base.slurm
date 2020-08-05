@@ -10,4 +10,4 @@ export OMP_NUM_THREADS=1
 
 module load singularity
 
-command time -v srun --export=all -N NODES_PLACEHOLDER -n MPI_PROCS_PLACEHOLDER --cpu_bind=sockets singularity exec ../../container/quop_mpi.sif python3 ../benchmark.py
+command time -v srun --export=all -N NODES_PLACEHOLDER -n MPI_PROCS_PLACEHOLDER --cpu_bind=sockets singularity exec ../../container/quop_mpi.sif python3 PYTHON_SCRIPT_PLACEHOLDER
