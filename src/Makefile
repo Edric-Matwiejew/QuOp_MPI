@@ -38,5 +38,9 @@ $(OBJDIR)/one_norms.o: $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o) one_no
 $(OBJDIR)/sparse.o: $(addprefix $(OBJDIR)/, iso_precisions.o) sparse.f90
 $(OBJDIR)/iso_precisions.o: iso_precisions.f90
 
+$(PYDIR)/mixers_mpi$(EXT_SUFFIX):  mixers_mpi.f90 $(PYDIR)/mixers_mpi$(EXT_SUFFIX) mixers_mpi.f90
+	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -c -m mixers_mpi mixers_mpi.f90
+	mv mixers_mpi$(EXT_SUFFIX) $(PYDIR)
+
 clean:
 	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
