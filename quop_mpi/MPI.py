@@ -600,8 +600,10 @@ class qaoa(system):
 
         W_row_starts = W_temp.indptr[self.lb:self.ub + 1].copy()
         W_col_indexes = W_temp.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
-        W_values = W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
+        W_values = -I * W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
         W_row_starts += 1
+
+        print("MASXI",np.max(W_col_indexes))
 
         return W_row_starts, W_col_indexes, W_values
 
@@ -640,7 +642,7 @@ class qaoa(system):
                     self.lb + 1,
                     self.ub)
 
-        if type(self.W_row_starts[0]) is list:
+        if isinstance(self.W_row_starts[0], np.ndarray):
 
             self.W_num_rec_inds = []
             self.W_rec_disps = []
@@ -746,20 +748,20 @@ class qaoa(system):
         """
         self.final_state = self.initial_state
 
-        if type(self.one_norms[0]) is list:
+        if isinstance(self.W_row_starts[0], np.ndarray):
 
             for gamma, t in zip(gammas, ts):
 
                 self.final_state = np.multiply(np.exp(-I * np.abs(gamma) * self.qualities), self.final_state)
 
-                for i in range(len(self.one_norms)):
+                for i in range(len(self.W_row_starts)):
 
                     self.final_state = fMPI.step(
                             self.system_size,
                             self.local_i,
                             self.W_row_starts[i],
                             self.W_col_indexes[i],
-                            -I * self.W_values[i],
+                            self.W_values[i],
                             self.W_num_rec_inds[i],
                             self.W_rec_disps[i],
                             self.W_num_send_inds[i],
@@ -785,7 +787,7 @@ class qaoa(system):
                         self.local_i,
                         self.W_row_starts,
                         self.W_col_indexes,
-                        -I * self.W_values,
+                        self.W_values,
                         self.W_num_rec_inds,
                         self.W_rec_disps,
                         self.W_num_send_inds,
