@@ -811,9 +811,6 @@ class qaoa(system):
                         self.comm.py2f(),
                         self.precision)
 
-                self.get_probabilities()
-                print(self.get_state_norm(),flush=True)
-
 class qwoa(system):
     """
     The :class:`qwoa` class provides for the instantiation a QWAO configuration
