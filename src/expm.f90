@@ -44,6 +44,7 @@ module Expm
     integer, parameter :: RHV = 2, m_max = 55, p_max = 8
 
     real(qp), parameter :: tol_dp = 2.0_qp**(-53.0_qp)
+    real(qp), parameter :: epsilon_dp = epsilon(real(0,dp))
 
     real(dp), dimension(100), target :: theta_dp = [2.220446049250313D-16, & 
         2.5809568029717673D-8, 0.000013863478661191213_dp, &
@@ -101,7 +102,8 @@ module Expm
     !    8.546902045684934_dp, 8.809694269971322_dp,   9.073187890176143_dp,   &
     !    9.337343505612015_dp, 9.602124472826556_dp,   9.8674966757534_dp]
 
-    real(qp), parameter :: tol_sp = 2.0_dp**(-24.0_dp)
+    real(dp), parameter :: tol_sp = 2.0_dp**(-24.0_dp)
+    real(dp), parameter :: epsilon_sp = epsilon(real(0,sp))
 
     real(dp), dimension(55), target :: theta_sp = [1.19209D-7, 0.000597886_dp, &
         0.0112339_dp, 0.0511662_dp, 0.130849_dp, 0.249529_dp, 0.401458_dp,     &
@@ -465,7 +467,7 @@ module Expm
         integer :: m_star, s
 
         character(len=2) :: set_target_precision
-        real(qp) :: tol
+        real(qp) :: tol, epsilon_tol
         real(qp) :: c_1, c_2
 
         integer :: i, j, lb, ub
@@ -481,13 +483,16 @@ module Expm
             if (target_precision == "sp") then
                 set_target_precision = target_precision
                 tol = tol_sp
+                epsilon_tol = epsilon_sp
             elseif (target_precision == "dp") then
                 set_target_precision = target_precision
                 tol = tol_dp
+                epsilon_tol = epsilon_dp
             endif
         else
             set_target_precision = "dp"
             tol = tol_dp
+            epsilon_tol = epsilon_dp
         endif
 
         lb = lbound(C,1)
@@ -496,7 +501,7 @@ module Expm
         allocate(B_temp_1(lb:ub))
         allocate(B_temp_2(lb:ub))
 
-        if (abs(t) < epsilon(t)) then
+        if (abs(t) < epsilon_tol) then
             m_star = 0
             s = 1
         else
@@ -633,7 +638,7 @@ module Expm
         real(dp) :: h
 
         character(len=2) :: set_target_precision
-        real(qp) :: tol
+        real(qp) :: tol, epsilon_tol
         real(qp) :: c_1, c_2
 
         integer :: m_star, s, m_hat
@@ -654,13 +659,16 @@ module Expm
             if (target_precision == "sp") then
                 set_target_precision = target_precision
                 tol = tol_sp
+                epsilon_tol = epsilon_sp
             elseif (target_precision == "dp") then
                 set_target_precision = target_precision
                 tol = tol_dp
+                epsilon_tol = epsilon_dp
             endif
         else
             set_target_precision = "dp"
             tol = tol_dp
+            epsilon_tol = epsilon_dp
         endif
 
         lb = partition_table(rank + 1)
