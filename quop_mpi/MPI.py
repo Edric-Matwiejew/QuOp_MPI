@@ -290,7 +290,7 @@ class system(object):
         .. note::
             The `param_func`, qual_func` and `state_func` must have the keyword argument 'seed'. This allows for a repeatable variation if :math:`(\\vec{\gamma}, \\vec{t}), q_i` and :math:`| s \\rangle` with each repetition at the same :math:`p`.
         """
-        
+
         # param persist and qual func warning.
         first = True
 
@@ -320,13 +320,14 @@ class system(object):
                     self.gammas_ts = self.comm.bcast(self.gammas_ts, root = 0)
 
                 else:
+
                     gammas, ts = np.split(previous_params, 2)
                     if self.rank == 0:
                         gamma_t = param_func(1,seed = i + itter)
                     else:
                         gamma_t = None
 
-                    self.gamma_t = self.comm.bcast(self.gamma_t, root = 0)
+                    gamma_t = self.comm.bcast(gamma_t, root = 0)
                     self.gammas_ts = np.append(np.append(gammas, gamma_t[0]), np.append(ts, gamma_t[1]))
 
                 if qual_func is not None:
