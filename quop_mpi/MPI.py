@@ -1,13 +1,14 @@
 from mpi4py import MPI
 import h5py
 import numpy as np
-from scipy.optimize import Bounds, minimize
+from scipy.optimize import minimize as sp_minimize
 from scipy import sparse
 import sys
 import os
 import quop_mpi.fqwoa_mpi as fqwoa_mpi
 import quop_mpi.fMPI as fMPI
 import quop_mpi.mixers_mpi as mixers_mpi
+from quop_mpi.nlopt_wrap import minimize as nlopt_minimize
 from time import time
 import csv
 
@@ -52,13 +53,19 @@ class system(object):
 
         # Set-up the default optimiser.
         self.stop = False
-        self.set_optimiser( minimize,
-                {'method':'BFGS','args':(self.stop,),'tol':1e-3},
+        self.set_optimiser( 'scipy',
+                {'method':'BFGS','tol':1e-3},
                             ['fun','nfev','success'])
 
-    def set_optimiser(self, optimiser, optimiser_args, optimiser_log):
+    def set_optimiser(self, optimiser, optimiser_args, optimiser_log = None):
 
-        self.optimiser = optimiser
+        if optimiser == 'scipy':
+            self.optimiser = sp_minimize
+        elif optimiser == 'nlopt':
+            self.optimiser = nlopt_minimize
+        else:
+            print("WARNING")
+
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
 
@@ -94,7 +101,7 @@ class system(object):
         local_expectation = np.dot(self.probabilities, self.qualities)
         return self.comm.allreduce(local_expectation, op = MPI.SUM)
 
-    def objective(self, gammas_ts, stop):
+    def objective(self, gammas_ts):
         """
         :math:`f(\\vec{\gamma}, \\vec{t}) = \langle \\vec{\gamma}, \\vec{t} | Q |\\vec{\gamma}, \\vec{t} \\rangle` \
         - the function minimised by the calssical optimizer.
@@ -108,7 +115,7 @@ class system(object):
         # During optimization the root processes controls parallel evaluation
         # through the passing of the self.stop parameter.
 
-        self.stop = self.comm.bcast(stop, root = 0)
+        self.stop = self.comm.bcast(self.stop, root = 0)
 
         if not self.stop:
             self.gammas_ts = self.comm.bcast(gammas_ts, root = 0)
@@ -139,10 +146,10 @@ class system(object):
         if self.comm.Get_rank() == 0:
             self.result = self.optimiser(self.objective,self.gammas_ts,**self.optimiser_args)
             self.stop = True
-            self.objective(self.gammas_ts, self.stop)
+            self.objective(self.gammas_ts)
         else:
             while not self.stop:
-                self.objective(self.gammas_ts,self.stop)
+                self.objective(self.gammas_ts)
 
         self.time = time() - self.time
 
@@ -408,8 +415,9 @@ class system(object):
                 self.logfile_csv = csv.writer(self.logfile)
             else:
                 headings = ['label','qubits','system_size','p','state_norm','simulation_time','MPI_nodes']
-                for optimiser_log in self.optimiser_log:
-                    headings.append(optimiser_log)
+                if self.optimiser_log is not None:
+                    for optimiser_log in self.optimiser_log:
+                        headings.append(optimiser_log)
 
                 self.logfile = open(filename + ".csv", "w")
                 self.logfile_csv = csv.writer(self.logfile)
@@ -433,8 +441,9 @@ class system(object):
                     self.comm.size
                     ]
 
-            for optimiser_log in self.optimiser_log:
-                log_output.append(self.result[optimiser_log])
+            if self.optimiser_log is not None:
+                for optimiser_log in self.optimiser_log:
+                    log_output.append(self.result[optimiser_log])
 
             self.logfile_csv.writerow(log_output)
 
@@ -559,7 +568,7 @@ class qaoa(system):
         self.system_size = 2**n_qubits
         self.comm = MPI_communicator
         self.rank = self.comm.Get_rank()
-        self.precision = "dp"
+        self.precision = "sp"
         self.graph_set = False
 
         self.partition_table = self._generate_partition_table(self.system_size, self.comm)
@@ -604,8 +613,6 @@ class qaoa(system):
         W_values = -I * W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
         W_row_starts += 1
 
-        print("MASXI",np.max(W_col_indexes))
-
         return W_row_starts, W_col_indexes, W_values
 
     def set_graph(self, scipy_csr = None, method = mixers_mpi.hypercube):
@@ -642,6 +649,7 @@ class qaoa(system):
                     self.n_qubits,
                     self.lb + 1,
                     self.ub)
+            self.W_values *= -I
 
         if isinstance(self.W_row_starts[0], np.ndarray):
 
@@ -725,7 +733,7 @@ class qaoa(system):
                     self.system_size,
                     self.W_row_starts,
                     self.W_col_indexes,
-                    -I * self.W_values,
+                    self.W_values,
                     self.W_num_rec_inds,
                     self.W_rec_disps,
                     self.W_num_send_inds,
@@ -802,6 +810,9 @@ class qaoa(system):
                         self.one_norms,
                         self.comm.py2f(),
                         self.precision)
+
+                self.get_probabilities()
+                print(self.get_state_norm(),flush=True)
 
 class qwoa(system):
     """
