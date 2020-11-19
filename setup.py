@@ -14,11 +14,11 @@ URL = 'https://github.com/Edric-Matwiejew/QuOp_MPI'
 EMAIL = 'Edric.Matwiejew@research.uwa.au'
 AUTHOR = 'Edric Matwiejew'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.0.2'
+VERSION = '0.0.3'
 
 # What packages are required for this module to be exeuted?
 REQUIRED = [
-        'numpy', 'scipy', 'mpi4py', 'h5py', 'networkx']
+        'numpy', 'scipy', 'mpi4py', 'h5py', 'networkx', 'nlopt']
 
 # What packages are optional?
 EXTRAS = {}
