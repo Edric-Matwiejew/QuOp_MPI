@@ -32,7 +32,8 @@ Python Dependencies
 -  numpy
 -  scipy
 -  h5py
--  Networkx (To run included example programs.)
+-  nlopt
+-  networkx (To run included example programs.)
 
 Running and Installing QuOp_MPI on Clusters
 -------------------------------------------
