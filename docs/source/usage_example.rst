@@ -14,6 +14,10 @@ As MPI based programs are parallelized through running multiple instances of the
 
 where n is a user specified parameter equal to the number of MPI *nodes* (or *processes*). Another possible workflow is to save the simulation results to disc and carry out visualization and analysis interactively, without calls to :mod:`~quop_mpi.MPI`.
 
+Learning to Use QuOp_MPI
+------------------------
+
+Usage of QuOp_MPI requires minimal (but some) python experience and a basic understanding of MPI parallelism. If you would like an introduction to MPI + QUOp_MPI which is more in-depth than the one offered below check out the tutorial programs located in QuOp_MPI/examples/tutorial.
 
 QWAO Simulation
 ---------------------
@@ -42,7 +46,7 @@ Define QWAO parameters, the depth of the circuit, p, the number of qubits, n_qub
     rng.np.random.RandomState(1)
 
     def x0(p):
-        return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)  
+        return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)
 
 Create a :class:`~quop_mpi.MPI.qwao` object. This contains the methods needed to perform parallel simulation of the QWAO algorithm.
 
@@ -98,9 +102,9 @@ QAOA simulation begins much the same as QWOA:
     rng.np.random.RandomState(1)
 
     def x0(p):
-        return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)  
+        return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)
 
-    qaoa = qu.MPI.qaoa(n_qubits, comm)    
+    qaoa = qu.MPI.qaoa(n_qubits, comm)
 
 By defualt the :class:`~quop_mpi.MPI.qaoa` class uses a :math:`2^n` dimensional hypercube. See :math:`~quop_mpi.MPI.qaoa.set_graph` for how to define a custom mixing operator.
 
@@ -127,7 +131,7 @@ Automated Benchmarking
 
 It is often the case that one wishes to see how a given system responds as a function of :math:`p`. To assist with this QuOp_MPI provides the :meth:`~quop_mpi.MPI.system.benchmark` method. Note that :meth:`~quop_mpi.MPI.system.log_results` can be used to log the results for each value of :meth:`p` and repetition.
 
-.. note:: 
+.. note::
     `param_func`,`qual_func and `state_func` each require an integer `seed` keyword argument.
 
 .. code-block:: python
