@@ -58,13 +58,31 @@ class system(object):
                             ['fun','nfev','success'])
 
     def set_optimiser(self, optimiser, optimiser_args, optimiser_log = None):
+        """
+        Defines the classical optimiser algorithm used, arguments passed to the optimiser and fields in the optimiser dictionary to write to the log file (when using :meth:`~system.log_results`). QuOp_MPI supports optimisers provided by SciPy through its minimize method `minimize <https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html>` and optimisers provided by the `NLopt <https://nlopt.readthedocs.io/en/latest/>` package with respect to minmisation with scalar constraints through a SciPy-like interface.
+
+
+        The default optimiser is the BFGS algorithm provided SciPy, which is set on instantiation of the :class:`~system` class as follows:
+
+        self.set_optimiser( 'scipy',
+                {'method':'BFGS','tol':1e-3},
+                            ['fun','nfev','success'])
+
+
+        :param optimiser: 'scipy' to use the SciPy or 'nlopt' to use NLopt.
+        :type optimiser: string
+
+        :param optimiser_args: Arguments to pass to the optimiser.
+        :type optimiser_args: dictionary
+
+        :param optimiser_log: Results of the optimisation process are stored in a dictionary. These values may be logged by passing a list of the corresponding keys.
+        :type optimiser_log: array, string
+        """
 
         if optimiser == 'scipy':
             self.optimiser = sp_minimize
         elif optimiser == 'nlopt':
             self.optimiser = nlopt_minimize
-        else:
-            print("WARNING")
 
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
@@ -552,10 +570,10 @@ class qaoa(system):
     """
     Subclass of :class:`system`, this provides for the instantiation of a QAOA system distributed over an MPI communicator and the execution of this algorithm in parallel. Evolution of the QAOA system involves high-precision approximation of the action of the time-evolution operator on the QAOA state vector. This allows
     for the use of arbitrary mixing operators, :math:`W`, but is less efficient than
-    :class:`qwoa` which makes use of a fast Fourier transform instead. If the user wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing operator use of the :class:`qwoa` class is recommended.
+    :class:`qwoa` which makes use of a fast Fourier transform instead. If the user wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing operator use of the :class:`qwoa` class is recommended. By default this class uses a hypercube mixing operator, :math:`W`, of size :math:`2^n \\times 2^n`.
 
-    :param W: Arbitrary :math:`N \\times N` mixing operator, :math:`W`, or list of :math:`N \\times N` mixing operators, in order of application.
-    :type W: SciPy sparse CSR matrix, or list of SciPy sparse CSR matrices.
+    :param n_qubits: The number of qubits :math:`n`. For the :class:`~qaoa` class this sets the dimension of the mixing unitary, :math:`U_{\\text{W}}.`
+    :type n_qubits: integer
 
     :param comm: MPI communicator objected created by mpi4py.
     :type comm: MPI communicator
@@ -616,6 +634,22 @@ class qaoa(system):
         return W_row_starts, W_col_indexes, W_values
 
     def set_graph(self, scipy_csr = None, method = mixers_mpi.hypercube):
+        """
+        Sets the operator, :math:`W`, used by the mixing unitary, :math:`U_{\\text{W}}`. This can be a :math:`2^n \\times 2^n` SciPy sparse CSR array, an array of :math:`2^n \\times 2^n` SciPy sprase CSR arrays or a python method which generates the mixing operator in parallel using MPI. An array of mixers allows for the simulation of mixing operators consisting of sequential non-commutative operators (:math:`U_{\\text{W}_1}, U_{\\text{W}_2},...`) each parameterised by the same :math:`t_i`. By default, this method generates a :math:`2^n \\times 2^n` sized hypercube using the 'method' option.
+
+        .. note::
+            To produce the mixing operator in parallel pass a method which takes the following arguments:
+                * the number of qubits (integer)
+                * The lower bound of the local row-wise partition of :math:`W` (as given by self.partition_table).
+                * The upper bound of the local row-wise parition of :math:`W` (as given by self.partition_table).
+            This method must return arrays (or an array of arrays) which describe the (MPI rank) local row-wise partition of the distributed CSR array(s) in the SciPy sparse CSR format: indptr, indices and values. See the SciPy CSR `documentation <https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html>` for more information on the CSR sparse format.
+
+        :param scipy_csr: SciPy sparse matrix, or array of SciPy sprase matrices. Must be of size :math:`2^n \\times 2^n`.
+        :type scipy_csr: complex, SciPy sparse array
+
+        :param method: A method which produces a :math:`2^n \\times 2^n` CSR mixing opertor(s) in parallel using MPI, as described above.
+        :param method: callable, optional
+        """
 
         if scipy_csr is not None:
 
