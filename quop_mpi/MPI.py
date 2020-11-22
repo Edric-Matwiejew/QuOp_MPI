@@ -194,16 +194,21 @@ class system(object):
         * `state` keyword.
             * Fully specify :math:`|s\\rangle`. Pass an MPI rank specific array of :math:`x_i \in \mathbb{C}` such that :math:`x_i    \geq 0' and  :math:`\\text{local_i} \leq i < \\text{local_i + local_i_offset}`. If keyword `normalized` is True, this state will be normalized.
 
+
         :param name: Name of a pre-defined initial state.
         :type name: str, optional
-
+        
         :param vertices: Specify an equal superposition over a set of :math:`|s_i\\rangle`.
         :type verticies: array, integer, optional
+
 
         :state: Initialize :math:`|s\\rangle` in a user-defined generalized state.
         :param: array, float, optional
 
-        :state normalized: If normalized is True and an argument to `state`is specified, normalize the input state.l
+
+        :state normalized: If normalized is `True` and an argument to `state` is specified, normalize the input state.
+        :param normalized: boolean, optional
+
         """
 
         # In some cases rank 0 might have no local indicies.
@@ -637,18 +642,20 @@ class qaoa(system):
         """
         Sets the operator, :math:`W`, used by the mixing unitary, :math:`U_{\\text{W}}`. This can be a :math:`2^n \\times 2^n` SciPy sparse CSR array, an array of :math:`2^n \\times 2^n` SciPy sprase CSR arrays or a python method which generates the mixing operator in parallel using MPI. An array of mixers allows for the simulation of mixing operators consisting of sequential non-commutative operators (:math:`U_{\\text{W}_1}, U_{\\text{W}_2},...`) each parameterised by the same :math:`t_i`. By default, this method generates a :math:`2^n \\times 2^n` sized hypercube using the 'method' option.
 
-        .. note::
-            To produce the mixing operator in parallel pass a method which takes the following arguments:
-                * the number of qubits (integer)
-                * The lower bound of the local row-wise partition of :math:`W` (as given by self.partition_table).
-                * The upper bound of the local row-wise parition of :math:`W` (as given by self.partition_table).
-            This method must return arrays (or an array of arrays) which describe the (MPI rank) local row-wise partition of the distributed CSR array(s) in the SciPy sparse CSR format: indptr, indices and values. See the SciPy CSR `documentation <https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html>` for more information on the CSR sparse format.
+        To produce the mixing operator in parallel pass a method which takes the following arguments:
+            * the number of qubits (integer)
+            * The lower bound of the local row-wise partition of :math:`W` (as given by self.partition_table).
+            * The upper bound of the local row-wise parition of :math:`W` (as given by self.partition_table).
+
+        This method must return arrays (or an array of arrays) which describe the (MPI rank) local row-wise partition of the distributed CSR array(s) in the SciPy sparse CSR format: indptr, indices and values. See the SciPy CSR `documentation <http://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html>`_ for more information on the CSR sparse format.
+        
 
         :param scipy_csr: SciPy sparse matrix, or array of SciPy sprase matrices. Must be of size :math:`2^n \\times 2^n`.
         :type scipy_csr: complex, SciPy sparse array
 
         :param method: A method which produces a :math:`2^n \\times 2^n` CSR mixing opertor(s) in parallel using MPI, as described above.
         :param method: callable, optional
+
         """
 
         if scipy_csr is not None:
