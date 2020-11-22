@@ -32,14 +32,17 @@ Next, set up the MPI environment by creating an MPI communicator object.
 
     comm = MPI.COMM_WORLD
 
-Define QWAO parameters, the depth of the circuit, p, the number of qubits, n_qubits, and an array of parameters of size 2p, x0, which defines the starting values of the :math:`\vec{\gamma}` and :math:`\vec{t}` arrays.
+Define QWAO parameters, the depth of the circuit, p, the number of qubits, n_qubits, and a function to generate arrays of size 2p, x0, which defines the starting values of the :math:`\vec{\gamma}` and :math:`\vec{t}` parameters.
 
 .. code-block:: python
 
     p = 2
     n_qubits = 3
-    np.random.seed(1)
-    x0 = np.random.rand(2*p)
+
+    rng.np.random.RandomState(1)
+
+    def x0(p):
+        return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)  
 
 Create a :class:`~quop_mpi.MPI.qwao` object. This contains the methods needed to perform parallel simulation of the QWAO algorithm.
 
@@ -47,17 +50,13 @@ Create a :class:`~quop_mpi.MPI.qwao` object. This contains the methods needed to
 
     qwoa = qu.MPI.qwao(n_qubits, comm)
 
-Define the circulant graph by passing a :mod:`~quop_mpi.graph_array` to :meth:`~quop_mpi.MPI.quop.graph`.
+By default this will use the adjacency maxtrix of a complex graph as :math:`W` in the mixing unitary :math:`U_W`.
+
+Define the solution qualities, :math:`\vec{q}`, by passing a :mod:`~quop_mpi.qualities` method to :meth:`~quop_mpi.MPI.quop.set_qualities`
 
 .. code-block:: python
 
-    quop.graph(qu.graph_array.complete(quop.size))
-
-Define the solution qualities by passing a :mod:`~quop_mpi.qualities` method to :meth:`~quop_mpi.MPI.quop.set_qualities`
-
-.. code-block:: python
-
-    quop.qualities(qu.set_qualities.random_floats)
+    quop.set_qualities(qu.qualities.random_floats)
 
 The QWAO algorithm may then be executed. Note that :meth:`~quop_mpi.MPI.quop.plan` and :meth:`~quop_mpi.MPI.quop.destroy_plan` are necessary to create and free ancillary arrays and pointers used by FFTW.
 
@@ -71,18 +70,18 @@ Simulation results can then be saved to disc as a HDF5 file using :meth:`~quop_m
 
 .. code-block:: python
 
-    quop.save("example", "example_config", action = "w")
+    quop.save("qwoa", "example_config", action = "w")
 
 The results of the optimization process can also be examined as follows:
 
 .. code-block:: python
 
-    quop.print_result
+    quop.print_result()
 
 QAOA Simulation + Real-Time Data Logging
 ----------------------------------------
 
-QAOA simulation begins much the same as QWOA. However, there are a number of key differences. Firstly, we need a means of generating :math:`W` as an adjacency matrix in the CSR SciPy sparse matrix format. This can easily be carried out for a wide range of graph topologies using NetworkX. Below :math:`W` is defined as a :math:`N \times N` hypercube, which is passed when initializing a :class:`~quop_mpi.MPI.qaoa` object:
+QAOA simulation begins much the same as QWOA:
 
 .. code-block:: python
 
@@ -95,13 +94,17 @@ QAOA simulation begins much the same as QWOA. However, there are a number of key
 
     p = 2
     n_qubits = 3
-    np.random.seed(1)
-    x0 = np.random.rand(2*p)
 
-    hyper_cube = nx.to_scipy_sparse_matrix(nx.hypercube_graph(n_qubits))
-    qaoa = qu.MPI.qaoa(hyper_cube,comm)
+    rng.np.random.RandomState(1)
 
-To set up real-time logging of the QAOA or QWOA results a log file must be defined:
+    def x0(p):
+        return rng.uniform(low = 0, high = 2*np.pi, size = 2 * p)  
+
+    qaoa = qu.MPI.qaoa(n_qubits, comm)    
+
+By defualt the :class:`~quop_mpi.MPI.qaoa` class uses a :math:`2^n` dimensional hypercube. See :math:`~quop_mpi.MPI.qaoa.set_graph` for how to define a custom mixing operator.
+
+To set up real-time logging of QAOA or QWOA results a log file must be defined:
 
 .. code-block:: python
 
@@ -129,9 +132,8 @@ It is often the case that one wishes to see how a given system responds as a fun
 
 .. code-block:: python
 
-    import qwao_mpi as qw
+    import quop_mpi as qu
     import numpy as np
-    import networkx as nx
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
@@ -142,20 +144,19 @@ It is often the case that one wishes to see how a given system responds as a fun
     repeats = 5
 
     def x0(p,seed):
-        return np.random.uniform(low = 0, high = 1, size = 2*p)
+        return np.random.uniform(low = 0, high = , size = 2*p)
 
-    for qubits in range(qubits_min, qubits_max):
-        hypercube = nx.to_scipy_sparse_matrix(nx.hypercube_graph(qubits))
-        qaoa = qw.MPI.qaoa(hypercube,comm)
+    for n_qubits in range(qubits_min, qubits_max):
+        qaoa = qu.MPI.qaoa(n_qubits,comm)
         qaoa.set_initial_state(name = "equal")
         qaoa.log_results("benchmark_example","qaoa_equal",action="a")
-        qaoa.set_qualities(qw.qualities.random_floats)
+        qaoa.set_qualities(qu.qualities.random_floats)
         qaoa.benchmark(
                 ps,
                 repeats,
                 param_func = x0,
-                qual_func = qw.qualities.random_floats,
-                filename = "qaoa_equal",
+                qual_func = qu.qualities.random_floats,
+                filename = "qaoa_complete_equal",
                 label = "qaoa_" + str(qubits))
 
 User Defined Quality Function
