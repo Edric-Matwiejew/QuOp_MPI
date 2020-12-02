@@ -238,11 +238,13 @@ To plot the results, we use Matplotlib.
 """
 
 ax1 = plt.gca()
-ax1.plot(np.abs(final_state)**2, label = r'Final quantum state, $<\vec{t}, \vec{\gamma}|q_i|\vec{t}, \vec{\gamma} >$')
-ax1.plot(qualities,'*', color = 'red', label = r'Qualities, $\vec{q} = q_i$.')
-plt.legend()
-ax1.set_ylabel("quality")
 ax2 = ax1.twinx()
+state_plot = ax1.plot(np.abs(final_state)**2, '+', label = r'Final quantum state, $|<\vec{t}, \vec{\gamma}|\vec{t}, \vec{\gamma} >|^2$')
+qual_plot = ax2.plot(qualities,'*', color = 'red', label = r'Qualities, $\vec{q} = q_i$.')
+dots1, labels1 = ax1.get_legend_handles_labels()
+dots2, labels2 = ax2.get_legend_handles_labels()
+plt.legend(dots1 + dots2, labels1 + labels2)
+ax1.set_ylabel("quality")
 ax2.set_ylabel("Probability")
 ax1.set_xlabel("Quantum State/Possible Solution")
 plt.savefig("qwoa_final_state")
