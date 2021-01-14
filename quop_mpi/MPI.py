@@ -2,6 +2,7 @@ from mpi4py import MPI
 import h5py
 import numpy as np
 from scipy.optimize import minimize as sp_minimize
+from scipy.optimize import basinhopping as sp_basinhopping
 from scipy import sparse
 import sys
 import os
@@ -54,19 +55,21 @@ class system(object):
         # Set-up the default optimiser.
         self.stop = False
         self.set_optimiser( 'scipy',
-                {'method':'BFGS','tol':1e-3},
+                {'method':'BFGS','tol':1e-5},
                             ['fun','nfev','success'])
 
-    def set_optimiser(self, optimiser, optimiser_args, optimiser_log = None):
+    def set_optimiser(self, optimiser, optimiser_args = {}, optimiser_log = None):
         """
-        Defines the classical optimiser algorithm used, arguments passed to the optimiser and fields in the optimiser dictionary to write to the log file (when using :meth:`~system.log_results`). QuOp_MPI supports optimisers provided by SciPy through its minimize method `minimize <https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html>` and optimisers provided by the `NLopt <https://nlopt.readthedocs.io/en/latest/>` package with respect to minmisation with scalar constraints through a SciPy-like interface.
+        Defines the classical optimiser algorithm used, arguments passed to the optimiser and fields in the optimiser dictionary to write to the log file (when using :meth:`~system.log_results`). QuOp_MPI supports optimisers provided by SciPy through its minimize method `minimize <http://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html>`_ and optimisers provided by the `NLopt <http://nlopt.readthedocs.io/en/latest/>`_ package with respect to minmisation with scalar constraints through a SciPy-like interface.
 
 
         The default optimiser is the BFGS algorithm provided SciPy, which is set on instantiation of the :class:`~system` class as follows:
 
-        self.set_optimiser( 'scipy',
-                {'method':'BFGS','tol':1e-3},
-                            ['fun','nfev','success'])
+        .. code-block:: python
+        
+            self.set_optimiser( 'scipy',
+                    {'method':'BFGS','tol':1e-3},
+                                ['fun','nfev','success'])
 
 
         :param optimiser: 'scipy' to use the SciPy or 'nlopt' to use NLopt.
@@ -83,6 +86,8 @@ class system(object):
             self.optimiser = sp_minimize
         elif optimiser == 'nlopt':
             self.optimiser = nlopt_minimize
+        elif optimiser == 'scipy_basinhopping':
+            self.optimiser = sp_basinhopping
 
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
@@ -318,7 +323,7 @@ class system(object):
         :type kwargs: dictionary, optional
 
         .. note::
-            The `param_func`, qual_func` and `state_func` must have the keyword argument 'seed'. This allows for a repeatable variation if :math:`(\\vec{\gamma}, \\vec{t}), q_i` and :math:`| s \\rangle` with each repetition at the same :math:`p`.
+            The `param_func`, `qual_func` and `state_func` must have the keyword argument 'seed'. This allows for a repeatable variation if :math:`(\\vec{\gamma}, \\vec{t}), q_i` and :math:`| s \\rangle` with each repetition at the same :math:`p`.
         """
 
         # param persist and qual func warning.
