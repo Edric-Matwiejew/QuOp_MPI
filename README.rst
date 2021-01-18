@@ -199,7 +199,7 @@ utilities required to download and configure QuOp_MPI’s dependencies.
 
 ::
 
-    brew install gcc python wget pkg-config mpich
+    brew install gcc python wget pkg-config mpich swing guile octave
 
 Download, extract and install parallel-HDF5.
 
