@@ -186,7 +186,7 @@ class system(object):
         if self.comm.Get_rank() == 0:
             print(self.result)
 
-    def set_initial_state(self, name = None, vertices = None, state = None, normalized = False):
+    def set_initial_state(self, name = None, vertices = None, state = None, normalized = True):
         """
         Set :math:`| s \\rangle`. This can be done in several mutually exclusive ways:
 
@@ -235,13 +235,13 @@ class system(object):
             if self.comm.Get_rank() == self.lowest_rank:
                 self.initial_state[0:2] = 1.0/np.sqrt(2.0)
         elif vertices is not None:
-            self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
+            self.initial_state = np.zeros(self.alloc_local, np.complex128)
             total_verticies = self.comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
             for vertex in vertices:
                 self.initial_state[vertex] = 1.0/np.sqrt(total_verticies)
         elif state is not None:
             self.initial_state = np.zeros(self.alloc_local, dtype = np.complex128)
-            self.initial_state[0:self.local_i] = np.array(state, np.complex128)
+            self.initial_state[0:self.local_i] = np.array(state[self.local_i_offset:self.local_i_offset + self.local_i], np.complex128)
             if not normalized:
                 normalization = self.comm.allreduce(np.sum(np.multiply(np.conjugate(state), state)), op = MPI.SUM)
                 self.initial_state = self.initial_state/np.sqrt(normalization)
