@@ -51,6 +51,8 @@ class system(object):
 
         self.log = False
         self.graph_set = False
+        self.objective_map_defined = False
+        self.repeat = 1 # temp fix if logging execute output.
 
         # Set-up the default optimiser.
         self.stop = False
@@ -145,7 +147,20 @@ class system(object):
             gammas, ts = np.split(self.gammas_ts, 2)
             self.evolve_state(gammas, ts)
             expectation = self.expectation()
+
+            if self.objective_map_defined:
+                expectation = self.objective_map(
+                        expectation,
+                        *self.objective_map_args,
+                        **self.objective_map_kwargs
+                        )
             return expectation
+
+    def objective_mapping(self, func, *args, **kwargs):
+        self.objective_map_defined = True
+        self.objective_map = func
+        self.objective_map_args = args
+        self.objective_map_kwargs = kwargs
 
     def execute(self, gammas_ts, seed = 0):
         """
@@ -343,6 +358,8 @@ class system(object):
 
             for i  in range(1, repeats + 1):
 
+                self.repeat  = i
+
                 np.random.seed(i + itter)
 
                 if (not param_persist) or first:
@@ -442,7 +459,7 @@ class system(object):
                 self.logfile = open(filename + ".csv", "a", newline='')
                 self.logfile_csv = csv.writer(self.logfile)
             else:
-                headings = ['label','qubits','system_size','p','state_norm','simulation_time','MPI_nodes']
+                headings = ['label','qubits','system_size','p','repeat','state_norm','simulation_time','MPI_nodes']
                 if self.optimiser_log is not None:
                     for optimiser_log in self.optimiser_log:
                         headings.append(optimiser_log)
@@ -464,6 +481,7 @@ class system(object):
                     self.n_qubits,
                     self.system_size,
                     self.p,
+                    self.repeat,
                     self.state_norm,
                     self.time,
                     self.comm.size
