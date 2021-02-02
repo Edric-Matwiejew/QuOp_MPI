@@ -162,6 +162,12 @@ class system(object):
         self.objective_map_args = args
         self.objective_map_kwargs = kwargs
 
+    def unset_objective_mapping(self):
+        self.objective_map_defined = False
+        self.objective_map = None
+        self.objective_map_args = []
+        self.objective_map_kwargs = {}
+
     def execute(self, gammas_ts, seed = 0):
         """
         Execute the QAOA-like algorithm.
