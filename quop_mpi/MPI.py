@@ -156,7 +156,7 @@ class system(object):
                         )
             return expectation
 
-    def objective_mapping(self, func, *args, **kwargs):
+    def set_objective_mapping(self, func, *args, **kwargs):
         self.objective_map_defined = True
         self.objective_map = func
         self.objective_map_args = args
