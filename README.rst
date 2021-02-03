@@ -104,7 +104,7 @@ Install MPICH and build applications:
 ::
 
     sudo apt-get update
-    sudo apt-get install build-essential cython python3-dev python3-pip python3-setuptools wget git mpich
+    sudo apt-get install build-essential cython python3-dev python3-pip python3-setuptools wget git mpich octave
 
 FFTW and HDF5, as provided by the Ubuntu app repository, have not been
 built with the required options. These must be built from source.
