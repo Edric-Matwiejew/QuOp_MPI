@@ -52,6 +52,7 @@ class system(object):
         self.log = False
         self.graph_set = False
         self.objective_map_defined = False
+        self.quality_map_defined = False
         self.repeat = 1 # temp fix if logging execute output.
 
         # Set-up the default optimiser.
@@ -123,7 +124,16 @@ class system(object):
         :rtype: float
         """
         self.get_probabilities()
-        local_expectation = np.dot(self.probabilities, self.qualities)
+        if self.quality_map_defined:
+            local_expectation = np.dot(
+                    self.probabilities,
+                    self.quality_map(
+                        self.qualities,
+                        *self.quality_map_args,
+                        **self.quality_map_kwargs
+                    ))
+        else:
+            local_expectation = np.dot(self.probabilities, self.qualities)
         return self.comm.allreduce(local_expectation, op = MPI.SUM)
 
     def objective(self, gammas_ts):
@@ -167,6 +177,18 @@ class system(object):
         self.objective_map = None
         self.objective_map_args = []
         self.objective_map_kwargs = {}
+
+    def set_quality_mapping(self, func, *args, **kwargs):
+        self.quality_map_defined = True
+        self.quality_map = func
+        self.quality_map_args = args
+        self.quality_map_kwargs = kwargs
+
+    def unset_quality_mapping(self):
+        self.quality_map_defined = False
+        self.quality_map = None
+        self.quality_map_args = []
+        self.quality_map_kwargs = {}
 
     def execute(self, gammas_ts, seed = 0):
         """
