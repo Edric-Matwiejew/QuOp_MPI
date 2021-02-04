@@ -49,6 +49,7 @@ class system(object):
     """
     def __init__(self):
 
+        self.initial_state_defined = False
         self.log = False
         self.graph_set = False
         self.objective_map_defined = False
@@ -69,7 +70,7 @@ class system(object):
         The default optimiser is the BFGS algorithm provided SciPy, which is set on instantiation of the :class:`~system` class as follows:
 
         .. code-block:: python
-        
+
             self.set_optimiser( 'scipy',
                     {'method':'BFGS','tol':1e-3},
                                 ['fun','nfev','success'])
@@ -197,6 +198,10 @@ class system(object):
         :param gammas_ts: An array of length :math:`2 p`, :math:`(\\vec{\gamma},\\vec{t})`.
         :type gammas_ts: float, array
         """
+
+        if not self.initial_state_defined:
+            self.set_initial_state("equal")
+
         self.time = time()
         self.gammas_ts = gammas_ts
 
@@ -245,7 +250,7 @@ class system(object):
 
         :param name: Name of a pre-defined initial state.
         :type name: str, optional
-        
+
         :param vertices: Specify an equal superposition over a set of :math:`|s_i\\rangle`.
         :type verticies: array, integer, optional
 
@@ -269,25 +274,31 @@ class system(object):
 
         if name == "equal":
             self.initial_state = np.ones(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
+            self.initial_state_defined = True
         elif name == "localized":
             self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
             if self.comm.Get_rank() == self.lowest_rank:
                 self.initial_state[0] = 1.0
+            self.initial_state_defined = True
         elif name == "split":
             self.initial_state = np.zeros(self.alloc_local, np.complex128)/np.sqrt(np.float64(self.system_size))
+            self.initial_state_defined = True
             if self.comm.Get_rank() == self.lowest_rank:
                 self.initial_state[0:2] = 1.0/np.sqrt(2.0)
+            self.initial_state_defined = True
         elif vertices is not None:
             self.initial_state = np.zeros(self.alloc_local, np.complex128)
             total_verticies = self.comm.allreduce(np.float64(len(vertices)), op = MPI.SUM)
             for vertex in vertices:
                 self.initial_state[vertex] = 1.0/np.sqrt(total_verticies)
+            self.initial_state_defined = True
         elif state is not None:
             self.initial_state = np.zeros(self.alloc_local, dtype = np.complex128)
             self.initial_state[0:self.local_i] = np.array(state[self.local_i_offset:self.local_i_offset + self.local_i], np.complex128)
             if not normalized:
                 normalization = self.comm.allreduce(np.sum(np.multiply(np.conjugate(state), state)), op = MPI.SUM)
                 self.initial_state = self.initial_state/np.sqrt(normalization)
+            self.initial_state_defined = True
 
     def set_qualities(self, func, *args, **kwargs):
         """
@@ -699,7 +710,7 @@ class qaoa(system):
             * The upper bound of the local row-wise parition of :math:`W` (as given by self.partition_table).
 
         This method must return arrays (or an array of arrays) which describe the (MPI rank) local row-wise partition of the distributed CSR array(s) in the SciPy sparse CSR format: indptr, indices and values. See the SciPy CSR `documentation <http://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html>`_ for more information on the CSR sparse format.
-        
+
 
         :param scipy_csr: SciPy sparse matrix, or array of SciPy sprase matrices. Must be of size :math:`2^n \\times 2^n`.
         :type scipy_csr: complex, SciPy sparse array
