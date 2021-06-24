@@ -21,7 +21,7 @@ project = 'QuOp_MPI'
 copyright = '2020, Edric Matwiejew'
 author = 'Edric Matwiejew'
 
-autodoc_mock_imports = ["mpi4py", "h5py", "quop_mpi.fqwoa_mpi", "quop_mpi.fMPI", "quop_mpi.mixers_mpi", "nlopt", "quop_mpi.nlopt_wrap"]
+autodoc_mock_imports = ["mpi4py", "h5py","nlopt", "quop_mpi.fqwoa_mpi", "quop_mpi.fMPI", "quop_mpi.mixers_mpi", "quop_mpi.nlopt_wrap"]
 
 # The full version, including alpha/beta/rc tags
 release = '1.0.0'
