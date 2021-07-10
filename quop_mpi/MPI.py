@@ -155,8 +155,13 @@ class system(object):
         # During optimization the root processes controls parallel evaluation
         # through the passing of the self.stop parameter.
 
-        self.stop = self.comm.bcast(self.stop, root = 0)
+		if comm2.Get_rank() == 0:
+			print("ROOT STOP", self.stop, flush = True)
+        #self.stop = self.comm.bcast(self.stop, root = 0)
+		if comm2.Get_rank() == 0:
+			print("ROOT STOP 2", self.gammas_ts, flush = True)
         self.stop = self.comm2.bcast(self.stop, root = 0)
+        self.gammas_ts = self.comm2.bcast(self.gammas_ts, root = 0)
 
         if not self.stop:
             self.gammas_ts = self.comm.bcast(gammas_ts, root = 0)

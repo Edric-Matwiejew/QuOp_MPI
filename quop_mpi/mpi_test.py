@@ -116,6 +116,7 @@ qwoa.set_qualities(qu.qualities.random_floats)
 qwoa.plan()
 
 if colours[COMM.Get_rank()] == 0:
+    print("ROOT COMM", COMM.Get_rank(), flush = True)
     x = x0(p)
 else:
     x = None
@@ -123,16 +124,18 @@ else:
 
 def mpi_jacobian(x, tol = 1e-8):
 
-    qwoa.stop = COMM.bcast(qwoa.stop, root = 0)
-
+    #qwoa.stop = COMM.bcast(qwoa.stop, root = 0)
 
     start = time.time()
     if True:
-   
-        x_jac = COMM.bcast(x, 0)
-        #print(COMM.Get_rank(), x_jac,flush = True)
+        x_jac = x#COMM.bcast(x, 0)
+        print("jac", COMM.Get_rank(), x_jac, flush = True)
+        print("jac", COMM.Get_rank(), x_jac,flush = True)
         if type(True) == type(x_jac):
             return
+        if not hasattr(x_jac, "__len__"):
+            return
+
         x_jac_temp = np.empty(len(x_jac))
         partials = []
 
@@ -173,14 +176,12 @@ def mpi_jacobian(x, tol = 1e-8):
             return jacobian
         else:
             return None
-#
+
 #if colours[COMM.Get_rank()] == 0:
 #    xs, ts = np.split(x,2)
 #    qwoa.evolve_state(xs, ts)
-#
+
 #print(mpi_jacobian(x), flush = True)
-#
-#
 
 qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5,'jac':mpi_jacobian},['fun','nfev','success'])
 
@@ -188,14 +189,17 @@ qwoa.comm2 = COMM
 
 start = time.time()
 if colours[COMM.Get_rank()] == 0:
+    qwoa.stop = False
     qwoa.execute(x)
     qwoa.print_result()
-    print('execution time', time.time() - start)
+    #print('execution time', time.time() - start)
 else:
     qwoa.stop = False
     while not qwoa.stop:
         qwoa.stop = COMM.bcast(qwoa.stop, 0)
-        #print(qwoa.stop)
+        print("GOT STOP")
+        x = COMM.bcast(x, 0)
+        print("truth?", qwoa.stop, x)
         if not qwoa.stop:
             mpi_jacobian(x)
 
