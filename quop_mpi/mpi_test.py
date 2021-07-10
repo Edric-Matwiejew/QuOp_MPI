@@ -89,15 +89,6 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
         for var in range(variables):
                 var_map[var % len(comm_opt_mapping)].append(var)
 
-<<<<<<< HEAD
-=======
-                #if COMM.Get_rank() == 0:
-                        #print(process_dict)
-                        #print(var_map)
-                        #print(comm_opt_mapping)
-                        #print(colours)
-
->>>>>>> 3b3aaaa0b8bd9fdcc31d73c49da78b86e7285555
         return COMM_OPT, var_map, comm_opt_roots, colours
 
 
@@ -195,19 +186,6 @@ qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5,'jac':mpi_jacobian},['fu
 
 qwoa.comm2 = COMM
 
-
-<<<<<<< HEAD
-=======
-if COMM.Get_rank() == 0:
-    jacobian = np.zeros(2*p, dtype = np.float64)
-    for i, var in enumerate(var_map[colours[COMM.Get_rank()]]):
-        jacobian[var] = partials[i]
-    for root, mapping in zip(comm_opt_roots,var_map):
-        if root != 0:
-            for var in mapping:
-                COMM.Irecv([jacobian[var:var+1], MPI.DOUBLE],  source = root, tag = root)
->>>>>>> 3b3aaaa0b8bd9fdcc31d73c49da78b86e7285555
-
 start = time.time()
 if colours[COMM.Get_rank()] == 0:
     qwoa.execute(x)
@@ -222,43 +200,12 @@ else:
             mpi_jacobian(x)
 
 
-
 qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5},['fun','nfev','success'])
 
-<<<<<<< HEAD
 if colours[COMM.Get_rank()] == 0:
     start = time.time()
     qwoa.execute(x0(p))
     print('execution time', time.time() - start)
     qwoa.print_result()
-    #else:
-    #
-    #
-    #
-    #if colours[comm.Get_rank()] == 0:
-    #    qwoa.print_result()
-    #
-=======
-if COMM.Get_rank() == 0:
-    print(jacobian, "JAC TIME", finish - start, flush = True)
-    print()
-    print(comm_opt_roots)
-    print()
-    print(colours)
-    print()
-    print()
-    for mapping in var_map:
-        print(mapping)
 
-#if colours[COMM.Get_rank()] == 0:
-#    print(COMM_OPT.Get_size(), COMM_OPT.Get_rank())
-#    qwoa.execute(x)
-#else:
-#
-#
-#
-#if colours[comm.Get_rank()] == 0:
-#    qwoa.print_result()
-#
->>>>>>> 3b3aaaa0b8bd9fdcc31d73c49da78b86e7285555
 qwoa.destroy_plan()
