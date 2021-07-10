@@ -61,6 +61,7 @@ class system(object):
         self.objective_map_defined = False
         self.quality_map_defined = False
         self.repeat = 1 # temp fix if logging execute output.
+        self.cnt = 0
 
         # Set-up the default optimiser.
         self.stop = False
@@ -161,27 +162,35 @@ class system(object):
 
 
         self.gammas_ts = gammas_ts
-        self.stop = self.comm2.bcast(self.stop, root = 0)
+        self.stop = self.comm.bcast(self.stop, root = 0)
+        #print("STOP", self.comm2.Get_rank(), flush = True)
         self.bcount += 1
-        self.gammas_ts = self.comm2.bcast(self.gammas_ts, root = 0)
+        #print("gammas_ts", self.comm2.Get_rank(), flush = True)
         self.bcount += 1
-        
+        self.cnt += 1
+
+
         if not self.stop:
-            self.gammas_ts = self.comm.bcast(gammas_ts, root = 0)
+
+            #self.gammas_ts = self.comm2.bcast(self.gammas_ts, root = 0)
+            gammas_ts = self.comm.bcast(gammas_ts, root = 0)
+            self.gammas_ts = gammas_ts
             gammas, ts = np.split(self.gammas_ts, 2)
             self.evolve_state(gammas, ts)
             #print('gammas', 'ts', gammas, ts, flush = True)
             expectation = self.expectation()
 
-            self.expt = self.comm2.bcast(expectation, root = 0)
+            self.expt = expectation
+            #print("expt", self.comm2.Get_rank(), self.expt, flush = True)
             self.bcount += 1
 
             if self.objective_map_defined:
                 expectation = self.objective_map(
                         expectation,
                         *self.objective_map_args,
-                        **self.objective_map_kwargs
-                        )
+                        **self.objective_map_kwargs)
+            #print("ITT", self.cnt, flush = True)
+                        
             return expectation
 
     def set_objective_mapping(self, func, *args, **kwargs):
@@ -236,6 +245,7 @@ class system(object):
             self.stop = True
             self.objective(self.gammas_ts)
         else:
+            cnt = 0
             while not self.stop:
                 self.objective(self.gammas_ts)
 

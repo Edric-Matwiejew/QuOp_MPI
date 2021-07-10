@@ -124,8 +124,19 @@ else:
 def mpi_jacobian(x, tol = 1e-8):
 
     #qwoa.stop = COMM.bcast(qwoa.stop, root = 0)
+    COMM.barrier()
+
+    qwoa.stop = COMM.bcast(qwoa.stop, 0)
+
+    if qwoa.stop:
+        #print('stop')
+        return
+
+    qwoa.gammas_ts = COMM.bcast(qwoa.gammas_ts, 0)
+    qwoa.expt = COMM.bcast(qwoa.expt, 0)
 
     start = time.time()
+    x = qwoa.gammas_ts
     x_jac_temp = np.empty(len(x))
     partials = []
 
@@ -189,20 +200,19 @@ start = time.time()
 if colours[COMM.Get_rank()] == 0:
     qwoa.stop = False
     qwoa.execute(x)
+    qwoa.stop = True
+    mpi_jacobian(qwoa.gammas_ts)
+    qwoa.stop = COMM.bcast(qwoa.stop, 0)
     print('execution time', time.time() - start)
     qwoa.print_result()
 else:
     qwoa.stop = False
     qwoa.gammas_ts = None
+    cnt = 0
     while not qwoa.stop:
-        qwoa.stop = COMM.bcast(qwoa.stop, 0)
-        #print("GOT STOP", qwoa.stop, flush = True)
-        qwoa.gammas_ts = COMM.bcast(qwoa.gammas_ts, 0)
-        #print("truth?", gammas_ts, flush = True)
-        if not qwoa.stop:
-            qwoa.expt = COMM.bcast(qwoa.expt, 0)
-            #print('pre jac', qwoa.gammas_ts, flush = True)
-            mpi_jacobian(qwoa.gammas_ts)
+        mpi_jacobian(qwoa.gammas_ts)
+        cnt += 1
+        #print("CNT", cnt, flush = True)
 
 
 #qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5},['fun','nfev','success'])
@@ -215,5 +225,4 @@ else:
 #    print('execution time', time.time() - start)
 #    qwoa.print_result()
 #
-COMM.barrier()
 qwoa.destroy_plan()
