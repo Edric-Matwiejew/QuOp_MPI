@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import quop_mpi as qu
+import time
 
 COMM = MPI.COMM_WORLD
 
@@ -88,6 +89,12 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
         for var in range(variables):
                 var_map[var % len(comm_opt_mapping)].append(var)
 
+		if COMM.Get_rank() == 0:
+			print(process_dict)
+			print(var_map)
+			print(comm_opt_mapping)
+			print(colours)
+
         return COMM_OPT, var_map, comm_opt_roots, colours
 
 
@@ -97,8 +104,8 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
 #    """
 
 
-p = 30
-n_qubits = 15
+p = 8
+n_qubits = 19
 
 rng = np.random.RandomState(1)
 
@@ -113,6 +120,8 @@ qwoa.set_initial_state(name="equal")
 qwoa.set_graph(qu.graph_array.complete(n_qubits))
 qwoa.set_qualities(qu.qualities.random_floats)
 qwoa.plan()
+
+start = time.time()
 
 if colours[COMM.Get_rank()] == 0:
     x = x0(p)
@@ -154,15 +163,13 @@ else:
 
 COMM.barrier()
 
+finish = time.time()
+
+
 if COMM.Get_rank() == 0:
-    print(jacobian, flush = True)
+    print(jacobian, "JAC TIME", finish - start, flush = True)
     for mapping in var_map:
         print(mapping)
-
-    COMM_OPT.colour = 0
-    
-
-
 
 #if colours[COMM.Get_rank()] == 0:
 #    print(COMM_OPT.Get_size(), COMM_OPT.Get_rank())
