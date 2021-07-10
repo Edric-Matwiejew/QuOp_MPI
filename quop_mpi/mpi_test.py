@@ -89,11 +89,11 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
         for var in range(variables):
                 var_map[var % len(comm_opt_mapping)].append(var)
 
-                if COMM.Get_rank() == 0:
-                        print(process_dict)
-                        print(var_map)
-                        print(comm_opt_mapping)
-                        print(colours)
+                #if COMM.Get_rank() == 0:
+                        #print(process_dict)
+                        #print(var_map)
+                        #print(comm_opt_mapping)
+                        #print(colours)
 
         return COMM_OPT, var_map, comm_opt_roots, colours
 
@@ -150,9 +150,10 @@ if COMM.Get_rank() == 0:
     jacobian = np.zeros(2*p, dtype = np.float64)
     for i, var in enumerate(var_map[colours[COMM.Get_rank()]]):
         jacobian[var] = partials[i]
-    for root, mapping in zip(comm_opt_roots[1:],var_map[1:]):
-        for var in mapping:
-            COMM.Irecv([jacobian[var:var+1], MPI.DOUBLE],  source = root, tag = root)
+    for root, mapping in zip(comm_opt_roots,var_map):
+        if root != 0:
+            for var in mapping:
+                COMM.Irecv([jacobian[var:var+1], MPI.DOUBLE],  source = root, tag = root)
 
 elif COMM_OPT.Get_rank() == 0:
     jacobian = None
@@ -168,6 +169,12 @@ finish = time.time()
 
 if COMM.Get_rank() == 0:
     print(jacobian, "JAC TIME", finish - start, flush = True)
+    print()
+    print(comm_opt_roots)
+    print()
+    print(colours)
+    print()
+    print()
     for mapping in var_map:
         print(mapping)
 
