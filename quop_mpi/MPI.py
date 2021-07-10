@@ -47,8 +47,12 @@ class system(object):
 
     QWAO_MPI contains two :class:`system` subclasses: :class:`qaoa` and :class:`qwoa`.
     """
-    def __init__(self):
+    def __init__(self, MPI_communicator, parallel = None):
 
+
+        self.comm2 = None
+        self.comm = MPI_communicator
+        self.parallel = parallel
         self.initial_state_defined = False
         self.log = False
         self.graph_set = False
@@ -96,15 +100,15 @@ class system(object):
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
 
-    def get_probabilities(self):
+    def get_local_probabilities(self):
         """
         :math:`\\vec{p} = ( \langle s_i|\\vec{\gamma}, \\vec{t} \\rangle` ), i=0,N-1
 
         :return: Probability vector corresponding the the local `self.final_state` partition.
         :rtype: array, float
         """
-        self.probabilities = np.abs(self.final_state[:self.local_i])**2
-        return self.probabilities
+        self.local_probabilities = np.abs(self.final_state[:self.local_i])**2
+        return self.local_probabilities
 
     def get_state_norm(self):
         """
@@ -114,7 +118,7 @@ class system(object):
         :return: Norm of the current `self.final_state`.
         :rtype: float
         """
-        self.state_norm = self.comm.allreduce(np.sum(self.probabilities), op = MPI.SUM)
+        self.state_norm = self.comm.allreduce(np.sum(self.local_probabilities), op = MPI.SUM)
         return self.state_norm
 
     def expectation(self):
@@ -124,17 +128,17 @@ class system(object):
         :return: The expectation value of the quality matrix operator, returned to all MPI nodes.
         :rtype: float
         """
-        self.get_probabilities()
+        self.get_local_probabilities()
         if self.quality_map_defined:
             local_expectation = np.dot(
-                    self.probabilities,
+                    self.local_probabilities,
                     self.quality_map(
                         self.qualities,
                         *self.quality_map_args,
                         **self.quality_map_kwargs
                     ))
         else:
-            local_expectation = np.dot(self.probabilities, self.qualities)
+            local_expectation = np.dot(self.local_probabilities, self.qualities)
         return self.comm.allreduce(local_expectation, op = MPI.SUM)
 
     def objective(self, gammas_ts):
@@ -152,6 +156,7 @@ class system(object):
         # through the passing of the self.stop parameter.
 
         self.stop = self.comm.bcast(self.stop, root = 0)
+        self.stop = self.comm2.bcast(self.stop, root = 0)
 
         if not self.stop:
             self.gammas_ts = self.comm.bcast(gammas_ts, root = 0)
@@ -311,7 +316,12 @@ class system(object):
         :param args: Extra arguments to pass to the quality function.
         :type args: array, optional
         """
-        self.qualities = func(self.system_size, self.local_i, self.local_i_offset, *args, **kwargs)
+        self.qual_func = func
+
+        if self.parallel == "jacobian":
+            return
+
+        self.qualities = self.qual_func(self.system_size, self.local_i, self.local_i_offset, *args, **kwargs)
 
     def benchmark(
             self,
@@ -645,13 +655,12 @@ class qaoa(system):
     :param comm: MPI communicator objected created by mpi4py.
     :type comm: MPI communicator
     """
-    def __init__(self, n_qubits, MPI_communicator):
+    def __init__(self, n_qubits, MPI_communicator, **kwargs):
 
-        super().__init__()
+        super().__init__(MPI_communicator, **kwargs)
 
         self.n_qubits = n_qubits
         self.system_size = 2**n_qubits
-        self.comm = MPI_communicator
         self.rank = self.comm.Get_rank()
         self.precision = "sp"
         self.graph_set = False
@@ -929,9 +938,9 @@ class qwoa(system):
 
     :param qubits: If qubits is True, system_size is the number of qubits, producing a system of size :math:`2^n`. Otherwise system_size is equal to :math:`n`, allowing for simulations with a non-integer number of qubits.
     """
-    def __init__(self, system_size, MPI_communicator, qubits = True):
+    def __init__(self, system_size, MPI_communicator, qubits = True, **kwargs):
 
-        super().__init__()
+        super().__init__(MPI_communicator, **kwargs)
 
         self.system_size = system_size
 
@@ -942,7 +951,6 @@ class qwoa(system):
             self.system_size = system_size
             self.n_qubits = np.log(self.system_size)/np.log(2.0)
 
-        self.comm = MPI_communicator
         self.rank = self.comm.Get_rank()
 
         # When performing a parallel 1D-FFT using FFTW it may be the case that
@@ -1072,3 +1080,87 @@ class qwoa(system):
                 self.comm.py2f())
 
         self.comm.Barrier()
+
+
+def mpi_jacobian_communication_topology(MPI_COMMUNICATOR, variables):
+    """
+    Create a set of MPI subcommunicators, COMM_OPT, that will be used to calculate the system jacobian in parallel by allocating computation of the partial derivatives across COMM_OPT.
+    """
+
+    COMM = MPI_COMMUNICATOR
+    
+    size = COMM.Get_size()
+    rank = COMM.Get_rank()
+    
+    process = MPI.Get_processor_name()
+    
+    if rank == 0:
+    
+            processes = [process]
+    
+            for i in range(1, size):
+                    processes.append(COMM.recv(source = i))
+    
+            unique_processes = list(set(processes))
+            lsts = [[] for _ in range(len(unique_processes))]
+            process_dict = dict(zip(unique_processes, lsts))
+    
+            for i, proc in enumerate(processes):
+                    process_dict[proc].append(i)
+    
+            for key in process_dict:
+                    process_dict[key] = np.array(process_dict[key])
+    
+    else:
+    
+            COMM.send(process, dest = 0)
+            process_dict = None
+    
+    process_dict = COMM.bcast(process_dict)
+    
+    n_processors = len(process_dict)
+    n_subcomm_processes = variables//n_processors
+    
+    if n_subcomm_processes == 0:
+    
+        comm_opt_mapping = [[] for _ in range(variables)]
+        for i, key in enumerate(process_dict.keys()):
+            for rank in process_dict[key]:
+                comm_opt_mapping[i % variables].append(rank)
+    
+    else:
+    
+        comm_opt_mapping = []
+    
+        for key in process_dict.keys():
+    
+            if n_subcomm_processes == 1:
+                comm_opt_mapping.append(process_dict[key])
+                continue
+    
+            for part in np.array_split(process_dict[key], n_subcomm_processes):
+                comm_opt_mapping.append(part)
+    
+    
+    colours = []
+    comm_opt_roots = []
+    for i, comm in enumerate(comm_opt_mapping):
+            comm_opt_roots.append(min(comm))
+            for _ in range(len(comm)):
+                    colours.append(i)
+    
+    
+    COMM_OPT = MPI.Comm.Split(
+            COMM,
+            colours[rank],
+            COMM.Get_rank())
+    
+    opt_size = COMM_OPT.Get_size()
+    
+    var_map = [[] for _ in range(opt_size)]
+    for var in range(variables):
+            var_map[var % opt_size].append(var)
+    
+    return COMM_OPT, var_map, comm_opt_roots
+    
+    
