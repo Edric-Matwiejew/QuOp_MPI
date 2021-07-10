@@ -50,6 +50,7 @@ class system(object):
     def __init__(self, MPI_communicator, parallel = None):
 
 
+        self.expt = None
         self.bcount = 0
         self.comm2 = None
         self.comm = MPI_communicator
@@ -108,7 +109,9 @@ class system(object):
         :return: Probability vector corresponding the the local `self.final_state` partition.
         :rtype: array, float
         """
-        self.local_probabilities = np.abs(self.final_state[:self.local_i])**2
+        #print(self.gammas_ts, flush = True)
+        #print(np.abs(self.final_state[:self.local_i], dtype = np.float64)**2, flush = True)
+        self.local_probabilities = np.abs(self.final_state[:self.local_i], dtype = np.float64)**2
         return self.local_probabilities
 
     def get_state_norm(self):
@@ -167,7 +170,11 @@ class system(object):
             self.gammas_ts = self.comm.bcast(gammas_ts, root = 0)
             gammas, ts = np.split(self.gammas_ts, 2)
             self.evolve_state(gammas, ts)
+            #print('gammas', 'ts', gammas, ts, flush = True)
             expectation = self.expectation()
+
+            self.expt = self.comm2.bcast(expectation, root = 0)
+            self.bcount += 1
 
             if self.objective_map_defined:
                 expectation = self.objective_map(

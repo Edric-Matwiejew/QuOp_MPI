@@ -1,4 +1,4 @@
-from mpi4py import MPI 
+from mpi4py import MPI
 import numpy as np
 import quop_mpi as qu
 import time
@@ -13,14 +13,13 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
         rank = COMM.Get_rank()
 
         process = MPI.Get_processor_name()
-        #process = str(rank)
 
         if rank == 0:
 
                 processes = [process]
 
                 for i in range(1, size):
-                    processes.append(COMM.recv(source = i))
+                        processes.append(COMM.recv(source = i))
 
                 unique_processes = list(set(processes))
                 lsts = [[] for _ in range(len(unique_processes))]
@@ -99,7 +98,7 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
 #    """
 
 
-p = 4
+p = 8
 n_qubits = 10
 
 rng = np.random.RandomState(1)
@@ -130,10 +129,14 @@ def mpi_jacobian(x, tol = 1e-8):
     x_jac_temp = np.empty(len(x))
     partials = []
 
-    COMM.barrier()
-    expectation = COMM.bcast(qwoa.expectation(), 0)
-    qwoa.bcount += 1
-
+    #if colours[COMM.Get_rank()] == 0:
+    #    expectation = qwoa.expectation()
+    #else:
+    #    expectation = None
+        
+    expectation = qwoa.expt
+    #if COMM.Get_rank() == 0:
+    #    print(expectation, flush = True)
 
     for var in var_map[colours[COMM.Get_rank()]]:
         x_jac_temp[:] = x
@@ -181,38 +184,36 @@ qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5,'jac':mpi_jacobian},['fu
 
 qwoa.comm2 = COMM
 
+qwoa.stop = False
 start = time.time()
 if colours[COMM.Get_rank()] == 0:
     qwoa.stop = False
     qwoa.execute(x)
-    print('execution time', time.time() - start, flush = True)
+    print('execution time', time.time() - start)
     qwoa.print_result()
 else:
     qwoa.stop = False
-    gammas_ts = None
+    qwoa.gammas_ts = None
     while not qwoa.stop:
         qwoa.stop = COMM.bcast(qwoa.stop, 0)
-        qwoa.bcount += 1
-        #print("GOT STOP")
-        gammas_ts = COMM.bcast(gammas_ts, 0)
-        qwoa.bcount += 1
-        #print("truth?", qwoa.stop, x)
+        #print("GOT STOP", qwoa.stop, flush = True)
+        qwoa.gammas_ts = COMM.bcast(qwoa.gammas_ts, 0)
+        #print("truth?", gammas_ts, flush = True)
         if not qwoa.stop:
-            mpi_jacobian(gammas_ts)
+            qwoa.expt = COMM.bcast(qwoa.expt, 0)
+            #print('pre jac', qwoa.gammas_ts, flush = True)
+            mpi_jacobian(qwoa.gammas_ts)
 
 
-qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5},['fun','nfev','success'])
-
-x = COMM.bcast(x, root = 0)
-qwoa.bcount += 1
-
-print('bcount', qwoa.bcount, COMM.Get_rank(), flush = True)
-
-if colours[COMM.Get_rank()] == 0:
-    start = time.time()
-    qwoa.execute(x)
-    print('execution time', time.time() - start, flush = True)
-    qwoa.print_result()
-
-
+#qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5},['fun','nfev','success'])
+#
+#x = COMM.bcast(x, root = 0)
+#
+#if colours[COMM.Get_rank()] == 0:
+#    start = time.time()
+#    qwoa.execute(x)
+#    print('execution time', time.time() - start)
+#    qwoa.print_result()
+#
+COMM.barrier()
 qwoa.destroy_plan()
