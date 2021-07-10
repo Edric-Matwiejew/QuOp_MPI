@@ -50,6 +50,7 @@ class system(object):
     def __init__(self, MPI_communicator, parallel = None):
 
 
+        self.bcount = 0
         self.comm2 = None
         self.comm = MPI_communicator
         self.parallel = parallel
@@ -158,8 +159,10 @@ class system(object):
 
         self.gammas_ts = gammas_ts
         self.stop = self.comm2.bcast(self.stop, root = 0)
+        self.bcount += 1
         self.gammas_ts = self.comm2.bcast(self.gammas_ts, root = 0)
-
+        self.bcount += 1
+        
         if not self.stop:
             self.gammas_ts = self.comm.bcast(gammas_ts, root = 0)
             gammas, ts = np.split(self.gammas_ts, 2)

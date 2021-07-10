@@ -1,4 +1,4 @@
-from mpi4py import MPI
+from mpi4py import MPI 
 import numpy as np
 import quop_mpi as qu
 import time
@@ -13,13 +13,14 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
         rank = COMM.Get_rank()
 
         process = MPI.Get_processor_name()
+        #process = str(rank)
 
         if rank == 0:
 
                 processes = [process]
 
                 for i in range(1, size):
-                        processes.append(COMM.recv(source = i))
+                    processes.append(COMM.recv(source = i))
 
                 unique_processes = list(set(processes))
                 lsts = [[] for _ in range(len(unique_processes))]
@@ -129,7 +130,10 @@ def mpi_jacobian(x, tol = 1e-8):
     x_jac_temp = np.empty(len(x))
     partials = []
 
+    COMM.barrier()
     expectation = COMM.bcast(qwoa.expectation(), 0)
+    qwoa.bcount += 1
+
 
     for var in var_map[colours[COMM.Get_rank()]]:
         x_jac_temp[:] = x
@@ -181,15 +185,17 @@ start = time.time()
 if colours[COMM.Get_rank()] == 0:
     qwoa.stop = False
     qwoa.execute(x)
-    print('execution time', time.time() - start)
+    print('execution time', time.time() - start, flush = True)
     qwoa.print_result()
 else:
     qwoa.stop = False
     gammas_ts = None
     while not qwoa.stop:
         qwoa.stop = COMM.bcast(qwoa.stop, 0)
+        qwoa.bcount += 1
         #print("GOT STOP")
         gammas_ts = COMM.bcast(gammas_ts, 0)
+        qwoa.bcount += 1
         #print("truth?", qwoa.stop, x)
         if not qwoa.stop:
             mpi_jacobian(gammas_ts)
@@ -198,11 +204,15 @@ else:
 qwoa.set_optimiser('scipy', {'method':'BFGS','tol':1e-5},['fun','nfev','success'])
 
 x = COMM.bcast(x, root = 0)
+qwoa.bcount += 1
+
+print('bcount', qwoa.bcount, COMM.Get_rank(), flush = True)
 
 if colours[COMM.Get_rank()] == 0:
     start = time.time()
     qwoa.execute(x)
-    print('execution time', time.time() - start)
+    print('execution time', time.time() - start, flush = True)
     qwoa.print_result()
+
 
 qwoa.destroy_plan()
