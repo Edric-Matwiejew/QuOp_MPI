@@ -89,11 +89,11 @@ def create_communication_topology(MPI_COMMUNICATOR, variables):
         for var in range(variables):
                 var_map[var % len(comm_opt_mapping)].append(var)
 
-		if COMM.Get_rank() == 0:
-			print(process_dict)
-			print(var_map)
-			print(comm_opt_mapping)
-			print(colours)
+                if COMM.Get_rank() == 0:
+                        print(process_dict)
+                        print(var_map)
+                        print(comm_opt_mapping)
+                        print(colours)
 
         return COMM_OPT, var_map, comm_opt_roots, colours
 
