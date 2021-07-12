@@ -169,7 +169,9 @@ class system(object):
         self.bcount += 1
         self.cnt += 1
 
-
+        #if self.stop:
+            #print(self.comm.Get_rank(), "out of obj")
+  
         if not self.stop:
 
             #self.gammas_ts = self.comm2.bcast(self.gammas_ts, root = 0)
@@ -181,7 +183,8 @@ class system(object):
             expectation = self.expectation()
 
             self.expt = expectation
-            #print("expt", self.comm2.Get_rank(), self.expt, flush = True)
+            #if self.comm.Get_rank() == 0:
+            #    print("expt", self.expt, flush = True)
             self.bcount += 1
 
             if self.objective_map_defined:
@@ -190,7 +193,7 @@ class system(object):
                         *self.objective_map_args,
                         **self.objective_map_kwargs)
             #print("ITT", self.cnt, flush = True)
-                        
+                      
             return expectation
 
     def set_objective_mapping(self, func, *args, **kwargs):
