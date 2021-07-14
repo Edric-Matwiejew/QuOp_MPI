@@ -272,6 +272,7 @@ class system(object):
                             **self.optimiser_args)
 
                     self.stop = True
+                    print("STOPPING", flush = True)
                     self.objective(None)
 
                     if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
@@ -401,7 +402,7 @@ class system(object):
                         else:
                             self.variational_parameters = None
 
-                        self.variational_parameters = self.comm.bcast(self.variational_parameters, root = 0)
+                        self.variational_parameters = self.COMM_OPT.bcast(self.variational_parameters, root = 0)
 
                     else:
 
@@ -419,7 +420,7 @@ class system(object):
                     #    self.initial_state = state_func(p, seed = i + itter)
 
                     if verbose:
-                        if self.comm.Get_rank() == 0:
+                        if self.COMM_OPT.Get_rank() == 0:
                             print(str(i) + ' of ' + str(repeats) + '...')
 
                     self.execute(self.variational_parameters, post = False)
@@ -722,7 +723,7 @@ class system(object):
                     for optimiser_log in self.optimiser_log:
                         headings.append(optimiser_log)
 
-                self.logfile = open(filename + ".csv", "w")
+                self.logfile = open(self.filename + ".csv", "w")
                 self.logfile_csv = csv.writer(self.logfile)
                 self.logfile_csv.writerow(headings)
 
@@ -876,11 +877,14 @@ class system(object):
             QUOP_ERR = "Observables function not defined."
             raise self._quop_raise_error(RuntimeError, QUOP_ERR)
 
+        # parallel jacobian not possible with one MPI process
+        if self.COMM.Get_size() == 1:
+            self.parallel = "global"
+
         # set up communication topology
-        if self.parallel == "global":
+        if (self.parallel == "global"):
 
             self.COMM_OPT = self.COMM
-
             self.colours = [0]*self.COMM.Get_size()
 
         elif (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
@@ -939,6 +943,15 @@ class system(object):
             return
 
         x = self.COMM_JAC.bcast(x, 0)
+
+        # if the jacobian is called before evaluation of the objective function
+        if self.colours[self.COMM.Get_rank()] == 0:
+
+            if self.expectation is None:
+
+                self.evolve_state(x)
+                self.expectation = self._get_expectation_value()
+
         self.expectation = self.COMM_JAC.bcast(self.expectation, 0)
 
         x_jac_temp = np.empty(len(x))
@@ -1012,21 +1025,6 @@ class qaoa(system):
 
         self.mixing_operator_set_type = None
 
-    def _generate_partition_table(self, N, MPI_communicator):
-
-        flock = MPI_communicator.Get_size()
-
-        partition_table = np.zeros(flock + 1, dtype = np.int32)
-        for i in range(flock + 1):
-            partition_table[i] = i * N / flock + 1
-
-        remainder = N - partition_table[flock]
-
-        for i in range(remainder):
-            partition_table[flock - i % flock : flock + 1] += 1
-
-        return partition_table
-
     def _csr_local_slice(self, W, MPI_communicator):
 
         if (sparse.issparse(W) and not sparse.isspmatrix_csr(W)):
@@ -1093,7 +1091,7 @@ class qaoa(system):
 
                         w_row_starts, w_col_indexes, w_values = self._csr_local_slice(
                                 w,
-                                self.comm)
+                                self.COMM_OPT)
 
                         self.W_row_starts.append(w_row_starts)
                         self.W_col_indexes.append(w_col_indexes)
@@ -1103,7 +1101,7 @@ class qaoa(system):
 
                     self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
                             self.W,
-                            self.comm)
+                            self.COMM_OPT)
 
             else:
 
@@ -1132,7 +1130,7 @@ class qaoa(system):
                                w_row_starts,
                                w_col_indexes,
                                self.partition_table,
-                               self.comm.py2f())
+                               self.COMM_OPT.py2f())
 
                     self.W_num_rec_inds.append(w_num_rec_inds)
                     self.W_rec_disps.append(w_rec_disps)

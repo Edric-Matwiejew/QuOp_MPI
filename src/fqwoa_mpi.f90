@@ -132,7 +132,6 @@ subroutine qwoa_state(  N, &
         enddo
     endif
 
-
     if (flag < 0) then
         call fftw_destroy_plan(plan_backward)
         call fftw_destroy_plan(plan_forward)
@@ -140,6 +139,90 @@ subroutine qwoa_state(  N, &
     endif
 
 end subroutine qwoa_state
+
+subroutine evolve_circulant(  N, &
+                        alloc_local, &
+                        local_i, &
+                        local_o, &
+                        t, &
+                        lambdas,  &
+                        state, &
+                        final_state, &
+                        MPI_communicator, &
+                        flag)
+
+    use, intrinsic :: iso_fortran_env, only: sp => real32, dp => real64
+    use, intrinsic :: iso_c_binding
+
+    implicit none
+
+    include 'fftw3-mpi.f03'
+
+    integer(dp), intent(in) :: N
+    integer(sp), intent(in) :: alloc_local
+    integer(sp), intent(in) :: local_i
+    integer(sp), intent(in) :: local_o
+    real(dp), intent(in) :: t
+    complex(dp), intent(in) :: lambdas(local_o)
+    complex(dp), intent(in) :: state(alloc_local)
+    complex(dp), intent(inout), target :: final_state(alloc_local)
+    integer(sp), intent(in) :: MPI_communicator
+    integer(sp), intent(in) :: flag
+
+    integer(C_INTPTR_T) :: N_temp, alloc_local_temp
+    type(C_PTR), save :: plan_forward, plan_backward, cdata
+    complex(C_DOUBLE_COMPLEX), pointer, save :: fdata(:)
+
+    integer :: i
+
+    if (flag >  0) then
+
+        N_temp = N
+
+        alloc_local_temp = alloc_local
+
+        cdata = fftw_alloc_complex(alloc_local_temp)
+        call c_f_pointer(cdata, fdata, [alloc_local_temp])
+
+        plan_forward = fftw_mpi_plan_dft_1d(N_temp, &
+                                            fdata, &
+                                            fdata, &
+                                            MPI_communicator, &
+                                            FFTW_FORWARD, &
+                                            FFTW_MEASURE)
+
+        plan_backward = fftw_mpi_plan_dft_1d(   N_temp, &
+                                                fdata, &
+                                                fdata, &
+                                                MPI_communicator, &
+                                                FFTW_BACKWARD, &
+                                                FFTW_MEASURE)
+        fdata => final_state
+
+
+    endif
+
+
+    if (flag == 0) then
+
+        final_state = state
+
+        call fftw_mpi_execute_dft(plan_forward, fdata, fdata)
+
+        fdata(1:local_o) = exp(-complex(0,1d0) * t * lambdas) *fdata(1:local_o)/real(N,8)
+
+        call fftw_mpi_execute_dft(plan_backward, fdata, fdata)
+
+
+    endif
+
+    if (flag < 0) then
+        call fftw_destroy_plan(plan_backward)
+        call fftw_destroy_plan(plan_forward)
+        call fftw_free(cdata)
+    endif
+
+end subroutine evolve_circulant
 
 subroutine save_dist_complex(   file_name, &
                                 group_name, &

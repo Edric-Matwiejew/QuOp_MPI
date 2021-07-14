@@ -10,10 +10,10 @@ p = 4
 alg = quop.MPI.ansatz(n_qubits,comm)
 
 alg.set_unitaries(
-        [op1, "sparse"],
-        [op2, "circulant"],
+        [op1, "sparse", 1.0, "mpi function", None],
+        [op2, "circulant", True, ],
         [op3, "diagonal"],
-        [op4, "sparse", "function", 2]
+        [op4, "sparse", True, "mpi function", 2]
         [op5, "diagonal", "function", 3]
         [op6, "circulant", "function", 4])
 
@@ -40,96 +40,177 @@ class ansatz():
             self.evolution_methods = []
             self.operator_types = []
             self.parameter_groups = []
-            self.evolution_args = []
 
-            for unitary in self.unitaries:
+            self.using_fftw = False
+            self.partition_table_generated = False
 
-                match unitary[1]:
-                    case "sparse":
-                        self.evolution_method.append(self.evolve_sparse)
-                    case "circulant":
-                        self.evolution_method.append(self.evolve_circulant)
-                    case "diagonal":
-                        self.evolution_method.append(self.evolve_diagonal)
-                    case _:
-                        print(ERROR_METHOD)
+            # parse operator type, evolution type and number of variational parameters.
+            for i, unitary in enumerate(self.unitaries):
+            
+                [op1, "sparse", "mpi function", None],
 
-                match len(unitary):
-                    case 2:
-                        self.operator_types.append("constant")
-                        self.parameter_groups.append(1)
-                    case 3
-                        self.operator_types.append("function")
-                        self.parameter_groups.append(1)
-                    case 4:
-                        self.operator_types.append("variational function")
-                        self.parameter_groups.append(unitary[3])
-                    case _:
-                        print(ERROR_LENGTH)
+                if unitary[1] == "sparse":
 
-                operator_type = "{} {}".format(unitary[1], self.operator_types[-1]):
+                    self.evolution_method.append(
+                            _sparse._evolve_sparse(self.system_size, self.COMM_OPT))
 
-                evolution_args.append([])
-                match
-                    case "sparse constant":
-                        DO SPARSE THINGS
-                        evolution_args[-1].append([])
-                    case "sparse function":
-                        CALL SPARSE THINGS
-                        evolution_args[-1].append([])
-                    case "sparse variational function":
-                        SET UP FOR RUNTIME CALLS
-                        evolution_args[-1].append([])
-                    case "circulant constant":
-                        DO CIRCULANT THINGS
-                        evolution_args[-1].append([])
-                    case "circulant function":
-                        DO GRAPH ARRAY THINGS
-                        evolution_args[-1].append([])
-                    case "circulant variational function":
-                        SET UP FOR RUNTIME CALLS
-                        evolution_args[-1].append([])
-                    case "diagonal constant":
-                        DO DIAGONAL THINGS
-                        evolution_args[-1].append([])
-                    case "diagonal function":
-                        GEN_DIAGONAL_THINGS
-                        evolution_args[-1].append([])
-                    case "diagonal variational function":
-                        SET UP FOR RUNTIME CALLS
-                        evolution_args[-1].append([])
-                    case _:
-                        print(ERROR_OPERATOR_TYPE)
+                elif unitary[1] == "circulant":
+
+                    self.evolution_method.append(
+                            _circulant._evolve_circulant(self.system_size, sef.COMM_OPT)
+
+                    if not self.using_fftw:
+                        self.using_fftw = i
+
+                elif unitary[1] == "diagonal":
+
+                    self.evolution_method.append(
+                            _diagonal._evolve_diagonal(self.system_size, self.COMM_OPT))
+
+                else:
+                    print(ERROR_METHOD)
+
+                if isinstance(unitary[4], int):
+                    self.parameter_groups.append(unitary[4] + 1)
+                else:
+                    self.parameter_groups.append(1)
+
+                # TODO check input types
+                # "constant" "function" "mpi function" "variational function", "mpi variational function"
+                self.operator_types.append(unitary[3])
+
+            # derive partitioning schemes from FFTW if "circulant" evolution is required.
+            if isinstance(self.using_fftw, int):
+
+                self.evolution_methods[self.using_fftw]._plan()
+
+                for i, operator_type in enumerate(self.operator_types)
+                    if i != self.using_fftw:
+                        self.evolution_methods[i]._copy_plan(self.evolution_method[self.using_fftw])
+
+            else:
+
+                for method in self.evolution_methods:
+                    method._generate_partition_table()
+
+
+            # complete set-up of evolution methods.
+
+            # "constant" "function" "mpi function" "variational function", "mpi variational function"
+            for i, unitary in enumerate(self.unitaries):
+
+                if unitary[1] == "sparse":
+
+                    if unitary[3] == "constant":
+
+                        self.evolution_methods[i]._csr_local_slice(unitary[0])
+                        self.evolution_methods[i]._plan()
+
+                    elif unitary[3] == "function":
+
+                        self.evolution_methods[i]._call_local_csr_function(unitary[0])
+                        self.evolution_methods[i]._plan()
+
+                    elif unitary[3] == "mpi function":
+
+                        self.evolution_methods[i]._call_mpi_csr_function(unitary[0])
+                        self.evolution_methods[i]._plan()
+
+                    elif unitary[3] == "variational function":
+
+                        self.evolution_methods[i].variational_operator_function = unitary[0]
+                        self.evolution_methods[i].variational_function_call = self.evolution_method[-1]._call_local_csr_function
+
+                    elif unitary[3] == "mpi variational function":
+
+                        self.evolution_methods[i].variational_operator_function = unitary[0]
+                        self.evolution_methods[i].variational_function_call = self.evolution_method[-1]._call_mpi_csr_function
+
+                    else:
+                        print("ERROR")
+
+                elif unitary[1] == "circulant":
+
+                    if unitary[3] == "constant":
+
+                    elif unitary[3] == "function":
+
+                    elif unitary[3] == "variational":
+
+                    else:
+                        print("ERROR")
+
+                elif unitary[1] == "diagonal":
+
+                    if unitary[3] == "constant":
+                        
+                        if len(unitary[0]) == self.evolution_methods[i].local_i:
+                            self.evolution_methods[i]._local_diag = unitary[0]
+
+                        elif len(unitary[0]) == self.system_size:
+
+                            local_offset_i = self.evolution_methods[i].local_offset_i
+                            local_i = self.evolution_methods[i].local_i
+                            self.evolution_methods[i]._local_diag = unitary[0][local_offset_i:local_offset_i + local_i]
+
+                    elif unitary[3] == "function":
+
+                        self.evolution_methods[i]._call_local_diag(unitary[0])
+
+                    elif unitary[3] == "mpi function":
+
+                        self.evolution_methods[i]._call_mpi_diag(unitary[0])
+
+                    elif unitary[3] == "variational function":
+
+                        self.evolution_methods[i].variational_operator_function = unitary[0]
+                        self.evolution_methods[i].variational_function_call = self.evolution_methods[i]._call_local_diag
+
+                    elif unitary[3] == "mpi variational function":
+
+                        self.evolution_methods[i].variational_operator_function = unitary[0]
+                        self.evolution_methods[i].variational_function_call = self.evolution_methods[i]._call_mpi_diag
+
+                    else:
+                        print("ERROR")
+
 
     def evolve_state(self, x):
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
+            self.final_state = self.initial_state
+
             param_groups = np.array_split(x, self.parameter_groups)
-            evolve = zip(self.evolution_methods, self.evolution_args, param_groups)
+            evolve = zip(self.evolution_methods, param_groups, self.operator_types)
 
-            for method, evol_args, param_group in evolve:
+            for method, param_group, operator_type in evolve:
 
-                if evol_args[0] is "variational function":
-                    # *_setup(variational_function(args))
-                    args = evol_args[3](evol_args[1](evol_args[2]))
+                if operator_type is "variational function":
+
+                    n_operator_param = len(param_group) - 1
+
+                    operator_parameters, evolution_parameter = np.array_split(
+                            param_group,
+                            [n_operator_param, 1])
+
+                    operator_function = method.variational_operator_function
+
+                    operator_call = method.variational_operator_function_call
+
+                    operator_call(
+                            operator_function,
+                            variational_parameters = operator_parameters)
+
+                    method._plan()
+
                 else:
-                    args = evol_args
 
-                self.final_state = method(args, param_group)
+                    evolution_parameter = param_group
 
-    def _sparse_setup(self, csr_partition):
-        pass
-    def _circulant_setup(self, graph_array):
-        pass
-    def _diagonal_setup(self, diag_elements):
+                method.initial_state = self.final_state
+                method._evolve(args, evolution_parameter)
+                self.final_state = method.final_state
 
-    def _evolve_sparse(self, evol_args, param_group):
-        pass
-    def _evolve_circulant(self, evol_args, param_group):
-        # plan() and destroy()
-        pass
-    def _evolve_diagonal(self, evol_args, param_group):
-        pass
-
-
+                if operator_type is "variational function":
+                    method._destroy()
