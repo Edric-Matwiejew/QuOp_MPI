@@ -1,7 +1,7 @@
+from mpi4py import MPI
 import h5py
 import numpy as np
 from scipy.optimize import minimize as sp_minimize
-from scipy.optimize import basinhopping as sp_basinhopping
 from scipy import sparse
 import sys
 import os
@@ -137,7 +137,7 @@ class system(object):
         self.optimiser_log = optimiser_log
 
         if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
-            if not self.optimiser_args.has_key("jac"):
+            if not "jac" in self.optimiser_args:
                 self.optimiser_args["jac"] = self._mpi_jacobian
 
     def set_observable_mapping(self, func, *args, **kwargs):
@@ -181,7 +181,7 @@ class system(object):
         """
 
         def state_check(state_type):
-            if state_type is not None:
+            if self.initial_state_type is not None:
                 QUOP_WRN = "Initial state redefined, switching to '{}'.".format(state_type)
                 raise Warning(QUOP_WRN)
             self.initial_state_type = state_type
@@ -232,10 +232,10 @@ class system(object):
         if self.colours[self.COMM.Get_rank()] == 0:
             return self._objective(variational_parameters)
 
-    def pre():
+    def pre(self):
         raise NotImplementedError("Simulation setup method 'pre' not defined by system subclass.")
 
-    def post():
+    def post(self):
         pass
 
     def execute(self, x, post = True):
@@ -250,9 +250,7 @@ class system(object):
 
         if self.pre_called:
             if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
-                if self.n_jacobian_variables == len(self.variational_parameters):
-                    continue
-                else:
+                if not (self.n_jacobian_variables == len(self.variational_parameters)):
                     self._post()
                     self._pre()
         else:
@@ -264,9 +262,9 @@ class system(object):
 
             if self.colours[self.COMM.Get_rank()] == 0:
 
-                self.time = time()
-
                 if self.COMM_OPT.Get_rank() == 0:
+
+                    self.time = time()
 
                     self.result = self.optimiser(
                             self.objective,
@@ -279,7 +277,7 @@ class system(object):
                     if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
                         self._mpi_jacobian(None)
 
-                self.time = time() - self.time
+                    self.time = time() - self.time
 
                 else:
 
@@ -302,7 +300,7 @@ class system(object):
         """
         Print the optimization result.
         """
-        if self.comm.Get_rank() == 0:
+        if self.COMM.Get_rank() == 0:
             print(self.result)
 
     def benchmark(
@@ -460,7 +458,7 @@ class system(object):
 
             self._post()
 
-    def save(self, file_name, config_name, data action = "a", verbose = False):
+    def save(self, file_name, config_name, action = "a", verbose = False):
         """
         Write the final state, qualities and execution results
         of the current configuration to a HDf5 file.
@@ -513,7 +511,7 @@ class system(object):
             Similarly, the qualities array, which is saved as an array of double-precision
             reals, should have its view set to np.float64.
         """
-        
+
         if self.colours[self.COMM.Get_rank()] == 0:
 
             if self.COMM_OPT.Get_rank() == 0:
@@ -533,10 +531,10 @@ class system(object):
                 config = File.create_group(self.config_name)
                 config.attrs["minimize_result"] = str(self.result)
 
-                File.create_dataset(self.config_name + "/initial_phases", data = self.gammas_ts, dtype = np.float64)
+                File.create_dataset(self.config_name + "/initial_phases", data = self.variational_parameters, dtype = np.float64)
                 File.close()
 
-            self.config_name = self.COMM_OPT.bcast(self.config_name, root = 0)
+            self.config_name = self.COMM_OPT.bcast(config_name, root = 0)
 
             fqwoa_mpi.save_dist_complex(
                     file_name,
@@ -560,7 +558,7 @@ class system(object):
 
             self.COMM_OPT.Barrier()
 
-    def _set_parameters(x):
+    def _set_parameters(self, x):
 
         self.variational_parameters = np.array(x, dtype = np.float64)
 
@@ -593,7 +591,7 @@ class system(object):
             else:
                 QUOP_ERR = "Initial state name = '{}' not recognised. Options are 'equal', 'localized' and 'split'".format(self.name)
                 raise self._quop_raise_error(ValueError, QUOP_ERR)
-        
+
         elif self.initial_state_type == "basis_states":
 
             self.initial_state = np.zeros(self.alloc_local, np.complex128)
@@ -601,7 +599,7 @@ class system(object):
             n_basis_states = len(self.basis_states) #self.COMM_OPT.allreduce(np.float64(len(vertices)), op = MPI.SUM)
             for state in self.basis_states:
                 if (state > self.local_i_offset) and (state <= self.local_i_offset + self.local_i):
-                self.initial_state[vertex] = 1.0/np.sqrt(total_verticies, dtype = np.float64)
+                    self.initial_state[vertex] = 1.0/np.sqrt(total_verticies, dtype = np.float64)
 
         elif self.initial_state_type == "state":
 
@@ -622,9 +620,7 @@ class system(object):
         self.observables = obs_func(
                 self.system_size,
                 self.local_i,
-                self.local_i_offset,
-                *args,
-                **kwargs)
+                self.local_i_offset)
 
         if (self.observables.ndim != 1) and (len(self.observables) != self.local_i):
             QUOP_ERR = "Output of obs_func is not a numpy array of length {}.".format(self.local_i)
@@ -637,8 +633,6 @@ class system(object):
         :return: Probability vector corresponding the the local `self.final_state` partition.
         :rtype: array, float
         """
-        #print(self.gammas_ts, flush = True)
-        #print(np.abs(self.final_state[:self.local_i], dtype = np.float64)**2, flush = True)
         self.local_probabilities = np.abs(self.final_state[:self.local_i], dtype = np.float64)**2
         return self.local_probabilities
 
@@ -650,13 +644,13 @@ class system(object):
         :return: Norm of the current `self.final_state`.
         :rtype: float
         """
-        if self.colours[self.COMM.Get_rank() == 0] == 0:
+        if self.colours[self.COMM.Get_rank()] == 0:
             self.state_norm = self.COMM_OPT.allreduce(np.sum(self.local_probabilities), op = MPI.SUM)
-        return self.state_norm
+            return self.state_norm
 
     def _get_expectation_value(self):
 
-        self.get_local_probabilities()
+        self._get_local_probabilities()
 
         if self.observable_map is not None:
 
@@ -689,7 +683,7 @@ class system(object):
 
             return self.expectation
 
-    def _gen_log(self, filename, label, action = "a"):
+    def _gen_log(self):
         """
         Creates a .csv in which to save key QAOA results after a call to :meth:`~system.execute`.
 
@@ -717,8 +711,8 @@ class system(object):
         self.n_log_fields = 6
 
         if self.COMM.Get_rank() == 0:
-            if (os.path.exists(filename + ".csv") and action == "a"):
-                self.logfile = open(filename + ".csv", "a", newline='')
+            if (os.path.exists(self.filename + ".csv") and self.log_action == "a"):
+                self.logfile = open(self.filename + ".csv", "a", newline='')
                 self.logfile_csv = csv.writer(self.logfile)
             else:
 
@@ -736,9 +730,9 @@ class system(object):
         """
         Update a .csv log of QAOA algorithm performance, instantiated by :meth:`~system.log_results`.
         """
-        self.state_norm = self.get_state_norm()
+        self.state_norm = self._get_state_norm()
 
-        if self.comm.Get_rank() == 0:
+        if self.COMM.Get_rank() == 0:
 
             log_output = [
                     self.label,
@@ -765,10 +759,10 @@ class system(object):
         node_ID = MPI.Get_processor_name()
 
         if self.COMM.Get_rank() == 0:
-            node_IDs = [node_IDs]
+            node_IDs = [node_ID]
 
             for i in range(1, self.COMM.Get_size()):
-                node_IDs.append(COMM.recv(source = i))
+                node_IDs.append(self.COMM.recv(source = i))
 
             unique_IDs = list(set(node_IDs))
             rank_lists = [[] for _ in range(len(unique_IDs))]
@@ -841,16 +835,15 @@ class system(object):
 
         # Colours specify membership to a particular self.COMM_OPT
         # comm_opt_roots is the self.COMM rank of the root process in each self.COMM_OPT
-        self.colours = np.full(self.COMM.size(), -1)
+        self.colours = np.full(self.COMM.Get_size(), -1)
         self.comm_opt_roots = []
-        #print(comm_opt_mapping,flush = True)
         for i, comm in enumerate(self.comm_opt_mapping):
             self.comm_opt_roots.append(min(comm))
             self.colours[comm] = i
 
         self.comm_opt_roots.sort()
 
-        if self.colours != -1:
+        if self.colours[self.COMM.Get_rank()] != -1:
 
             self.COMM_OPT = MPI.Comm.Split(
                     self.COMM,
@@ -877,11 +870,11 @@ class system(object):
 
         if self.variational_parameters is None:
             QUOP_ERR = "Variational parameters not defined."
-            raise self._quop_raise_error(TypeError, QUOP_ERR)
+            raise self._quop_raise_error(RuntimeError, QUOP_ERR)
 
         if self.observables_func is None:
             QUOP_ERR = "Observables function not defined."
-            raise self._quop_raise_error(TypeError, QUOP_ERR)
+            raise self._quop_raise_error(RuntimeError, QUOP_ERR)
 
         # set up communication topology
         if self.parallel == "global":
@@ -899,23 +892,23 @@ class system(object):
 
             self.pre()
 
-            partion_parameters = [self.system_size, self.alloc_local, self.local_i, self.local_i_offset]
+            partition_parameters = [self.system_size, self.alloc_local, self.local_i, self.local_i_offset]
             parameter_names = ["system_size", "alloc_local", "local_i", "local_i_offset"]
 
             for parameter, name in zip(partition_parameters, parameter_names):
                 if parameter is None:
                     QUOP_ERR = "MPI partition parameter '{}' not defined by 'pre' method of system subclass.".format(name)
-                    raise self._quop_raise_error(TypeError, QUOP_ERR)
+                    raise self._quop_raise_error(RuntimeError, QUOP_ERR)
 
             if self.observables is None:
 
-                _gen_observables(
+                self._gen_observables(
                         self.observables_func,
                         self.observable_func_args,
                         self.observable_func_kwargs)
 
             if self.initial_state_type is None:
-                self.set_initial_state(name = "even")
+                self.set_initial_state(name = "equal")
 
             self._gen_initial_state()
 
@@ -935,43 +928,45 @@ class system(object):
     def _post(self):
         self.post()
 
-    def _mpi_jacobian(self, x, tol = 1e-8):
-    
+    def _mpi_jacobian(self, x, tol = 1e-13):
+
         self.COMM_JAC.barrier()
-    
-        self.stop = COMM_JAC.bcast(self.stop, 0)
-    
+
+        self.stop = self.COMM_JAC.bcast(self.stop, 0)
+
         if self.stop:
             self.COMM_JAC.barrier()
             return
-    
+
         x = self.COMM_JAC.bcast(x, 0)
-        self.expectation = COMM_JAC.bcast(self.expectation, 0)
+        self.expectation = self.COMM_JAC.bcast(self.expectation, 0)
 
         x_jac_temp = np.empty(len(x))
         partials = []
-    
+
         if  self.COMM.Get_rank() != 0:
             #xs, ts = np.split(x,2)
             #self.evolve_state(xs, ts)
             #expectation = self.expectation()
-            h = 1.4901161193847656e-08    #np.max(np.abs(x_jac_temp))*np.sqrt(tol)
+            h = np.abs(np.min(x)*np.sqrt(tol))
+            if (h >= -np.finfo(np.float64).eps) and  (h <= np.finfo(np.float64).eps):
+                h = 1.4901161193847656e-08
             for var in self.var_map[self.colours[self.COMM.Get_rank()]]:
                 x_jac_temp[:] = x
                 x_jac_temp[var] += h
                 self.evolve_state(x_jac_temp)
-                partials.append((self.get_expectation_value() - self.expectation)/h)
-        
+                partials.append((self._get_expectation_value() - self.expectation)/h)
+
         opt_root = self.comm_opt_roots[self.colours[self.COMM.Get_rank()]]
-        
+
         if self.COMM.Get_rank() == 0:
-            jacobian = np.zeros(2*p, dtype = np.float64)
+            jacobian = np.zeros(len(self.variational_parameters), dtype = np.float64)
             reqs = []
             for root, mapping in zip(self.comm_opt_roots, self.var_map):
                 if root > 0:
                     for var in mapping:
                         self.COMM.Recv([jacobian[var:var+1], MPI.DOUBLE],  source = root, tag = var)
-       
+
         elif self.COMM_OPT.Get_rank() == 0:
             reqs = []
             jacobian = None
@@ -982,7 +977,7 @@ class system(object):
 
         self.COMM_JAC.barrier()
 
-        if COMM.Get_rank() == 0:
+        if self.COMM.Get_rank() == 0:
             return jacobian
         else:
             return None
@@ -994,286 +989,313 @@ class system(object):
         else:
             exit()
 
-#class qaoa(system):
-#    """
-#    Subclass of :class:`system`, this provides for the instantiation of a QAOA system distributed over an MPI communicator and the execution of this algorithm in parallel. Evolution of the QAOA system involves high-precision approximation of the action of the time-evolution operator on the QAOA state vector. This allows
-#    for the use of arbitrary mixing operators, :math:`W`, but is less efficient than
-#    :class:`qwoa` which makes use of a fast Fourier transform instead. If the user wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing operator use of the :class:`qwoa` class is recommended. By default this class uses a hypercube mixing operator, :math:`W`, of size :math:`2^n \\times 2^n`.
-#
-#    :param n_qubits: The number of qubits :math:`n`. For the :class:`~qaoa` class this sets the dimension of the mixing unitary, :math:`U_{\\text{W}}.`
-#    :type n_qubits: integer
-#
-#    :param comm: MPI communicator objected created by mpi4py.
-#    :type comm: MPI communicator
-#    """
-#    def __init__(self, n_qubits, MPI_communicator, **kwargs):
-#
-#        super().__init__(MPI_communicator, **kwargs)
-#
-#        self.n_qubits = n_qubits
-#        self.system_size = 2**n_qubits
-#        self.rank = self.comm.Get_rank()
-#        self.precision = "sp"
-#        self.graph_set = False
-#
-#        self.partition_table = self._generate_partition_table(self.system_size, self.comm)
-#
-#        self.lb = self.partition_table[self.rank] - 1
-#        self.ub = self.partition_table[self.rank + 1] - 1
-#
-#        self.local_i = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
-#        self.local_i_offset = self.partition_table[self.rank] - 1
-#
-#        self.alloc_local = self.local_i
-#
-#    def _generate_partition_table(self, N, MPI_communicator):
-#
-#        flock = MPI_communicator.Get_size()
-#
-#        partition_table = np.zeros(flock + 1, dtype = np.int32)
-#        for i in range(flock + 1):
-#            partition_table[i] = i * N / flock + 1
-#
-#        remainder = N - partition_table[flock]
-#
-#        for i in range(remainder):
-#            partition_table[flock - i % flock : flock + 1] += 1
-#
-#        return partition_table
-#
-#    def _csr_local_slice(self, W, MPI_communicator):
-#
-#        if (sparse.issparse(W) and not sparse.isspmatrix_csr(W)):
-#            W_temp = W.tocsr()
-#        elif not sparse.issparse(W):
-#            try:
-#                W_temp = sparse.csr_matrix(W)
-#            except:
-#                print("Unable to convert input operator to csr_matrix.")
-#        else:
-#            W_temp = W
-#
-#        W_row_starts = W_temp.indptr[self.lb:self.ub + 1].copy()
-#        W_col_indexes = W_temp.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
-#        W_values = -I * W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
-#        W_row_starts += 1
-#
-#        return W_row_starts, W_col_indexes, W_values
-#
-#    def set_graph(self, scipy_csr = None, method = mixers_mpi.hypercube):
-#        """
-#        Sets the operator, :math:`W`, used by the mixing unitary, :math:`U_{\\text{W}}`. This can be a :math:`2^n \\times 2^n` SciPy sparse CSR array, an array of :math:`2^n \\times 2^n` SciPy sprase CSR arrays or a python method which generates the mixing operator in parallel using MPI. An array of mixers allows for the simulation of mixing operators consisting of sequential non-commutative operators (:math:`U_{\\text{W}_1}, U_{\\text{W}_2},...`) each parameterised by the same :math:`t_i`. By default, this method generates a :math:`2^n \\times 2^n` sized hypercube using the 'method' option.
-#
-#        To produce the mixing operator in parallel pass a method which takes the following arguments:
-#            * the number of qubits (integer)
-#            * The lower bound of the local row-wise partition of :math:`W` (as given by self.partition_table).
-#            * The upper bound of the local row-wise parition of :math:`W` (as given by self.partition_table).
-#
-#        This method must return arrays (or an array of arrays) which describe the (MPI rank) local row-wise partition of the distributed CSR array(s) in the SciPy sparse CSR format: indptr, indices and values. See the SciPy CSR `documentation <http://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html>`_ for more information on the CSR sparse format.
-#
-#
-#        :param scipy_csr: SciPy sparse matrix, or array of SciPy sprase matrices. Must be of size :math:`2^n \\times 2^n`.
-#        :type scipy_csr: complex, SciPy sparse array
-#
-#        :param method: A method which produces a :math:`2^n \\times 2^n` CSR mixing opertor(s) in parallel using MPI, as described above.
-#        :param method: callable, optional
-#
-#        """
-#
-#        if scipy_csr is not None:
-#
-#            W = scipy_csr
-#
-#            if type(W) is list:
-#
-#                self.W_row_starts = []
-#                self.W_col_indexes = []
-#                self.W_values = []
-#
-#                for w in W:
-#
-#                    w_row_starts, w_col_indexes, w_values = self._csr_local_slice(
-#                            w,
-#                            self.comm)
-#
-#                    self.W_row_starts.append(w_row_starts)
-#                    self.W_col_indexes.append(w_col_indexes)
-#                    self.W_values.append(w_values)
-#
-#            else:
-#
-#                self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
-#                        W,
-#                        self.comm)
-#
-#        else:
-#
-#            self.W_row_starts, self.W_col_indexes, self.W_values = method(
-#                    self.n_qubits,
-#                    self.lb + 1,
-#                    self.ub)
-#            self.W_values *= -I
-#
-#        if isinstance(self.W_row_starts[0], np.ndarray):
-#
-#            self.W_num_rec_inds = []
-#            self.W_rec_disps = []
-#            self.W_num_send_inds = []
-#            self.W_send_disps = []
-#            self.W_local_col_inds = []
-#            self.W_rhs_send_inds = []
-#            self.one_norms = []
-#            self.num_norms = []
-#
-#            for w_row_starts, w_col_indexes, w_values in zip(self.W_row_starts, self.W_col_indexes, self.W_values):
-#
-#                w_num_rec_inds, w_rec_disps, w_num_send_inds, w_send_disps = fMPI.rec_a(
-#                           self.system_size,
-#                           w_row_starts,
-#                           w_col_indexes,
-#                           self.partition_table,
-#                           self.comm.py2f())
-#
-#                self.W_num_rec_inds.append(w_num_rec_inds)
-#                self.W_rec_disps.append(w_rec_disps)
-#                self.W_num_send_inds.append(w_num_send_inds)
-#                self.W_send_disps.append(w_send_disps)
-#
-#                w_local_col_inds, w_rhs_send_inds = fMPI.rec_b(
-#                        self.system_size,
-#                        np.sum(self.W_num_send_inds),
-#                        w_row_starts,
-#                        w_col_indexes,
-#                        w_num_rec_inds,
-#                        w_rec_disps,
-#                        w_num_send_inds,
-#                        w_send_disps,
-#                        self.partition_table,
-#                        self.comm.py2f())
-#
-#                self.W_local_col_inds.append(w_local_col_inds)
-#                self.W_rhs_send_inds.append(w_rhs_send_inds)
-#
-#                one_norms, num_norms = fMPI.one_norm_series(
-#                        self.system_size,
-#                        w_row_starts,
-#                        w_col_indexes,
-#                        -I * w_values,
-#                        w_num_rec_inds,
-#                        w_rec_disps,
-#                        w_num_send_inds,
-#                        w_send_disps,
-#                        w_local_col_inds,
-#                        w_rhs_send_inds,
-#                        self.partition_table,
-#                        self.comm.py2f())
-#
-#                self.one_norms.append(one_norms)
-#                self.num_norms.append(num_norms)
-#
-#        else:
-#
-#            self.W_num_rec_inds, self.W_rec_disps, self.W_num_send_inds, self.W_send_disps = fMPI.rec_a(
-#                       self.system_size,
-#                       self.W_row_starts,
-#                       self.W_col_indexes,
-#                       self.partition_table,
-#                       self.comm.py2f())
-#
-#            self.W_local_col_inds, self.W_rhs_send_inds = fMPI.rec_b(
-#                    self.system_size,
-#                    np.sum(self.W_num_send_inds),
-#                    self.W_row_starts,
-#                    self.W_col_indexes,
-#                    self.W_num_rec_inds,
-#                    self.W_rec_disps,
-#                    self.W_num_send_inds,
-#                    self.W_send_disps,
-#                    self.partition_table,
-#                    self.comm.py2f())
-#
-#            self.one_norms, self.num_norms = fMPI.one_norm_series(
-#                    self.system_size,
-#                    self.W_row_starts,
-#                    self.W_col_indexes,
-#                    self.W_values,
-#                    self.W_num_rec_inds,
-#                    self.W_rec_disps,
-#                    self.W_num_send_inds,
-#                    self.W_send_disps,
-#                    self.W_local_col_inds,
-#                    self.W_rhs_send_inds,
-#                    self.partition_table,
-#                    self.comm.py2f())
-#
-#        self.graph_set = True
-#
-#    def evolve_state(self, gammas, ts):
-#        """
-#        Evolves the QAOA initial_state to its final_state.
-#
-#        :param gammas: Quality-proportional phase shifts.
-#        :type gammas: float, array
-#
-#        :param ts: Continuous-time quantum walk times.
-#        :type ts: float, array
-#        """
-#        self.final_state = self.initial_state
-#
-#        if isinstance(self.W_row_starts[0], np.ndarray):
-#
-#            for gamma, t in zip(gammas, ts):
-#
-#                self.final_state = np.multiply(np.exp(-I * np.abs(gamma) * self.qualities), self.final_state)
-#
-#                for i in range(len(self.W_row_starts)):
-#
-#                    self.final_state = fMPI.step(
-#                            self.system_size,
-#                            self.local_i,
-#                            self.W_row_starts[i],
-#                            self.W_col_indexes[i],
-#                            self.W_values[i],
-#                            self.W_num_rec_inds[i],
-#                            self.W_rec_disps[i],
-#                            self.W_num_send_inds[i],
-#                            self.W_send_disps[i],
-#                            self.W_local_col_inds[i],
-#                            self.W_rhs_send_inds[i],
-#                            np.abs(t),
-#                            self.final_state,
-#                            self.partition_table,
-#                            self.num_norms[i],
-#                            self.one_norms[i],
-#                            self.comm.py2f(),
-#                            self.precision)
-#
-#        else:
-#
-#            for gamma, t in zip(gammas, ts):
-#
-#                self.final_state = np.multiply(np.exp(-I * np.abs(gamma) * self.qualities), self.final_state)
-#
-#                self.final_state = fMPI.step(
-#                        self.system_size,
-#                        self.local_i,
-#                        self.W_row_starts,
-#                        self.W_col_indexes,
-#                        self.W_values,
-#                        self.W_num_rec_inds,
-#                        self.W_rec_disps,
-#                        self.W_num_send_inds,
-#                        self.W_send_disps,
-#                        self.W_local_col_inds,
-#                        self.W_rhs_send_inds,
-#                        np.abs(t),
-#                        self.final_state,
-#                        self.partition_table,
-#                        self.num_norms,
-#                        self.one_norms,
-#                        self.comm.py2f(),
-#                        self.precision)
-#
+class qaoa(system):
+    """
+    Subclass of :class:`system`, this provides for the instantiation of a QAOA system distributed over an MPI communicator and the execution of this algorithm in parallel. Evolution of the QAOA system involves high-precision approximation of the action of the time-evolution operator on the QAOA state vector. This allows
+    for the use of arbitrary mixing operators, :math:`W`, but is less efficient than
+    :class:`qwoa` which makes use of a fast Fourier transform instead. If the user wishes to simulate the dynamics of a QAOA-like algorithm with a circulant mixing operator use of the :class:`qwoa` class is recommended. By default this class uses a hypercube mixing operator, :math:`W`, of size :math:`2^n \\times 2^n`.
+
+    :param n_qubits: The number of qubits :math:`n`. For the :class:`~qaoa` class this sets the dimension of the mixing unitary, :math:`U_{\\text{W}}.`
+    :type n_qubits: integer
+
+    :param comm: MPI communicator objected created by mpi4py.
+    :type comm: MPI communicator
+    """
+    def __init__(self, n_qubits, MPI_communicator, parallel = "global"):
+
+        super().__init__(MPI_communicator, parallel = "global")
+
+        self.n_qubits = n_qubits
+
+        self.system_size = 2**n_qubits
+        self.precision = "dp"
+
+        self.mixing_operator_set_type = None
+
+    def _generate_partition_table(self, N, MPI_communicator):
+
+        flock = MPI_communicator.Get_size()
+
+        partition_table = np.zeros(flock + 1, dtype = np.int32)
+        for i in range(flock + 1):
+            partition_table[i] = i * N / flock + 1
+
+        remainder = N - partition_table[flock]
+
+        for i in range(remainder):
+            partition_table[flock - i % flock : flock + 1] += 1
+
+        return partition_table
+
+    def _csr_local_slice(self, W, MPI_communicator):
+
+        if (sparse.issparse(W) and not sparse.isspmatrix_csr(W)):
+            W_temp = W.tocsr()
+        elif not sparse.issparse(W):
+            try:
+                W_temp = sparse.csr_matrix(W)
+            except:
+                print("Unable to convert input operator to csr_matrix.")
+        else:
+            W_temp = W
+
+        W_row_starts = W_temp.indptr[self.lb:self.ub + 1].copy()
+        W_col_indexes = W_temp.indices[W_row_starts[0]:W_row_starts[-1]].copy() + 1
+        W_values = -I * W_temp.data[W_row_starts[0]:W_row_starts[-1]].copy()
+        W_row_starts += 1
+
+        return W_row_starts, W_col_indexes, W_values
+
+    def set_graph(self, scipy_csr = None, function = mixers_mpi.hypercube):
+        """
+        Sets the operator, :math:`W`, used by the mixing unitary, :math:`U_{\\text{W}}`. This can be a :math:`2^n \\times 2^n` SciPy sparse CSR array, an array of :math:`2^n \\times 2^n` SciPy sprase CSR arrays or a python method which generates the mixing operator in parallel using MPI. An array of mixers allows for the simulation of mixing operators consisting of sequential non-commutative operators (:math:`U_{\\text{W}_1}, U_{\\text{W}_2},...`) each parameterised by the same :math:`t_i`. By default, this method generates a :math:`2^n \\times 2^n` sized hypercube using the 'method' option.
+
+        To produce the mixing operator in parallel pass a method which takes the following arguments:
+            * the number of qubits (integer)
+            * The lower bound of the local row-wise partition of :math:`W` (as given by self.partition_table).
+            * The upper bound of the local row-wise parition of :math:`W` (as given by self.partition_table).
+
+        This method must return arrays (or an array of arrays) which describe the (MPI rank) local row-wise partition of the distributed CSR array(s) in the SciPy sparse CSR format: indptr, indices and values. See the SciPy CSR `documentation <http://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csr_matrix.html>`_ for more information on the CSR sparse format.
+
+
+        :param scipy_csr: SciPy sparse matrix, or array of SciPy sprase matrices. Must be of size :math:`2^n \\times 2^n`.
+        :type scipy_csr: complex, SciPy sparse array
+
+        :param method: A method which produces a :math:`2^n \\times 2^n` CSR mixing opertor(s) in parallel using MPI, as described above.
+        :param method: callable, optional
+
+        """
+
+        if scipy_csr is not None:
+
+            self.W = scipy_csr
+            self.mixing_operator_set_type = "scipy_csr"
+
+        else:
+
+            self.W = function
+            self.mixing_operator_set_type = "function"
+
+
+    def _gen_mixing_operator(self):
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            if self.mixing_operator_set_type == "scipy_csr":
+
+                if type(self.W) is list:
+
+                    self.W_row_starts = []
+                    self.W_col_indexes = []
+                    self.W_values = []
+
+                    for w in self.W:
+
+                        w_row_starts, w_col_indexes, w_values = self._csr_local_slice(
+                                w,
+                                self.comm)
+
+                        self.W_row_starts.append(w_row_starts)
+                        self.W_col_indexes.append(w_col_indexes)
+                        self.W_values.append(w_values)
+
+                else:
+
+                    self.W_row_starts, self.W_col_indexes, self.W_values = self._csr_local_slice(
+                            self.W,
+                            self.comm)
+
+            else:
+
+                self.W_row_starts, self.W_col_indexes, self.W_values = self.W(
+                        self.n_qubits,
+                        self.lb + 1,
+                        self.ub)
+
+                self.W_values *= -I
+
+            if isinstance(self.W_row_starts[0], np.ndarray):
+
+                self.W_num_rec_inds = []
+                self.W_rec_disps = []
+                self.W_num_send_inds = []
+                self.W_send_disps = []
+                self.W_local_col_inds = []
+                self.W_rhs_send_inds = []
+                self.one_norms = []
+                self.num_norms = []
+
+                for w_row_starts, w_col_indexes, w_values in zip(self.W_row_starts, self.W_col_indexes, self.W_values):
+
+                    w_num_rec_inds, w_rec_disps, w_num_send_inds, w_send_disps = fMPI.rec_a(
+                               self.system_size,
+                               w_row_starts,
+                               w_col_indexes,
+                               self.partition_table,
+                               self.comm.py2f())
+
+                    self.W_num_rec_inds.append(w_num_rec_inds)
+                    self.W_rec_disps.append(w_rec_disps)
+                    self.W_num_send_inds.append(w_num_send_inds)
+                    self.W_send_disps.append(w_send_disps)
+
+                    w_local_col_inds, w_rhs_send_inds = fMPI.rec_b(
+                            self.system_size,
+                            np.sum(self.W_num_send_inds),
+                            w_row_starts,
+                            w_col_indexes,
+                            w_num_rec_inds,
+                            w_rec_disps,
+                            w_num_send_inds,
+                            w_send_disps,
+                            self.partition_table,
+                            self.COMM_OPT.py2f())
+
+                    self.W_local_col_inds.append(w_local_col_inds)
+                    self.W_rhs_send_inds.append(w_rhs_send_inds)
+
+                    one_norms, num_norms = fMPI.one_norm_series(
+                            self.system_size,
+                            w_row_starts,
+                            w_col_indexes,
+                            -I * w_values,
+                            w_num_rec_inds,
+                            w_rec_disps,
+                            w_num_send_inds,
+                            w_send_disps,
+                            w_local_col_inds,
+                            w_rhs_send_inds,
+                            self.partition_table,
+                            self.COMM_OPT.py2f())
+
+                    self.one_norms.append(one_norms)
+                    self.num_norms.append(num_norms)
+
+            else:
+
+                self.W_num_rec_inds, self.W_rec_disps, self.W_num_send_inds, self.W_send_disps = fMPI.rec_a(
+                           self.system_size,
+                           self.W_row_starts,
+                           self.W_col_indexes,
+                           self.partition_table,
+                           self.COMM_OPT.py2f())
+
+                self.W_local_col_inds, self.W_rhs_send_inds = fMPI.rec_b(
+                        self.system_size,
+                        np.sum(self.W_num_send_inds),
+                        self.W_row_starts,
+                        self.W_col_indexes,
+                        self.W_num_rec_inds,
+                        self.W_rec_disps,
+                        self.W_num_send_inds,
+                        self.W_send_disps,
+                        self.partition_table,
+                        self.COMM_OPT.py2f())
+
+                self.one_norms, self.num_norms = fMPI.one_norm_series(
+                        self.system_size,
+                        self.W_row_starts,
+                        self.W_col_indexes,
+                        self.W_values,
+                        self.W_num_rec_inds,
+                        self.W_rec_disps,
+                        self.W_num_send_inds,
+                        self.W_send_disps,
+                        self.W_local_col_inds,
+                        self.W_rhs_send_inds,
+                        self.partition_table,
+                        self.COMM_OPT.py2f())
+
+    def pre(self):
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            self.rank = self.COMM_OPT.Get_rank()
+
+            self.partition_table = self._generate_partition_table(self.system_size, self.COMM_OPT)
+
+            self.lb = self.partition_table[self.rank] - 1
+            self.ub = self.partition_table[self.rank + 1] - 1
+
+            self.local_i = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
+            self.local_i_offset = self.partition_table[self.rank] - 1
+
+            self.alloc_local = self.local_i
+
+            if self.mixing_operator_set_type is None:
+                self.set_graph()
+
+            self._gen_mixing_operator()
+
+    def evolve_state(self, gammas_ts):
+        """
+        Evolves the QAOA initial_state to its final_state.
+
+        :param gammas: Quality-proportional phase shifts.
+        :type gammas: float, array
+
+        :param ts: Continuous-time quantum walk times.
+        :type ts: float, array
+        """
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            self.final_state = self.initial_state
+
+            if isinstance(self.W_row_starts[0], np.ndarray):
+
+                for gamma, t in zip(gammas_ts[::2], gammas_ts[1::2]):
+
+                    self.final_state = np.multiply(np.exp(-I * np.gamma * self.observables), self.final_state)
+
+                    for i in range(len(self.W_row_starts)):
+
+                        self.final_state = fMPI.step(
+                                self.system_size,
+                                self.local_i,
+                                self.W_row_starts[i],
+                                self.W_col_indexes[i],
+                                self.W_values[i],
+                                self.W_num_rec_inds[i],
+                                self.W_rec_disps[i],
+                                self.W_num_send_inds[i],
+                                self.W_send_disps[i],
+                                self.W_local_col_inds[i],
+                                self.W_rhs_send_inds[i],
+                                np.abs(t),
+                                self.final_state,
+                                self.partition_table,
+                                self.num_norms[i],
+                                self.one_norms[i],
+                                self.COMM_OPT.py2f(),
+                                self.precision)
+
+            else:
+
+                for gamma, t in zip(gammas_ts[::2], gammas_ts[1::2]):
+
+                    self.final_state = np.multiply(np.exp(-I * gamma * self.observables), self.final_state)
+
+                    self.final_state = fMPI.step(
+                            self.system_size,
+                            self.local_i,
+                            self.W_row_starts,
+                            self.W_col_indexes,
+                            self.W_values,
+                            self.W_num_rec_inds,
+                            self.W_rec_disps,
+                            self.W_num_send_inds,
+                            self.W_send_disps,
+                            self.W_local_col_inds,
+                            self.W_rhs_send_inds,
+                            np.abs(t),
+                            self.final_state,
+                            self.partition_table,
+                            self.num_norms,
+                            self.one_norms,
+                            self.COMM_OPT.py2f(),
+                            self.precision)
+
 class qwoa(system):
     """
     The :class:`qwoa` class provides for the instantiation a QWAO configuration
@@ -1301,6 +1323,8 @@ class qwoa(system):
         else:
             self.system_size = system_size
             self.n_qubits = np.log(self.system_size)/np.log(2.0)
+
+        self.graph_array = None
 
     def set_graph(self, graph_array = None):
         """
@@ -1353,6 +1377,12 @@ class qwoa(system):
         Calls FFTW subroutines which set up the ancillary data structures needed to
         efficiently perform 1D parallel Fourier and inverse Fourier transforms.
         """
+
+        if self.initial_state_type == None:
+            self.set_initial_state(name = "equal")
+
+        self._gen_initial_state()
+
         fqwoa_mpi.qwoa_state(
                 self.system_size,
                 self.dummy_gammas,
@@ -1380,32 +1410,37 @@ class qwoa(system):
         :type ts: float, array
         """
 
-        fqwoa_mpi.qwoa_state(
-                self.system_size,
-                gammas[::2],
-                np.abs(ts[1::2]),
-                self.observables,
-                self.lambdas,
-                self.initial_state,
-                self.final_state,
-                self.comm.py2f(),
-                0)
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            fqwoa_mpi.qwoa_state(
+                    self.system_size,
+                    gammas_ts[::2],
+                    np.abs(gammas_ts[1::2]),
+                    self.observables,
+                    self.lambdas,
+                    self.initial_state,
+                    self.final_state,
+                    self.COMM_OPT.py2f(),
+                    0)
 
 
     def post(self):
         """
         Deallocates/frees ancillary arrays and pointers needed by FFTW.
         """
-        fqwoa_mpi.qwoa_state(
-                self.system_size,
-                self.dummy_gammas,
-                self.dummy_ts,
-                self.dummy_qualities,
-                self.dummy_lambdas,
-                self.initial_state,
-                self.final_state,
-                self.comm.py2f(),
-                -1)
+
+        if self.colours[self.COMM.Get_rank()] == -1:
+
+            fqwoa_mpi.qwoa_state(
+                    self.system_size,
+                    self.dummy_gammas,
+                    self.dummy_ts,
+                    self.dummy_observables,
+                    self.dummy_lambdas,
+                    self.initial_state,
+                    self.final_state,
+                    self.COMM_OPT.py2f(),
+                    -1)
 
     def save(self, file_name, config_name, action = "a"):
         """
@@ -1440,7 +1475,7 @@ class qwoa(system):
                     self.system_size,
                     self.local_o_offset,
                     self.lambdas[:self.local_o],
-                    self.comm.py2f())
+                    self.COMM_OPT.py2f())
 
             self.COMM_OPT.Barrier()
 
