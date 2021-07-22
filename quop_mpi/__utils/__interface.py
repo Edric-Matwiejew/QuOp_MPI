@@ -1,0 +1,54 @@
+from mpi4py import MPI
+from inspect import signature
+from functools import partial
+import numpy as np
+
+class interface(object):
+    """
+    This class takes an user-input function, instance of a class and
+    list of class attributes. It binds the function's positional parameters
+    to corresponding class attributes where matches are found; creating
+    a partially bound function. Unmatched positional parameters will raise
+    a RuntimeError.
+
+    Function keyword parameters are not bound. They are expected to be defined
+    when calling the partially bound function or to have  appropriate deafult values.
+
+    The bound function is accessible through the 'call' class attribute, e.g.:
+
+    interface.call(**kwargs)
+    """
+    def __init__(
+            self,
+            obj,
+            function,
+            avaliable_parameters,
+            function_name,
+            MPI_COMM):
+
+        self.function_name = function_name
+
+        self.rank = MPI_COMM.Get_rank()
+
+        function_signature = signature(function)
+        function_parameters = function_signature.parameters
+        positional_params = [str(param) for param in function_parameters.values() if (param.default == param.empty)]
+        n_positional_params = len(positional_params)
+
+        for positional_param in positional_params:
+            if not positional_param in avaliable_parameters:
+                raise RuntimeError("Rank {}: Unmatched positional parameter '{}' in '{}' function.".format(self.rank, positional_param, function_name))
+
+        self.function = function
+        self.positional_params = positional_params
+        self.obj = obj
+
+        self.update_parameters()
+
+    def update_parameters(self):
+
+        self.args = []
+        for positional_param in self.positional_params:
+            self.args.append(getattr(self.obj, positional_param))
+
+        self.call= partial(self.function, *self.args)
