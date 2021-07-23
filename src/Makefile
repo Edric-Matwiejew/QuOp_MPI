@@ -16,7 +16,7 @@ LIB = -L/usr/local/lib
 INCLUDE = -I/usr/local/include
 
 OBJDIR := obj
-PYDIR := ../quop_mpi
+PYDIR := ../quop_mpi/__lib
 
 $(shell mkdir -p $(OBJDIR))
 
