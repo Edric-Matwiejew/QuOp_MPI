@@ -1,12 +1,13 @@
 #!/bin/bash
 
-OUTPUT_BASENAME=$1
-TIME=$2
-THREADS=$3
-MPI_PROCESSES=$4
-BENCH_TYPE=$5
-TEST_MODULE_IMPORT_PATH=$6
-TYPE=$7
+BASE_SLURM=$1
+OUTPUT_BASENAME=$2
+TIME=$3
+THREADS=$4
+MPI_PROCESSES=$5
+BENCH_TYPE=$6
+TEST_MODULE_IMPORT_PATH=$7
+TYPE=$8
 
 if [ "$TYPE" = "CLUSTER" ]; then
 	NODES=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
@@ -17,19 +18,20 @@ fi
 mkdir -p output/${TYPE}/${OUTPUT_BASENAME}/log
 mkdir -p output/${TYPE}/${OUTPUT_BASENAME}/csv
 
-cp resources/launch.sh output/${OUTPUT_BASENAME}
+cp resources/launch.sh output/${TYPE}/${OUTPUT_BASENAME}
 
 for NODE in ${NODES[@]}; do
 
     SCRIPT_PATHNAME=output/${TYPE}/${OUTPUT_BASENAME}/${NODE}_${OUTPUT_BASENAME}.slurm
-    TOTAL_MPI_PROCS=$(($NODE * $MPI_PROCESSES))
 
-    cp resources/base.slurm $SCRIPT_PATHNAME
+    cp $BASE_SLURM $SCRIPT_PATHNAME
 
     	if [ "$TYPE" = "CLUSTER" ]; then
 		sed -i "s/NODES/$NODE/g" $SCRIPT_PATHNAME
+    		TOTAL_MPI_PROCESSES=$(($NODE * $MPI_PROCESSES))
     	elif [ "$TYPE" = "WORKSTATION" ]; then
 	    	sed -i "s/NODES/1/g" $SCRIPT_PATHNAME
+    		TOTAL_MPI_PROCESSES=$NODE
     	fi
 
     	sed -i "s/JOB_NAME/${OUTPUT_BASENAME}_${NODE}/g" $SCRIPT_PATHNAME

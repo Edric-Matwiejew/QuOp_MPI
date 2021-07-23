@@ -16,7 +16,7 @@ LIB = $(addprefix -L, $(subst :, ,$(LD_LIBRARY_PATH)))
 INCLUDE = $(addprefix -I, $(subst :, ,$(PATH)))
 
 OBJDIR := obj
-PYDIR := ../quop_mpi/__lib
+PYDIR := ../quop_mpi
 
 $(shell mkdir -p $(OBJDIR))
 
