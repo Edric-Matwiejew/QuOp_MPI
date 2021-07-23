@@ -11,7 +11,7 @@ I = np.complex(0,1)
 
 class ansatz(object):
 
-    def __init__(self, system_size, MPI_communicator, parallel = "global"):
+    def __init__(self, system_size, MPI_communicator = MPI.COMM_WORLD, parallel = "global"):
 
         rank = MPI_communicator.Get_rank() # confirm argument is an MPI4Py communicator
 
@@ -980,5 +980,31 @@ class ansatz(object):
 
     def __is_zero(self, x):
         return (x >= -np.finfo(np.float64).eps) and  (x <= np.finfo(np.float64).eps)
+
+class phase_and_mixer(ansatz):
+
+    def __init__(self, system_size, MPI_communicator = MPI.COMM_WORLD, parallel = "global"):
+
+        super().__init__(system_size, MPI_communicator, parallel = "global")
+
+        self.operator_function = None
+        self.param_function = None
+
+    def set_qualities(self, operator_function, **kwargs):
+        self.operator_function = operator_function
+        self.operator_kwargs = kwargs
+
+    def set_params(self, param_function, **kwargs):
+        self.param_function
+        self.param_kwargs = kwargs
+
+    def _pre(self):
+
+        if self.operator_function is None:
+            raise RuntimeError("Rank {}: Solution qualities not defined.".format(self.rank))
+
+        if self.param_function is None:
+            from quop_mpi.params import uniform
+            self.set_params(uniform)
 
 
