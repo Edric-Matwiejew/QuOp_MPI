@@ -208,6 +208,30 @@ class ansatz(object):
 
             self.__parallel_jacobian_communication_topology()
             self.n_jacobian_variables = len(self.variational_parameters)
+        # if the number of MPI processes is greater than 
+        # system_size, resize the communicator
+        if self.system_size // self.COMM_OPT.Get_size() == 0:
+
+            shrunk_size = self.system_size // 2
+
+            if self.COMM_OPT.Get_rank() >= shrunk_size:
+                self.colours[self.COMM.Get_rank()] = -1
+
+            for i in range(self.COMM.Get_size()):
+                self.colours[i] = self.COMM.bcast(self.colours[i], root = i)
+
+            if self.parallel != "global":
+                MPI.Comm.Free(self.COMM_OPT)
+
+            if self.colours[self.COMM.Get_rank()] == -1:
+                colour = MPI.UNDEFINED
+            else:
+                colour = self.colours[self.COMM.Get_rank()]
+
+            self.COMM_OPT = MPI.Comm.Split(
+                    self.COMM,
+                    colour,
+                    self.COMM.Get_rank())
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
@@ -280,10 +304,12 @@ class ansatz(object):
 
         self.pre_called = False
 
+        if self.COMM_OPT != self.COMM:
+            MPI.Comm.Free(self.COMM_OPT)
+
     def evolve_state(self, x):
 
         if not self.pre_called:
-            print("HI",flush = True)
             self.pre()
 
         if self.colours[self.COMM.Get_rank()] != -1:
@@ -631,22 +657,24 @@ class ansatz(object):
         if not self.pre_called:
             self.pre()
 
-        if ansatz_depth is None:
-            ansatz_depth = self.ansatz_depth
+        if self.colours[self.COMM.Get_rank()] != -1:
 
-        params = np.zeros(ansatz_depth*self.total_params)
+            if ansatz_depth is None:
+                ansatz_depth = self.ansatz_depth
 
-        if self.COMM_OPT.Get_rank() == 0:
+            params = np.zeros(ansatz_depth*self.total_params)
 
-            param_iterations = np.split(params, ansatz_depth)
+            if self.COMM_OPT.Get_rank() == 0:
 
-            for param_iters in param_iterations:
-                for i, unitary in enumerate(self.unitaries):
-                    unitary.seed += i + 1
-                    param_iters[self.param_map[i]:self.param_map[i+1]] = unitary.get_initial_params()
+                param_iterations = np.split(params, ansatz_depth)
 
-        self.COMM_OPT.Bcast([params, MPI.DOUBLE], 0)
-        return params
+                for param_iters in param_iterations:
+                    for i, unitary in enumerate(self.unitaries):
+                        unitary.seed += i + 1
+                        param_iters[self.param_map[i]:self.param_map[i+1]] = unitary.get_initial_params()
+
+            self.COMM_OPT.Bcast([params, MPI.DOUBLE], 0)
+            return params
 
     def __get_local_probabilities(self):
         """
