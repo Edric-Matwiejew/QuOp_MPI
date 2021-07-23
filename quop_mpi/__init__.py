@@ -295,7 +295,7 @@ class ansatz(object):
             if self.log:
                 self.__gen_log()
 
-            self.pre_called= True
+        self.pre_called= True
 
     def post(self):
 
@@ -304,8 +304,9 @@ class ansatz(object):
 
         self.pre_called = False
 
-        if self.COMM_OPT != self.COMM:
-            MPI.Comm.Free(self.COMM_OPT)
+        if self.colours[self.COMM.Get_rank()] != -1:
+            if self.COMM_OPT.Get_size() < self.COMM.Get_size():
+                MPI.Comm.Free(self.COMM_OPT)
 
     def evolve_state(self, x):
 
@@ -674,6 +675,7 @@ class ansatz(object):
                         param_iters[self.param_map[i]:self.param_map[i+1]] = unitary.get_initial_params()
 
             self.COMM_OPT.Bcast([params, MPI.DOUBLE], 0)
+
             return params
 
     def __get_local_probabilities(self):
