@@ -75,4 +75,33 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
     return W_row_starts, W_col_indexes, W_values
 
+def shrink_communicator(newsize, colours, COMM_OPT):
+
+    subcolours = []
+    for i in range(COMM_OPT.Get_size()):
+        if i < newsize:
+            subcolours.append(0)
+        else:
+            colours[i] = -1
+            subcolours.append(MPI.UNDEFINED)
+
+    COMM_OPT_NEW = MPI.Comm.Split(
+            COMM_OPT,
+            subcolours[COMM_OPT.Get_rank()],
+            COMM_OPT.Get_rank())
+
+    return colours, COMM_OPT_NEW
+
+def gather_array(array, partition_table, COMM_OPT):
+
+    if COMM_OPT.Get_rank() == 0:
+        gathered_array = np.empty(partition_table[-1] - 1, type(array[0]))
+    else:
+        gathered_array = None
+
+    counts = partition_table[1:] - partition_table[:-1]
+
+    COMM_OPT.Gatherv(array, [gathered_array, counts], 0)
+
+    return gathered_array
 

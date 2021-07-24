@@ -6,6 +6,8 @@ from importlib import import_module
 import numpy as np
 from mpi4py import MPI
 from quop_mpi.__utils.__interface import interface
+from quop_mpi.__utils.__mpi import shrink_communicator, gather_array
+
 
 I = np.complex(0,1)
 
@@ -69,6 +71,9 @@ class ansatz(object):
                 'MPI_COMM',
                 'partition_table'
                 ]
+
+    def __del__(self):
+        self.post()
 
     def set_unitaries(self, unitaries, index):
 
@@ -192,110 +197,132 @@ class ansatz(object):
 
     def pre(self):
 
-        self.variational_parameters = np.empty(self.total_params * self.ansatz_depth, np.float64)
+        busy_comm = False
+        while not busy_comm:
 
-        # parallel jacobian not possible with one MPI process
-        if self.COMM.Get_size() == 1:
-            self.parallel = "global"
+            self.variational_parameters = np.empty(self.total_params * self.ansatz_depth, np.float64)
 
-        # set up communication topology
-        if (self.parallel == "global"):
-            self.COMM_OPT = self.COMM
-            self.MPI_COMM = self.COMM
-            self.colours = [0]*self.COMM.Get_size()
+            # parallel jacobian not possible with one MPI process
+            if self.COMM.Get_size() == 1:
+                self.parallel = "global"
 
-        elif (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
+            # set up communication topology
+            if self.COMM_OPT is None:
 
-            self.__parallel_jacobian_communication_topology()
-            self.n_jacobian_variables = len(self.variational_parameters)
-        # if the number of MPI processes is greater than 
-        # system_size, resize the communicator
-        if self.system_size // self.COMM_OPT.Get_size() == 0:
+                if (self.parallel == "global"):
+                    self.COMM_OPT = self.COMM
+                    self.MPI_COMM = self.COMM
+                    self.colours = [0]*self.COMM.Get_size()
 
-            shrunk_size = self.system_size // 2
+                elif (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
 
-            if self.COMM_OPT.Get_rank() >= shrunk_size:
-                self.colours[self.COMM.Get_rank()] = -1
+                    self.__parallel_jacobian_communication_topology()
+                    self.n_jacobian_variables = len(self.variational_parameters)
+            # if the number of MPI processes is greater than
+            # system_size, resize the communicator
+            if self.colours[self.COMM.Get_rank()] != -1:
+                if self.system_size // self.COMM_OPT.Get_size() == 0:
 
-            for i in range(self.COMM.Get_size()):
-                self.colours[i] = self.COMM.bcast(self.colours[i], root = i)
+                    newsize = self.system_size // 2
 
-            if self.parallel != "global":
-                MPI.Comm.Free(self.COMM_OPT)
+                    self.colours, self.COMM_OPT = shrink_communicator(
+                            newsize,
+                            self.colours,
+                            self.COMM_OPT)
 
-            if self.colours[self.COMM.Get_rank()] == -1:
-                colour = MPI.UNDEFINED
-            else:
-                colour = self.colours[self.COMM.Get_rank()]
+                    if self.colours[self.COMM.Get_rank()] == -1:
+                        busy_comm = True
 
-            self.COMM_OPT = MPI.Comm.Split(
-                    self.COMM,
-                    colour,
-                    self.COMM.Get_rank())
+            if self.colours[self.COMM.Get_rank()] != -1:
 
-        if self.colours[self.COMM.Get_rank()] != -1:
+                # find if any of the unitaries should be used for planning
+                # TODO check that there are not planner of different type
 
-            # find if any of the unitaries should be used for planning
-            # TODO check that there are not planner of different type
-
-            for unitary in self.unitaries:
-                if unitary.planner:
-                    planner = unitary
-                    planner.plan(self.system_size, self.COMM_OPT)
-                    break
-            else:
-                planner = self.unitaries[0]
-                planner.plan(self.system_size, self.COMM_OPT)
-
-
-            for unitary in self.unitaries:
-                if unitary != planner:
-                    unitary.copy_plan(planner)
-
-            self.alloc_local = planner.alloc_local
-            self.local_i = planner.local_i
-            self.local_i_offset = planner.local_i_offset
-            self.final_state = planner.final_state
-
-            if self.observable_map is not None:
-                self.__parse_observable_mapping()
-
-            if self.initial_state_input is None:
-                from quop_mpi.states import equal
-                self.set_initial_state(equal)
-
-            self.__parse_initial_state_function()
-
-            self.initial_state = self.initial_state_function.call(
-                    **self.initial_state_input[1]
-                    )
-
-            if self.observable_index is None:
-
-                for i, unitary in enumerate(self.unitaries):
-                    if unitary.unitary_type == "diagonal":
-                        self.observable_index = i
+                for unitary in self.unitaries:
+                    if unitary.planner:
+                        planner = unitary
+                        planner.plan(self.system_size, self.COMM_OPT)
                         break
                 else:
-                    RuntimeError("Rank {}: Cannot identify observables, no diagonal unitary defined".format(self.COMM.Get_rank()))
+                    planner = self.unitaries[0]
+                    planner.plan(self.system_size, self.COMM_OPT)
 
 
-            for i, unitary in enumerate(self.unitaries):
+                for unitary in self.unitaries:
+                    if unitary != planner:
+                        unitary.copy_plan(planner)
 
-                if unitary.operator_n_params == 0:
-                    unitary.gen_operator()
-                    if self.observable_index == i:
-                        self.observables = np.real(unitary.operator)
+                self.alloc_local = planner.alloc_local
+                self.local_i = planner.local_i
+                self.local_i_offset = planner.local_i_offset
+                self.final_state = planner.final_state
 
-            if self.optimiser is None:
-                self.set_optimiser( 'scipy',
-                    {'method':'BFGS','tol':1e-5},
-                                ['fun','nfev','success'])
+                if self.local_i == 0:
+                    empty_rank = 1
+                else:
+                    empty_rank = 0
 
-            if self.log:
-                self.__gen_log()
+                empty_ranks = self.COMM_OPT.allreduce(
+                        empty_rank,
+                        op = MPI.SUM)
+
+                if empty_ranks == 0:
+                    busy_comm = True
+                else:
+                    planner.destroy()
+
+                if empty_rank == 1:
+                    busy_comm = True
+
+                newsize = self.COMM_OPT.Get_size() - empty_ranks
+                self.colours, self.COMM_OPT = shrink_communicator(
+                        newsize,
+                        self.colours,
+                        self.COMM_OPT)
+
+
+            if self.colours[self.COMM.Get_rank()] != -1:
+
+                if self.observable_map is not None:
+                    self.__parse_observable_mapping()
+
+                if self.initial_state_input is None:
+                    from quop_mpi.states import equal
+                    self.set_initial_state(equal)
+
+                self.__parse_initial_state_function()
+
+                self.initial_state = self.initial_state_function.call(
+                        **self.initial_state_input[1]
+                        )
+
+                if self.observable_index is None:
+
+                    for i, unitary in enumerate(self.unitaries):
+                        if unitary.unitary_type == "diagonal":
+                            self.observable_index = i
+                            break
+                    else:
+                        RuntimeError("Rank {}: Cannot identify observables, no diagonal unitary defined".format(self.COMM.Get_rank()))
+
+
+                for i, unitary in enumerate(self.unitaries):
+
+                    if unitary.operator_n_params == 0:
+                        unitary.gen_operator()
+                        if self.observable_index == i:
+                            self.observables = np.real(unitary.operator)
+
+                if self.optimiser is None:
+                    self.set_optimiser( 'scipy',
+                        {'method':'BFGS','tol':1e-5},
+                                    ['fun','nfev','success'])
+
+                if self.log:
+                    self.__gen_log()
 
         self.pre_called= True
+        self.COMM.barrier()
 
     def post(self):
 
@@ -307,6 +334,8 @@ class ansatz(object):
         if self.colours[self.COMM.Get_rank()] != -1:
             if self.COMM_OPT.Get_size() < self.COMM.Get_size():
                 MPI.Comm.Free(self.COMM_OPT)
+
+        self.COMM_OPT = None
 
     def evolve_state(self, x):
 
@@ -341,7 +370,7 @@ class ansatz(object):
 
                         self.final_state[:] = unitary.final_state
 
-    def execute(self, post = True):
+    def execute(self):
         """
         Execute the QAOA-like algorithm.
 
@@ -396,10 +425,6 @@ class ansatz(object):
 
             if self.log:
                 self.__log_update()
-
-            if post:
-                self.post()
-                self.pre_called = False
 
     def print_optimiser_result(self):
         """
@@ -476,7 +501,7 @@ class ansatz(object):
         if self.colours[self.COMM.Get_rank()] != -1:
 
             self.benchmarking = True
-            
+
             self.rank = self.COMM_OPT.Get_rank()
 
             first = True
@@ -514,7 +539,7 @@ class ansatz(object):
                         if self.COMM_OPT.Get_rank() == 0:
                             print(str(i) + ' of ' + str(repeats) + '...')
 
-                    self.execute(post = False)
+                    self.execute()
 
                     if param_persist:
 
@@ -549,6 +574,23 @@ class ansatz(object):
             self.post()
             self.benchmarking = False
             self.ansatz_depth = ansatz_depth_temp
+
+    def get_final_state(self):
+        if self.colours[self.COMM.Get_rank()] != -1:
+            if self.colours[self.COMM.Get_rank()] == 0:
+                return gather_array(
+                        self.final_state,
+                        self.unitaries[0].partition_table,
+                        self.COMM_OPT)
+
+    def get_probabilities(self):
+        if self.colours[self.COMM.Get_rank()] != -1:
+            if self.colours[self.COMM.Get_rank()] == 0:
+                prob = np.abs(self.final_state)**2
+                return gather_array(
+                        prob,
+                        self.unitaries[0].partition_table,
+                        self.COMM_OPT)
 
     def save(self, file_name, config_name, action = "a", verbose = False):
         """
