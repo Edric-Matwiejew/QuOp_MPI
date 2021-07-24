@@ -8,5 +8,4 @@ def function(system_size, COMM):
     params = alg.get_initial_params()
     alg.pre()
     alg.evolve_state(params)
-    alg.post()
     return alg.final_state

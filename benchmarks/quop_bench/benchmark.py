@@ -22,7 +22,7 @@ def evolution(
     
     elapsed = 0
     last_time = 0
-    qubits = 1
+    qubits = 10
     
     while elapsed + last_time < simulation_time:
     
@@ -41,6 +41,9 @@ def evolution(
     
         peak_mem = COMM.reduce(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, MPI.SUM,0)
     
+        if final_state is None:
+            final_state = 0
+
         norm = COMM.reduce(np.sum(np.abs(final_state)**2), root = 0, op = MPI.SUM)
     
         if COMM.Get_rank() == 0:
