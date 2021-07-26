@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0,'../../../../')
+sys.path.insert(0,'../')
 exec('import ' + sys.argv[4] + ' as test_module')
 import quop_bench.benchmark as benchmark
 
