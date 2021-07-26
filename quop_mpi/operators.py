@@ -4,21 +4,21 @@ from quop_mpi.__utils.__mpi import __scatter_sparse, __scatter_1D_array
 
 def circulant_complete(
         system_size,
-        local_i,
-        local_i_offset):
+        local_o,
+        local_o_offset):
 
     fqwoa_mpi = import_module('quop_mpi.__lib.fqwoa_mpi')
 
     graph_array = np.ones(system_size, dtype = np.float64)
     graph_array[0] = 0
 
-    return fqwoa_mpi.graph_eigenvalues(graph_array, local_i, local_i_offset)
+    return fqwoa_mpi.graph_eigenvalues(graph_array, local_o, local_o_offset)
 
 
 def circulant_graph(
         system_size,
-        local_i,
-        local_i_offset,
+        local_o,
+        local_o_offset,
         i = None):
     '''
     Returns an array c1=c2=...=ci=1, others equals to '0'
@@ -49,8 +49,8 @@ def circulant_graph(
 
     eigenvalues = fqwoa_mpi.graph_eigenvalues(
             graph_array,
-            local_i,
-            local_i_offset)
+            local_o,
+            local_o_offset)
 
     return eigenvalues
 
