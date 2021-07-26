@@ -218,9 +218,12 @@ class ansatz(object):
 
                     self.__parallel_jacobian_communication_topology()
                     self.n_jacobian_variables = len(self.variational_parameters)
+
             # if the number of MPI processes is greater than
             # system_size, resize the communicator
+
             if self.colours[self.COMM.Get_rank()] != -1:
+
                 if self.system_size // self.COMM_OPT.Get_size() == 0:
 
                     newsize = self.system_size // 2
@@ -247,11 +250,6 @@ class ansatz(object):
                     planner = self.unitaries[0]
                     planner.plan(self.system_size, self.COMM_OPT)
 
-
-                for unitary in self.unitaries:
-                    if unitary != planner:
-                        unitary.copy_plan(planner)
-
                 self.alloc_local = planner.alloc_local
                 self.local_i = planner.local_i
                 self.local_i_offset = planner.local_i_offset
@@ -271,58 +269,61 @@ class ansatz(object):
                 else:
                     planner.destroy()
 
-                if empty_rank == 1:
+                if not busy_comm:
+                    newsize = self.COMM_OPT.Get_size() - empty_ranks
+                    self.colours, self.COMM_OPT = shrink_communicator(
+                            newsize,
+                            self.colours,
+                            self.COMM_OPT)
+
+                if self.colours[self.COMM.Get_rank()] == -1:
                     busy_comm = True
 
-                newsize = self.COMM_OPT.Get_size() - empty_ranks
-                self.colours, self.COMM_OPT = shrink_communicator(
-                        newsize,
-                        self.colours,
-                        self.COMM_OPT)
+        if self.colours[self.COMM.Get_rank()] != -1:
 
+            for unitary in self.unitaries:
+                if unitary is not planner:
+                    unitary.copy_plan(planner)
 
-            if self.colours[self.COMM.Get_rank()] != -1:
+            if self.observable_map is not None:
+                self.__parse_observable_mapping()
 
-                if self.observable_map is not None:
-                    self.__parse_observable_mapping()
+            if self.initial_state_input is None:
+                from quop_mpi.states import equal
+                self.set_initial_state(equal)
 
-                if self.initial_state_input is None:
-                    from quop_mpi.states import equal
-                    self.set_initial_state(equal)
+            self.__parse_initial_state_function()
 
-                self.__parse_initial_state_function()
+            self.initial_state = self.initial_state_function.call(
+                    **self.initial_state_input[1]
+                    )
 
-                self.initial_state = self.initial_state_function.call(
-                        **self.initial_state_input[1]
-                        )
-
-                if self.observable_index is None:
-
-                    for i, unitary in enumerate(self.unitaries):
-                        if unitary.unitary_type == "diagonal":
-                            self.observable_index = i
-                            break
-                    else:
-                        RuntimeError("Rank {}: Cannot identify observables, no diagonal unitary defined".format(self.COMM.Get_rank()))
-
+            if self.observable_index is None:
 
                 for i, unitary in enumerate(self.unitaries):
+                    if unitary.unitary_type == "diagonal":
+                        self.observable_index = i
+                        break
+                else:
+                    RuntimeError("Rank {}: Cannot identify observables, no diagonal unitary defined".format(self.COMM.Get_rank()))
 
-                    if unitary.operator_n_params == 0:
-                        unitary.gen_operator()
-                        if self.observable_index == i:
-                            self.observables = np.real(unitary.operator)
 
-                if self.optimiser is None:
-                    self.set_optimiser( 'scipy',
-                        {'method':'BFGS','tol':1e-5},
-                                    ['fun','nfev','success'])
+            for i, unitary in enumerate(self.unitaries):
 
-                if self.log:
-                    self.__gen_log()
+                if unitary.operator_n_params == 0:
+                    unitary.gen_operator()
+                    if self.observable_index == i:
+                        self.observables = np.real(unitary.operator)
 
-        self.pre_called= True
-        self.COMM.barrier()
+            if self.optimiser is None:
+                self.set_optimiser( 'scipy',
+                    {'method':'BFGS','tol':1e-5},
+                                ['fun','nfev','success'])
+
+            if self.log:
+                self.__gen_log()
+
+        self.pre_called = True
 
     def post(self):
 
@@ -342,9 +343,10 @@ class ansatz(object):
         if not self.pre_called:
             self.pre()
 
+        cnt = 0
         if self.colours[self.COMM.Get_rank()] != -1:
 
-            self.final_state[:] = self.initial_state
+            self.final_state[:self.local_i] = self.initial_state
 
             params_split = np.split(x, self.ansatz_depth)
 
@@ -363,12 +365,12 @@ class ansatz(object):
                         evolution_parameter = param_group
 
                     if not self.__is_zero(evolution_parameter):
-
-                        unitary.initial_state[:] = self.final_state
+                        cnt += 1
+                        unitary.initial_state[:self.local_i] = self.final_state[:self.local_i]
 
                         unitary.propagate(evolution_parameter)
 
-                        self.final_state[:] = unitary.final_state
+                        self.final_state[:self.local_i] = unitary.final_state[:self.local_i]
 
     def execute(self):
         """
