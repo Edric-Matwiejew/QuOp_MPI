@@ -338,6 +338,8 @@ class circulant(__unitary):
 
             self.planned = False
 
+        self.MPI_COMM.barrier()
+
 class diagonal(__quop_partitioned):
 
     def __init__(

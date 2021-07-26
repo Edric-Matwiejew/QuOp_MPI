@@ -327,23 +327,24 @@ class ansatz(object):
 
     def post(self):
 
-        for unitary in self.unitaries:
-            unitary.destroy()
+        if self.pre_called:
 
-        self.pre_called = False
+            if self.colours[self.COMM.Get_rank()] != -1:
 
-        if self.colours[self.COMM.Get_rank()] != -1:
-            if self.COMM_OPT.Get_size() < self.COMM.Get_size():
-                MPI.Comm.Free(self.COMM_OPT)
+                for unitary in self.unitaries:
+                    unitary.destroy()
 
-        self.COMM_OPT = None
+                if self.COMM is not self.COMM_OPT:
+                    MPI.Comm.Free(self.COMM_OPT)
+
+                self.COMM_OPT = None
+                self.pre_called = False
 
     def evolve_state(self, x):
 
         if not self.pre_called:
             self.pre()
 
-        cnt = 0
         if self.colours[self.COMM.Get_rank()] != -1:
 
             self.final_state[:self.local_i] = self.initial_state
@@ -365,7 +366,7 @@ class ansatz(object):
                         evolution_parameter = param_group
 
                     if not self.__is_zero(evolution_parameter):
-                        cnt += 1
+
                         unitary.initial_state[:self.local_i] = self.final_state[:self.local_i]
 
                         unitary.propagate(evolution_parameter)
