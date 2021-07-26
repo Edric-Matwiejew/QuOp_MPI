@@ -15,8 +15,13 @@ elif [ "$TYPE" = "WORKSTATION" ]; then
 	NODES=(1 2 4 8 16 32)
 fi
 
-mkdir -p output/${TYPE}/${OUTPUT_BASENAME}/log
-mkdir -p output/${TYPE}/${OUTPUT_BASENAME}/csv
+OUT_DIR=output/${TYPE}/${OUTPUT_BASENAME}/log
+CSV_DIR=output/${TYPE}/${OUTPUT_BASENAME}/csv
+
+mkdir -p $OUT_DIR
+mkdir -p $CSV_DIR
+
+echo $OUT_DIR
 
 cp resources/launch.sh output/${TYPE}/${OUTPUT_BASENAME}
 
@@ -27,14 +32,14 @@ for NODE in ${NODES[@]}; do
     cp $BASE_SLURM $SCRIPT_PATHNAME
 
     	if [ "$TYPE" = "CLUSTER" ]; then
-		sed -i "s/NODES/$NODE/g" $SCRIPT_PATHNAME
+			sed -i "s/NODES/$NODE/g" $SCRIPT_PATHNAME
     		TOTAL_MPI_PROCESSES=$(($NODE * $MPI_PROCESSES))
     	elif [ "$TYPE" = "WORKSTATION" ]; then
 	    	sed -i "s/NODES/1/g" $SCRIPT_PATHNAME
     		TOTAL_MPI_PROCESSES=$NODE
     	fi
 
-    	sed -i "s/JOB_NAME/${OUTPUT_BASENAME}_${NODE}/g" $SCRIPT_PATHNAME
+    sed -i "s/JOB_NAME/${OUTPUT_BASENAME}_${NODE}/g" $SCRIPT_PATHNAME
 	sed -i "s/TIME/$TIME/g" $SCRIPT_PATHNAME
 	sed -i "s/ACCOUNT/$ACCOUNT/g" $SCRIPT_PATHNAME
 	sed -i "s/LOG_NAME/${NODE}_${OUTPUT_BASENAME}.out/g" $SCRIPT_PATHNAME
@@ -43,5 +48,7 @@ for NODE in ${NODES[@]}; do
 	sed -i "s/BENCH_TYPE/$BENCH_TYPE/g" $SCRIPT_PATHNAME
 	sed -i "s/CSV_NAME/${NODE}_${OUTPUT_BASENAME}.csv/g" $SCRIPT_PATHNAME
 	sed -i "s/TEST_MODULE_IMPORT_PATH/$TEST_MODULE_IMPORT_PATH/g" $SCRIPT_PATHNAME
+	sed -i "s|CSV_DIR|$CSV_DIR|g" $SCRIPT_PATHNAME
+	sed -i "s|OUT_DIR|$OUT_DIR|g" $SCRIPT_PATHNAME
 
 done
