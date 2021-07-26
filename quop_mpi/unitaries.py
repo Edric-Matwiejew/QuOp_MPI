@@ -31,6 +31,8 @@ class __unitary(object):
                     'local_alloc',
                     'local_i',
                     'local_i_offset',
+                    'local_o',
+                    'local_o_offset',
                     'partition_table',
                     'lb',
                     'ub',
@@ -167,6 +169,7 @@ class __quop_partitioned(__unitary):
         self.parse_operator_function()
         self.parse_parameter_function()
 
+
     def plan(self, system_size, MPI_COMM):
 
         super().plan(system_size, MPI_COMM)
@@ -220,6 +223,7 @@ class circulant(__unitary):
         self.unitary_type = "circulant"
         self.planner = True
         self.n_params += 1
+        self.planned = False
 
         self.dummy_eigs = np.empty(1, dtype = np.float64)
 
@@ -300,6 +304,8 @@ class circulant(__unitary):
         self.parse_operator_function()
         self.parse_parameter_function()
 
+        self.planned = True
+
     def propagate(self, x):
 
         # Class variables initial_state and final_state
@@ -318,15 +324,19 @@ class circulant(__unitary):
 
     def destroy(self):
 
-        self.evolve_circulant(
-                self.system_size,
-                self.local_i,
-                0,
-                self.dummy_eigs,
-                self.initial_state,
-                self.final_state,
-                self.MPI_COMM.py2f(),
-                -1)
+        if self.planned:
+
+            self.evolve_circulant(
+                    self.system_size,
+                    self.local_i,
+                    0,
+                    self.dummy_eigs,
+                    self.initial_state,
+                    self.final_state,
+                    self.MPI_COMM.py2f(),
+                    -1)
+
+            self.planned = False
 
 class diagonal(__quop_partitioned):
 
@@ -347,6 +357,7 @@ class diagonal(__quop_partitioned):
                 parameter_kwargs,
                 )
 
+        self.unitary_type="diagonal"
         self.n_params += 1
 
     def propagate(self, x):
