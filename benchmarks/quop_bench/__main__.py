@@ -24,9 +24,13 @@ if bench_type == "execute":
     simulation_time = float(sys.argv[2])
     qubits = int(sys.argv[3])
     output_filepath = str(sys.argv[4])
+    bench_log_name = str(sys.argv[5])
+    quop_log_name = str(sys.argv[6])
 
     benchmark.execute(
             simulation_time,
             qubits,
             output_filepath,
+            bench_log_name,
+            quop_log_name,
             test_module.function)
