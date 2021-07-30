@@ -1,12 +1,16 @@
 import numpy as np
 from mpi4py import MPI
+from quop_mpi.__utils.__mpi import __scatter_1D_array
 
 def equal(
         system_size,
         local_i):
 
-    initial_state = np.empty(local_i, np.complex128)
-    initial_state[:] = 1/np.sqrt(np.float64(system_size))
+    if not local_i is None:
+        initial_state = np.empty(local_i, np.complex128)
+        initial_state[:] = 1/np.sqrt(np.float64(system_size))
+    else:
+        initial_state = None
 
     return initial_state
 
@@ -44,3 +48,19 @@ def state(
 
     return initial_state
 
+def state_function(
+        partition_table,
+        MPI_COMM,
+        function = None,
+        args = [],
+        kwargs = {}):
+
+    if MPI_COMM.Get_rank() == 0:
+
+        state = np.array(function(*args, **kwargs), dtype = np.complex128)
+
+    else:
+
+        state = None
+
+    return __scatter_1D_array(state, partition_table, MPI_COMM, np.complex128)

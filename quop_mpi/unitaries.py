@@ -62,6 +62,7 @@ class __unitary(object):
         self.partition_table = None
         self.lb = None
         self.ub = None
+        self.variational_parameters = None
 
         self.n_params += operator_n_params
 
@@ -110,8 +111,10 @@ class __unitary(object):
         self.parsed_parameter_function.update_parameters()
         return self.parsed_parameter_function.call(**self.parameter_kwargs)
 
-    def gen_operator(self, *args):
-        self.operator = self.parsed_operator_function.call(*args, **self.operator_kwargs)
+    def gen_operator(self):
+        if self.variational_parameters is not None:
+            self.parsed_operator_function.update_parameters()
+        self.operator = self.parsed_operator_function.call(**self.operator_kwargs)
 
     def propagate(self, x):
         raise NotImplementedError("Rank {}: Method 'propagate' not implemented by child class".format(self.rank))

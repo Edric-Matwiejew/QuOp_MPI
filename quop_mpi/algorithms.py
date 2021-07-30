@@ -12,7 +12,7 @@ class qwoa(phase_and_mixer):
 
         UQ = diagonal(
                 self.operator_function,
-                operator_kwargs = self.operator_kwargs,
+                operator_kwargs = self.operator_function_kwargs,
                 parameter_function = self.param_function)
 
         UW = circulant(
@@ -20,7 +20,7 @@ class qwoa(phase_and_mixer):
                 parameter_function = self.param_function,
                 parameter_kwargs = self.param_kwargs)
 
-        self.set_unitaries([UQ, UW], 0)
+        self.set_unitaries([UQ, UW])
 
         super().pre()
 
@@ -35,7 +35,7 @@ class qaoa(phase_and_mixer):
 
         UQ = diagonal(
                 self.operator_function,
-                operator_kwargs = self.operator_kwargs,
+                operator_kwargs = self.operator_function_kwargs,
                 parameter_function = self.param_function)
 
         UW = sparse(
@@ -43,7 +43,7 @@ class qaoa(phase_and_mixer):
                 parameter_function = self.param_function,
                 parameter_kwargs = self.param_kwargs)
 
-        self.set_unitaries([UQ, UW], 0)
+        self.set_unitaries([UQ, UW])
 
         super().pre()
 

@@ -74,24 +74,31 @@ def sparse_hypercube(
     return [W_row_starts], [W_col_indexes], [W_values]
 
 def sparse_function(
-        operator_function,
         partition_table,
-        variational_parameters,
         MPI_COMM,
-        **kwargs):
+        variational_parameters,
+        function = None,
+        args = [],
+        kwargs = {}
+        ):
 
     if MPI_COMM.Get_rank() == 0:
 
-        W = operator_function(*variational_parameters, **kwargs)
+        if variational_parameters is not None:
+            input_args = [*args, variational_parameters]
+        else:
+            input_args = args
+
+        W = function(*input_args, **kwargs)
 
         row_starts = []
         col_indexes = []
         values = []
 
         for w in W:
-            row_starts.append(w.indptr)
-            col_indexes.append(w.indices)
-            values.append(w.values)
+            row_starts.append((w.tocsr()).indptr)
+            col_indexes.append((w.tocsr()).indices)
+            values.append((w.tocsr()).data)
 
     else:
 
@@ -111,11 +118,9 @@ def diagonal_uniform(
 
     if MPI_COMM.Get_rank() == 0:
 
-        #seed = 0
         np.random.seed(seed)
 
         diagonal = np.random.uniform(low = low, high = high, size = system_size)
-        #print(diagonal, flush = True)
 
     else:
 
@@ -124,18 +129,48 @@ def diagonal_uniform(
     return __scatter_1D_array(diagonal, partition_table, MPI_COMM, np.float64)
 
 def diagonal_function(
-        operator_function,
         partition_table,
-        variational_parameters,
         MPI_COMM,
-        **kwargs):
+        variational_parameters,
+        function = None,
+        args = [],
+        kwargs = {},
+        ):
 
     if MPI_COMM.Get_rank() == 0:
-        operator = operator_function(*variational_parameters, **kwargs)
+
+        if variational_parameters is not None:
+            input_args = [*args, variational_parameters]
+        else:
+            input_args = args
+
+        operator = function(*input_args, **kwargs)
+
     else:
         operator = None
 
     return __scatter_1D_array(operator, partition_table, MPI_COMM, np.float64)
+
+
+def diagonal_function_2(
+        partition_table,
+        MPI_COMM,
+        function = None,
+        args = [],
+        kwargs = {},
+        ):
+
+    if MPI_COMM.Get_rank() == 0:
+
+        operator = function(*args, **kwargs)
+
+    else:
+
+        operator = None
+
+    return __scatter_1D_array(operator, partition_table, MPI_COMM, np.float64)
+
+
 
 def diagonal_csv(
         system_size,
@@ -172,3 +207,19 @@ def diagonal_hdf5(
 
     return operator
 
+def diagonal_mpi_array(
+        system_size,
+        partition_table,
+        MPI_COMM,
+        array = None
+        ):
+
+    return __scatter_1D_array(diagonal, partition_table, MPI_COMM, np.float64)
+
+def diagonal_serial_array(
+        local_i,
+        local_i_offset,
+        array = None
+        ):
+    #print(array)
+    return array[local_i_offset:local_i_offset + local_i]

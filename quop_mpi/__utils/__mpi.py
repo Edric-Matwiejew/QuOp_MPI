@@ -5,7 +5,7 @@ def __scatter_1D_array(array, partition_table, MPI_COMM, dtype):
 
     rank = MPI_COMM.Get_rank()
     local_i = partition_table[rank + 1] - partition_table[rank]
-    operator = np.empty(local_i, np.float64)
+    operator = np.empty(local_i, dtype)
 
     counts = partition_table[1:] - partition_table[:-1]
     disps = partition_table[:-1] - 1
@@ -25,10 +25,10 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
     size = MPI_COMM.Get_size()
 
     lb = partition_table[rank] - 1
-    ub = partition_table[rank + 1]
+    ub = partition_table[rank + 1] - 1
 
     if rank == 0:
-        n_terms = MPI_COMM.bcast(len(row_starts[0]), 0)
+        n_terms = MPI_COMM.bcast(len(row_starts), 0)
     else:
         n_terms = MPI_COMM.bcast(None, 0)
 
@@ -36,21 +36,23 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
     W_col_indexes = []
     W_values = []
 
-    for i in n_terms:
+    for i in range(n_terms):
 
         n_local_rows = partition_table[rank + 1] - partition_table[rank]
+
         W_row_starts.append(np.empty(n_local_rows + 1, np.int32))
+
         counts = partition_table[1:] - partition_table[0:-1] + 1
-        disps = partition_table[0:-1] - 1
+        disps = partition_table[:-1] - 1
 
         if rank == 0:
-            sends = [row_starts[i], counts, disps, MPI.DOUBLE_COMPLEX]
+            sends = [row_starts[i], counts, disps, MPI.INT]
         else:
-            sends = None
+            sends = None #[None, counts, disps, MPI.INT]
 
         MPI_COMM.Scatterv(sends, W_row_starts[-1], 0)
 
-        n_local_nnz = W_row_starts[ub] - W_row_starts[lb]
+        n_local_nnz = W_row_starts[-1][-1] - W_row_starts[-1][0]
 
         W_col_indexes.append(np.empty(n_local_nnz, np.int32))
         W_values.append(np.empty(n_local_nnz, np.complex128))
@@ -58,20 +60,26 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
         counts = np.zeros(size, int)
         counts[rank] = n_local_nnz
 
-        MPI_COMM.Reduce([counts, MPI.INTEGER], OP = MPI.SUM)
+        for j in range(size):
+            counts[j] = MPI_COMM.bcast(n_local_nnz, j)
 
-        disps = np.zeros(size, int)
-        disps[1:] = np.cumsum(counts)
+        disps = [0 for _ in range(size)]
+        for j in range(1, size):
+            disps[j] = disps[j - 1] + counts[j - 1]
+
 
         if rank == 0:
-            send_indexes = [col_indexes[i], counts, disps, MPI.INTEGER]
+            send_indexes = [col_indexes[i], counts, disps, MPI.INT]
             send_values = [values[i], counts, disps, MPI.DOUBLE_COMPLEX]
         else:
-            send_indexes = None
-            send_values = None
+            send_indexes = None #[None, counts, disps, MPI.INT]
+            send_values = None #[None, counts, disps, MPI.DOUBLE_COMPLEX]
 
         MPI_COMM.Scatterv(send_indexes, W_col_indexes[-1], 0)
         MPI_COMM.Scatterv(send_values, W_values[-1], 0)
+
+        #MPI_COMM.barrier()
+        #exit()
 
     return W_row_starts, W_col_indexes, W_values
 
