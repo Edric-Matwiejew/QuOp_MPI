@@ -6,12 +6,13 @@ from importlib import import_module
 from mpi4py import MPI
 import numpy as np
 
+COMM = MPI.COMM_WORLD
+
 def evolution(
         simulation_time,
         output_filepath,
         function):
 
-    COMM = MPI.COMM_WORLD
     rank = COMM.Get_rank()
 
     if COMM.Get_rank() == 0:
@@ -63,3 +64,58 @@ def evolution(
             elapsed,
             peak_mem))
             log.close()
+
+def execute(
+        simulation_time,
+        qubits,
+        output_filepath,
+        function
+        ):
+
+    rank = COMM.Get_rank()
+
+    if COMM.Get_rank() == 0:
+        if not exists(output_filepath):
+            log = open(output_filepath, 'a')
+            log.write('comm_size,qubits,system_size,depth,time,peak_memory\n')
+            log.close()
+
+    elapsed = 0
+    last_time = 0
+    depth = 0
+
+    while elapsed + last_time < simulation_time:
+
+        depth += 1
+
+        start = time()
+
+        system_size = 2**qubits
+
+        function(system_size, depth, output_filepath, COMM)
+        finish = time()
+        last_time = finish - start
+
+        COMM.barrier()
+
+        last_time = COMM.allreduce(last_time, op = MPI.MAX)
+        elapsed += last_time
+
+        peak_mem = COMM.reduce(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, MPI.SUM,0)
+
+        if COMM.Get_rank() == 0:
+
+            peak_mem = peak_mem*(1024**(-2))
+
+            log = open(output_filepath, 'a')
+            log.write('{},{},{},{},{},{}\n'.format(
+            COMM.Get_size(),
+            qubits,
+            system_size,
+            depth,
+            elapsed,
+            peak_mem))
+            log.close()
+
+
+COMM.barrier()

@@ -1,6 +1,7 @@
 import copy
 from quop_mpi.algorithms import qwoa
 from quop_mpi.operators import diagonal_uniform
+import numpy as np
 
 def function(system_size, COMM):
     try:
