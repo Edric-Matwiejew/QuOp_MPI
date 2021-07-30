@@ -362,29 +362,35 @@ class ansatz(object):
                     self.__gen_log()
 
         self.pre_called = True
+        self.post_called = False
+    
+    def __del__(self):
+        self.post()
 
     def post(self):
 
-        if self.COMM.rank == 0:
-            if self.log:
-                self.logfile.close()
+        if not self.post_called:
 
-        self.COMM.barrier()
+            if self.COMM.rank == 0:
+                if self.log:
+                    self.logfile.close()
 
-        if self.pre_called:
+            self.COMM.barrier()
 
-            if self.colours[self.COMM.Get_rank()] != -1:
+            if self.pre_called:
 
-                for unitary in self.unitaries:
-                    unitary.destroy()
+                if self.colours[self.COMM.Get_rank()] != -1:
 
-                if self.COMM is not self.COMM_OPT:
-                    MPI.Comm.Free(self.COMM_OPT)
+                    for unitary in self.unitaries:
+                        unitary.destroy()
 
-                self.COMM_OPT = None
+                    if self.COMM is not self.COMM_OPT:
+                        MPI.Comm.Free(self.COMM_OPT)
 
-        self.pre_called = False
-        self.post_called = True
+                    self.COMM_OPT = None
+
+            self.pre_called = False
+            self.post_called = True
 
     def evolve_state(self, x):
 
