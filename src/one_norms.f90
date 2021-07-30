@@ -468,7 +468,7 @@ module One_Norms
         integer :: ierr
         integer :: MASTER = 0
 
-        call MPI_comm_rank(MPI_comm_world, rank, ierr)
+        call MPI_comm_rank(MPI_communicator, rank, ierr)
 
         lb_elements = A%row_starts(partition_table(rank + 1))
         ub_elements = A%row_starts(partition_table(rank + 2)) - 1

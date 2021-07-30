@@ -799,7 +799,7 @@ module Sparse
                         1, &
                         MPI_integer, &
                         root, &
-                        MPI_comm_world, &
+                        MPI_communicator, &
                         ierr)
 
         allocate(requests_out(0:flock-1))
