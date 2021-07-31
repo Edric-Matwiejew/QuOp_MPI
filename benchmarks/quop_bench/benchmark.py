@@ -65,7 +65,7 @@ def evolution(
             peak_mem))
             log.close()
 
-def execute(
+def execute_depth(
         simulation_time,
         qubits,
         output_filepath,
@@ -77,17 +77,17 @@ def execute(
     rank = COMM.Get_rank()
 
     if COMM.Get_rank() == 0:
-        bench_log = "{}/{}".format(output_filepath  bench_log_name)
+        bench_log = "{}/{}".format(output_filepath,  bench_log_name)
         if not exists(bench_log):
             log = open(bench_log, 'a')
-            log.write('comm_size,qubits,system_size,depth,time,peak_memory\n')
+            log.write('comm_size,qubits,system_size,depth,time\n')
             log.close()
 
     elapsed = 0
     last_time = 0
     depth = 0
 
-    quop_log = "{}/{}".format(output_filepath, quop_log)
+    quop_log = "{}/{}".format(output_filepath, quop_log_name)
 
     while elapsed + last_time < simulation_time:
 
@@ -96,6 +96,9 @@ def execute(
         start = time()
 
         system_size = 2**qubits
+
+        
+        COMM.barrier()
 
         function(system_size, depth, quop_log, COMM)
         finish = time()
@@ -106,21 +109,59 @@ def execute(
         last_time = COMM.allreduce(last_time, op = MPI.MAX)
         elapsed += last_time
 
-        peak_mem = COMM.reduce(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, MPI.SUM,0)
-
         if COMM.Get_rank() == 0:
 
-            peak_mem = peak_mem*(1024**(-2))
-
             log = open(bench_log, 'a')
-            log.write('{},{},{},{},{},{}\n'.format(
+            log.write('{},{},{},{},{}\n'.format(
             COMM.Get_size(),
             qubits,
             system_size,
             depth,
-            elapsed,
-            peak_mem))
+            elapsed))
             log.close()
 
+def execute(
+        depth,
+        qubits,
+        output_filepath,
+        bench_log_name,
+        quop_log_name,
+        function
+        ):
 
-COMM.barrier()
+    rank = COMM.Get_rank()
+
+    if COMM.Get_rank() == 0:
+        bench_log = "{}/{}".format(output_filepath,  bench_log_name)
+        if not exists(bench_log):
+            log = open(bench_log, 'a')
+            log.write('comm_size,qubits,system_size,depth,time,peak_memory\n')
+            log.close()
+
+    quop_log = "{}/{}".format(output_filepath, quop_log_name)
+
+    system_size = 2**qubits
+
+    start = time()
+
+    function(system_size, depth, quop_log, COMM)
+
+    finish = time()
+
+    time = COMM.allreduce(finish - start, op = MPI.MAX)
+
+    peak_mem = COMM.reduce(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, MPI.SUM,0)
+
+    if COMM.Get_rank() == 0:
+
+        peak_mem = peak_mem*(1024**(-2))
+
+        log = open(bench_log, 'a')
+        log.write('{},{},{},{},{},{}\n'.format(
+        COMM.Get_size(),
+        qubits,
+        system_size,
+        depth,
+        time,
+        peak_mem))
+        log.close()

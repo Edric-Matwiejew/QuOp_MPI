@@ -17,9 +17,9 @@ if bench_type == "evolution":
             test_module.function
             )
 
-if bench_type == "execute":
+if bench_type == "execute_depth":
 
-    exec('import ' + sys.argv[5] + ' as test_module')
+    exec('import ' + sys.argv[7] + ' as test_module')
 
     simulation_time = float(sys.argv[2])
     qubits = int(sys.argv[3])
@@ -27,8 +27,26 @@ if bench_type == "execute":
     bench_log_name = str(sys.argv[5])
     quop_log_name = str(sys.argv[6])
 
-    benchmark.execute(
+    benchmark.execute_depth(
             simulation_time,
+            qubits,
+            output_filepath,
+            bench_log_name,
+            quop_log_name,
+            test_module.function)
+
+if bench_type == "execute":
+
+    exec('import ' + sys.argv[7] + ' as test_module')
+
+    depth = float(sys.argv[2])
+    qubits = int(sys.argv[3])
+    output_filepath = str(sys.argv[4])
+    bench_log_name = str(sys.argv[5])
+    quop_log_name = str(sys.argv[6])
+
+    benchmark.execute(
+			depth,
             qubits,
             output_filepath,
             bench_log_name,
