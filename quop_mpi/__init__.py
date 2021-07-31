@@ -59,6 +59,8 @@ class ansatz(object):
         self.benchmarking = False # indicates wether the benchmark method is running
         self.pre_called = False
         self.post_called = False
+        self.COMM_JAC = None
+        self.jac_ranks = None
 
         self.initial_state_parameters = [
                 'partition_table',
@@ -216,42 +218,58 @@ class ansatz(object):
 
         self.variational_parameters = np.empty(self.total_params * self.ansatz_depth, np.float64)
 
-         #parallel jacobian not possible with one MPI process
+        #parallel jacobian not possible with one MPI process
         if self.COMM.Get_size() == 1:
             self.parallel = "global"
 
         # set up communication topology
-        if self.COMM_OPT is None:
+     #   if self.COMM_OPT is None:
 
-            if (self.parallel == "global"):
-                self.COMM_OPT = self.COMM
-                self.MPI_COMM = self.COMM
-                self.colours = [0]*self.COMM.Get_size()
+        if (self.parallel == "global"):
+            self.COMM_OPT = self.COMM
+            self.MPI_COMM = self.COMM
+            self.colours = [0]*self.COMM.Get_size()
 
-            elif (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
+        elif (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
 
-                self.__parallel_jacobian_communication_topology()
-                self.n_jacobian_variables = len(self.variational_parameters)
-                self.MPI_COMM = self.COMM_OPT
+            self.__parallel_jacobian_communication_topology()
+            self.n_jacobian_variables = len(self.variational_parameters)
+            self.MPI_COMM = self.COMM_OPT
 
             # if the number of MPI processes is greater than
             # system_size, resize the communicator
 
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            if self.system_size // self.COMM_OPT.Get_size() == 0:
+
+                newsize = self.system_size // 2
+
+            else:
+
+                newsize = 0
+
+        else:
+
+            newsize = 0
+
+        newsize = self.COMM.allreduce(newsize, op = MPI.MAX)
+
+        if newsize > 0:
+
+            self.colours, self.COMM_OPT, self.COMM_JAC, self.jac_ranks = shrink_communicator(
+                    newsize,
+                    self.colours,
+                    self.COMM,
+                    self.COMM_OPT,
+                    self.COMM_JAC,
+                    self.jac_ranks)
+
         while not busy_comm:
 
-            if self.colours[self.COMM.Get_rank()] != -1:
-
-                if self.system_size // self.COMM_OPT.Get_size() == 0:
-
-                    newsize = self.system_size // 2
-
-                    self.colours, self.COMM_OPT = shrink_communicator(
-                            newsize,
-                            self.colours,
-                            self.COMM_OPT)
-
-                    if self.colours[self.COMM.Get_rank()] == -1:
-                        busy_comm = True
+            #if self.colours[self.COMM.Get_rank()] == -1:
+            #    busy_comm = True
 
             if self.colours[self.COMM.Get_rank()] != -1:
 
@@ -289,13 +307,30 @@ class ansatz(object):
 
                 if not busy_comm:
                     newsize = self.COMM_OPT.Get_size() - empty_ranks
-                    self.colours, self.COMM_OPT = shrink_communicator(
-                            newsize,
-                            self.colours,
-                            self.COMM_OPT)
+                else:
+                    newsize = 0
 
-                if self.colours[self.COMM.Get_rank()] == -1:
-                    busy_comm = True
+            else:
+
+                newsize = 0
+
+            newsize = self.COMM.allreduce(newsize, op = MPI.MAX)
+
+            if newsize > 0:
+    
+                self.colours, self.COMM_OPT, self.COMM_JAC, self.jac_ranks = shrink_communicator(
+                        newsize,
+                        self.colours,
+                        self.COMM,
+                        self.COMM_OPT,
+                        self.COMM_JAC,
+                        self.jac_ranks)
+            else:
+
+                busy_comm = True
+    
+            #if self.colours[self.COMM.Get_rank()] == -1:
+            #    busy_comm = True
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
@@ -375,7 +410,6 @@ class ansatz(object):
                 if self.log:
                     self.logfile.close()
 
-            self.COMM.barrier()
 
             if self.pre_called:
 
@@ -384,10 +418,15 @@ class ansatz(object):
                     for unitary in self.unitaries:
                         unitary.destroy()
 
-                    if self.COMM is not self.COMM_OPT:
+                    if self.COMM_JAC is not None:
+
                         MPI.Comm.Free(self.COMM_OPT)
 
-                    self.COMM_OPT = None
+                        if self.COMM.Get_rank() in self.jac_ranks:
+                            MPI.Comm.Free(self.COMM_JAC)
+
+            self.COMM_OPT = None
+            self.COMM_JAC = None
 
             self.pre_called = False
             self.post_called = True
@@ -927,6 +966,8 @@ class ansatz(object):
             for key in nodes_dict:
                 nodes_dict[key] = np.array(nodes_dict[key])
 
+            nodes_dict = {k: nodes_dict[k] for k in sorted(nodes_dict.keys(),key= lambda x : nodes_dict[x][0])}
+
         else:
                 self.COMM.send(node_ID, dest = 0)
                 nodes_dict = None
@@ -944,10 +985,10 @@ class ansatz(object):
         # and distribution of state evolution is not constrained to individual nodes
         # then create subcommunicators across multiple physical nodes.
 
-            self.comm_opt_mapping = [[] for _ in range(variables + 1)]
+            self.comm_opt_mapping = [[] for _ in range(n_variational_parameters + 1)]
             for i, key in enumerate(nodes_dict.keys()):
                 for rank in nodes_dict[key]:
-                    self.comm_opt_mapping[i % variables].append(rank)
+                    self.comm_opt_mapping[i % (n_variational_parameters + 1)].append(rank)
 
         elif (parameters_per_node == 0) and (self.parallel == "jacobian_local"):
         # If the number of nodes is greater than n_variational_parameters + 1
@@ -956,7 +997,7 @@ class ansatz(object):
         # nodes.
 
             self.comm_opt_mapping = []
-            for node, parameter in zip(nodes_dict.keys(), list(range(n_variational_parameters))):
+            for key in nodes_dict.keys():
                 self.comm_opt_mapping.append(nodes_dict[key])
 
         else:
@@ -1012,14 +1053,14 @@ class ansatz(object):
         # Create self.COMM_JAC, a communicator containing the self.COMM_OPT used to calculate the gradient
         # values and the root process of the sub communicator responsible for calls to the
         # objective function.
-        jac_ranks = [rank for rank in range(self.COMM.Get_size()) if self.colours[rank] != 0]
-        jac_ranks.insert(0,0)
+        self.jac_ranks = [rank for rank in range(self.COMM.Get_size()) if self.colours[rank] != 0]
+        self.jac_ranks.insert(0,0)
 
         world_group = MPI.Comm.Get_group(self.COMM)
-        jac_group = MPI.Group.Incl(world_group, jac_ranks)
+        jac_group = MPI.Group.Incl(world_group, self.jac_ranks)
         self.COMM_JAC = self.COMM.Create_group(jac_group)
 
-    def __mpi_jacobian(self, x, tol = 1e-8, diff_type = 'forward'):
+    def __mpi_jacobian(self, x, tol = 1e-12, diff_type = 'forward'):
 
         self.COMM_JAC.barrier()
 
@@ -1050,10 +1091,13 @@ class ansatz(object):
 
         if  self.COMM.Get_rank() != 0:
 
-            h = np.min(np.abs(x))*np.sqrt(tol)
+            h_default = 1.4901161193847656e-08
+            h = h_default  #np.min(np.abs(x))*np.sqrt(tol)
+            #if h < h_default:
+            #    h = h_default
 
-            if self.__is_zero(h):
-                h = 1.4901161193847656e-08
+            #if self.__is_zero(h):
+            #    h = 1.4901161193847656e-08
 
             for var in self.var_map[self.colours[self.COMM.Get_rank()]]:
 

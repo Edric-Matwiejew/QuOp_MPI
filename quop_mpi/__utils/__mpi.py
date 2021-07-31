@@ -83,14 +83,19 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
     return W_row_starts, W_col_indexes, W_values
 
-def shrink_communicator(newsize, colours, COMM_OPT):
+def shrink_communicator(newsize, colours, COMM, COMM_OPT, COMM_JAC, jac_ranks):
+
+    if jac_ranks is not None:
+        if COMM.Get_rank() in jac_ranks:
+            MPI.Comm.Free(COMM_JAC)
 
     subcolours = []
     for i in range(COMM_OPT.Get_size()):
         if i < newsize:
             subcolours.append(0)
         else:
-            colours[i] = -1
+            if COMM_OPT.Get_rank() == i:
+                colours[COMM.Get_rank()] = -1
             subcolours.append(MPI.UNDEFINED)
 
     COMM_OPT_NEW = MPI.Comm.Split(
@@ -98,7 +103,19 @@ def shrink_communicator(newsize, colours, COMM_OPT):
             subcolours[COMM_OPT.Get_rank()],
             COMM_OPT.Get_rank())
 
-    return colours, COMM_OPT_NEW
+    for i, colour in enumerate(colours):
+        colours[i] = COMM.bcast(colours[i], i)
+
+    if jac_ranks is not None:
+        jac_ranks = []
+        jac_ranks = [rank for rank in range(COMM.Get_size()) if (colours[rank] != 0) and (colours[rank] != -1)]
+        jac_ranks.insert(0,0)
+        
+        world_group = MPI.Comm.Get_group(COMM)
+        jac_group = MPI.Group.Incl(world_group, jac_ranks)
+        COMM_JAC = COMM.Create_group(jac_group)
+
+    return colours, COMM_OPT_NEW, COMM_JAC, jac_ranks
 
 def gather_array(array, partition_table, COMM_OPT):
 
