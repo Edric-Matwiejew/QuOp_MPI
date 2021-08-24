@@ -7,13 +7,14 @@ import numpy as np
 from mpi4py import MPI
 from quop_mpi.__utils.__interface import interface
 from quop_mpi.__utils.__mpi import shrink_communicator, gather_array
+import atexit
 
 
 I = np.complex(0,1)
 
 class ansatz(object):
 
-    def __init__(self, system_size, MPI_communicator = MPI.COMM_WORLD, parallel = "global"):
+    def __init__(self, system_size, MPI_communicator = MPI.COMM_WORLD):
 
         rank = MPI_communicator.Get_rank() # confirm argument is an MPI4Py communicator
 
@@ -22,12 +23,6 @@ class ansatz(object):
 
         # initialisation inputs
         self.COMM = MPI_communicator # global MPI communicator, usually MPI.COMM_WORLD
-
-        if parallel in ["jacobian", "jacobian_local", "global"]:
-            self.parallel = parallel # type of MPI parallelisation: "global", "jacobian" or "jacobian_local"
-        else:
-            QUOP_ERR = "Rank {}: Parallel scheme '{}' not recognised. Options are 'jacobian', 'jacobian_local' and 'global'.".format(self.COMM.Get_rank(), parallel)
-            raise ValueError(QUOP_ERR)
 
         # variables that must be set by the 'pre' method of the child class
         self.alloc_local = None
@@ -44,10 +39,12 @@ class ansatz(object):
         self.ansatz_depth = 1 # ansatz circuit depth
         self.initial_state_type = None
         self.optimiser = None # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
+        self.optimiser = None # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
 
         # parameters linked to optional methods in the 'system' class
-        self.observable_map = None # scalar tranformation on the output of the objective function
-        self.log = False # wether results will be recorded in a *.log file.
+        self.observable_map_input = None # scalar tranformation on the observable values
+        self.objective_map_input = None
+        self.setup_log = False # wether results will be recorded in a *.log file.
 
         # variables managed by the 'system' class
         self.stop = False # synchronise ranks durring optimisation
@@ -61,6 +58,25 @@ class ansatz(object):
         self.post_called = False
         self.COMM_JAC = None
         self.jac_ranks = None
+
+        self.verbose_objective = False
+        self.record_objective = False
+        self.objective_history = []
+
+        self.setup_depth = True
+        self.setup_parallel = True
+        self.setup_unitaries = True
+        self.setup_observables = True
+        self.setup_initial_state = True
+        self.setup_observable_map = False
+        self.setup_objective_map = False
+        self.setup_log = False
+        self.setup_optimiser = True
+        self.setup_optimiser = True
+        self.planned = False
+
+        self.set_parallel()
+
 
         self.initial_state_parameters = [
                 'partition_table',
@@ -80,7 +96,6 @@ class ansatz(object):
 
         # remove variational_parameters
         self.observable_parameters = [
-                    'variational_parameters',
                     'partition_table',
                     'system_size',
                     'local_alloc',
@@ -90,6 +105,16 @@ class ansatz(object):
                     'MPI_COMM',
                 ]
 
+
+        # remove variational_parameters
+        self.objective_map_parameters = [
+                    'expectation',
+                ]
+
+        atexit.register(self.exit)
+
+    def exit(self):
+        self.COMM.barrier()
 
     def set_unitaries(self, unitaries):
 
@@ -104,11 +129,13 @@ class ansatz(object):
         self.total_params = np.sum(self.param_map)
         self.param_map = np.cumsum(self.param_map)
 
-    def set_observables(self, observables, kwargs = {}):
-        self.observable_input = [observables, kwargs]
+        self.setup_unitaries = True
 
-        #if self.unitaries[i].unitary_type != "diagonal":
-        #    RuntimeError("Rank {}: Unitary containing observable values is not diagonal.".format(self.COMM.Get_rank()))
+    def set_observables(self, function, kwargs = {}):
+
+        self.observable_input = [function, kwargs]
+
+        self.setup_observables = True
 
     def set_optimiser(self, optimiser, optimiser_args = {}, optimiser_log = None):
         """
@@ -138,21 +165,29 @@ class ansatz(object):
             from scipy.optimize import minimize as sp_minimize
             self.optimiser = sp_minimize
         elif optimiser == 'nlopt':
-            from quop_mpi.__util._nlopt_wrap import minimize as nlopt_minimize
+            from quop_mpi.__utils.__nlopt_wrap import minimize as nlopt_minimize
             self.optimiser = nlopt_minimize
 
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
 
         if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
-            if not "jac" in self.optimiser_args:
+            if not "jac" in self.optimiser_args or self.optimiser_args["jac"]:
                 self.optimiser_args["jac"] = self.__mpi_jacobian
 
-    def set_depth(self, depth):
-        self.ansatz_depth = depth
+        self.setup_optimiser = True
 
-    def set_observable_map(self, **kwargs):
+    def set_depth(self, depth):
+
+        self.ansatz_depth = int(depth)
+
+        self.setup_depth = True
+
+    def set_observable_map(self, func, kwargs = {}):
+
         self.observable_map_input = [func, kwargs]
+
+        self.setup_observable_map = True
 
     def __parse_observable_mapping(self):
 
@@ -166,8 +201,31 @@ class ansatz(object):
     def unset_observable_map(self):
         self.observable_map_input = None
 
+    def set_objective_map(self, func, kwargs = {}):
+
+        if self.COMM.Get_rank() == 0:
+            self.objective_map_input = [func, kwargs]
+
+        self.setup_objective_map = True
+
+    def __parse_objective_mapping(self):
+
+        self.objective_map = interface(
+                self,
+                self.objective_map_input[0],
+                self.objective_map_parameters,
+                "objective mapping",
+                self.COMM_OPT)
+
+    def unset_objective_map(self):
+        self.objective_map_input = None
+
+
     def set_initial_state(self, function, kwargs = {}):
+
         self.initial_state_input = [function, kwargs]
+
+        self.setup_initial_state = True
 
     def __parse_initial_state_function(self):
 
@@ -180,12 +238,15 @@ class ansatz(object):
 
     def set_log(self, filename, label, action = "a"):
 
-        self.log = True
         self.filename = filename
         self.label = label
         self.log_action = "a"
 
         self.repeat = 1 # needed if logging results from the execute method
+
+        self.log = True
+
+        self.setup_log = True
 
     def get_expectation_value(self):
         """
@@ -212,11 +273,69 @@ class ansatz(object):
         if self.colours[self.COMM.Get_rank()] == 0:
             return self.__objective(variational_parameters)
 
-    def pre(self):
+    def __check_setup_validity(self):
+        """
+        This method is called by execute, it determines wether the object needs to update
+        any attributes or re-configure MPI communicators.
+
+        First it checks the 'set' methods, each of these have an associated flag starting
+        with 'setup'. e.g. 'setup_initial_state = True' indicates that the initial state
+        function should be re-parsed and called. For every 'set' method the flag is
+        set from False to True as the last action of that method.
+
+        Depending on the flags there are a number of actions that may or may not be called
+        by the pre method.
+
+        List of method --> setup flags:
+
+            set_unitaries --> self.setup_unitaries
+            set_depth --> setup_depth
+            set_parallel --> setup_parallel
+            set_unitaries --> setup_unitaries
+            set_observables --> setup_observables
+            set_initial_state --> setup_initial_state
+            set_observable_map --> setup_observable_map
+            set_objective_map --> setup_objective_map
+            set_log --> setup_log
+            set_optimiser --> setup_optimiser
+
+        """
+
+        if self.setup_depth and (self.parallel in ['jacobian', 'jacobian_local']):
+            self.setup_parallel = True
+            self.setup_initial_parameters = True
+
+            self.pre_called = False
+
+        if self.setup_unitaries:
+            self.setup_initial_parameters = True
+            self.setup_parallel = True
+
+            self.pre_called = False
+
+        if self.setup_parallel:
+
+            self.setup_unitaries = True
+            self.setup_observables = True
+            self.setup_initial_state = True
+            self.setup_observable_map = True
+            self.setup_objective_map = True
+
+            self.pre_called = False
+
+    def set_parallel(self, parallel = "global"):
+
+        if parallel in ["jacobian", "jacobian_local", "global"]:
+            self.parallel = parallel # type of MPI parallelisation: "global", "jacobian" or "jacobian_local"
+        else:
+            QUOP_ERR = "Rank {}: Parallel scheme '{}' not recognised. Options are 'jacobian', 'jacobian_local' and 'global'.".format(self.COMM.Get_rank(), parallel)
+            raise ValueError(QUOP_ERR)
+        
+        self.setup_parallel = True
+
+    def __gen_parallel(self):
 
         busy_comm = False
-
-        self.variational_parameters = np.empty(self.total_params * self.ansatz_depth, np.float64)
 
         #parallel jacobian not possible with one MPI process
         if self.COMM.Get_size() == 1:
@@ -278,18 +397,18 @@ class ansatz(object):
 
                 for unitary in self.unitaries:
                     if unitary.planner:
-                        planner = unitary
-                        planner.plan(self.system_size, self.COMM_OPT)
+                        self.planner = unitary
+                        self.planner.plan(self.system_size, self.COMM_OPT)
                         break
                 else:
-                    planner = self.unitaries[0]
-                    planner.plan(self.system_size, self.COMM_OPT)
+                    self.planner = self.unitaries[0]
+                    self.planner.plan(self.system_size, self.COMM_OPT)
 
-                self.alloc_local = planner.alloc_local
-                self.local_i = planner.local_i
-                self.local_i_offset = planner.local_i_offset
-                self.final_state = planner.final_state
-                self.partition_table = planner.partition_table
+                self.alloc_local = self.planner.alloc_local
+                self.local_i = self.planner.local_i
+                self.local_i_offset = self.planner.local_i_offset
+                self.final_state = self.planner.final_state
+                self.partition_table = self.planner.partition_table
 
                 if self.local_i == 0:
                     empty_rank = 1
@@ -303,7 +422,7 @@ class ansatz(object):
                 if empty_ranks == 0:
                     busy_comm = True
                 else:
-                    planner.destroy()
+                    self.planner.destroy()
 
                 if not busy_comm:
                     newsize = self.COMM_OPT.Get_size() - empty_ranks
@@ -329,17 +448,34 @@ class ansatz(object):
 
                 busy_comm = True
     
-            #if self.colours[self.COMM.Get_rank()] == -1:
-            #    busy_comm = True
+    def __gen_unitaries(self):
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
             for unitary in self.unitaries:
-                if unitary is not planner:
-                    unitary.copy_plan(planner)
+                if unitary is not self.planner:
+                    unitary.copy_plan(self.planner)
 
-            if self.observable_map is not None:
+            for i, unitary in enumerate(self.unitaries):
+
+                if unitary.operator_n_params == 0:
+                    unitary.gen_operator()
+
+    def __gen_depth(self):
+
+        self.variational_parameters = np.empty(self.total_params * self.ansatz_depth, np.float64)
+
+
+    def __gen_observable_map(self):
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            if self.observable_map_input is not None:
                 self.__parse_observable_mapping()
+
+    def __gen_initial_state(self):
+
+        if self.colours[self.COMM.Get_rank()] != -1:
 
             if self.initial_state_input is None:
                 from quop_mpi.states import equal
@@ -348,13 +484,11 @@ class ansatz(object):
             self.__parse_initial_state_function()
 
             self.initial_state = self.initial_state_function.call(
-                    **self.initial_state_input[1]
-                    )
+                    **self.initial_state_input[1])
 
-            for i, unitary in enumerate(self.unitaries):
+    def __gen_observables(self):
 
-                if unitary.operator_n_params == 0:
-                    unitary.gen_operator()
+        if self.colours[self.COMM.Get_rank()] != -1:
 
             if callable(self.observable_input[0]):
 
@@ -369,17 +503,11 @@ class ansatz(object):
                 kwargs = self.observable_input[1]
                 self.observables = self.parsed_observable_function.call(**kwargs)
 
+                if self.observables.shape[0] != self.local_i:
+                    self.observables = np.reshape(a, (self.local_i, ))
+
             else:
 
-                #if self.observable_input is None:
-
-                #    for i, unitary in enumerate(self.unitaries):
-                #        if (unitary.unitary_type == "diagonal") and (unitary.variational_parameters == 1):
-                #            self.observable_index = i
-                #            break
-                #    else:
-                #        RuntimeError("Rank {}: Cannot identify observables, no non-variational diagonal unitary defined".format(self.COMM.Get_rank()))
-                #else:
                 unitary = self.unitaries[self.observable_input[0]]
 
                 if (unitary.unitary_type == "diagonal"):
@@ -387,54 +515,102 @@ class ansatz(object):
                 else:
                     RuntimeError("Rank {}: Cannot identify observables, no diagonal unitary defined".format(self.COMM.Get_rank()))
 
+    def __gen_optimiser(self):
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
             if self.optimiser is None:
-                self.set_optimiser( 'scipy',
+
+                self.set_optimiser('scipy',
                         {'method':'BFGS','tol':1e-5},
                                 ['fun','nfev','success'])
 
-            if self.colours[self.COMM.Get_rank()] == 0:
-                if self.log:
-                    self.__gen_log()
+    def __gen_objective_map(self):
+
+        if self.COMM.Get_rank() == 0:
+            if self.objective_map_input is not None:
+                self.__parse_objective_mapping()
+
+    def pre(self):
+
+        if self.setup_depth:
+            self.__gen_depth()
+            self.setup_depth = False
+
+        if self.setup_parallel:
+            self.__gen_parallel()
+            self.setup_parallel = False
+
+        if self.setup_unitaries:
+            self.__gen_unitaries()
+            self.setup_unitaries = False
+
+        if self.setup_observables:
+            self.__gen_observables()
+            self.setup_observables = False
+
+        if self.setup_initial_state:
+            self.__gen_initial_state()
+            self.setup_initial_state = False
+
+        if self.setup_observable_map:
+            self.__gen_observable_map()
+            self.setup_observable_map = False
+
+        if self.setup_observable_map:
+            self.__gen_observable_map()
+            self.setup_observable_map = False
+
+        if self.setup_optimiser:
+            self.__gen_optimiser()
+            self.setup_optimiser = False
+
+        if self.setup_log:
+            self.__gen_log()
 
         self.pre_called = True
         self.post_called = False
-    
-    def __del__(self):
-        self.post()
+
+    def __post_log(self):
+
+        if self.COMM.rank == 0:
+            if self.log:
+                self.logfile.close()
+
+    def __post_unitaries(self):
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            for unitary in self.unitaries:
+                if unitary.planned:
+                    unitary.destroy()
+
+    def __post_parallel(self):
+
+        if self.colours[self.COMM.Get_rank()] != -1:
+
+            if self.COMM_JAC is not None:
+
+                MPI.Comm.Free(self.COMM_OPT)
+
+                if self.COMM.Get_rank() in self.jac_ranks:
+                    MPI.Comm.Free(self.COMM_JAC)
 
     def post(self):
 
-        if not self.post_called:
+        if self.setup_log:
+            self.__post_log()
 
-            if self.COMM.rank == 0:
-                if self.log:
-                    self.logfile.close()
+        if self.setup_unitaries:
+            self.__post_unitaries()
 
+        if self.setup_parallel:
+            self.__post_parallel()
 
-            if self.pre_called:
-
-                if self.colours[self.COMM.Get_rank()] != -1:
-
-                    for unitary in self.unitaries:
-                        unitary.destroy()
-
-                    if self.COMM_JAC is not None:
-
-                        MPI.Comm.Free(self.COMM_OPT)
-
-                        if self.COMM.Get_rank() in self.jac_ranks:
-                            MPI.Comm.Free(self.COMM_JAC)
-
-            self.COMM_OPT = None
-            self.COMM_JAC = None
-
-            self.pre_called = False
-            self.post_called = True
+        self.post_called = True
+        self.pre_called = False
 
     def evolve_state(self, x):
-
-        if not self.pre_called:
-            self.pre()
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
@@ -450,21 +626,20 @@ class ansatz(object):
 
                     if unitary.operator_n_params > 0:
 
-                        evolution_parameter = param_slice[0]
-                        unitary.variational_parameters = param_slice[1:]
+                        evolution_parameter = param_slice[:self.unitary_n_params]
+                        unitary.variational_parameters = param_slice[self.unitary_n_params:]
 
                         unitary.gen_operator()
 
                     else:
                         evolution_parameter = param_slice
 
-                    if not self.__is_zero(evolution_parameter):
+                    unitary.initial_state[:self.local_i] = self.final_state[:self.local_i]
 
-                        unitary.initial_state[:self.local_i] = self.final_state[:self.local_i]
+                    unitary.propagate(evolution_parameter)
 
-                        unitary.propagate(evolution_parameter)
+                    self.final_state[:self.local_i] = unitary.final_state[:self.local_i]
 
-                        self.final_state[:self.local_i] = unitary.final_state[:self.local_i]
 
     def execute(self):
         """
@@ -474,12 +649,10 @@ class ansatz(object):
         :type gammas_ts: float, array
         """
         if self.pre_called:
-            if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
-                if not (self.n_jacobian_variables == len(self.variational_parameters)):
-                    self.post()
-                    self.pre()
-        else:
-            self.pre()
+            self.__check_setup_validity()
+            self.post()
+
+        self.pre()
 
         if not self.benchmarking:
             self.variational_parameters = self.get_initial_params(self.ansatz_depth)
@@ -491,6 +664,8 @@ class ansatz(object):
             if self.colours[self.COMM.Get_rank()] == 0:
 
                 if self.COMM_OPT.Get_rank() == 0:
+
+                    self.neval_mpi_jac = 0
 
                     self.time = time()
 
@@ -514,10 +689,8 @@ class ansatz(object):
                     while not self.stop:
                         self.__objective(self.variational_parameters)
 
-
                 if self.log:
                     self.__log_update()
-
 
             else:
 
@@ -667,7 +840,8 @@ class ansatz(object):
 
                 if param_persist:
                     previous_params = best_p_params
-                    first = False
+
+                first = False
 
             self.post()
             self.benchmarking = False
@@ -844,24 +1018,22 @@ class ansatz(object):
 
         self.__get_local_probabilities()
 
-        if self.observable_map is not None:
+        if self.observable_map_input is not None:
 
             local_expectation = np.dot(
                     self.local_probabilities,
                     self.observable_map(
                         self.observables,
-                        *self.observable_map_args,
-                        **self.observable_map_kwargs
+                        **self.observable_map_input[1]
                     ))
         else:
 
             local_expectation = np.dot(self.local_probabilities, self.observables)
 
-        return self.COMM_OPT.allreduce(local_expectation, op = MPI.SUM)
+        return np.real(self.COMM_OPT.allreduce(local_expectation, op = MPI.SUM))
 
 
     def __objective(self, variational_parameters):
-
 
         self.stop = self.COMM_OPT.bcast(self.stop, root = 0)
 
@@ -872,6 +1044,18 @@ class ansatz(object):
             self.evolve_state(self.variational_parameters)
 
             self.expectation = self.get_expectation_value()
+
+            if self.COMM.Get_rank() == 0:
+
+                if self.verbose_objective:
+                    print(self.expectation, flush = True)
+
+                if self.record_objective:
+                    self.objective_history.append(self.expectation)
+
+                if self.objective_map_input is not None:
+                    self.objective_map.update_parameters()
+                    self.expectation = self.objective_map.call(**self.objective_map_input[1])
 
             return self.expectation
 
@@ -900,23 +1084,25 @@ class ansatz(object):
         * MPI_nodes: Number of mpi processes.
         """
 
-        self.n_log_fields = 6
+        if self.colours[self.COMM.Get_rank()] == 0:
 
-        if self.COMM.Get_rank() == 0:
-            if (os.path.exists(self.filename + ".csv") and self.log_action == "a"):
-                self.logfile = open(self.filename + ".csv", "a", newline='')
-                self.logfile_csv = csv.writer(self.logfile)
-            else:
+            self.n_log_fields = 6
 
-                headings = ['label','system_size','ansatz_depth','repeat','state_norm','simulation_time','MPI_nodes']
+            if self.COMM.Get_rank() == 0:
+                if (os.path.exists(self.filename + ".csv") and self.log_action == "a"):
+                    self.logfile = open(self.filename + ".csv", "a", newline='')
+                    self.logfile_csv = csv.writer(self.logfile)
+                else:
 
-                if self.optimiser_log is not None:
-                    for optimiser_log in self.optimiser_log:
-                        headings.append(optimiser_log)
+                    headings = ['label','system_size','ansatz_depth','repeat','state_norm','simulation_time','MPI_nodes', 'MPI_jacobian_evaluations']
 
-                self.logfile = open(self.filename + ".csv", "w")
-                self.logfile_csv = csv.writer(self.logfile)
-                self.logfile_csv.writerow(headings)
+                    if self.optimiser_log is not None:
+                        for optimiser_log in self.optimiser_log:
+                            headings.append(optimiser_log)
+
+                    self.logfile = open(self.filename + ".csv", "w")
+                    self.logfile_csv = csv.writer(self.logfile)
+                    self.logfile_csv.writerow(headings)
 
     def __log_update(self):
         """
@@ -933,8 +1119,8 @@ class ansatz(object):
                     self.repeat,
                     self.state_norm,
                     self.time,
-                    self.COMM.size
-                    ]
+                    self.COMM.size,
+                    self.neval_mpi_jac]
 
             if self.optimiser_log is not None:
                 for optimiser_log in self.optimiser_log:
@@ -1073,13 +1259,11 @@ class ansatz(object):
         x = self.COMM_JAC.bcast(x, 0)
 
         # if the jacobian is called before evaluation of the objective function
-        if self.colours[self.COMM.Get_rank()] == 0:
-            if self.expectation is None:
+        if self.colours[self.COMM.Get_rank()] != 0:
+            self.evolve_state(x)
+            self.expectation = self.__get_expectation_value()
 
-                self.evolve_state(x)
-                self.expectation = self.__get_expectation_value()
-
-        self.expectation = self.COMM_JAC.bcast(self.expectation, 0)
+        #self.expectation = self.COMM_JAC.bcast(self.expectation, 0)
 
         if diff_type == 'forward':
             x_jac_temp = np.empty(len(x))
@@ -1140,6 +1324,7 @@ class ansatz(object):
         self.COMM_JAC.barrier()
 
         if self.COMM.Get_rank() == 0:
+            self.neval_mpi_jac += 1
             return jacobian
         else:
             return None
@@ -1149,9 +1334,9 @@ class ansatz(object):
 
 class phase_and_mixer(ansatz):
 
-    def __init__(self, system_size, MPI_communicator = MPI.COMM_WORLD, parallel = "global"):
+    def __init__(self, *args, **kwargs):
 
-        super().__init__(system_size, MPI_communicator, parallel)
+        super().__init__(*args, **kwargs)
 
         self.operator_function = None
         self.param_function = None
@@ -1164,14 +1349,6 @@ class phase_and_mixer(ansatz):
         self.set_observables(0)
 
     def set_params(self, param_function, kwargs = {}):
+
         self.param_function
         self.param_kwargs = kwargs
-
-    def _pre(self):
-
-        if self.operator_function is None:
-            raise RuntimeError("Rank {}: Solution qualities not defined.".format(self.rank))
-
-        if self.param_function is None:
-            from quop_mpi.params import uniform
-            self.set_params(uniform)
