@@ -16,7 +16,12 @@ class interface(object):
 
     The bound function is accessible through the 'call' class attribute, e.g.:
 
-    interface.call(**kwargs)
+        interface.call(**kwargs)
+
+    To update the bound parameters:
+
+        interface.update_parameters()
+
     """
     def __init__(
             self,
@@ -27,17 +32,19 @@ class interface(object):
             MPI_COMM):
 
         self.function_name = function_name
+        self.avaliable_parameters = avaliable_parameters
 
         self.rank = MPI_COMM.Get_rank()
 
         function_signature = signature(function)
         function_parameters = function_signature.parameters
-        positional_params = [str(param) for param in function_parameters.values() if (param.default == param.empty)]
-        n_positional_params = len(positional_params)
 
-        for positional_param in positional_params:
-            if not positional_param in avaliable_parameters:
-                raise RuntimeError("Rank {}: Unmatched positional parameter '{}' in '{}' function.".format(self.rank, positional_param, function_name))
+        positional_params = []
+        for param in function_parameters.values():
+            if param.default == param.empty:
+                positional_params.append(str(param))
+
+        n_positional_params = len(positional_params)
 
         self.function = function
         self.positional_params = positional_params
@@ -49,6 +56,10 @@ class interface(object):
 
         self.args = []
         for positional_param in self.positional_params:
-            self.args.append(getattr(self.obj, positional_param))
+
+            if not positional_param in self.avaliable_parameters:
+                self.args.append(None)
+            else:
+                self.args.append(getattr(self.obj, positional_param))
 
         self.call= partial(self.function, *self.args)
