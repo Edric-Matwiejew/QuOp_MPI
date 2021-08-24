@@ -13,14 +13,15 @@ class __unitary(object):
             operator_n_params = 0,
             operator_kwargs = {},
             parameter_function = None,
-            parameter_kwargs = {}
-            ):
+            parameter_kwargs = {},
+            unitary_n_params = 1):
 
         self.operator_function = operator_function
         self.operator_n_params = operator_n_params
         self.operator_kwargs = operator_kwargs
         self.parameter_function = parameter_function
         self.parameter_kwargs = parameter_kwargs
+        self.unitary_n_params = unitary_n_params
 
         self.unitary_type = None
         self.planner = False
@@ -63,8 +64,9 @@ class __unitary(object):
         self.lb = None
         self.ub = None
         self.variational_parameters = None
+        self.planned = False
 
-        self.n_params += operator_n_params
+        self.n_params += operator_n_params + unitary_n_params
 
 
     def parse_operator_function(self):
@@ -127,22 +129,26 @@ class __unitary(object):
 
 class __quop_partitioned(__unitary):
 
-    def __init__(
-            self,
-            operator_function,
-            operator_n_params = 0,
-            operator_kwargs = {},
-            parameter_function = None,
-            parameter_kwargs = {}
-            ):
+    def __init__(self, *args, **kwargs):
 
-        super().__init__(
-                operator_function,
-                operator_n_params,
-                operator_kwargs,
-                parameter_function,
-                parameter_kwargs,
-                )
+        super().__init__(*args, **kwargs)
+
+    #def __init__(
+    #        self,
+    #        operator_function,
+    #        operator_n_params = 0,
+    #        operator_kwargs = {},
+    #        parameter_function = None,
+    #        parameter_kwargs = {}
+    #        ):
+
+    #    super().__init__(
+    #            operator_function,
+    #            operator_n_params,
+    #            operator_kwargs,
+    #            parameter_function,
+    #            parameter_kwargs,
+    #            )
 
     def copy_plan(self, unitary):
 
@@ -225,7 +231,6 @@ class circulant(__unitary):
 
         self.unitary_type = "circulant"
         self.planner = True
-        self.n_params += 1
         self.planned = False
 
         self.dummy_eigs = np.empty(1, dtype = np.float64)
@@ -248,8 +253,6 @@ class circulant(__unitary):
                 self.final_state,
                 self.MPI_COMM.py2f(),
                 1)
-
-
 
     def __gen_partition_table(self):
 
@@ -282,6 +285,9 @@ class circulant(__unitary):
         self.final_state = unitary.final_state
         self.initial_state = unitary.initial_state
         self.__gen_partition_table()
+
+        self.parse_operator_function()
+        self.parse_parameter_function()
 
         if not self.planned:
             self.__fftw_plan()
@@ -341,31 +347,20 @@ class circulant(__unitary):
 
             self.planned = False
 
-        self.MPI_COMM.barrier()
-
 class diagonal(__quop_partitioned):
 
-    def __init__(
-            self,
-            operator_function,
-            operator_n_params = 0,
-            operator_kwargs = {},
-            parameter_function = None,
-            parameter_kwargs = {}
-            ):
+    def __init__(self, *args, **kwargs):
 
-        super().__init__(
-                operator_function,
-                operator_n_params,
-                operator_kwargs,
-                parameter_function,
-                parameter_kwargs,
-                )
+        super().__init__(*args, **kwargs)
 
         self.unitary_type="diagonal"
-        self.n_params += 1
 
-    def propagate(self, x):
+        if self.unitary_n_params > 1:
+            self.propagate = self.evolve_group
+        else:
+            self.propagate = self.evolve_single
+
+    def evolve_single(self, x):
 
         # Class variables initial_state and final_state
         # need to be assigned directly. Expected size
@@ -374,24 +369,23 @@ class diagonal(__quop_partitioned):
 
         self.final_state[:self.local_i] = np.exp(-I * x * self.operator[:self.local_i]) * self.initial_state[:self.local_i]
 
+    def evolve_group(self, x):
+
+        self.final_state = self.initial_state
+
+        for operator, param in zip(self.operator, x):
+            self.final_state[:self.local_i] = np.exp(-I * param * operator[:self.local_i]) * self.final_state[:self.local_i]
+
 class sparse(__quop_partitioned):
 
-    def __init__(
-            self,
-            operator_function,
-            operator_n_params = 0,
-            operator_kwargs = {},
-            parameter_function = None,
-            parameter_kwargs = {}
-            ):
+    def __init__(self, *args, **kwargs):
 
-        super().__init__(
-            operator_function,
-            operator_n_params,
-            operator_kwargs,
-            parameter_function,
-            parameter_kwargs
-            )
+        super().__init__(*args, **kwargs)
+
+        if self.unitary_n_params > 1:
+            self.propagate = self.evolve_group
+        else:
+            self.propagate = self.evolve_single
 
         self.fMPI = import_module('quop_mpi.__lib.fMPI')
 
@@ -409,8 +403,6 @@ class sparse(__quop_partitioned):
         self.W_send_disps = None
         self.W_local_col_inds = None
         self.W_rhs_send_inds = None
-
-        self.n_params += 1
 
     def gen_operator(self, *args):
 
@@ -476,7 +468,7 @@ class sparse(__quop_partitioned):
             self.one_norms.append(one_norms)
             self.num_norms.append(num_norms)
 
-    def propagate(self, x):
+    def evolve_single(self, x):
         """
         Evolves the QAOA initial_state to its final_state.
 
@@ -489,7 +481,7 @@ class sparse(__quop_partitioned):
 
         for i in range(len(self.W_row_starts)):
 
-            self.final_state = self.fMPI.step(
+            self.final_state[:self.local_i] = self.fMPI.step(
                     self.system_size,
                     self.local_i,
                     self.W_row_starts[i],
@@ -502,9 +494,46 @@ class sparse(__quop_partitioned):
                     self.W_local_col_inds[i],
                     self.W_rhs_send_inds[i],
                     np.abs(x),
-                    self.initial_state,
+                    self.initial_state[:self.local_i],
                     self.partition_table,
                     self.num_norms[i],
                     self.one_norms[i],
                     self.MPI_COMM.py2f(),
                     self.precision)
+
+            self.initial_state[:] = self.final_state
+
+    def evolve_group(self, x):
+        """
+        Evolves the QAOA initial_state to its final_state.
+
+        :param gammas: Quality-proportional phase shifts.
+        :type gammas: float, array
+
+        :param ts: Continuous-time quantum walk times.
+        :type ts: float, array
+        """
+
+        for i in range(len(self.W_row_starts)):
+
+            self.final_state[:self.local_i] = self.fMPI.step(
+                    self.system_size,
+                    self.local_i,
+                    self.W_row_starts[i],
+                    self.W_col_indexes[i],
+                    self.W_values[i],
+                    self.W_num_rec_inds[i],
+                    self.W_rec_disps[i],
+                    self.W_num_send_inds[i],
+                    self.W_send_disps[i],
+                    self.W_local_col_inds[i],
+                    self.W_rhs_send_inds[i],
+                    np.abs(x[i]),
+                    self.initial_state[:self.local_i],
+                    self.partition_table,
+                    self.num_norms[i],
+                    self.one_norms[i],
+                    self.MPI_COMM.py2f(),
+                    self.precision)
+
+            self.initial_state[:] = self.final_state
