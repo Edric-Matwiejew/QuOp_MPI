@@ -70,7 +70,7 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
         if rank == 0:
             send_indexes = [col_indexes[i], counts, disps, MPI.INT]
-            send_values = [values[i], counts, disps, MPI.DOUBLE_COMPLEX]
+            send_values = [values[i].astype(np.complex128), counts, disps, MPI.DOUBLE_COMPLEX]
         else:
             send_indexes = None #[None, counts, disps, MPI.INT]
             send_values = None #[None, counts, disps, MPI.DOUBLE_COMPLEX]
