@@ -5,10 +5,15 @@ class qwoa(phase_and_mixer):
 
     def pre(self):
 
-        self._pre()
-
         from quop_mpi.unitaries import diagonal, circulant
-        from quop_mpi.operators import circulant_complete
+        from quop_mpi.operators.circulant import complete
+
+        if self.operator_function is None:
+            raise RuntimeError("Rank {}: Solution qualities not defined.".format(self.rank))
+
+        if self.param_function is None:
+            from quop_mpi.params import uniform
+            self.set_params(uniform)
 
         UQ = diagonal(
                 self.operator_function,
@@ -16,7 +21,7 @@ class qwoa(phase_and_mixer):
                 parameter_function = self.param_function)
 
         UW = circulant(
-                circulant_complete,
+                complete,
                 parameter_function = self.param_function,
                 parameter_kwargs = self.param_kwargs)
 
@@ -28,10 +33,15 @@ class qaoa(phase_and_mixer):
 
     def pre(self):
 
-        self._pre()
-
         from quop_mpi.unitaries import diagonal, sparse
-        from quop_mpi.operators import sparse_hypercube
+        from quop_mpi.operators.sparse import hypercube
+
+        if self.operator_function is None:
+            raise RuntimeError("Rank {}: Solution qualities not defined.".format(self.rank))
+
+        if self.param_function is None:
+            from quop_mpi.params import uniform
+            self.set_params(uniform)
 
         UQ = diagonal(
                 self.operator_function,
@@ -39,7 +49,7 @@ class qaoa(phase_and_mixer):
                 parameter_function = self.param_function)
 
         UW = sparse(
-                sparse_hypercube,
+                hypercube,
                 parameter_function = self.param_function,
                 parameter_kwargs = self.param_kwargs)
 
