@@ -107,7 +107,6 @@ def minimize(fun, x0, args=(), method=None, jac=None, bounds=None,
     if isinstance(method, str):
         method = get_nlopt_enum(method)
 
-    print(method,dim)
     opt = nlopt.opt(method, dim)
 
     # Initialize path
