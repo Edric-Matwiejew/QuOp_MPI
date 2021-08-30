@@ -703,8 +703,8 @@ class ansatz(object):
 
                 self.__pre_or_post()
 
-            if self.colours[self.COMM.Get_rank()] != -1:
-                self.variational_parameters[:] = np.array(variational_parameters, dtype = np.float64)
+                if self.colours[self.COMM.Get_rank()] != -1:
+                    self.variational_parameters[:] = np.array(variational_parameters, dtype = np.float64)
 
             else:
                 self.__pre_or_post()
