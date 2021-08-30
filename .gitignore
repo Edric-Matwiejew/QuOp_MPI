@@ -11,3 +11,13 @@ experiments
 src/obj
 *.sif
 *.swp
+*.npy
+*.log
+*.swo
+_bak
+__bak
+*.ipynb_checkpoints*
+_dist
+*.png
+Untitled.ipynb
+*.pyc

@@ -2,9 +2,11 @@ from time import time
 import sys
 import resource
 from os.path import exists
+from copy import copy, deepcopy
 from importlib import import_module
 from mpi4py import MPI
 import numpy as np
+import h5py as h5
 
 COMM = MPI.COMM_WORLD
 
@@ -165,3 +167,100 @@ def execute(
         time,
         peak_mem))
         log.close()
+
+
+def optimisers(
+        min_qubits,
+        max_qubits,
+        min_depth,
+        max_depth,
+        algs,
+        alg_names,
+        qualities,
+        backends,
+        method_names,
+        options,
+        log_filename,
+        objective_history_filename):
+
+    def target(expectation, target_val = None):
+        return np.abs(expectation - target_val)
+
+    for alg, alg_name in zip(algs, alg_names):
+
+        for n_qubits in range(min_qubits, max_qubits + 1):
+
+            system_size = 2**n_qubits
+
+            test_alg = alg(system_size)
+            test_alg.set_parallel('jacobian')
+            test_alg.verbose_objective = True
+
+            test_alg.set_qualities(qualities)
+
+            test_alg.record_objective = True
+
+            thetas = []
+            fmin = []
+            for depth in range(min_depth, max_depth + 1):
+
+                test_alg.set_depth(depth)
+
+                test_alg.set_optimiser('scipy',
+                        {'method':'BFGS','tol':1e-12},
+                                ['fun','nfev','success'])
+
+
+                test_alg.set_log(
+                        "{}/{}".format(log_filename, alg_name),
+                        'target_scipy_BFGS_depth_{}'.format(depth),
+                        action = 'a')
+
+                theta = test_alg.gen_initial_params(depth)
+
+                thetas.append(deepcopy(theta))
+
+                test_alg.execute(theta)
+
+                test_alg.print_optimiser_result()
+
+                if test_alg.COMM.Get_rank() == 0:
+                    fmin.append(test_alg.result['fun'])
+
+                    data = np.array([test_alg.total_n_evolutions, test_alg.objective_history], dtype = np.float64)
+                    data_label =  '{}_{}_{}_{}'.format(alg_name, 'baseline', n_qubits, depth)
+                    np.save(objective_history_filename + '/' + data_label + '.npy', data)
+            fmin = test_alg.COMM.bcast(fmin, 0)
+
+            for i, backend in enumerate(backends):
+
+                for option, method_name, in zip(options[i], method_names[i]):
+
+                    if test_alg.COMM.Get_rank() == 0:
+                        print(method_name, flush = True)
+                    
+                    test_alg.set_log(
+                            "{}/{}".format(log_filename, alg_name),
+                            '{}'.format(method_name),
+                            action = 'a')
+
+                    test_alg.set_optimiser(
+                            backend,
+                            copy(option),
+                            ['fun','nfev','success', 'message'])
+
+                    if not 'jac' in option:
+                        test_alg.optimiser_args['jac'] = None
+
+                    for j, theta in enumerate(thetas):
+
+                        test_alg.set_objective_map(target,{'target_val':fmin[j]})
+
+                        test_alg.execute(theta)
+
+                        test_alg.print_optimiser_result()
+
+                        if test_alg.COMM.Get_rank() == 0:
+                            data = np.array([test_alg.total_n_evolutions, test_alg.objective_history], dtype = np.float64)
+                            data_label =  '{}_{}_{}_{}'.format(alg_name, method_name, n_qubits, len(theta)//test_alg.total_params)
+                            np.save(objective_history_filename + '/' + data_label + '.npy', data)

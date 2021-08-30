@@ -82,8 +82,8 @@ class __unitary(object):
     def parse_parameter_function(self):
 
         if self.parameter_function is None:
-            from quop_mpi.params import uniform
-            self.parameter_function = uniform
+            from quop_mpi.params import random
+            self.parameter_function = random
 
         self.parsed_parameter_function = interface(
                 self,
@@ -109,7 +109,7 @@ class __unitary(object):
         self.rank = self.MPI_COMM.Get_rank()
         self.size = self.MPI_COMM.Get_size()
 
-    def get_initial_params(self):
+    def gen_initial_params(self):
         self.parsed_parameter_function.update_parameters()
         return self.parsed_parameter_function.call(**self.parameter_kwargs)
 

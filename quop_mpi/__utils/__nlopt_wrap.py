@@ -156,7 +156,7 @@ def minimize(fun, x0, args=(), method=None, jac=None, bounds=None,
     # Perform the optimization
     try:
         x = opt.optimize(x0)
-    except nlopt.RoundoffLimited:
+    except:# nlopt.RoundoffLimited:
         # If we encounter a RoundoffLimited exception, simply return last point
         x = path[-1]
 

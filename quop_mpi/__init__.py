@@ -1,14 +1,14 @@
 import sys
 import os
 import csv
+import atexit
+from copy import copy, deepcopy
 from time import time
 from importlib import import_module
 import numpy as np
 from mpi4py import MPI
 from quop_mpi.__utils.__interface import interface
 from quop_mpi.__utils.__mpi import shrink_communicator, gather_array
-import atexit
-
 
 I = np.complex(0,1)
 
@@ -48,20 +48,31 @@ class ansatz(object):
 
         # variables managed by the 'system' class
         self.stop = False # synchronise ranks durring optimisation
+
         self.COMM_OPT = None # communicator used for optimisation
         self.expectation = None # expectation value of the system
         self.initial_state_input = None
-        self.initial_state = None # initial state before algorithm evolution
+        self.ansatz_initial_state = None # initial state before algorithm evolution
         self.final_state = None # quantum state durring and after simulation
         self.benchmarking = False # indicates wether the benchmark method is running
+
         self.pre_called = False
         self.post_called = False
+        self.call_post = False
+
         self.COMM_JAC = None
         self.jac_ranks = None
 
         self.verbose_objective = False
+        self.objective_cnt = 0
         self.record_objective = False
-        self.objective_history = []
+
+        self.n_evolutions = 0
+        self.total_n_evolutions = []
+
+        self.log = False
+
+        self.set_parallel()
 
         self.setup_depth = True
         self.setup_parallel = True
@@ -72,11 +83,6 @@ class ansatz(object):
         self.setup_objective_map = False
         self.setup_log = False
         self.setup_optimiser = True
-        self.setup_optimiser = True
-        self.planned = False
-
-        self.set_parallel()
-
 
         self.initial_state_parameters = [
                 'partition_table',
@@ -110,10 +116,12 @@ class ansatz(object):
         self.objective_map_parameters = [
                     'expectation',
                 ]
-
+        
         atexit.register(self.exit)
 
     def exit(self):
+        if self.pre_called:
+            self.post()
         self.COMM.barrier()
 
     def set_unitaries(self, unitaries):
@@ -179,9 +187,9 @@ class ansatz(object):
 
     def set_depth(self, depth):
 
-        self.ansatz_depth = int(depth)
-
-        self.setup_depth = True
+        if depth != self.ansatz_depth:
+            self.ansatz_depth = int(depth)
+            self.setup_depth = True
 
     def set_observable_map(self, func, kwargs = {}):
 
@@ -203,8 +211,7 @@ class ansatz(object):
 
     def set_objective_map(self, func, kwargs = {}):
 
-        if self.COMM.Get_rank() == 0:
-            self.objective_map_input = [func, kwargs]
+        self.objective_map_input = [func, kwargs]
 
         self.setup_objective_map = True
 
@@ -302,14 +309,22 @@ class ansatz(object):
         """
 
         if self.setup_depth and (self.parallel in ['jacobian', 'jacobian_local']):
+
             self.setup_parallel = True
             self.setup_initial_parameters = True
+
+            if self.pre_called:
+                self.call_post = True
 
             self.pre_called = False
 
         if self.setup_unitaries:
+
             self.setup_initial_parameters = True
             self.setup_parallel = True
+
+            if self.pre_called:
+                self.call_post = True
 
             self.pre_called = False
 
@@ -321,12 +336,38 @@ class ansatz(object):
             self.setup_observable_map = True
             self.setup_objective_map = True
 
+            if self.pre_called:
+                self.call_post = True
+
             self.pre_called = False
 
-    def set_parallel(self, parallel = "global"):
+    def __pre_or_post(self):
+        
+        if self.pre_called:
+
+            self.__check_setup_validity()
+
+            if self.call_post:
+                self.post()
+
+            if not self.pre_called:
+                self.pre()
+
+        elif not self.pre_called:
+            self.pre()
+
+    def set_parallel(self, parallel = "global", method = "forward", tol = 1e-12):
 
         if parallel in ["jacobian", "jacobian_local", "global"]:
+
             self.parallel = parallel # type of MPI parallelisation: "global", "jacobian" or "jacobian_local"
+            self.jac_method = method
+            self.jac_tol = tol
+
+            if (parallel in ["jacobian", "jacobian_local"]) and (self.COMM.Get_size() == 1):
+                QUOP_ERR = "Rank {}: Parallel setting '{}' requires an MPI communicator size greater than 1.".format(self.COMM.Get_rank(), parallel)
+                raise RuntimeError(QUOP_ERR)
+
         else:
             QUOP_ERR = "Rank {}: Parallel scheme '{}' not recognised. Options are 'jacobian', 'jacobian_local' and 'global'.".format(self.COMM.Get_rank(), parallel)
             raise ValueError(QUOP_ERR)
@@ -462,7 +503,6 @@ class ansatz(object):
                     unitary.gen_operator()
 
     def __gen_depth(self):
-
         self.variational_parameters = np.empty(self.total_params * self.ansatz_depth, np.float64)
 
 
@@ -483,8 +523,9 @@ class ansatz(object):
 
             self.__parse_initial_state_function()
 
-            self.initial_state = self.initial_state_function.call(
+            self.ansatz_initial_state = self.initial_state_function.call(
                     **self.initial_state_input[1])
+
 
     def __gen_observables(self):
 
@@ -557,9 +598,9 @@ class ansatz(object):
             self.__gen_observable_map()
             self.setup_observable_map = False
 
-        if self.setup_observable_map:
-            self.__gen_observable_map()
-            self.setup_observable_map = False
+        if self.setup_objective_map:
+            self.__gen_objective_map()
+            self.setup_objective_map = False
 
         if self.setup_optimiser:
             self.__gen_optimiser()
@@ -569,7 +610,7 @@ class ansatz(object):
             self.__gen_log()
 
         self.pre_called = True
-        self.post_called = False
+        self.call_post = False
 
     def __post_log(self):
 
@@ -578,6 +619,8 @@ class ansatz(object):
                 self.logfile.close()
 
     def __post_unitaries(self):
+
+        self.COMM.barrier()
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
@@ -614,7 +657,7 @@ class ansatz(object):
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
-            self.final_state[:self.local_i] = self.initial_state
+            self.final_state[:self.local_i] = self.ansatz_initial_state[:self.local_i]
 
             params_split = np.split(x, self.ansatz_depth)
 
@@ -639,31 +682,48 @@ class ansatz(object):
                     unitary.propagate(evolution_parameter)
 
                     self.final_state[:self.local_i] = unitary.final_state[:self.local_i]
+            
+            if self.COMM_OPT.Get_rank() == 0:
+                self.n_evolutions += 1
 
-
-    def execute(self):
+    def execute(self, variational_parameters = None):
         """
         Execute the QAOA-like algorithm.
 
         :param gammas_ts: An array of length :math:`2 p`, :math:`(\\vec{\gamma},\\vec{t})`.
         :type gammas_ts: float, array
         """
-        if self.pre_called:
-            self.__check_setup_validity()
-            self.post()
-
-        self.pre()
 
         if not self.benchmarking:
-            self.variational_parameters = self.get_initial_params(self.ansatz_depth)
+
+            if variational_parameters is not None:
+
+                if not (len(variational_parameters) == self.ansatz_depth * self.total_params):
+                    self.set_depth(len(variational_parameters)//self.total_params)
+
+                self.__pre_or_post()
+
+            if self.colours[self.COMM.Get_rank()] != -1:
+                self.variational_parameters[:] = np.array(variational_parameters, dtype = np.float64)
+
+            else:
+                self.__pre_or_post()
+                self.variational_parameters = self.__gen_initial_params(self.ansatz_depth)
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
             self.stop = False
+            self.n_evolutions = 0
 
             if self.colours[self.COMM.Get_rank()] == 0:
 
+                self.objective_cnt = 0
+
                 if self.COMM_OPT.Get_rank() == 0:
+
+                    if self.record_objective:
+                        self.objective_history = []
+                        self.total_n_evolutions = []
 
                     self.neval_mpi_jac = 0
 
@@ -683,7 +743,6 @@ class ansatz(object):
 
                     self.time = time() - self.time
 
-
                 else:
 
                     while not self.stop:
@@ -694,6 +753,7 @@ class ansatz(object):
 
             else:
 
+
                 while not self.stop:
                     self.__mpi_jacobian(None)
 
@@ -702,7 +762,7 @@ class ansatz(object):
         Print the optimization result.
         """
         if self.COMM.Get_rank() == 0:
-            print(self.result)
+            print(self.result, flush = True)
 
     def benchmark(
             self,
@@ -766,55 +826,55 @@ class ansatz(object):
             The `param_func`, `qual_func` and `state_func` must have the keyword argument 'seed'. This allows for a repeatable variation if :math:`(\\vec{\gamma}, \\vec{t}), q_i` and :math:`| s \\rangle` with each repetition at the same :math:`p`.
         """
 
-        if not self.pre_called:
-            self.pre()
+        ansatz_depth_temp = deepcopy(self.ansatz_depth) # return to this value after benchmarking
+        previous_params = None
+        self.benchmarking = True
+        first = True
 
-        if self.colours[self.COMM.Get_rank()] != -1:
+        for depth in ansatz_depths:
 
-            self.benchmarking = True
+            self.set_depth(depth)
 
-            self.rank = self.COMM_OPT.Get_rank()
+            self.__pre_or_post()
 
-            first = True
+            if self.colours[self.COMM.Get_rank()] == 0:
 
-            itter = 0
-
-            previous_params = None
-
-            ansatz_depth_temp = self.ansatz_depth # return to this value after benchmarking
-            for depth in ansatz_depths:
-                self.ansatz_depth = depth
                 if param_persist:
                     best_p_result = np.finfo(dtype=np.float64).max
                     result = None
 
                 if verbose:
                     if self.COMM_OPT.Get_rank() == 0:
-                        print('Starting depth = ' + str(depth) + ':')
+                        print('Starting depth = {}:'.format(depth), flush = True)
 
-                for i  in range(1, repeats + 1):
+            for i  in range(1, repeats + 1):
+
+                if self.colours[self.COMM.Get_rank()] == 0:
 
                     self.repeat  = i
 
-                    if (not param_persist) or first:
+                    if (not param_persist) or first or (self.ansatz_depth == 1):
 
-                        self.variational_parameters = self.get_initial_params(depth)
+                        self.variational_parameters = self.__gen_initial_params()
 
                     else:
 
-                        new_parameters = self.get_initial_params(1)
-
-                        self.variational_parameters = np.append(previous_params, new_parameters)
+                        self.variational_parameters[:len(previous_params)] = previous_params
+                        new_params = self.__gen_initial_params(1)
+                        self.variational_parameters[len(previous_params):] = new_params
 
                     if verbose:
                         if self.COMM_OPT.Get_rank() == 0:
-                            print(str(i) + ' of ' + str(repeats) + '...')
-
+                            print('{} of {}...'.format(i,repeats), flush = True)
+                    
                     self.execute()
+
+                    if verbose:
+                        self.print_optimiser_result()
 
                     if param_persist:
 
-                        if self.rank == 0:
+                        if self.COMM.Get_rank() == 0:
                             result = self.result['fun']
                             x = self.result['x']
                         else:
@@ -826,26 +886,28 @@ class ansatz(object):
 
                         if result < best_p_result:
                             best_p_result = result
-                            best_p_params = x
+                            best_p_params = copy(x)
 
-                    if self.COMM_OPT.Get_rank() == 0:
-                        if verbose:
-                            print(self.result,flush=True)
+                        first = False
 
                     if filename is not None:
+
                         if first:
                             self.save(filename, label + '_' + str(depth) + '_' + str(i), action = save_action)
                         else:
                             self.save(filename, label + '_' + str(depth) + '_' + str(i), action = "a")
 
+                else:
+
+                    self.execute()
+
+
+            if self.colours[self.COMM.Get_rank()] == 0:
                 if param_persist:
                     previous_params = best_p_params
 
-                first = False
-
-            self.post()
-            self.benchmarking = False
-            self.ansatz_depth = ansatz_depth_temp
+        self.benchmarking = False
+        self.ansatz_depth = ansatz_depth_temp
 
     def get_final_state(self):
         if self.colours[self.COMM.Get_rank()] != -1:
@@ -920,10 +982,11 @@ class ansatz(object):
 
         if self.colours[self.COMM.Get_rank()] == 0:
 
-            import h5py
             from quop_mpi.__lib import fqwoa_mpi
 
             if self.COMM_OPT.Get_rank() == 0:
+
+                import h5py
 
                 self.config_name = config_name
 
@@ -942,8 +1005,10 @@ class ansatz(object):
 
                 File.create_dataset(self.config_name + "/initial_phases", data = self.variational_parameters, dtype = np.float64)
                 File.close()
+            else:
+                self.config_name = None
 
-            self.config_name = self.COMM_OPT.bcast(config_name, root = 0)
+            self.config_name = self.COMM_OPT.bcast(self.config_name, root = 0)
 
             fqwoa_mpi.save_dist_complex(
                     file_name,
@@ -965,28 +1030,50 @@ class ansatz(object):
                     self.observables[:self.local_i],
                     self.COMM_OPT.py2f())
 
-            self.COMM_OPT.Barrier()
+    def gen_initial_params(self, ansatz_depth = None):
 
-    def get_initial_params(self, ansatz_depth = None):
+        if ansatz_depth is None:
+            params = self.__gen_initial_params()
+        else:
+            params = self.__gen_initial_params(ansatz_depth)
 
-        if not self.pre_called:
-            self.pre()
+        if self.COMM.Get_rank() == 0:
+            n_params = len(params)
+        else:
+            n_params = None
 
-        if self.colours[self.COMM.Get_rank()] != -1:
+        n_params = self.COMM.bcast(n_params, 0)
 
-            if ansatz_depth is None:
-                ansatz_depth = self.ansatz_depth
+        if self.colours[self.COMM.Get_rank()] != 0:
+            params = np.empty(n_params, dtype = np.float64)
 
-            params = np.zeros(ansatz_depth*self.total_params)
+        self.COMM.Bcast([params, MPI.DOUBLE], 0)
 
-            if self.COMM_OPT.Get_rank() == 0:
+        return params
+
+    def __gen_initial_params(self, ansatz_depth = None):
+
+        if not self.benchmarking:
+            if self.ansatz_depth is not None:
+                self.set_depth(ansatz_depth)
+
+            self.__pre_or_post()
+
+        if ansatz_depth is None:
+            ansatz_depth = self.ansatz_depth
+
+        if self.colours[self.COMM.Get_rank()] == 0:
+
+            params = np.zeros(ansatz_depth*self.total_params, dtype = np.float64)
+
+            if self.COMM.Get_rank() == 0:
 
                 param_iterations = np.split(params, ansatz_depth)
 
                 for param_iters in param_iterations:
-                    for i, unitary in enumerate(self.unitaries):
-                        unitary.seed += i + 1
-                        param_iters[self.param_map[i]:self.param_map[i+1]] = unitary.get_initial_params()
+                    for ii, unitary in enumerate(self.unitaries):
+                        unitary.seed += ii + 1
+                        param_iters[self.param_map[ii]:self.param_map[ii+1]] = unitary.gen_initial_params()
 
             self.COMM_OPT.Bcast([params, MPI.DOUBLE], 0)
 
@@ -1040,24 +1127,32 @@ class ansatz(object):
         if not self.stop:
 
             self.variational_parameters = self.COMM_OPT.bcast(variational_parameters, root = 0)
-
             self.evolve_state(self.variational_parameters)
 
             self.expectation = self.get_expectation_value()
 
             if self.COMM.Get_rank() == 0:
 
-                if self.verbose_objective:
-                    print(self.expectation, flush = True)
-
-                if self.record_objective:
-                    self.objective_history.append(self.expectation)
-
                 if self.objective_map_input is not None:
                     self.objective_map.update_parameters()
                     self.expectation = self.objective_map.call(**self.objective_map_input[1])
 
-            return self.expectation
+                if self.verbose_objective:
+
+                    self.objective_cnt += 1
+
+                    print('Call # {}, f(x) = {}'.format(
+                        self.objective_cnt,
+                        self.expectation),
+                        flush = True)
+
+                if self.record_objective:
+                    expectation = deepcopy(self.expectation)
+                    self.objective_history.append(expectation)
+        
+                if self.record_objective:
+                    self.total_n_evolutions.append(self.n_evolutions)
+                return self.expectation
 
     def __gen_log(self):
         """
@@ -1246,7 +1341,7 @@ class ansatz(object):
         jac_group = MPI.Group.Incl(world_group, self.jac_ranks)
         self.COMM_JAC = self.COMM.Create_group(jac_group)
 
-    def __mpi_jacobian(self, x, tol = 1e-12, diff_type = 'forward'):
+    def __mpi_jacobian(self, x):
 
         self.COMM_JAC.barrier()
 
@@ -1257,17 +1352,16 @@ class ansatz(object):
             return
 
         x = self.COMM_JAC.bcast(x, 0)
+        h_default = 1.4901161193847656e-08
 
         # if the jacobian is called before evaluation of the objective function
         if self.colours[self.COMM.Get_rank()] != 0:
             self.evolve_state(x)
             self.expectation = self.__get_expectation_value()
 
-        #self.expectation = self.COMM_JAC.bcast(self.expectation, 0)
-
-        if diff_type == 'forward':
+        if self.jac_method == 'forward':
             x_jac_temp = np.empty(len(x))
-        elif diff_type == 'central':
+        elif self.jac_method == 'central':
             x_jac_temp_1 = np.empty(len(x))
             x_jac_temp_2 = np.empty(len(x))
 
@@ -1275,23 +1369,21 @@ class ansatz(object):
 
         if  self.COMM.Get_rank() != 0:
 
-            h_default = 1.4901161193847656e-08
-            h = h_default  #np.min(np.abs(x))*np.sqrt(tol)
-            #if h < h_default:
-            #    h = h_default
 
-            #if self.__is_zero(h):
-            #    h = 1.4901161193847656e-08
+            h = np.min(np.abs(x))*np.sqrt(self.jac_tol)
+
+            if self.__is_zero(h):
+                h = h_default
 
             for var in self.var_map[self.colours[self.COMM.Get_rank()]]:
 
-                if  diff_type == 'forward':
+                if  self.jac_method == 'forward':
                     x_jac_temp[:] = x
                     x_jac_temp[var] += h
                     self.evolve_state(x_jac_temp)
                     partials.append((self.__get_expectation_value() - self.expectation)/h)
 
-                elif diff_type == 'central':
+                elif self.jac_method == 'central':
                     h = h/2
                     x_jac_temp_1[:] = x
                     x_jac_temp_2[:] = x
@@ -1302,7 +1394,7 @@ class ansatz(object):
                     self.evolve_state(x_jac_temp_2)
                     expectation_backward = self.__get_expectation_value()
                     partials.append((expectation_forward - 2*self.expectation + expectation_backward)/h)
-
+    
         opt_root = self.comm_opt_roots[self.colours[self.COMM.Get_rank()]]
 
         if self.COMM.Get_rank() == 0:
@@ -1322,12 +1414,22 @@ class ansatz(object):
             jacobian = None
 
         self.COMM_JAC.barrier()
+        
+        if self.record_objective:
+            if self.COMM_JAC.Get_rank() == 0:
+                self.n_evolutions = self.COMM_JAC.reduce(self.n_evolutions, op = MPI.SUM, root = 0)
+            else:
+                self.COMM_JAC.reduce(self.n_evolutions, op = MPI.SUM, root = 0)
+                self.n_evolutions = 0
 
         if self.COMM.Get_rank() == 0:
+
             self.neval_mpi_jac += 1
             return jacobian
+
         else:
             return None
+
 
     def __is_zero(self, x):
         return (x >= -np.finfo(np.float64).eps) and  (x <= np.finfo(np.float64).eps)

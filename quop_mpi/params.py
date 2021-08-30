@@ -1,6 +1,6 @@
 import numpy as np
 
-def uniform(
+def random(
         n_params,
         seed,
         low = 0,

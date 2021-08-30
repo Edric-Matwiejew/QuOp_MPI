@@ -12,8 +12,8 @@ class qwoa(phase_and_mixer):
             raise RuntimeError("Rank {}: Solution qualities not defined.".format(self.rank))
 
         if self.param_function is None:
-            from quop_mpi.params import uniform
-            self.set_params(uniform)
+            from quop_mpi.params import random
+            self.set_params(random)
 
         UQ = diagonal(
                 self.operator_function,
@@ -40,8 +40,8 @@ class qaoa(phase_and_mixer):
             raise RuntimeError("Rank {}: Solution qualities not defined.".format(self.rank))
 
         if self.param_function is None:
-            from quop_mpi.params import uniform
-            self.set_params(uniform)
+            from quop_mpi.params import random
+            self.set_params(random)
 
         UQ = diagonal(
                 self.operator_function,
