@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0,'../')
 from time import time
 import sys
 import resource
@@ -7,6 +9,7 @@ from importlib import import_module
 from mpi4py import MPI
 import numpy as np
 import h5py as h5
+import quop_bench.tracer as tracer
 
 COMM = MPI.COMM_WORLD
 
@@ -146,11 +149,15 @@ def execute(
 
     start = time()
 
-    function(system_size, depth, quop_log, COMM)
+    def wrapped():
+        function(system_size, depth, quop_log, COMM)
+
+    tf = tracer.traced_function(wrapped)
+    tf.trace()
 
     finish = time()
 
-    time = COMM.allreduce(finish - start, op = MPI.MAX)
+    time_log = COMM.allreduce(finish - start, op = MPI.MAX)
 
     peak_mem = COMM.reduce(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, MPI.SUM,0)
 
@@ -164,7 +171,7 @@ def execute(
         qubits,
         system_size,
         depth,
-        time,
+        time_log,
         peak_mem))
         log.close()
 
