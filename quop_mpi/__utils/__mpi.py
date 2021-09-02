@@ -78,9 +78,6 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
         MPI_COMM.Scatterv(send_indexes, W_col_indexes[-1], 0)
         MPI_COMM.Scatterv(send_values, W_values[-1], 0)
 
-        #MPI_COMM.barrier()
-        #exit()
-
     return W_row_starts, W_col_indexes, W_values
 
 def shrink_communicator(newsize, colours, COMM, COMM_OPT, COMM_JAC, jac_ranks):

@@ -378,8 +378,6 @@ class ansatz(object):
 
         busy_comm = False
 
-        print(self.parallel, flush = True)
-
         #parallel jacobian not possible with one MPI process
         if self.COMM.Get_size() == 1:
             self.parallel = "global"
@@ -430,7 +428,6 @@ class ansatz(object):
 
         while not busy_comm:
 
-            print('top', self.COMM.Get_rank(), self.colours, self.COMM_JAC, self.jac_ranks, flush = True)
             #if self.colours[self.COMM.Get_rank()] == -1:
             #    busy_comm = True
 
@@ -448,8 +445,6 @@ class ansatz(object):
                     self.planner = self.unitaries[0]
                     self.planner.plan(self.system_size, self.COMM_OPT)
 
-                print('io', flush = True)
-
                 self.alloc_local = self.planner.alloc_local
                 self.local_i = self.planner.local_i
                 self.local_i_offset = self.planner.local_i_offset
@@ -464,23 +459,18 @@ class ansatz(object):
                 empty_ranks = self.COMM_OPT.allreduce(
                         empty_rank,
                         op = MPI.SUM)
-                print('ioooo', flush = True)
 
                 if empty_ranks == 0:
                     newsize = 0
                 else:
                     self.planner.destroy()
                     newsize = self.COMM_OPT.Get_size() - empty_ranks
-                print('iuuuo', flush = True)
 
             else:
 
                 newsize = 0
 
             newsize = self.COMM.allreduce(newsize, op = MPI.MAX)
-            self.COMM.barrier()
-            print('hihi', newsize, flush = True)
-            self.COMM.barrier()
 
             if newsize > 0:
 
@@ -491,18 +481,13 @@ class ansatz(object):
                         self.COMM_OPT,
                         self.COMM_JAC,
                         self.jac_ranks)
-                #print(self.colours, self.COMM_OPT, self.COMM_JAC, self.jac_ranks, flush = True)
             else:
 
                 busy_comm = True
 
-        print(self.COMM.Get_rank, busy_comm, flush = True)
-        print('all out of parallel', flush = True)    
-
     def __gen_unitaries(self):
 
         if self.colours[self.COMM.Get_rank()] != -1:
-
             for unitary in self.unitaries:
                 if unitary is not self.planner:
                     unitary.copy_plan(self.planner)
@@ -629,8 +614,6 @@ class ansatz(object):
                 self.logfile.close()
 
     def __post_unitaries(self):
-
-        self.COMM.barrier()
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
