@@ -101,6 +101,8 @@ def shrink_communicator(newsize, colours, COMM, COMM_OPT, COMM_JAC, jac_ranks):
                 COMM_OPT,
                 subcolours[COMM_OPT.Get_rank()],
                 COMM_OPT.Get_rank())
+    else:
+        COMM_OPT_NEW = None
 
     for i, colour in enumerate(colours):
         colours[i] = COMM.bcast(colours[i], i)
@@ -109,7 +111,7 @@ def shrink_communicator(newsize, colours, COMM, COMM_OPT, COMM_JAC, jac_ranks):
         jac_ranks = []
         jac_ranks = [rank for rank in range(COMM.Get_size()) if (colours[rank] != 0) and (colours[rank] != -1)]
         jac_ranks.insert(0,0)
-            
+
         world_group = MPI.Comm.Get_group(COMM)
         jac_group = MPI.Group.Incl(world_group, jac_ranks)
         COMM_JAC = COMM.Create_group(jac_group)
