@@ -1,0 +1,29 @@
+label,system_size,ansatz_depth,repeat,state_norm,simulation_time,MPI_nodes,MPI_jacobian_evaluations,fun,nfev,success
+target_scipy_BFGS_depth_4,65536,4,1,1.0000000000177447,6.165243625640869,240,85,0.07473150448381154,96,False
+target_scipy_BFGS_depth_5,65536,5,1,1.000000000024407,2.272941827774048,240,120,0.060016626229996525,132,False
+BFGS,65536,4,1,1.000000000017745,5.733201265335083,240,61,0.0,73,False,Desired error not necessarily achieved due to precision loss.
+BFGS,65536,5,1,1.0000000000244063,2.3103671073913574,240,122,2.0116324161989496e-09,134,False,Desired error not necessarily achieved due to precision loss.
+CG,65536,4,1,1.000000000020443,5.733182907104492,240,63,0.059639488303699154,75,False,Desired error not necessarily achieved due to precision loss.
+CG,65536,5,1,1.00000000002803,1.1979341506958008,240,62,0.06957214231892385,75,False,Desired error not necessarily achieved due to precision loss.
+Nelder-Mead,65536,4,1,1.0000000000167821,4.583341598510742,240,0,0.1337921044251451,316,True,Optimization terminated successfully.
+Nelder-Mead,65536,5,1,1.0000000000284026,1.6133196353912354,240,0,0.07060353482278829,348,True,Optimization terminated successfully.
+trust-constr,65536,4,1,1.0000000000172036,5.694409132003784,240,122,0.12826376935117945,15,True,`xtol` termination condition is satisfied.
+trust-constr,65536,5,1,1.0000000000240215,2.7115941047668457,240,180,0.13336123646083742,35,True,`xtol` termination condition is satisfied.
+Powell,65536,4,1,1.000000000011874,26.72955060005188,240,0,0.019781237642550284,2919,True,Optimization terminated successfully.
+Powell,65536,5,1,1.000000000050183,46.218672037124634,240,0,0.011723174101779824,9992,True,Optimization terminated successfully.
+TNC,65536,4,1,1.0000000000130496,5.226940870285034,240,40,0.02417370028453196,40,True,Converged (|x_n-x_(n-1)| ~= 0)
+TNC,65536,5,1,1.000000000019773,1.8408124446868896,240,101,0.03448399957543907,101,False,Max. number of function evaluations reached
+LD_LBFGS,65536,4,1,1.0000000000258136,4.761475086212158,240,12,0.3654256250097415,12,False,Failure
+LD_LBFGS,65536,5,1,1.000000000026076,0.5238833427429199,240,27,0.18113909042099396,27,False,Failure
+LN_BOBYQA,65536,4,1,1.0000000000177964,36.406306743621826,240,0,0.07955546693987402,3969,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_BOBYQA,65536,5,1,1.000000000024134,5.12729549407959,240,0,0.10300954076778142,1111,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,4,1,1.0000000000120912,4.594403028488159,240,0,0.07998775095854728,226,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,5,1,1.000000000025861,2.1502246856689453,240,0,0.048017158824849,462,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,4,1,1.0000000000266687,15.621200799942017,240,0,0.0939059981707132,1464,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,5,1,1.0000000000497051,11.234836339950562,240,0,0.044147111510085824,2409,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_SBPLX,65536,4,1,1.0000000000443174,52.48830270767212,240,0,0.02160753550301467,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_SBPLX,65536,5,1,1.000000000048511,22.987571239471436,240,0,0.013844667685304832,5000,True,Optimization stopped because maxeval (above) was reached.
+LD_MMA,65536,4,1,1.0000000000245297,4.58905291557312,240,0,0.3654256250097415,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_MMA,65536,5,1,1.0000000000335088,1.4207062721252441,240,0,0.3870500491365406,307,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,4,1,1.0000000000245297,4.600762844085693,240,0,0.3654256250097415,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,5,1,1.0000000000338924,1.4249095916748047,240,0,0.3871735434455123,308,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.

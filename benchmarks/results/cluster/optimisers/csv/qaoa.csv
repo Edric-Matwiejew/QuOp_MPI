@@ -1,0 +1,29 @@
+label,system_size,ansatz_depth,repeat,state_norm,simulation_time,MPI_nodes,MPI_jacobian_evaluations,fun,nfev,success
+target_scipy_BFGS_depth_4,65536,4,1,0.9999999999996516,72.8267412185669,240,183,0.35600331796251466,188,False
+target_scipy_BFGS_depth_5,65536,5,1,0.9999999999997145,123.21684646606445,240,168,0.3229042485155692,180,False
+BFGS,65536,4,1,0.999999999999651,55.14085102081299,240,135,8.447131882860504e-13,135,True,Optimization terminated successfully.
+BFGS,65536,5,1,0.9999999999997101,56.33540630340576,240,77,0.00027163973180277523,77,True,Optimization terminated successfully.
+CG,65536,4,1,0.9999999999997016,65.2694981098175,240,146,0.021289640876244464,158,False,Desired error not necessarily achieved due to precision loss.
+CG,65536,5,1,0.9999999999998027,440.3081068992615,240,608,0.0002744378019154947,608,True,Optimization terminated successfully.
+Nelder-Mead,65536,4,1,1.000000000000958,106.09696626663208,240,0,6.653284534419157e-09,630,True,Optimization terminated successfully.
+Nelder-Mead,65536,5,1,1.0000000000000897,278.47119092941284,240,0,5.948393921872963e-08,1583,True,Optimization terminated successfully.
+trust-constr,65536,4,1,0.9999999999998004,481.7302289009094,240,1444,0.05494185205234453,430,True,`xtol` termination condition is satisfied.
+trust-constr,65536,5,1,1.0000000000003655,113.20117855072021,240,134,0.00018861679504916795,52,True,`xtol` termination condition is satisfied.
+Powell,65536,4,1,0.9999999999999702,158.1612889766693,240,0,7.771561172376096e-16,823,True,Optimization terminated successfully.
+Powell,65536,5,1,1.0000000000006701,158.12309646606445,240,0,0.0,939,True,Optimization terminated successfully.
+TNC,65536,4,1,0.9999999999998452,46.966285943984985,240,100,0.0621157744815764,100,False,Max. number of function evaluations reached
+TNC,65536,5,1,1.0000000000005183,80.06190729141235,240,100,0.06273033740662698,100,False,Max. number of function evaluations reached
+LD_LBFGS,65536,4,1,0.9999999999997923,23.42079472541809,240,56,0.0002701962024796445,56,False,Failure
+LD_LBFGS,65536,5,1,0.9999999999998324,63.66138982772827,240,85,0.0002819682144152291,85,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_BOBYQA,65536,4,1,1.000000000000169,49.69119954109192,240,0,4.999889391399392e-13,247,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_BOBYQA,65536,5,1,0.9999999999998437,48.10799312591553,240,0,4.001243780749064e-13,260,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,4,1,1.0000000000002052,388.57680201530457,240,0,0.0002906015074585211,2481,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,5,1,0.9999999999999694,293.47619009017944,240,0,0.03566726191238795,1853,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,4,1,0.9999999999997466,405.73019218444824,240,0,7.476241847825804e-13,1329,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,5,1,1.0000000000009455,228.65401983261108,240,0,8.191780587196718e-13,910,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_SBPLX,65536,4,1,0.9999999999997031,267.7943923473358,240,0,1.3877787807814457e-15,1329,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_SBPLX,65536,5,1,1.0000000000008016,526.0878636837006,240,0,0.0,2120,True,Optimization stopped because xtol_rel or xtol_abs (above) was reached.
+LD_MMA,65536,4,1,0.9999999999997276,42.02921986579895,240,0,0.11735918865818112,311,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_MMA,65536,5,1,1.0000000000003746,72.47294902801514,240,0,0.1744297611618948,306,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,4,1,0.9999999999999228,49.85033369064331,240,0,0.12427305025463442,324,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,5,1,0.9999999999997752,54.87110209465027,240,0,0.17405051352945744,308,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
