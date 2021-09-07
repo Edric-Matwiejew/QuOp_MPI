@@ -9,7 +9,6 @@ from importlib import import_module
 from mpi4py import MPI
 import numpy as np
 import h5py as h5
-import quop_bench.tracer as tracer
 
 COMM = MPI.COMM_WORLD
 
@@ -149,11 +148,7 @@ def execute(
 
     start = time()
 
-    def wrapped():
-        function(system_size, depth, quop_log, COMM)
-
-    tf = tracer.traced_function(wrapped)
-    tf.trace()
+    function(system_size, depth, quop_log, COMM)
 
     finish = time()
 
@@ -209,34 +204,54 @@ def optimisers(
 
             thetas = []
             fmin = []
+
             for depth in range(min_depth, max_depth + 1):
 
-                test_alg.set_depth(depth)
+                for seed in range(1, 6):
 
-                test_alg.set_optimiser('scipy',
-                        {'method':'BFGS','tol':1e-12},
-                                ['fun','nfev','success'])
+                    test_alg.seed = seed
+                    test_alg.set_depth(depth)
+
+                    theta = test_alg.gen_initial_params(depth)
+
+                    thetas.append(deepcopy(theta))
+
+                    fmins = []
+
+                    for i, backend in enumerate(backends):
+
+                        for option, method_name, in zip(options[i], method_names[i]):
+
+                            test_alg.set_log(
+                                    "{}/{}".format(log_filename, alg_name),
+                                    'baseline_{}'.format(method_name),
+                                    action = 'a')
+
+                            test_alg.set_optimiser(
+                                    backend,
+                                    copy(option),
+                                    ['fun','nfev','success', 'message'])
 
 
-                test_alg.set_log(
-                        "{}/{}".format(log_filename, alg_name),
-                        'target_scipy_BFGS_depth_{}'.format(depth),
-                        action = 'a')
+                            if not 'jac' in option:
+                                test_alg.optimiser_args['jac'] = None
 
-                theta = test_alg.gen_initial_params(depth)
+                            test_alg.execute(theta)
 
-                thetas.append(deepcopy(theta))
+                            test_alg.print_optimiser_result()
 
-                test_alg.execute(theta)
+                        if test_alg.COMM.Get_rank() == 0:
+                            fmins.append(test_alg.result['fun'])
 
-                test_alg.print_optimiser_result()
+                            data = np.array([test_alg.total_n_evolutions, test_alg.objective_history], dtype = np.float64)
+                            data_label =  '{}_{}_{}_{}_{}_{}'.format(method_name, alg_name, 'baseline', seed, n_qubits, depth)
+                            np.save(objective_history_filename + '/' + data_label + '.npy', data)
 
-                if test_alg.COMM.Get_rank() == 0:
-                    fmin.append(test_alg.result['fun'])
+						test_alg.COMM.barrier()
+  
+                    if test_alg.COMM.Get_rank() == 0:
+                        fmin.append(np.min(fmins))
 
-                    data = np.array([test_alg.total_n_evolutions, test_alg.objective_history], dtype = np.float64)
-                    data_label =  '{}_{}_{}_{}'.format(alg_name, 'baseline', n_qubits, depth)
-                    np.save(objective_history_filename + '/' + data_label + '.npy', data)
             fmin = test_alg.COMM.bcast(fmin, 0)
 
             for i, backend in enumerate(backends):
@@ -269,5 +284,5 @@ def optimisers(
 
                         if test_alg.COMM.Get_rank() == 0:
                             data = np.array([test_alg.total_n_evolutions, test_alg.objective_history], dtype = np.float64)
-                            data_label =  '{}_{}_{}_{}'.format(alg_name, method_name, n_qubits, len(theta)//test_alg.total_params)
+                            data_label =  '{}_{}_{}_{}_{}'.format(alg_name, method_name, j, n_qubits, len(theta)//test_alg.total_params)
                             np.save(objective_history_filename + '/' + data_label + '.npy', data)

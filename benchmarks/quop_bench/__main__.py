@@ -1,5 +1,6 @@
 import sys
 sys.path.insert(0,'../')
+sys.path.insert(0,'.')
 import pickle
 import quop_bench.benchmark as benchmark
 from quop_mpi.algorithms import qwoa, qaoa
@@ -67,11 +68,11 @@ if bench_type == "optimisers":
     min_depth = 4
     max_depth = 5
     
-    min_qubits = 3
-    max_qubits = 3
+    min_qubits = 16
+    max_qubits = 16
     
-    algs = [qaoa, qwoa]
-    alg_names = ['qaoa', 'qwoa']
+    algs = [qwoa]
+    alg_names = ['qwoa']
     
     qualities = random
     
