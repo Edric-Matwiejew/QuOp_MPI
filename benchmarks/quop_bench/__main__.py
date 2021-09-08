@@ -62,17 +62,21 @@ if bench_type == "execute":
 if bench_type == "optimisers":
 
     basename = str(sys.argv[2])
+    alg_name = str(sys.argv[3])
 
     max_evaluations = 5000
     
-    min_depth = 4
+    min_depth = 5
     max_depth = 5
     
-    min_qubits = 16
-    max_qubits = 16
+    min_qubits = 4 
+    max_qubits = 4
     
-    algs = [qwoa]
-    alg_names = ['qwoa']
+    alg_names = [alg_names]
+    if alg_name == 'qwoa':
+        algs = [qwoa]
+    elif alg_name == 'qaoa':
+        algs = [qaoa]
     
     qualities = random
     
@@ -129,7 +133,7 @@ if bench_type == "optimisers":
     
     log_filename = basename + '/csv'
     objective_history_filename = basename + '/npy'
-    print(log_filename, objective_history_filename, flush = True) 
+
     benchmark.optimisers(
             min_qubits,
             max_qubits,

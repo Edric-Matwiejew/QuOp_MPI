@@ -196,7 +196,7 @@ def optimisers(
 
             test_alg = alg(system_size)
             test_alg.set_parallel('jacobian')
-            test_alg.verbose_objective = True
+            #test_alg.verbose_objective = True
 
             test_alg.set_qualities(qualities)
 
@@ -207,12 +207,12 @@ def optimisers(
 
             for depth in range(min_depth, max_depth + 1):
 
-                for seed in range(1, 6):
+                for repeat in range(1, 6):
 
-                    test_alg.seed = seed
                     test_alg.set_depth(depth)
 
                     theta = test_alg.gen_initial_params(depth)
+                    print("NEW THETA", theta, flush = True)
 
                     thetas.append(deepcopy(theta))
 
@@ -238,19 +238,17 @@ def optimisers(
 
                             test_alg.execute(theta)
 
-                            test_alg.print_optimiser_result()
+                            #test_alg.print_optimiser_result()
+
+                            if test_alg.COMM.Get_rank() == 0:
+                                fmins.append(test_alg.result['fun'])
+
+                                data = np.array([test_alg.total_n_evolutions, test_alg.objective_history], dtype = np.float64)
+                                data_label =  '{}_{}_{}_{}_{}_{}'.format(method_name, alg_name, 'baseline', repeat, n_qubits, depth)
+                                np.save(objective_history_filename + '/' + data_label + '.npy', data)
 
                         if test_alg.COMM.Get_rank() == 0:
-                            fmins.append(test_alg.result['fun'])
-
-                            data = np.array([test_alg.total_n_evolutions, test_alg.objective_history], dtype = np.float64)
-                            data_label =  '{}_{}_{}_{}_{}_{}'.format(method_name, alg_name, 'baseline', seed, n_qubits, depth)
-                            np.save(objective_history_filename + '/' + data_label + '.npy', data)
-
-						test_alg.COMM.barrier()
-  
-                    if test_alg.COMM.Get_rank() == 0:
-                        fmin.append(np.min(fmins))
+                            fmin.append(np.min(fmins))
 
             fmin = test_alg.COMM.bcast(fmin, 0)
 
