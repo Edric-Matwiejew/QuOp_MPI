@@ -84,6 +84,8 @@ class ansatz(object):
         self.setup_log = False
         self.setup_optimiser = True
 
+        self.seed = 0
+
         self.initial_state_parameters = [
                 'partition_table',
                 'system_size',
@@ -247,11 +249,9 @@ class ansatz(object):
 
         self.filename = filename
         self.label = label
-        self.log_action = "a"
+        self.log_action = action
 
         self.repeat = 1 # needed if logging results from the execute method
-
-        self.log = True
 
         self.setup_log = True
 
@@ -335,6 +335,13 @@ class ansatz(object):
             self.setup_initial_state = True
             self.setup_observable_map = True
             self.setup_objective_map = True
+
+            if self.pre_called:
+                self.call_post = True
+
+            self.pre_called = False
+
+        if self.setup_log:
 
             if self.pre_called:
                 self.call_post = True
@@ -496,6 +503,7 @@ class ansatz(object):
 
                 if unitary.operator_n_params == 0:
                     unitary.gen_operator()
+                    unitary.seed = self.seed
 
     def __gen_depth(self):
         self.variational_parameters = np.empty(self.total_params * self.ansatz_depth, np.float64)
@@ -569,6 +577,8 @@ class ansatz(object):
 
     def pre(self):
 
+        self.seed += 1
+
         if self.setup_depth:
             self.__gen_depth()
             self.setup_depth = False
@@ -603,6 +613,7 @@ class ansatz(object):
 
         if self.setup_log:
             self.__gen_log()
+            self.setup_log = False
 
         self.pre_called = True
         self.call_post = False
@@ -634,7 +645,7 @@ class ansatz(object):
 
     def post(self):
 
-        if self.setup_log:
+        if self.log:
             self.__post_log()
 
         if self.setup_unitaries:
@@ -1191,6 +1202,8 @@ class ansatz(object):
                     self.logfile = open(self.filename + ".csv", "w")
                     self.logfile_csv = csv.writer(self.logfile)
                     self.logfile_csv.writerow(headings)
+
+        self.log = True
 
     def __log_update(self):
         """
