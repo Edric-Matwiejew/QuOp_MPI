@@ -1,0 +1,87 @@
+label,system_size,ansatz_depth,repeat,state_norm,simulation_time,MPI_nodes,MPI_jacobian_evaluations,fun,nfev,success,message
+baseline_BFGS,65536,5,1,0.9999999999997436,134.00902271270752,240,166,0.21524125301966496,177,False,Desired error not necessarily achieved due to precision loss.
+baseline_CG,65536,5,1,0.9999999999996809,298.0403730869293,240,429,0.3935472964245397,429,False,Desired error not necessarily achieved due to precision loss.
+baseline_BFGS,65536,5,1,0.9999999999997436,132.66656255722046,240,166,0.21524125301966496,177,False,Desired error not necessarily achieved due to precision loss.
+baseline_CG,65536,5,1,0.9999999999996809,298.78887963294983,240,429,0.3935472964245397,429,False,Desired error not necessarily achieved due to precision loss.
+baseline_Nelder-Mead,65536,5,1,0.9999999999997587,476.64619421958923,240,0,0.2152416988499717,2710,True,Optimization terminated successfully.
+baseline_trust-constr,65536,5,1,1.000000000000312,328.08529806137085,240,422,0.24905603043789193,110,True,`xtol` termination condition is satisfied.
+baseline_Powell,65536,5,1,1.0000000000001583,297.5478632450104,240,0,0.16232007677541507,1332,True,Optimization terminated successfully.
+baseline_TNC,65536,5,1,1.0000000000002003,67.37545847892761,240,101,0.48075965460402614,101,False,Max. number of function evaluations reached
+baseline_LD_LBFGS,65536,5,1,0.9999999999996805,146.5206184387207,240,213,0.21429301784706004,213,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_BOBYQA,65536,5,1,0.9999999999996944,214.36541199684143,240,0,0.22974382466953586,1252,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_PRAXIS,65536,5,1,0.9999999999997792,401.1828963756561,240,0,0.24125426750117562,2284,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_NELDERMEAD,65536,5,1,0.9999999999995383,1675.169355392456,240,0,0.35854977032013613,5000,True,Optimization stopped because maxeval (above) was reached.
+baseline_LN_SBPLX,65536,5,1,0.9999999999998351,922.7214298248291,240,0,0.3151954284677889,5000,True,Optimization stopped because maxeval (above) was reached.
+baseline_LD_MMA,65536,5,1,0.9999999999998602,0.3408181667327881,240,0,0.49939054328052634,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LD_CCSAQ,65536,5,1,0.9999999999998602,0.34379029273986816,240,0,0.49939054328052634,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_BFGS,65536,5,1,0.9999999999996974,172.6783323287964,240,106,0.1563270887090202,106,True,Optimization terminated successfully.
+baseline_CG,65536,5,1,1.0000000000003384,1146.0441944599152,240,683,0.16228314448184197,683,True,Optimization terminated successfully.
+baseline_Nelder-Mead,65536,5,1,0.9999999999998753,1147.8205773830414,240,0,0.2659146119548106,2856,True,Optimization terminated successfully.
+baseline_trust-constr,65536,5,1,1.000000000001406,6076.703943967819,240,3953,0.23636506995250664,1000,False,The maximum number of function evaluations is exceeded.
+baseline_Powell,65536,5,1,0.9999999999999909,136.18573713302612,240,0,0.47009868977949687,352,True,Optimization terminated successfully.
+baseline_TNC,65536,5,1,0.9999999999999443,189.02597832679749,240,101,0.44510261287120223,101,False,Max. number of function evaluations reached
+baseline_LD_LBFGS,65536,5,1,0.9999999999996472,246.5680148601532,240,155,0.16054793702378653,155,False,Failure
+baseline_LN_BOBYQA,65536,5,1,0.9999999999990062,1642.7680060863495,240,0,0.3585744711556697,5000,True,Optimization stopped because maxeval (above) was reached.
+baseline_LN_PRAXIS,65536,5,1,1.0000000000007063,881.457319021225,240,0,0.29143456441930904,2154,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_NELDERMEAD,65536,5,1,1.000000000000007,1224.945339679718,240,0,0.4667357219762086,3164,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_SBPLX,65536,5,1,1.0000000000001812,2335.1535210609436,240,0,0.35855533033822606,5000,True,Optimization stopped because maxeval (above) was reached.
+baseline_LD_MMA,65536,5,1,1.0000000000000349,0.8153243064880371,240,0,0.4978264702310431,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LD_CCSAQ,65536,5,1,1.0000000000000349,0.8143148422241211,240,0,0.4978264702310431,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_BFGS,65536,5,1,1.000000000001952,252.590350151062,240,141,0.15631777455833096,141,True,Optimization terminated successfully.
+baseline_CG,65536,5,1,1.0000000000019629,910.7927165031433,240,506,0.43254084246563723,506,True,Optimization terminated successfully.
+baseline_Nelder-Mead,65536,5,1,1.000000000000872,824.4519064426422,240,0,0.24687227894228655,1830,True,Optimization terminated successfully.
+baseline_trust-constr,65536,5,1,1.0000000000004161,5363.812842845917,240,4278,0.22293056402900563,1000,False,The maximum number of function evaluations is exceeded.
+baseline_Powell,65536,5,1,0.9999999999998552,326.12509965896606,240,0,0.32251263414981335,831,True,Optimization terminated successfully.
+baseline_TNC,65536,5,1,1.0000000000003602,156.69629454612732,240,101,0.24577055694726152,101,False,Max. number of function evaluations reached
+baseline_LD_LBFGS,65536,5,1,1.0000000000032394,291.5458986759186,240,166,0.3522762572198058,166,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_BOBYQA,65536,5,1,1.000000000001019,1909.425179719925,240,0,0.1203654564120183,4352,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_PRAXIS,65536,5,1,1.000000000000483,575.9344999790192,240,0,0.2284156686936994,1337,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_NELDERMEAD,65536,5,1,1.0000000000005491,1768.2465069293976,240,0,0.4358048259027254,4129,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_SBPLX,65536,5,1,0.9999999999998496,1021.2926557064056,240,0,0.16228848549155453,1981,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LD_MMA,65536,5,1,1.0000000000001894,0.8480150699615479,240,0,0.4967420562961341,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LD_CCSAQ,65536,5,1,1.0000000000001894,0.8455970287322998,240,0,0.4967420562961341,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_BFGS,65536,5,1,1.0000000000024853,123.58851099014282,240,81,0.23604587377992214,81,True,Optimization terminated successfully.
+baseline_CG,65536,5,1,1.0000000000023679,471.9792649745941,240,306,0.23904756298728108,317,False,Desired error not necessarily achieved due to precision loss.
+baseline_Nelder-Mead,65536,5,1,1.0000000000010298,1720.3248629570007,240,0,0.2368195867350546,4333,True,Optimization terminated successfully.
+baseline_trust-constr,65536,5,1,1.0000000000015694,199.07564067840576,240,154,0.3741268756510882,52,True,`xtol` termination condition is satisfied.
+baseline_Powell,65536,5,1,1.000000000001415,193.1940040588379,240,0,0.24500520342176185,493,True,Optimization terminated successfully.
+baseline_TNC,65536,5,1,1.0000000000015805,156.76561427116394,240,101,0.36554207789872917,101,False,Max. number of function evaluations reached
+baseline_LD_LBFGS,65536,5,1,1.000000000001259,165.42532873153687,240,106,0.22790906573164704,106,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_BOBYQA,65536,5,1,1.0000000000006237,787.8947036266327,240,0,0.26802635124464813,2048,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_PRAXIS,65536,5,1,1.0000000000015836,1567.7993631362915,240,0,0.2453886210709071,3922,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_NELDERMEAD,65536,5,1,1.0000000000000775,1789.615374326706,240,0,0.2833248507678983,4334,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_SBPLX,65536,5,1,1.0000000000005018,1983.8993475437164,240,0,0.2434519375883958,5000,True,Optimization stopped because maxeval (above) was reached.
+baseline_LD_MMA,65536,5,1,1.0000000000016076,0.7835404872894287,240,0,0.4662651583620928,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LD_CCSAQ,65536,5,1,1.0000000000016076,0.809708833694458,240,0,0.4662651583620928,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_BFGS,65536,5,1,1.0000000000002274,1093.2689747810364,240,235,0.1599938424762343,246,False,Desired error not necessarily achieved due to precision loss.
+baseline_CG,65536,5,1,1.0000000000015226,1190.6478090286255,240,748,0.24407043687705066,748,True,Optimization terminated successfully.
+baseline_Nelder-Mead,65536,5,1,1.000000000000073,796.0188851356506,240,0,0.45464271165016235,2095,True,Optimization terminated successfully.
+baseline_trust-constr,65536,5,1,1.000000000000051,4318.521018743515,240,3672,0.4635927756979257,1000,False,The maximum number of function evaluations is exceeded.
+baseline_Powell,65536,5,1,1.0000000000000004,178.82704854011536,240,0,0.4694453661137012,464,True,Optimization terminated successfully.
+baseline_TNC,65536,5,1,1.0000000000003122,163.481214761734,240,100,0.2616744970346969,100,False,Max. number of function evaluations reached
+baseline_LD_LBFGS,65536,5,1,1.000000000002054,232.9014012813568,240,131,0.15407468246852174,131,False,Failure
+baseline_LN_BOBYQA,65536,5,1,1.0000000000011777,1984.5842485427856,240,0,0.23928694565048134,5000,True,Optimization stopped because maxeval (above) was reached.
+baseline_LN_PRAXIS,65536,5,1,1.0000000000004725,1759.7919952869415,240,0,0.20346322644230028,4328,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_NELDERMEAD,65536,5,1,1.0000000000007825,1616.2167284488678,240,0,0.4514725548934757,2687,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LN_SBPLX,65536,5,1,1.000000000001624,2052.7103123664856,240,0,0.23613686885501256,5000,True,Optimization stopped because maxeval (above) was reached.
+baseline_LD_MMA,65536,5,1,1.000000000000087,0.7431421279907227,240,0,0.5009867853257615,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+baseline_LD_CCSAQ,65536,5,1,1.000000000000087,0.7481098175048828,240,0,0.5009867853257615,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+BFGS,65536,5,1,0.9999999999997506,170.30668115615845,240,219,0.0529195211430287,233,False,Desired error not necessarily achieved due to precision loss.
+BFGS,65536,5,1,1.0000000000005551,232.07561922073364,240,141,0.0002830841210229862,153,False,Desired error not necessarily achieved due to precision loss.
+BFGS,65536,5,1,1.00000000000138,238.32584166526794,240,133,0.0011126359973534505,145,False,Desired error not necessarily achieved due to precision loss.
+BFGS,65536,5,1,1.0000000000024853,123.95853638648987,240,81,0.07971878507090194,81,True,Optimization terminated successfully.
+BFGS,65536,5,1,1.0000000000002274,1088.5124192237854,240,235,0.0036760679179033418,246,False,Desired error not necessarily achieved due to precision loss.
+CG,65536,5,1,0.999999999999693,301.5922863483429,240,426,0.1945783909213423,437,False,Desired error not necessarily achieved due to precision loss.
+CG,65536,5,1,0.9999999999996532,552.5741813182831,240,326,2.8961155070506006e-06,338,False,Desired error not necessarily achieved due to precision loss.
+CG,65536,5,1,1.0000000000015445,1807.2969131469727,240,1025,0.029361241292713697,1025,True,Optimization terminated successfully.
+CG,65536,5,1,1.0000000000026052,993.1333105564117,240,649,0.0797194369430477,649,True,Optimization terminated successfully.
+CG,65536,5,1,1.0000000000015226,1188.0427219867706,240,748,0.0877526623187197,748,True,Optimization terminated successfully.
+Nelder-Mead,65536,5,1,0.9999999999997587,471.4850561618805,240,0,0.05292162207455664,2710,True,Optimization terminated successfully.
+Nelder-Mead,65536,5,1,0.9999999999998753,1159.0936589241028,240,0,0.10359453517939551,2856,True,Optimization terminated successfully.
+Nelder-Mead,65536,5,1,1.000000000000872,822.1484160423279,240,0,0.09054519023326635,1830,True,Optimization terminated successfully.
+Nelder-Mead,65536,5,1,1.0000000000010298,1735.0293841362,240,0,0.08049249802603439,4333,True,Optimization terminated successfully.
+Nelder-Mead,65536,5,1,1.000000000000073,800.6537308692932,240,0,0.2983249370918314,2095,True,Optimization terminated successfully.
+trust-constr,65536,5,1,1.000000000000312,355.010112285614,240,422,0.08673595366247686,110,True,`xtol` termination condition is satisfied.
+trust-constr,65536,5,1,1.000000000001406,6150.227070808411,240,3953,0.07404499317709157,1000,False,The maximum number of function evaluations is exceeded.
+trust-constr,65536,5,1,1.0000000000004161,5403.068063259125,240,4278,0.06660347531998542,1000,False,The maximum number of function evaluations is exceeded.
+trust-constr,65536,5,1,1.0000000000015286,3889.3588440418243,240,2999,0.2141794628037418,1000,False,The maximum number of function evaluations is exceeded.

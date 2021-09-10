@@ -1,0 +1,51 @@
+label,system_size,ansatz_depth,repeat,state_norm,simulation_time,MPI_nodes,MPI_jacobian_evaluations,fun,nfev,success,message
+trust-constr,65536,5,1,0.9999999999997436,100.05151700973511,264,166,0.05292117624424997,177,False,Desired error not necessarily achieved due to precision loss.
+trust-constr,65536,5,1,1.0000000000003364,157.28778386116028,264,156,0.20224463422101335,167,False,Desired error not necessarily achieved due to precision loss.
+trust-constr,65536,5,1,1.0000000000008507,129.42085671424866,264,93,0.033372923102138755,93,True,Optimization terminated successfully.
+trust-constr,65536,5,1,0.9999999999998912,39.38740634918213,264,33,0.019403696416391614,33,True,Optimization terminated successfully.
+trust-constr,65536,5,1,1.0000000000004685,90.84787821769714,264,88,0.04975346911489009,88,True,Optimization terminated successfully.
+Powell,65536,5,1,0.9999999999996809,224.99519395828247,264,429,0.23122721964912474,429,False,Desired error not necessarily achieved due to precision loss.
+Powell,65536,5,1,1.0000000000025218,746.6220161914825,264,688,0.08963236917425663,688,True,Optimization terminated successfully.
+Powell,65536,5,1,1.0000000000023035,700.0245995521545,264,505,0.12058192298806954,505,True,Optimization terminated successfully.
+Powell,65536,5,1,0.9999999999998952,266.87408924102783,264,223,0.019403688861182433,223,True,Optimization terminated successfully.
+Powell,65536,5,1,1.0000000000008924,129.7510747909546,264,115,0.00131940200600289,126,False,Desired error not necessarily achieved due to precision loss.
+TNC,65536,5,1,0.9999999999997587,480.2618818283081,264,0,0.05292162207455672,2710,True,Optimization terminated successfully.
+TNC,65536,5,1,1.0000000000002638,843.8593294620514,264,0,0.19405296717964454,2368,True,Optimization terminated successfully.
+TNC,65536,5,1,1.0000000000004936,1223.6034281253815,264,0,0.20193414897607498,2515,True,Optimization terminated successfully.
+TNC,65536,5,1,1.000000000000246,990.704660654068,264,0,0.01770534397233492,2431,True,Optimization terminated successfully.
+TNC,65536,5,1,1.0000000000002334,970.4432191848755,264,0,0.06259369732702999,2627,True,Optimization terminated successfully.
+LD_LBFGS,65536,5,1,0.9999999999996805,110.64912819862366,264,213,0.051972941071645046,213,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_LBFGS,65536,5,1,0.9999999999997204,168.41383028030396,264,136,1.3228684010102576e-05,136,False,Failure
+LD_LBFGS,65536,5,1,1.0000000000023594,174.51068925857544,264,123,0.0893954068201069,123,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_LBFGS,65536,5,1,0.9999999999998943,47.64104652404785,264,40,0.01940368575105783,40,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_LBFGS,65536,5,1,0.9999999999990175,144.92158818244934,264,136,0.09308224036639459,136,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_BOBYQA,65536,5,1,0.9999999999996944,218.74628162384033,264,0,0.06742374789412087,1252,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_BOBYQA,65536,5,1,1.0000000000015898,1982.9561779499054,264,0,0.04934711666814437,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_BOBYQA,65536,5,1,1.000000000001007,1224.2837433815002,264,0,0.2352563341388756,2786,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_BOBYQA,65536,5,1,1.0000000000009706,1813.4614923000336,264,0,0.03753713888959892,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_BOBYQA,65536,5,1,0.9999999999997334,173.42068147659302,264,0,0.125928668010767,504,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,5,1,0.9999999999997864,397.5234386920929,264,0,0.078942381904921,2232,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,5,1,1.0000000000011378,1197.978598833084,264,0,0.07585307269389627,3655,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,5,1,1.0000000000010345,2433.780716896057,264,0,0.11636671170764985,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_PRAXIS,65536,5,1,0.9999999999991616,1612.5652704238892,264,0,0.019383394777618246,3926,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_PRAXIS,65536,5,1,1.000000000000121,1324.2414338588715,264,0,0.08987695884916574,3851,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,5,1,0.9999999999995383,1715.2301025390625,264,0,0.19622969354472114,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_NELDERMEAD,65536,5,1,1.000000000003464,1880.4192748069763,264,0,0.2023342774679021,2186,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,5,1,1.0000000000003475,2861.4405472278595,264,0,0.09643484018847322,3642,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,5,1,1.0000000000032625,2152.055242538452,264,0,9.299228054260311e-13,3790,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_NELDERMEAD,65536,5,1,1.0000000000006377,974.2209367752075,264,0,0.008208647659463358,2358,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_SBPLX,65536,5,1,0.9999999999998351,937.1474366188049,264,0,0.15287535169237393,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_SBPLX,65536,5,1,1.0000000000012645,2037.3199248313904,264,0,0.005229100125823338,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_SBPLX,65536,5,1,0.9999999999986897,2868.653475999832,264,0,0.20280791353477134,5000,True,Optimization stopped because maxeval (above) was reached.
+LN_SBPLX,65536,5,1,1.0000000000001428,508.7275490760803,264,0,1.3877787807814457e-16,999,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LN_SBPLX,65536,5,1,1.000000000002025,2094.3435673713684,264,0,0.08274637971712395,5000,True,Optimization stopped because maxeval (above) was reached.
+LD_MMA,65536,5,1,0.9999999999998602,0.3480992317199707,264,0,0.33707046650511135,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_MMA,65536,5,1,1.0000000000012785,0.6631813049316406,264,0,0.3450777721205459,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_MMA,65536,5,1,0.9999999999999918,0.9289181232452393,264,0,0.3784833762856359,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_MMA,65536,5,1,1.000000000000219,0.7929439544677734,264,0,0.2738977258905962,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_MMA,65536,5,1,0.9999999999997915,0.7170231342315674,264,0,0.3429755516167441,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,5,1,0.9999999999998602,0.351179838180542,264,0,0.33707046650511135,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,5,1,1.0000000000012785,0.6672260761260986,264,0,0.3450777721205459,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,5,1,0.9999999999999918,0.9334943294525146,264,0,0.3784833762856359,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,5,1,1.000000000000219,0.7875101566314697,264,0,0.2738977258905962,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
+LD_CCSAQ,65536,5,1,0.9999999999997915,0.7214982509613037,264,0,0.3429755516167441,2,True,Optimization stopped because ftol_rel or ftol_abs (above) was reached.
