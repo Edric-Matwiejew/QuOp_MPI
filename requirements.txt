@@ -4,3 +4,5 @@ mpi4py
 scipy
 h5py
 nlopt
+pandas
+pandas-datareader
