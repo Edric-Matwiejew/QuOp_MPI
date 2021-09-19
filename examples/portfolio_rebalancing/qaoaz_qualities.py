@@ -1,16 +1,18 @@
 import numpy as np
 from mpi4py import MPI
 
+
 def qaoaz_portfolio(
-        system_size,
-        local_i,
-        local_i_offset,
-        MPI_COMM,
-        stocks=None,
-        risk=0.5,
-        penalty=1.5,
-        start_date='1/01/2017',
-        end_date='12/31/2018'):
+    system_size,
+    local_i,
+    local_i_offset,
+    MPI_COMM,
+    stocks=None,
+    risk=0.5,
+    penalty=1.5,
+    start_date="1/01/2017",
+    end_date="12/31/2018",
+):
 
     n_qubits = int(np.log(system_size) / np.log(2.0))
     n_stocks = n_qubits // 2
@@ -19,22 +21,46 @@ def qaoaz_portfolio(
 
         import pandas_datareader.data as web
 
-        if int(2**(n_qubits))!=int(system_size):
+        if int(2 ** (n_qubits)) != int(system_size):
             return print("System size does not correspond to qubit hilbert dimension")
 
         if stocks is None:
-            stocks = ['AMP.AX', 'ANZ.AX', 'AMC.AX', 'BHP.AX', 'BXB.AX',
-                      'CBA.AX', 'CSL.AX', 'IAG.AX', 'MQG.AX', 'GMG.AX',
-                      'NAB.AX', 'RIO.AX', 'SCG.AX', 'S32.AX', 'TLS.AX',
-                      'WES.AX', 'BKL.AX', 'CMW.AX', 'HUB.AX', 'ALU.AX',
-                      'SUL.AX', 'TPM.AX', 'APE.AX', 'OSH.AX', 'IPH.AX',
-                      'SGR.AX', 'BEN.AX', 'HVN.AX', 'QAN.AX', 'BKW.AX'][0:n_stocks]
+            stocks = [
+                "AMP.AX",
+                "ANZ.AX",
+                "AMC.AX",
+                "BHP.AX",
+                "BXB.AX",
+                "CBA.AX",
+                "CSL.AX",
+                "IAG.AX",
+                "MQG.AX",
+                "GMG.AX",
+                "NAB.AX",
+                "RIO.AX",
+                "SCG.AX",
+                "S32.AX",
+                "TLS.AX",
+                "WES.AX",
+                "BKL.AX",
+                "CMW.AX",
+                "HUB.AX",
+                "ALU.AX",
+                "SUL.AX",
+                "TPM.AX",
+                "APE.AX",
+                "OSH.AX",
+                "IPH.AX",
+                "SGR.AX",
+                "BEN.AX",
+                "HVN.AX",
+                "QAN.AX",
+                "BKW.AX",
+            ][0:n_stocks]
 
         data = web.DataReader(
-                stocks,
-                data_source="yahoo",
-                start=start_date,
-                end=end_date)['Adj Close']
+            stocks, data_source="yahoo", start=start_date, end=end_date
+        )["Adj Close"]
 
         stock_ret = data.pct_change()
         mean_returns = stock_ret.mean()  # Avg returns and covariance calculations
@@ -58,10 +84,10 @@ def qaoaz_portfolio(
     for k in range(local_i):
 
         if k == 0:
-            temp = np.repeat('0',n_qubits)
-            binary = np.zeros(n_qubits//2)
+            temp = np.repeat("0", n_qubits)
+            binary = np.zeros(n_qubits // 2)
         else:
-            binary = np.zeros(n_qubits//2)
+            binary = np.zeros(n_qubits // 2)
             temp = list(bin(k + local_i_offset))
             temp.pop(0)  # removes 0b start to binary
             temp.pop(0)
@@ -70,22 +96,22 @@ def qaoaz_portfolio(
             temp[::] = temp[::-1]
             for l in range(len(temp)):
                 if temp[l] == 0.0:
-                    temp[l] = '0'
+                    temp[l] = "0"
 
         for i in range(0, len(temp), 2):  # converts binary string to int in an array
-            if temp[i] == '0' and temp[i + 1] == '0':
+            if temp[i] == "0" and temp[i + 1] == "0":
                 binary[i // 2] = 0
-            elif temp[i] == '1' and temp[i + 1] == '1':
+            elif temp[i] == "1" and temp[i + 1] == "1":
                 binary[i // 2] = 0
-            elif temp[i] == '1' and temp[i + 1] == '0':
+            elif temp[i] == "1" and temp[i + 1] == "0":
                 binary[i // 2] = -1
-            elif temp[i] == '0' and temp[i + 1] == '1':
+            elif temp[i] == "0" and temp[i + 1] == "1":
                 binary[i // 2] = 1
 
         portfolio_return[k] = np.dot(mean_returns, binary)
         portfolio_std_dev[k] = np.dot(binary.T, np.dot(cov_matrix, binary))
-        costfunc[k] = 250*(risk * portfolio_std_dev[k] - (1 - risk) * portfolio_return[k])
+        costfunc[k] = 250 * (
+            risk * portfolio_std_dev[k] - (1 - risk) * portfolio_return[k]
+        )
 
     return costfunc
-
-
