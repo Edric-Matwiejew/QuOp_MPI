@@ -1,1 +1,0 @@
-.. include:: ../../container/README.rst
