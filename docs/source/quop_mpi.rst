@@ -1,32 +1,64 @@
+*******
 Modules
-=======
+*******
 
-MPI
----
-.. note::
-    All methods contained in :mod:`~quop_mpi.MPI` must be called collectively (by each MPI process).
-
-.. automodule:: quop_mpi.MPI
+.. automodule:: quop_mpi
     :members:
-    :undoc-members:
-    :show-inheritance:
 
-graph_array
-------------
-
-Methods to generate arrays corresponding to the first row of a circulant graph adjacency matrix. These may be passed to :meth:`~quop_mpi.MPI.qwao.graph` to produce an array of graph eigenvalues distributed over the MPI communicator associated with the :class:`~quop_mpi.MPI.qwao` object.
-
-.. automodule:: quop_mpi.graph_array
+algorithm
+=========
+.. automodule:: quop_mpi.algorithm
     :members:
-    :undoc-members:
-    :show-inheritance:
 
-qualities
+observable
+==========
+.. automodule:: quop_mpi.observable
+    :members:
+
+.. automodule:: quop_mpi.observable.rand
+    :members:
+
+param
+=====
+.. automodule:: quop_mpi.param
+    :members:
+
+.. automodule:: quop_mpi.param.rand
+    :members:
+
+state
+=====
+.. automodule:: quop_mpi.state
+    :members:
+
+propagator
+==========
+
+circulant
 ---------
-
-When passed to :meth:`~quop_mpi.MPI.qwao.set_qualities`, these methods create an array of qualities distributed over the MPI communicator associated with the :class:`~quop_mpi.MPI.qwao` object.
-
-.. automodule:: quop_mpi.qualities
+.. automodule:: quop_mpi.propagator.circulant
     :members:
-    :undoc-members:
-    :show-inheritance:
+
+.. automodule:: quop_mpi.propagator.circulant.operator
+    :members:
+
+diagonal
+--------
+.. automodule:: quop_mpi.propagator.diagonal
+    :members:
+
+.. automodule:: quop_mpi.propagator.diagonal.operator
+    :members:
+
+sparse
+------
+.. automodule:: quop_mpi.propagator.sparse
+    :members:
+
+.. automodule:: quop_mpi.propagator.sparse.operator
+    :members:
+
+toolkit
+=======
+.. automodule:: quop_mpi.toolkit
+    :members:

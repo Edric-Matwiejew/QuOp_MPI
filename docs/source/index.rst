@@ -6,9 +6,6 @@ Welcome to QuOp_MPI's documentation!
    :caption: Contents:
 
    Readme <readme_link>
-   Containerisation <container_link>
-   symbols
-   usage_example
    quop_mpi
    cite
 

@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'QuOp_MPI'
-copyright = '2020, Edric Matwiejew'
+copyright = '2021, Edric Matwiejew'
 author = 'Edric Matwiejew'
 
 autodoc_mock_imports = ["mpi4py", "h5py","nlopt", "quop_mpi.fqwoa_mpi", "quop_mpi.fMPI", "quop_mpi.mixers_mpi", "quop_mpi.nlopt_wrap"]
