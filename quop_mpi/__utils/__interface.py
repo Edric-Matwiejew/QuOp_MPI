@@ -3,7 +3,7 @@ from inspect import signature
 from functools import partial
 import numpy as np
 
-class interface(object):
+class interface():
     """
     This class takes an user-input function, instance of a class and
     list of class attributes. It binds the function's positional parameters
@@ -56,7 +56,6 @@ class interface(object):
 
         self.args = []
         for positional_param in self.positional_params:
-
             if not positional_param in self.avaliable_parameters:
                 self.args.append(None)
             else:

@@ -5,6 +5,21 @@ def hypercube(
         system_size,
         lb,
         ub):
+    """
+    Generate a parallel partition of a :math:`N \\times N` hypercube mixing operator where for :math:`n` qubits :math:`N = 2^n`.
+
+    :param system_size: Size of the quantum system :math`N`.
+    :type system_size: integer
+
+    :param lb: Lower bound of the local partition.
+    :type lb: integer
+
+    :param ub: Upper bound of the local partition.
+    :type ub: integer
+
+    :return: Local parallel parallel of the hypercube.
+    :rtype: QuOp_MPI sparse matrix arrays
+    """
 
     from quop_mpi.__lib.mixers_mpi import hypercube
 
@@ -28,6 +43,27 @@ def serial(
         args = [],
         kwargs = {}
         ):
+    """Generate a mixing operator, or sequence of mixing operators, from a
+    serial function.
+
+    :param partition_table: Parallel partitioning scheme.
+    :type partition_table: array, integer
+
+    :param MPI_COMM: MPI communicator
+    :type MPI_COMM: MPI4py communicator object
+
+    :param variational_parameters: Variational parameters :math:`\\theta` assocaited with the mixing operator.
+    :type variational_parameters: array, float
+
+    :param function: Serial function that generates the mixing operators.
+    :type function: callable
+
+    :param args: Positional arguments assocaited with `function`.
+    :type args: optional, list, default = None
+
+    :param kwargs: Keyword arguments assocaited with `function`.
+    :type kwargs: optional, dictionary, default = None
+    """
 
     if MPI_COMM.Get_rank() == 0:
 
