@@ -7,7 +7,7 @@ Introduction
 ------------
 
 QuOp_MPI is a Python 3 module for parallel distributed memory simulation
-of Quantum Approximate Optimization Algorithms on arbitrary mixing
+of quantum variational algorithms on arbitrary mixing
 graphs. See https://arxiv.org/abs/1804.08227 and
 https://arxiv.org/abs/1912.07353 for the theoretical background.
 
@@ -35,12 +35,6 @@ Python Dependencies
 -  nlopt
 -  networkx (To run included example programs.)
 
-Running and Installing QuOp_MPI on Clusters
--------------------------------------------
-
-Please consult the section covering containerisation in the QuOp_MPI
-docs.
-
 Installation on Unix-Like Systems
 ---------------------------------
 
@@ -50,14 +44,11 @@ https://github.com/Edric-Matwiejew/QuOp_MPI. Then:
 
 ::
 
-    cd QuOp_MPI/src
-    make
-    cd ../
     python3 setup.py sdist bdist_wheel
     pip3 install quop_mpi-0.0.1.tar.gz
 
 Before importing QuOp_MPI in a python script, ensure that the path to
-the FFTW and HDF5 libraries is present in the LD_LIBRARY_PATH variable.
+the FFTW and HDF5 libraries is present in the LD_LIBRARY_PATH environment variable.
 If they are not present:
 
 ::
@@ -99,7 +90,7 @@ The following processes successfully installed QuOP_MPI on Ubuntu
 18.04.4, this as not been tested on other Linux distros, but the
 processes should generally be applicable with minor modifications.
 
-Install MPICH and build applications:
+Install dependancies. Note: 'openmpi' may be used in place of 'mpich'.
 
 ::
 
@@ -157,11 +148,7 @@ Alternatively:
 Will install QuOp_MPI with reference to the QuOp_MPI source folder. This
 is useful if you wish to debug or modify the package.
 
-Finally, check for successful installation by:
-
-::
-
-    mpiexec -N 2 python3 -m quop_mpi
+Next, test the installation by running one of the included examples.
 
 If QuOp_MPI is unable to find the HDF5 or FFTW shared object libraries.
 
@@ -254,17 +241,11 @@ Alternatively:
 Will install QuOp_MPI with reference to the QuOp_MPI source folder. This
 is useful if you wish to debug or modify the package.
 
-Finally, check for successful installation by:
-
-::
-
-    mpiexec -N 2 python3 -m quop_mpi
-
 Contact Information
 -------------------
 
-QuOp_MPI is under development. If you encounter a bug, please submit an
-issue via github, or email me at edric.matwiejew@research.uwa.edu.au.
+If you encounter a bug, please submit a
+report via github. If you would like to get in touch, email me at edric.matwiejew@research.uwa.edu.au.
 
 .. |Documentation_Status| image:: https://readthedocs.org/projects/quop-mpi/badge/?version=latest
    :target: https://quop-mpi.readthedocs.io/en/latest/?badge=latest
