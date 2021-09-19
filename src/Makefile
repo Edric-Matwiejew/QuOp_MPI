@@ -12,9 +12,6 @@ endif
 
 EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
 
-LIB = $(addprefix -L, $(subst :, ,$(LD_LIBRARY_PATH)))
-INCLUDE = $(addprefix -I, $(subst :, ,$(PATH)))
-
 OBJDIR := obj
 PYDIR := ../quop_mpi/__lib
 
@@ -43,4 +40,4 @@ $(OBJDIR)/sparse.o: $(addprefix $(OBJDIR)/, iso_precisions.o) sparse.f90
 $(OBJDIR)/iso_precisions.o: iso_precisions.f90
 
 clean:
-	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
+	rm -f $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
