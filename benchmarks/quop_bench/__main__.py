@@ -65,11 +65,11 @@ if bench_type == "optimisers":
 
     max_evaluations = 5000
 
-    min_depth = 2
-    max_depth = 2
+    min_depth = 5
+    max_depth = 5
 
-    min_qubits = 3
-    max_qubits = 3
+    min_qubits = 16
+    max_qubits = 16
 
     alg_names = [alg_name]
     if alg_name == "qwoa":
