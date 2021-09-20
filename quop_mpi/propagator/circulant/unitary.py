@@ -4,7 +4,7 @@ from ...Unitary import Unitary
 
 
 class unitary(Unitary):
-    """Implements a mixing unitary with a circulant maxtrix operator exponent.
+    """Implements a mixing unitary with a circulant matrix operator exponent.
 
     See :class:`Unitary` for more information.
     """

@@ -25,10 +25,10 @@ def serial(
     :param function: Function that returns :math:`\\text{diag}(\hat{O})`.
     :type function: callable
 
-    :param args: Positional arguments assocaited with `function`.
+    :param args: Positional arguments associated with `function`.
     :type args: optional, list, default = None
 
-    :param kwargs: Keyword arguments assocaited with `function`.
+    :param kwargs: Keyword arguments associated with `function`.
     :type kwargs: optional, dictionary, default = None
     """
     if args is None:
