@@ -22,9 +22,9 @@ General Dependencies
 -  HDF5 configured with –enable-fortran, –enable-parallel, and
    –enable-shared.
 
-src/Makefile assumes that the include and lib directories containing the
-FTW and HDf5 shared object libraries are located in /usr/local, this
-file may need to be modified for your system.
+Durring installation, setup.py assumes that the include and lib directories
+containing the FTW and HDf5 shared object libraries are located in /usr/local,
+or /usr this file may need to be modified for your system.
 
 Python Dependencies
 -------------------
