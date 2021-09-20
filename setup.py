@@ -9,29 +9,29 @@ import subprocess
 from setuptools import find_packages, setup, Command
 from setuptools.command.build_ext import build_ext
 
-def parse_paths(paths, prefix):
-
-    existant = []
-    for path in paths.split(':'):
-        if os.path.exists(path):
-            existant.append(path)
-
-    for i in range(len(existant)):
-        existant[i] = ' {}{}'.format(prefix,existant[i])
-
-    return ''.join(existant)
-
 class Build(build_ext):
 
-    LIB = os.environ.get('LIB')
-    INCLUDE = os.environ.get('INCLUDE')
-
-    if LIB is None:
-        LIB = "/usr/local/lib:/usr/lib:/usr/lib/x86_64-linux-gnu"
-    if INCLUDE is None:
-        INCLUDE = "/usr/local/include:/usr/include:/usr/include/x86_64-linux-gnu"
-
     def run(self):
+
+        LIB = os.environ.get('LIB')
+        INCLUDE = os.environ.get('INCLUDE')
+
+        if LIB is None:
+            LIB = "/usr/local/lib:/usr/lib:/usr/lib/x86_64-linux-gnu"
+        if INCLUDE is None:
+            INCLUDE = "/usr/local/include:/usr/include:/usr/include/x86_64-linux-gnu"
+
+        def parse_paths(paths, prefix):
+
+            existant = []
+            for path in paths.split(':'):
+                if os.path.exists(path):
+                    existant.append(path)
+
+            for i in range(len(existant)):
+                existant[i] = ' {}{}'.format(prefix,existant[i])
+
+            return ''.join(existant)
 
         lib = parse_paths(LIB, '-L')
         include = parse_paths(INCLUDE, '-I')

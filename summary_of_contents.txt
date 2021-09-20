@@ -1,0 +1,599 @@
+SUMMARY OF FILES
+================
+
+Overview of submission:
+
+	QuOp_MPI/                      # Description (Section in manuscript)
+	---------                      -------------------------------------
+	├── summary_of_contents.txt    # Summary of all files submitted to CPC.
+	├── MANIFEST.in                # Additional files to included with installation of QuOp_MPI.
+	├── README.rst                 # Package overview and installation instructions.
+	├── requirements.txt		   # Required python packages.
+	├── setup.py                   # Python setup file for module installation
+	├── docs                       # Package documentation.
+	├── quop_mpi                   # The QuOp_MPI Python package (Sections 3-5).
+	├── src                        # Source code of Fortran subroutines.
+	├── container                  # Docker definition file used to run the QuOp_MPI benchmarks. (Section 7).
+	├── benchmarks                 # Benchmarks of QuOp_MPI. (Section 7).
+	│   ├── README.md              # Benchmarking README.
+	│   ├── quop_bench             # Python module for QuOp_MPI benchmarks.
+	│   ├── plots                  # Scripts to plot benchmarking results.
+	│   ├── programs               # Slurm job-submission scripts.
+	│   └── results                # Benchmarking results included for the CPC submission.
+	└── examples                   # QuOp_MPI examples. Section 6 of the manuscript.
+	   ├── README.md               # Examples README.
+	   ├── maxcut				   # (Section 6.1.1 and 6.1.3).
+	   ├── maxcut_extended         # (Section 6.1.2).
+	   └── portfolio_rebalancing   # (Section 6.2.1).
+
+Complete listing of files
+-------------------------
+
+Altogether there are 71 directories and 491 files.
+
+The folder QuOp_MPI/benchmarks/results contains 336 files corresponding to the results of
+of the QuOp_MPI benchmarks, these have been included specifically for the CPC submission.
+
+	QuOp_MPI
+	├── MANIFEST.in
+	├── summary_of_contents.txt
+	├── README.rst
+	├── benchmarks
+	│   ├── README.md
+	│   ├── plots
+	│   │   ├── evolution.py
+	│   │   ├── optimisers.py
+	│   │   ├── output
+	│   │   │   ├── qaoa_optimiser_comparison.png
+	│   │   │   ├── qaoa_optimiser_comparison_legend.png
+	│   │   │   ├── qaoa_state_evolution_multi.png
+	│   │   │   ├── qaoa_state_evolution_multi_legend.png
+	│   │   │   ├── qaoa_state_evolution_single_node.png
+	│   │   │   ├── qaoa_state_evolution_single_node_legend.png
+	│   │   │   ├── qwoa_execute_n_params.png
+	│   │   │   ├── qwoa_execute_time.png
+	│   │   │   ├── qwoa_execute_time_l.png
+	│   │   │   ├── qwoa_optimiser_comparison.png
+	│   │   │   ├── qwoa_optimiser_comparison_legend.png
+	│   │   │   ├── qwoa_state_evolution_multi.png
+	│   │   │   ├── qwoa_state_evolution_multi_legend.png
+	│   │   │   ├── qwoa_state_evolution_single_node.png
+	│   │   │   └── qwoa_state_evolution_single_node_legend.png
+	│   │   └── qwoa_execute.py
+	│   ├── programs
+	│   │   ├── cluster
+	│   │   │   ├── optimisers
+	│   │   │   │   └── 25_optimisers.slurm
+	│   │   │   ├── qaoa_evolution
+	│   │   │   │   ├── 10_qaoa_evolution.slurm
+	│   │   │   │   ├── 11_qaoa_evolution.slurm
+	│   │   │   │   ├── 12_qaoa_evolution.slurm
+	│   │   │   │   ├── 13_qaoa_evolution.slurm
+	│   │   │   │   ├── 14_qaoa_evolution.slurm
+	│   │   │   │   ├── 15_qaoa_evolution.slurm
+	│   │   │   │   ├── 2_qaoa_evolution.slurm
+	│   │   │   │   ├── 3_qaoa_evolution.slurm
+	│   │   │   │   ├── 4_qaoa_evolution.slurm
+	│   │   │   │   ├── 5_qaoa_evolution.slurm
+	│   │   │   │   ├── 6_qaoa_evolution.slurm
+	│   │   │   │   ├── 7_qaoa_evolution.slurm
+	│   │   │   │   ├── 8_qaoa_evolution.slurm
+	│   │   │   │   └── 9_qaoa_evolution.slurm
+	│   │   │   ├── qwoa_evolution
+	│   │   │   │   ├── 10_qwoa_evolution.slurm
+	│   │   │   │   ├── 11_qwoa_evolution.slurm
+	│   │   │   │   ├── 12_qwoa_evolution.slurm
+	│   │   │   │   ├── 13_qwoa_evolution.slurm
+	│   │   │   │   ├── 14_qwoa_evolution.slurm
+	│   │   │   │   ├── 15_qwoa_evolution.slurm
+	│   │   │   │   ├── 2_qwoa_evolution.slurm
+	│   │   │   │   ├── 3_qwoa_evolution.slurm
+	│   │   │   │   ├── 4_qwoa_evolution.slurm
+	│   │   │   │   ├── 5_qwoa_evolution.slurm
+	│   │   │   │   ├── 6_qwoa_evolution.slurm
+	│   │   │   │   ├── 7_qwoa_evolution.slurm
+	│   │   │   │   ├── 8_qwoa_evolution.slurm
+	│   │   │   │   └── 9_qwoa_evolution.slurm
+	│   │   │   ├── qwoa_execute
+	│   │   │   │   ├── 16_qwoa_execute.slurm
+	│   │   │   │   ├── 1_qwoa_execute.slurm
+	│   │   │   │   ├── 2_qwoa_execute.slurm
+	│   │   │   │   ├── 4_qwoa_execute.slurm
+	│   │   │   │   └── 8_qwoa_execute.slurm
+	│   │   │   └── qwoa_execute_global
+	│   │   │       ├── 16_qwoa_execute.slurm
+	│   │   │       ├── 1_qwoa_execute.slurm
+	│   │   │       ├── 2_qwoa_execute.slurm
+	│   │   │       ├── 4_qwoa_execute.slurm
+	│   │   │       └── 8_qwoa_execute.slurm
+	│   │   └── workstation
+	│   │       ├── qaoa_evolution
+	│   │       │   ├── 16_qaoa_evolution.slurm
+	│   │       │   ├── 1_qaoa_evolution.slurm
+	│   │       │   ├── 2_qaoa_evolution.slurm
+	│   │       │   ├── 4_qaoa_evolution.slurm
+	│   │       │   └── 8_qaoa_evolution.slurm
+	│   │       ├── qwoa_evolution
+	│   │       │   ├── 16_qwoa_evolution.slurm
+	│   │       │   ├── 1_qwoa_evolution.slurm
+	│   │       │   ├── 2_qwoa_evolution.slurm
+	│   │       │   ├── 4_qwoa_evolution.slurm
+	│   │       │   └── 8_qwoa_evolution.slurm
+	│   │       └── qwoa_execute
+	│   │           ├── 1_qwoa_execute.slurm
+	│   │           └── 24_qwoa_execute.slurm
+	│   ├── quop_bench
+	│   │   ├── __init__.py
+	│   │   ├── __main__.py
+	│   │   ├── benchmark.py
+	│   │   ├── evolution
+	│   │   │   ├── __init__.py
+	│   │   │   ├── qaoa_evolution.py
+	│   │   │   └── qwoa_evolution.py
+	│   │   └── execute
+	│   │       ├── qwoa.py
+	│   │       ├── qwoa_parallel_jacobian.py
+	│   │       └── qwoa_parallel_jacobian_local.py
+	│   └── results
+	│       ├── cluster
+	│       │   ├── optimisers
+	│       │   │   ├── csv
+	│       │   │   │   ├── 240_qwoa.csv
+	│       │   │   │   └── 264_qaoa.csv
+	│       │   │   ├── log
+	│       │   │   ├── npy
+	│       │   │   │   ├── 240_BFGS_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_BFGS_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_BFGS_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_BFGS_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_BFGS_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_CG_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_CG_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_CG_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_CG_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_CG_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_LD_CCSAQ_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_LD_CCSAQ_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_LD_CCSAQ_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_LD_CCSAQ_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_LD_CCSAQ_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_LD_LBFGS_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_LD_LBFGS_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_LD_LBFGS_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_LD_LBFGS_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_LD_LBFGS_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_LD_MMA_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_LD_MMA_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_LD_MMA_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_LD_MMA_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_LD_MMA_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_LN_BOBYQA_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_LN_BOBYQA_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_LN_BOBYQA_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_LN_BOBYQA_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_LN_BOBYQA_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_LN_NELDERMEAD_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_LN_NELDERMEAD_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_LN_NELDERMEAD_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_LN_NELDERMEAD_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_LN_NELDERMEAD_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_LN_PRAXIS_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_LN_PRAXIS_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_LN_PRAXIS_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_LN_PRAXIS_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_LN_PRAXIS_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_LN_SBPLX_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_LN_SBPLX_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_LN_SBPLX_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_LN_SBPLX_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_LN_SBPLX_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_Nelder-Mead_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_Nelder-Mead_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_Nelder-Mead_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_Nelder-Mead_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_Nelder-Mead_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_Powell_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_Powell_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_Powell_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_Powell_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_Powell_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_TNC_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_TNC_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_TNC_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_TNC_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_TNC_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 240_qwoa_BFGS_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_BFGS_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_BFGS_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_BFGS_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_BFGS_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_CG_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_CG_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_CG_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_CG_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_CG_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_CCSAQ_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_CCSAQ_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_CCSAQ_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_CCSAQ_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_CCSAQ_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_LBFGS_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_LBFGS_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_LBFGS_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_LBFGS_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_LBFGS_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_MMA_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_MMA_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_MMA_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_MMA_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LD_MMA_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_BOBYQA_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_BOBYQA_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_BOBYQA_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_BOBYQA_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_BOBYQA_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_NELDERMEAD_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_NELDERMEAD_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_NELDERMEAD_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_NELDERMEAD_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_NELDERMEAD_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_PRAXIS_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_PRAXIS_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_PRAXIS_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_PRAXIS_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_PRAXIS_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_SBPLX_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_SBPLX_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_SBPLX_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_SBPLX_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_LN_SBPLX_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Nelder-Mead_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Nelder-Mead_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Nelder-Mead_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Nelder-Mead_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Nelder-Mead_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Powell_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Powell_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Powell_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Powell_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_Powell_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_TNC_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_TNC_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_TNC_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_TNC_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_TNC_4_16_5.npy
+	│       │   │   │   ├── 240_qwoa_trust-constr_0_16_5.npy
+	│       │   │   │   ├── 240_qwoa_trust-constr_1_16_5.npy
+	│       │   │   │   ├── 240_qwoa_trust-constr_2_16_5.npy
+	│       │   │   │   ├── 240_qwoa_trust-constr_3_16_5.npy
+	│       │   │   │   ├── 240_qwoa_trust-constr_4_16_5.npy
+	│       │   │   │   ├── 240_trust-constr_qwoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 240_trust-constr_qwoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 240_trust-constr_qwoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 240_trust-constr_qwoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 240_trust-constr_qwoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_BFGS_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_BFGS_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_BFGS_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_BFGS_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_BFGS_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_CG_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_CG_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_CG_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_CG_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_CG_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_LD_CCSAQ_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_LD_CCSAQ_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_LD_CCSAQ_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_LD_CCSAQ_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_LD_CCSAQ_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_LD_LBFGS_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_LD_LBFGS_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_LD_LBFGS_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_LD_LBFGS_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_LD_LBFGS_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_LD_MMA_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_LD_MMA_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_LD_MMA_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_LD_MMA_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_LD_MMA_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_LN_BOBYQA_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_LN_BOBYQA_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_LN_BOBYQA_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_LN_BOBYQA_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_LN_BOBYQA_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_LN_NELDERMEAD_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_LN_NELDERMEAD_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_LN_NELDERMEAD_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_LN_NELDERMEAD_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_LN_NELDERMEAD_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_LN_PRAXIS_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_LN_PRAXIS_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_LN_PRAXIS_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_LN_PRAXIS_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_LN_PRAXIS_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_LN_SBPLX_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_LN_SBPLX_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_LN_SBPLX_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_LN_SBPLX_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_LN_SBPLX_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_Nelder-Mead_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_Nelder-Mead_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_Nelder-Mead_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_Nelder-Mead_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_Nelder-Mead_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_Powell_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_Powell_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_Powell_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_Powell_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_Powell_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_TNC_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_TNC_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_TNC_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_TNC_qaoa_baseline_4_16_5.npy
+	│       │   │   │   ├── 264_TNC_qaoa_baseline_5_16_5.npy
+	│       │   │   │   ├── 264_qaoa_BFGS_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_BFGS_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_BFGS_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_BFGS_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_BFGS_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_CG_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_CG_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_CG_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_CG_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_CG_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_CCSAQ_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_CCSAQ_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_CCSAQ_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_CCSAQ_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_CCSAQ_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_LBFGS_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_LBFGS_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_LBFGS_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_LBFGS_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_LBFGS_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_MMA_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_MMA_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_MMA_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_MMA_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LD_MMA_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_BOBYQA_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_BOBYQA_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_BOBYQA_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_BOBYQA_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_BOBYQA_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_NELDERMEAD_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_NELDERMEAD_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_NELDERMEAD_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_NELDERMEAD_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_NELDERMEAD_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_PRAXIS_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_PRAXIS_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_PRAXIS_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_PRAXIS_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_PRAXIS_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_SBPLX_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_SBPLX_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_SBPLX_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_SBPLX_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_LN_SBPLX_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Nelder-Mead_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Nelder-Mead_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Nelder-Mead_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Nelder-Mead_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Nelder-Mead_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Powell_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Powell_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Powell_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Powell_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_Powell_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_TNC_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_TNC_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_TNC_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_TNC_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_TNC_4_16_5.npy
+	│       │   │   │   ├── 264_qaoa_trust-constr_0_16_5.npy
+	│       │   │   │   ├── 264_qaoa_trust-constr_1_16_5.npy
+	│       │   │   │   ├── 264_qaoa_trust-constr_2_16_5.npy
+	│       │   │   │   ├── 264_qaoa_trust-constr_3_16_5.npy
+	│       │   │   │   ├── 264_qaoa_trust-constr_4_16_5.npy
+	│       │   │   │   ├── 264_trust-constr_qaoa_baseline_1_16_5.npy
+	│       │   │   │   ├── 264_trust-constr_qaoa_baseline_2_16_5.npy
+	│       │   │   │   ├── 264_trust-constr_qaoa_baseline_3_16_5.npy
+	│       │   │   │   ├── 264_trust-constr_qaoa_baseline_4_16_5.npy
+	│       │   │   │   └── 264_trust-constr_qaoa_baseline_5_16_5.npy
+	│       │   │   └── other
+	│       │   │       ├── nlopt_names
+	│       │   │       └── scipy_names
+	│       │   ├── qaoa_evolution
+	│       │   │   ├── csv
+	│       │   │   │   ├── 10_qaoa_evolution.csv
+	│       │   │   │   ├── 11_qaoa_evolution.csv
+	│       │   │   │   ├── 12_qaoa_evolution.csv
+	│       │   │   │   ├── 13_qaoa_evolution.csv
+	│       │   │   │   ├── 14_qaoa_evolution.csv
+	│       │   │   │   ├── 15_qaoa_evolution.csv
+	│       │   │   │   ├── 1_qaoa_evolution.csv
+	│       │   │   │   ├── 2_qaoa_evolution.csv
+	│       │   │   │   ├── 3_qaoa_evolution.csv
+	│       │   │   │   ├── 4_qaoa_evolution.csv
+	│       │   │   │   ├── 5_qaoa_evolution.csv
+	│       │   │   │   ├── 6_qaoa_evolution.csv
+	│       │   │   │   ├── 7_qaoa_evolution.csv
+	│       │   │   │   ├── 8_qaoa_evolution.csv
+	│       │   │   │   └── 9_qaoa_evolution.csv
+	│       │   │   └── log
+	│       │   ├── qwoa_evolution
+	│       │   │   ├── csv
+	│       │   │   │   ├── 10_qwoa_evolution.csv
+	│       │   │   │   ├── 11_qwoa_evolution.csv
+	│       │   │   │   ├── 12_qwoa_evolution.csv
+	│       │   │   │   ├── 13_qwoa_evolution.csv
+	│       │   │   │   ├── 14_qwoa_evolution.csv
+	│       │   │   │   ├── 15_qwoa_evolution.csv
+	│       │   │   │   ├── 1_qwoa_evolution.csv
+	│       │   │   │   ├── 2_qwoa_evolution.csv
+	│       │   │   │   ├── 3_qwoa_evolution.csv
+	│       │   │   │   ├── 4_qwoa_evolution.csv
+	│       │   │   │   ├── 5_qwoa_evolution.csv
+	│       │   │   │   ├── 6_qwoa_evolution.csv
+	│       │   │   │   ├── 7_qwoa_evolution.csv
+	│       │   │   │   ├── 8_qwoa_evolution.csv
+	│       │   │   │   └── 9_qwoa_evolution.csv
+	│       │   │   └── log
+	│       │   ├── qwoa_execute
+	│       │   │   ├── csv
+	│       │   │   │   ├── 16_qwoa_execute_bench_log.csv
+	│       │   │   │   ├── 16_qwoa_execute_quop_log.csv
+	│       │   │   │   ├── 1_qwoa_execute_bench_log.csv
+	│       │   │   │   ├── 1_qwoa_execute_quop_log.csv
+	│       │   │   │   ├── 2_qwoa_execute_bench_log.csv
+	│       │   │   │   ├── 2_qwoa_execute_quop_log.csv
+	│       │   │   │   ├── 4_qwoa_execute_bench_log.csv
+	│       │   │   │   ├── 4_qwoa_execute_quop_log.csv
+	│       │   │   │   ├── 8_qwoa_execute_bench_log.csv
+	│       │   │   │   └── 8_qwoa_execute_quop_log.csv
+	│       │   │   └── log
+	│       │   │       ├── 16_qwoa_execute.log
+	│       │   │       ├── 1_qwoa_execute.log
+	│       │   │       ├── 2_qwoa_execute.log
+	│       │   │       ├── 4_qwoa_execute.log
+	│       │   │       └── 8_qwoa_execute.log
+	│       │   └── qwoa_execute_global
+	│       │       ├── csv
+	│       │       │   ├── 16_qwoa_execute_bench_log.csv
+	│       │       │   ├── 1_qwoa_execute_bench_log.csv
+	│       │       │   ├── 1_qwoa_execute_quop_log.csv
+	│       │       │   ├── 2_qwoa_execute_bench_log.csv
+	│       │       │   ├── 2_qwoa_execute_quop_log.csv
+	│       │       │   ├── 4_qwoa_execute_bench_log.csv
+	│       │       │   ├── 8_qwoa_execute_bench_log.csv
+	│       │       │   └── 8_qwoa_execute_quop_log.csv
+	│       │       └── log
+	│       │           ├── 16_qwoa_execute.log
+	│       │           ├── 1_qwoa_execute.log
+	│       │           ├── 2_qwoa_execute.log
+	│       │           ├── 4_qwoa_execute.log
+	│       │           └── 8_qwoa_execute.log
+	│       └── workstation
+	│           ├── qaoa_evolution
+	│           │   ├── csv
+	│           │   │   ├── 16_qaoa_evolution.csv
+	│           │   │   ├── 1_qaoa_evolution.csv
+	│           │   │   ├── 24_qaoa_evolution.csv
+	│           │   │   ├── 2_qaoa_evolution.csv
+	│           │   │   ├── 4_qaoa_evolution.csv
+	│           │   │   └── 8_qaoa_evolution.csv
+	│           │   └── log
+	│           ├── qwoa_evolution
+	│           │   ├── csv
+	│           │   │   ├── 16_qwoa_evolution.csv
+	│           │   │   ├── 1_qwoa_evolution.csv
+	│           │   │   ├── 24_qwoa_evolution.csv
+	│           │   │   ├── 2_qwoa_evolution.csv
+	│           │   │   ├── 4_qwoa_evolution.csv
+	│           │   │   └── 8_qwoa_evolution.csv
+	│           │   └── log
+	│           └── qwoa_execute
+	│               ├── csv
+	│               │   ├── 24_qwoa_execute_bench_log.csv
+	│               │   └── 24_qwoa_execute_quop_log.csv
+	│               └── log
+	├── container
+	│   ├── README.md
+	│   └── quop_mpi.def
+	├── docs
+	│   ├── Makefile
+	│   ├── README.md
+	│   ├── build
+	│   ├── make.bat
+	│   ├── requirements.txt
+	│   └── source
+	│       ├── cite.rst
+	│       ├── conf.py
+	│       ├── index.rst
+	│       ├── quop_mpi.rst
+	│       └── readme_link.rst
+	├── examples
+	│   ├── README.md
+	│   ├── maxcut
+	│   │   ├── README.md
+	│   │   ├── maxcut.py
+	│   │   ├── maxcut_parallel_qualities.py
+	│   │   └── maxcut_plots.py
+	│   ├── maxcut_extended
+	│   │   ├── README.md
+	│   │   ├── maxcut_extended.py
+	│   │   └── maxcut_extended_plots.py
+	│   └── portfolio_rebalancing
+	│       ├── README.md
+	│       ├── portfolio_plots.py
+	│       ├── qaoaz_portfolio.py
+	│       ├── qaoaz_qualities.py
+	│       ├── qwoa_portfolio.py
+	│       └── qwoa_qualities.py
+	├── quop_mpi
+	│   ├── Ansatz.py
+	│   ├── Unitary.py
+	│   ├── __init__.py
+	│   ├── __lib
+	│   │   └── __init__.py
+	│   ├── __utils
+	│   │   ├── __init__.py
+	│   │   ├── __interface.py
+	│   │   ├── __mpi.py
+	│   │   └── __nlopt_wrap.py
+	│   ├── algorithm
+	│   │   ├── __init__.py
+	│   │   ├── phase_and_mixer.py
+	│   │   ├── qaoa.py
+	│   │   └── qwoa.py
+	│   ├── observable
+	│   │   ├── __init__.py
+	│   │   ├── rand.py
+	│   │   └── standard.py
+	│   ├── param
+	│   │   ├── __init__.py
+	│   │   └── rand.py
+	│   ├── propagator
+	│   │   ├── __init__.py
+	│   │   ├── circulant
+	│   │   │   ├── __init__.py
+	│   │   │   ├── operator
+	│   │   │   │   ├── __init__.py
+	│   │   │   │   └── eigenvalues.py
+	│   │   │   └── unitary.py
+	│   │   ├── diagonal
+	│   │   │   ├── __init__.py
+	│   │   │   ├── operator
+	│   │   │   │   ├── __init__.py
+	│   │   │   │   ├── rand.py
+	│   │   │   │   └── standard.py
+	│   │   │   └── unitary.py
+	│   │   └── sparse
+	│   │       ├── __init__.py
+	│   │       ├── operator
+	│   │       │   ├── __init__.py
+	│   │       │   └── standard.py
+	│   │       └── unitary.py
+	│   ├── state
+	│   │   ├── __init__.py
+	│   │   └── standard.py
+	│   └── toolkit
+	│       ├── __init__.py
+	│       ├── kronecker.py
+	│       ├── pauli.py
+	│       └── string.py
+	├── requirements.txt
+	├── setup.py
+	└── src
+	    ├── Makefile
+	    ├── expm.f90
+	    ├── fMPI.f90
+	    ├── fMPI.pyf
+	    ├── fqwoa_mpi.f90
+	    ├── iso_precisions.f90
+	    ├── mixers_mpi.f90
+	    ├── obj
+	    ├── one_norms.f90
+	    └── sparse.f90
