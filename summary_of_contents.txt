@@ -29,14 +29,10 @@ Overview of submission:
 Complete listing of files
 -------------------------
 
-Altogether there are 71 directories and 491 files.
-
-The folder QuOp_MPI/benchmarks/results contains 336 files corresponding to the results of
-of the QuOp_MPI benchmarks, these have been included specifically for the CPC submission.
+Altogether there are 69 directories and 491 files.
 
 	QuOp_MPI
 	├── MANIFEST.in
-	├── summary_of_contents.txt
 	├── README.rst
 	├── benchmarks
 	│   ├── README.md
@@ -505,7 +501,6 @@ of the QuOp_MPI benchmarks, these have been included specifically for the CPC su
 	├── docs
 	│   ├── Makefile
 	│   ├── README.md
-	│   ├── build
 	│   ├── make.bat
 	│   ├── requirements.txt
 	│   └── source
@@ -586,14 +581,14 @@ of the QuOp_MPI benchmarks, these have been included specifically for the CPC su
 	│       └── string.py
 	├── requirements.txt
 	├── setup.py
-	└── src
-	    ├── Makefile
-	    ├── expm.f90
-	    ├── fMPI.f90
-	    ├── fMPI.pyf
-	    ├── fqwoa_mpi.f90
-	    ├── iso_precisions.f90
-	    ├── mixers_mpi.f90
-	    ├── obj
-	    ├── one_norms.f90
-	    └── sparse.f90
+	├── src
+	│   ├── Makefile
+	│   ├── expm.f90
+	│   ├── fMPI.f90
+	│   ├── fMPI.pyf
+	│   ├── fqwoa_mpi.f90
+	│   ├── iso_precisions.f90
+	│   ├── mixers_mpi.f90
+	│   ├── one_norms.f90
+	│   └── sparse.f90
+	└── summary_of_contents.txt
