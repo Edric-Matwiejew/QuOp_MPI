@@ -2,7 +2,7 @@ from ...Unitary import Unitary
 import numpy as np
 
 class unitary(Unitary):
-    """Implements a phase-shift unitary with a diagonal maxtrix operator
+    """Implements a phase-shift unitary with a diagonal matrix operator
     exponent.
 
     See :class:`Unitary` for more information.

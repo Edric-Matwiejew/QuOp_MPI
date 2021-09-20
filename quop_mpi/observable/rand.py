@@ -12,7 +12,7 @@ def uniform(system_size, partition_table, seed, MPI_COMM, low=0, high=1):
     :param system_size: Number of observables :math:`N`.
     :type system_size: integer
 
-    :param partition_table: A class attribute of the :class:`Unitary` class, an  array of length :math:`M + 1` where :math:`M` is the size of the MPI communicator. For each MPI rank :math:`m` index :math:`m` of the array returns the starting point of the local parition of `local_i` observables. The last index of partition_table is equal to :math:`N + 1`.
+    :param partition_table: A class attribute of the :class:`Unitary` class, an  array of length :math:`M + 1` where :math:`M` is the size of the MPI communicator. For each MPI rank :math:`m` index :math:`m` of the array returns the starting point of the local partition of `local_i` observables. The last index of partition_table is equal to :math:`N + 1`.
     :type partition_table: array, integer
 
     :param seed: Set the state of the random number generator.
