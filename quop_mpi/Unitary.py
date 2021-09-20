@@ -11,19 +11,19 @@ class Unitary:
     :param operator_function: Function returning the local partition of the unitary's matrix operator exponent, :math:`\hat{O}` or :math:`\hat{W}`.
     :type operator_function: callable
 
-    :param operator_n_params: Number of variational parameters :math:`|\\theta|` assocaited with :math:`\hat{O}` or :math:`\hat{W}`.
+    :param operator_n_params: Number of variational parameters :math:`|\\theta|` associated with :math:`\hat{O}` or :math:`\hat{W}`.
     :type operator_n_params: optional, integer, default = 0
 
     :param operator_kwargs: Keyword arguments associated with `operator_function`.
     :type operator_kwargs: optional, dictionary, default = None
 
-    :param parameter_function: Function responsible for generation of the :math:`\\theta` assocaited with the unitary and its matrix operator exponent.
+    :param parameter_function: Function responsible for generation of the :math:`\\theta` associated with the unitary and its matrix operator exponent.
     :type parameter_function: callable
 
     :param parameter_kwargs: Keyword arguments associated with `parameter_function`.
     :type parameter_kwargs: optional, dictionary, default = None
 
-    :param unitary_n_params: Number of variational parameters :math:`|\\theta|` assocaited with the unitary time-evolution operator.
+    :param unitary_n_params: Number of variational parameters :math:`|\\theta|` associated with the unitary time-evolution operator.
     :type unitary_n_params: optional, integer, default = 0
     """
 

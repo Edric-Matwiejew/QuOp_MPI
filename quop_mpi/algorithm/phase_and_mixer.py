@@ -19,7 +19,7 @@ class phase_and_mixer(Ansatz):
     def set_qualities(self, function, kwargs=None):
         """Define the quality operator :math:`\\text{diag}(\hat{Q})`.
 
-        :param function: Function returning a parition of :math:`\\text{diag}(\hat{Q})` with `local_i` elements and a global positional offset of `local_i_offset`.
+        :param function: Function returning a partition of :math:`\\text{diag}(\hat{Q})` with `local_i` elements and a global positional offset of `local_i_offset`.
         :type function: callable
 
         :param kwargs: Keyword arguments associated `function`.
@@ -40,7 +40,7 @@ class phase_and_mixer(Ansatz):
         :param param_function: Function that accepts `n_params` as one of its positional arguments and returns an array of size `n_params`.
         :type param_function: array, float
 
-        :param kwargs: Keyword arguments assocaited with `param_function`.
+        :param kwargs: Keyword arguments associated with `param_function`.
         :type kwargs: optional, dictionary, default = None
         """
         if kwargs is None:
