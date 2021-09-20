@@ -52,16 +52,16 @@ def serial(
     :param MPI_COMM: MPI communicator
     :type MPI_COMM: MPI4py communicator object
 
-    :param variational_parameters: Variational parameters :math:`\\theta` assocaited with the mixing operator.
+    :param variational_parameters: Variational parameters :math:`\\theta` associated with the mixing operator.
     :type variational_parameters: array, float
 
     :param function: Serial function that generates the mixing operators.
     :type function: callable
 
-    :param args: Positional arguments assocaited with `function`.
+    :param args: Positional arguments associated with `function`.
     :type args: optional, list, default = None
 
-    :param kwargs: Keyword arguments assocaited with `function`.
+    :param kwargs: Keyword arguments associated with `function`.
     :type kwargs: optional, dictionary, default = None
     """
 
