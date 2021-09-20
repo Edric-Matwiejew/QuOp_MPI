@@ -22,7 +22,7 @@ General Dependencies
 -  HDF5 configured with –enable-fortran, –enable-parallel, and
    –enable-shared.
 
-Durring installation, setup.py assumes that the include and lib directories
+During installation, setup.py assumes that the include and lib directories
 containing the FTW and HDf5 shared object libraries are located in /usr/local,
 or /usr this file may need to be modified for your system.
 
@@ -71,7 +71,7 @@ Navigate to QuOp_MPI/docs and build the documentation:
 
     make html
 
-Documentaion will then be present in QuOp_MPI/docs/build/html.
+Documentation will then be present in QuOp_MPI/docs/build/html.
 
 Detailed installation on Windows
 --------------------------------
@@ -90,7 +90,7 @@ The following processes successfully installed QuOP_MPI on Ubuntu
 18.04.4, this as not been tested on other Linux distros, but the
 processes should generally be applicable with minor modifications.
 
-Install dependancies. Note: 'openmpi' may be used in place of 'mpich'.
+Install dependencies. Note: 'openmpi' may be used in place of 'mpich'.
 
 ::
 
@@ -178,8 +178,8 @@ This can be installed via the following terminal command:
 
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 
-You will be prompted for your user password on installing the homebrew
-dependencies and on installing homebrew itself.
+You will be prompted for your user password on installing the Homebrew
+dependencies and on installing Homebrew itself.
 
 Next, install the GNU compiler collection, python3 + pip3, MPI, and
 utilities required to download and configure QuOp_MPI’s dependencies.
@@ -214,7 +214,7 @@ Download, extract and install FFTW.
     sudo make install
     cd
 
-Finally, we can clone and install QuOp_mpi.
+Finally, we can clone and install QuOp_MPI.
 
 ::
 
@@ -245,7 +245,7 @@ Contact Information
 -------------------
 
 If you encounter a bug, please submit a
-report via github. If you would like to get in touch, email me at edric.matwiejew@research.uwa.edu.au.
+report via Github. If you would like to get in touch, email me at edric.matwiejew@research.uwa.edu.au.
 
 .. |Documentation_Status| image:: https://readthedocs.org/projects/quop-mpi/badge/?version=latest
    :target: https://quop-mpi.readthedocs.io/en/latest/?badge=latest
