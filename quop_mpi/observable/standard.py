@@ -23,10 +23,10 @@ def serial(
     :param function: Function that returns :math:`\\text{diag}(\hat{Q})`.
     :type function: callable
 
-    :param args: Positional arguments assocaited with `function`.
+    :param args: Positional arguments associated with `function`.
     :type args: optional, list, default = None
 
-    :param kwargs: Keyword arguments assocaited with `function`.
+    :param kwargs: Keyword arguments associated with `function`.
     :type kwargs: optional, dictionary, default = None
     """
 
@@ -122,7 +122,7 @@ def hdf5(local_i, local_i_offset, MPI_COMM, filename=None, dataset_name=None):
     :param local_i: Number of elements in the local partition of :math:`\\text{diag}(\hat{Q})`.
     :type local_i: integer
 
-    :param local_i_offset: Number of elements preceeding the local partition.
+    :param local_i_offset: Number of elements preceding the local partition.
     :param local_i_offset: integer
 
     :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{Q})` is partitioned.
