@@ -12,7 +12,7 @@ class interface():
     a RuntimeError.
 
     Function keyword parameters are not bound. They are expected to be defined
-    when calling the partially bound function or to have  appropriate deafult values.
+    when calling the partially bound function or to have  appropriate default values.
 
     The bound function is accessible through the 'call' class attribute, e.g.:
 
