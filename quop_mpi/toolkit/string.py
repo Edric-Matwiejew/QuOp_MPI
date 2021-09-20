@@ -12,7 +12,7 @@ def string(state):
     :param state: A bit string state.
     :type state: string
 
-    :return: The parsed quantu state.
+    :return: The parsed quantum state.
     :rtype: array, complex
     """
 

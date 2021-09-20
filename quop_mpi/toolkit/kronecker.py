@@ -5,10 +5,10 @@ from scipy import sparse as __sparse
 def kron(terms):
     """Calculate :math:`A \otimes B \otimes C \otimes...`.
 
-    :param terms: A list of square sparse matricies.
+    :param terms: A list of square sparse matrices.
     :type terms: list, Scipy sparse matrix
 
-    :return: The kronecker product of the input matricies ordered from left to right.
+    :return: The Kronecker product of the input matrices ordered from left to right.
     :rtype: Scipy sparse matrix
     """
 
