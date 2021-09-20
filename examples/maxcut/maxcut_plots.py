@@ -19,8 +19,8 @@ Graph = nx.circular_ladder_graph(4)
 G = nx.to_scipy_sparse_matrix(Graph)
 
 maxcut = h5.File("maxcut.h5", "r")
-final_state = np.array(maxcut["depth 5/final_state"]).view(np.complex128)
-qualities = np.abs(np.array(maxcut["depth 5/observables"]).view(np.float64))
+final_state = np.array(maxcut["depth 2/final_state"]).view(np.complex128)
+qualities = np.abs(np.array(maxcut["depth 2/observables"]).view(np.float64))
 unique, counts = np.unique(qualities, return_counts=True)
 
 print("Starting expectation value: {}".format(-np.mean(qualities)))
