@@ -16,7 +16,7 @@ class Ansatz:
     :param system_size: Size of the quantum system, :math:`N`.
     :type system_size: integer
 
-    :param MPI_communicator: An MPI4Py MPI communiactor object.
+    :param MPI_communicator: An MPI4Py MPI communicator object.
     :type MPI_communicator: optional, default = 'MPI.COMM_WORLD'
     """
 
@@ -51,20 +51,20 @@ class Ansatz:
 
         # parameters linked to optional methods in the 'system' class
         self.observable_map_input = (
-            None  # scalar tranformation on the observable values
+            None  # scalar transformation on the observable values
         )
         self.objective_map_input = None
-        self.setup_log = False  # wether results will be recorded in a *.log file.
+        self.setup_log = False  # whether results will be recorded in a *.log file.
 
         # variables managed by the 'system' class
-        self.stop = False  # synchronise ranks durring optimisation
+        self.stop = False  # synchronise ranks during optimisation
 
         self.COMM_OPT = None  # communicator used for optimisation
         self.expectation = None  # expectation value of the system
         self.initial_state_input = None
         self.ansatz_initial_state = None  # initial state before algorithm evolution
-        self.final_state = None  # quantum state durring and after simulation
-        self.benchmarking = False  # indicates wether the benchmark method is running
+        self.final_state = None  # quantum state during and after simulation
+        self.benchmarking = False  # indicates whether the benchmark method is running
 
         self.pre_called = False
         self.post_called = False
@@ -138,7 +138,7 @@ class Ansatz:
         untaries are passed in a python list in order of application from left
         to right.
 
-        :param unitaries: List of unitaries corresponding to one application of the anzatz :math:`D=1`.
+        :param unitaries: List of unitaries corresponding to one application of the ansatz :math:`D=1`.
         :type unitaries: list, Unitary
         """
 
@@ -155,15 +155,15 @@ class Ansatz:
         self.setup_unitaries = True
 
     def set_observables(self, function, kwargs=None):
-        """Define the observables used durring calculation of the objective
+        """Define the observables used during calculation of the objective
         function.
 
-        :param function: A callable returing a local partition of :math:`\\text{diag}(\hat{Q})` or an integer specifying the index of the phase-shift unitary in the list passed to the :meth:`~Ansatz.set_observables` whose exponent contains :math:`\\text{diag}(\hat{Q})`.
+        :param function: A callable returning a local partition of :math:`\\text{diag}(\hat{Q})` or an integer specifying the index of the phase-shift unitary in the list passed to the :meth:`~Ansatz.set_observables` whose exponent contains :math:`\\text{diag}(\hat{Q})`.
 
         :type function: callable or integer
 
-        :param kwargs: Keyword arguments to pass to the observable function durring generation of the observables.
-        :type kwargs: optional, defualt = None
+        :param kwargs: Keyword arguments to pass to the observable function during generation of the observables.
+        :type kwargs: optional, default = None
         """
 
         if kwargs is None:
@@ -177,13 +177,13 @@ class Ansatz:
         """Defines the classical optimiser algorithm used, arguments passed to
         the optimiser and fields in the optimiser dictionary to write to the
         log file (when using :meth:`~system.log_results`). QuOp_MPI supports
-        optimisers provided by SciPy through its minimize method `minimize <htt
-        p://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimiz
-        e.html>`_ and optimisers provided by the `NLopt
+        optimisers provided by SciPy through its minimize method 
+        `minimize <http://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html>`_
+        and optimisers provided by the `NLopt
         <http://nlopt.readthedocs.io/en/latest/>`_ package with respect to
-        minmisation with scalar constraints through a SciPy-like interface.
+        minimisation with scalar constraints through a SciPy-like interface.
 
-        The default optimiser is the BFGS algorithm, which is set interally as follows:
+        The default optimiser is the BFGS algorithm, which is set internally as follows:
 
         .. code-block:: python
 
@@ -233,9 +233,9 @@ class Ansatz:
             self.setup_depth = True
 
     def set_observable_map(self, func, kwargs=None):
-        """Define a function that acts on the observable values durring
-        calculation of the expectation value. The function should take a numpy
-        array as its input, and return a numpy array of the same size.
+        """Define a function that acts on the observable values during
+        calculation of the expectation value. The function should take a Numpy
+        array as its input, and return a Numpy array of the same size.
 
         :param func: Function to apply to the observable values.
         :type func: callable
@@ -299,7 +299,7 @@ class Ansatz:
     def set_initial_state(self, function, kwargs=None):
         """Define the initial quantum state.
 
-        :param function; A function that returns a local parition of the quantum state vector :math"`|\psi_0\\rangle_\\text{ANZ}`.
+        :param function; A function that returns a local partition of the quantum state vector :math"`|\psi_0\\rangle_\\text{ANZ}`.
         :type function: callable
 
         :type kwargs: Keyword arguments passed to the function.
@@ -325,10 +325,10 @@ class Ansatz:
 
     def set_log(self, filename, label, action="a"):
 
-        """Creates a .csv in which to save key QAOA results after a call to
+        """Creates a CSV in which to save key QAOA results after a call to
         :meth:`~Ansatz.execute`.
 
-        :param filename: Name of the .csv file.
+        :param filename: Name of the CSV file.
         :type filename: string
 
         :param label: User-set identifier of the currently defined ansatz.
@@ -342,11 +342,11 @@ class Ansatz:
         * label: User-defined system label.
         * p: :math:`p`.
         * objective_function: Final result of objective function minimization.
-        * objective_evaluations: Number of objective function evalutions needed durring optimisation.
+        * objective_evaluations: Number of objective function evaluations needed during optimisation.
         * optimization_success: If the minimizer converged to its target tolerances.
         * state_norm: Norm of the final state. This should always equal 1 (within the limits of double precision accuracy).
-        * simulation_time: In-program simultion time.
-        * MPI_nodes: Number of mpi processes.
+        * simulation_time: In-program simulation time.
+        * MPI_nodes: Number of MPI processes.
         """
 
         self.filename = filename
@@ -392,11 +392,11 @@ class Ansatz:
             return self.__objective(variational_parameters)
 
     def __check_setup_validity(self):
-        """This method is called by execute, it determines wether the object
+        """This method is called by execute, it determines whether the object
         needs to update any attributes or re-configure MPI communicators.
 
         First it checks the 'set' methods, each of these have an associated flag starting
-        with 'setup'. e.g. 'setup_initial_state = True' indicates that the initial state
+        with 'setup'. \e.g. 'setup_initial_state = True' indicates that the initial state
         function should be re-parsed and called. For every 'set' method the flag is
         set from False to True as the last action of that method.
 
@@ -483,7 +483,7 @@ class Ansatz:
         Types of parallelisation methods include:
 
         * "global": The global MPI communicator simulates :meth:`|\\boldsymbol{\\theta} \\rangle_\\text{ANZ}`.
-        * "jacobian": The global MPI communicator is paritioned into a sub-communicator calculating :math:`\\boldsymbol{\\theta} \\rangle_\\text{ANZ}` and sub-communicators calculating terms in the objective function gradient.
+        * "jacobian": The global MPI communicator is partitioned into a sub-communicator calculating :math:`\\boldsymbol{\\theta} \\rangle_\\text{ANZ}` and sub-communicators calculating terms in the objective function gradient.
         * "jacobian-local": Create MPI sub-communicators as described above, but group MPI ranks based on CPU ID.
 
         Type of gradient approximations include:
@@ -533,7 +533,7 @@ class Ansatz:
 
         busy_comm = False
 
-        # parallel jacobian not possible with one MPI process
+        # parallel Jacobian not possible with one MPI process
         if self.COMM.Get_size() == 1:
             self.parallel = "global"
 
@@ -982,7 +982,7 @@ class Ansatz:
         :param label: If filename is specified, evolved systems will be saved as 'filename/label_p_repetition'.
         :type label: string, optional, default = 'test'
 
-        :param save_action: Action taken durring first .5 file write. "a", append. "w", over-write.
+        :param save_action: Action taken during first .5 file write. "a", append. "w", over-write.
         :type save_action: string, optional, default = "a"
         """
 
@@ -1084,8 +1084,8 @@ class Ansatz:
         """Gather :math:`|\\boldsymbol{\\theta}_f \\rangle_\\text{ANZ}` at the
         root MPI rank following a call to :meth:`~Ansatz.execute`,
         :meth:`~Ansatz.evolve_state` or `~Ansatz.benchmark`. If called after
-        `~Ansatz.benchmark` the gathered state will corresponed to the last
-        performed simulationation.
+        `~Ansatz.benchmark` the gathered state will correspond to the last
+        performed simulation.
 
         :return: :math:`|\\boldsymbol{\\theta}_f\\rangle_\\text{ANZ}`
         :rtype: array, complex
@@ -1102,8 +1102,8 @@ class Ansatz:
         """Gather :math:`||\\boldsymbol{\\theta}_f \\rangle_\\text{ANZ}|^2` at
         the root MPI rank following a call to :meth:`~Ansatz.execute`,
         :meth:`~Ansatz.evolve_state` or `~Ansatz.benchmark`. If called after
-        `~Ansatz.benchmark` the gathered probabilities will corresponed to the
-        last performed simulationation.
+        `~Ansatz.benchmark` the gathered probabilities will correspond to the
+        last performed simulation.
 
         :return: :math:`||\\boldsymbol{\\theta}_f \\rangle_\\text{ANZ}|^2`.
         :rtype: array, float
@@ -1467,7 +1467,7 @@ class Ansatz:
         elif (parameters_per_node == 0) and (self.parallel == "jacobian_local"):
             # If the number of nodes is greater than n_variational_parameters + 1
             # and state evolution is constrained to individual nodes, then create
-            # a subcommunicator per variational parameter and ignore the remianing
+            # a subcommunicator per variational parameter and ignore the remaining
             # nodes.
 
             self.comm_opt_mapping = []
