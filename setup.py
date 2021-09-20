@@ -9,19 +9,19 @@ import subprocess
 from setuptools import find_packages, setup, Command
 from setuptools.command.build_ext import build_ext
 
+def parse_paths(paths, prefix):
+
+    existant = []
+    for path in paths.split(':'):
+        if os.path.exists(path):
+            existant.append(path)
+
+    for i in range(len(existant)):
+        existant[i] = ' {}{}'.format(prefix,existant[i])
+
+    return ''.join(existant)
+
 class Build(build_ext):
-
-    def parse_paths(paths, prefix):
-
-        existant = []
-        for path in paths.split(':'):
-            if os.path.exists(path):
-                existant.append(path)
-
-        for i in range(len(existant)):
-            existant[i] = ' {}{}'.format(prefix,existant[i])
-
-        return ''.join(existant)
 
     LIB = os.environ.get('LIB')
     INCLUDE = os.environ.get('INCLUDE')
