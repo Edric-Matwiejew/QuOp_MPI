@@ -839,10 +839,9 @@ class Ansatz:
                     param_slice = params[self.param_map[i] : self.param_map[i + 1]]
 
                     if unitary.operator_n_params > 0:
-
-                        evolution_parameter = param_slice[: self.unitary_n_params]
+                        evolution_parameter = param_slice[:-unitary.operator_n_params]
                         unitary.variational_parameters = param_slice[
-                            self.unitary_n_params :
+                                unitary.unitary_n_params::
                         ]
 
                         unitary.gen_operator()
@@ -1052,8 +1051,6 @@ class Ansatz:
                             best_p_result = result
                             best_p_params = copy(x)
 
-                        first = False
-
                     if filename is not None:
 
                         if first:
@@ -1068,6 +1065,8 @@ class Ansatz:
                                 label + "_" + str(depth) + "_" + str(i),
                                 action="a",
                             )
+
+                    first = False
 
                 else:
 
