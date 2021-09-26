@@ -55,6 +55,8 @@ If they are not present:
 
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path to HDF5 lib>:<path to FFTW lib>
 
+The file 'setup.cfg' sets the FFTW and HDF5 library and include paths.
+
 Documentation
 -------------
 
