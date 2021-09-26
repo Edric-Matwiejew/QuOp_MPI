@@ -37,9 +37,6 @@ class Build(build_ext):
         ):
             sys.exit(-1)
 
-        os.environ.clear()
-        os.environ.update(old_env)
-
         build_ext.run(self)
 
 
