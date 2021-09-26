@@ -5,7 +5,7 @@ Overview of submission:
 
 	QuOp_MPI/                      # Description (Section in manuscript)
 	---------                      -------------------------------------
-	├── summary_of_contents.txt    # Summary of all files submitted to CPC.
+	├── summary_of_contents.txt    # Summary of all data and program files submitted Journal of Computer Science.
 	├── MANIFEST.in                # Additional files to included with installation of QuOp_MPI.
 	├── README.rst                 # Package overview and installation instructions.
 	├── requirements.txt		   # Required python packages.
@@ -19,7 +19,7 @@ Overview of submission:
 	│   ├── quop_bench             # Python module for QuOp_MPI benchmarks.
 	│   ├── plots                  # Scripts to plot benchmarking results.
 	│   ├── programs               # Slurm job-submission scripts.
-	│   └── results                # Benchmarking results included for the CPC submission.
+	│   └── results                # Benchmarking results included for the Journal of Computer Science Submission.
 	└── examples                   # QuOp_MPI examples. Section 6 of the manuscript.
 	   ├── README.md               # Examples README.
 	   ├── maxcut				   # (Section 6.1.1 and 6.1.3).
