@@ -13,18 +13,10 @@ class Build(build_ext):
 
     def run(self):
 
-        LIB = os.environ.get('LIB')
-        INCLUDE = os.environ.get('INCLUDE')
-
-        if LIB is None:
-            LIB = "/usr/local/lib:/usr/lib:/usr/lib/x86_64-linux-gnu"
-        if INCLUDE is None:
-            INCLUDE = "/usr/local/include:/usr/include:/usr/include/x86_64-linux-gnu"
-
         def parse_paths(paths, prefix):
 
             existant = []
-            for path in paths.split(':'):
+            for path in paths:
                 if os.path.exists(path):
                     existant.append(path)
 
@@ -33,11 +25,20 @@ class Build(build_ext):
 
             return ''.join(existant)
 
-        lib = parse_paths(LIB, '-L')
-        include = parse_paths(INCLUDE, '-I')
+        old_env = os.environ.copy()
+
+        path_string = ""
+        for path in self.library_dirs:
+            path_string += "{}:".format(path)
+
+        lib = parse_paths(self.library_dirs, '-L')
+        include = parse_paths(self.include_dirs, '-I')
 
         if subprocess.call("make -C src LIB=\"{}\" INCLUDE=\"{}\"".format(lib, include), shell = True) != 0:
             sys.exit(-1)
+
+        os.environ.clear()
+        os.environ.update(old_env)
 
         build_ext.run(self)
 
@@ -45,7 +46,7 @@ class Build(build_ext):
 NAME = 'quop_mpi'
 DESCRIPTION = 'A framework for simulation of quantum variational algorithms.'
 URL = 'https://github.com/Edric-Matwiejew/QuOp_MPI'
-EMAIL = 'Edric.Matwiejew@research.uwa.au'
+EMAIL = 'edric.matwiejew@research.uwa.au'
 AUTHOR = 'Edric Matwiejew'
 REQUIRES_PYTHON = '>=3.6.0'
 VERSION = '1.0.0'
