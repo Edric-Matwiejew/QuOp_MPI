@@ -188,7 +188,7 @@ class Ansatz:
         .. code-block:: python
 
             self.set_optimiser( 'scipy',
-                    {'method':'BFGS','tol':1e-8},
+                    {'method':'BFGS','options':{'gtol':1e-3}},
                                 ['fun','nfev','success'])
 
 
@@ -725,7 +725,7 @@ class Ansatz:
 
                 self.set_optimiser(
                     "scipy",
-                    {"method": "BFGS", "tol": 1e-8},
+                    {"method": "BFGS", 'options':{'gtol':1e-3}},
                     ["fun", "nfev", "success"],
                 )
 
