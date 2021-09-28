@@ -139,14 +139,13 @@ class Unitary:
         self.partition_table = np.zeros(self.size + 1, dtype=np.int32)
         self.partition_table[self.rank + 1] = self.local_i
 
-        self.partition_table[1:] = self.MPI_COMM.allgather(
-            self.partition_table[self.rank + 1]
+        self.partition_table = self.MPI_COMM.allreduce(
+            self.partition_table,
+            op = MPI.SUM
         )
 
-        self.partition_table[0] = 1
-
-        for i in range(1, self.MPI_COMM.Get_size() + 1):
-            self.partition_table[i] += self.partition_table[i - 1]
+        self.partition_table = np.cumsum(self.partition_table)
+        self.partition_table += 1
 
         self.lb = self.partition_table[self.rank] - 1
         self.ub = self.partition_table[self.rank + 1] - 1

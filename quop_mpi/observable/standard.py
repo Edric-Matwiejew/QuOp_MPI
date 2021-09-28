@@ -115,7 +115,7 @@ def csv(system_size, partition_table, MPI_COMM, filename=None, **kwargs):
     return __scatter_1D_array(diagonals, partition_table, MPI_COMM, np.float64)
 
 
-def hdf5(local_i, local_i_offset, MPI_COMM, filename=None, dataset_name=None):
+def hdf5(partition_table, MPI_COMM, filename=None, dataset_name=None):
 
     """Import :math:`\\text{diag}(\hat{Q})` from a HDF5 file.
 
@@ -137,20 +137,20 @@ def hdf5(local_i, local_i_offset, MPI_COMM, filename=None, dataset_name=None):
 
     import h5py as h5
 
-    for i in range(MPI_COMM.size):
+    if MPI_COMM.rank == 0:
+        f = h5.File(filename, "r")
 
-        if MPI_COMM.rank == i:
-            f = h5.File(filename, "r")
+        operator = np.array(
+            f[dataset_name],
+            dtype = np.float64
+        )
+        print(operator, partition_table, type(operator), type(operator[0]), operator.shape, 2**16)
 
-            operator = np.array(
-                f[dataset_name][local_i_offset : local_i_offset + local_i]
-            )
+        f.close()
+    else:
+        operator = None
 
-            f.close()
-
-        MPI_COMM.barrier()
-
-    return operator
+    return __scatter_1D_array(operator, partition_table, MPI_COMM, np.float64)
 
 
 def array(system_size, partition_table, MPI_COMM, array=None):

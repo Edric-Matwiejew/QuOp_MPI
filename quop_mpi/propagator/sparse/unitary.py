@@ -36,15 +36,10 @@ class unitary(Unitary):
     def plan(self, system_size, MPI_COMM):
 
         size = MPI_COMM.Get_size()
-        rank = MPI_COMM.Get_size()
+        rank = MPI_COMM.Get_rank()
 
-        local_i = system_size // size
+        local_i = int(system_size // size + np.ceil((system_size % size) // (rank + 1) / size))
 
-        if local_i * size != system_size:
-            remainder = system_size - local_i * size
-            if rank < remainder:
-                local_i += 1
-                print(local_i, flush = True)
         return local_i, local_i
 
     def copy_plan(self, ex_unitary):

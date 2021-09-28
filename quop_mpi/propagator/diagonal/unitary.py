@@ -22,14 +22,9 @@ class unitary(Unitary):
     def plan(self, system_size, MPI_COMM):
 
         size = MPI_COMM.Get_size()
-        rank = MPI_COMM.Get_size()
+        rank = MPI_COMM.Get_rank()
 
-        local_i = system_size // size
-
-        if local_i * size != system_size:
-            remainder = system_size - local_i * size
-            if rank < remainder:
-                local_i += 1
+        local_i = int(system_size // size + np.ceil((system_size % size) // (rank + 1) / size))
 
         return local_i, local_i
 
