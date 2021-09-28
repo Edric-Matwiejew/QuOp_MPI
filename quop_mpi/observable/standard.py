@@ -137,13 +137,18 @@ def hdf5(local_i, local_i_offset, MPI_COMM, filename=None, dataset_name=None):
 
     import h5py as h5
 
-    f = h5.File(filename, "r")
+    for i in range(MPI_COMM.size):
 
-    operator = np.array(
-        f[dataset_name][local_i_offset : local_i_offset + local_i]
-    ).view(np.float64)
+        if MPI_COMM.rank == i:
+            f = h5.File(filename, "r")
 
-    f.close()
+            operator = np.array(
+                f[dataset_name][local_i_offset : local_i_offset + local_i]
+            )
+
+            f.close()
+
+        MPI_COMM.barrier()
 
     return operator
 
