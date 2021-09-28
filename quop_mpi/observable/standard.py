@@ -144,9 +144,9 @@ def hdf5(partition_table, MPI_COMM, filename=None, dataset_name=None):
             f[dataset_name],
             dtype = np.float64
         )
-        print(operator, partition_table, type(operator), type(operator[0]), operator.shape, 2**16)
 
         f.close()
+
     else:
         operator = None
 
