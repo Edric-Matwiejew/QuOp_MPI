@@ -8,6 +8,7 @@ Overview of submission:
 	├── summary_of_contents.txt    # Summary of all data and program files submitted Journal of Computer Science.
 	├── MANIFEST.in                # Additional files to included with installation of QuOp_MPI.
 	├── README.rst                 # Package overview and installation instructions.
+	├── CONTRIBUTORS.md            # Acknowledgement of code contributions.
 	├── requirements.txt		   # Required python packages.
 	├── setup.py                   # Python setup file for module installation
 	├── docs                       # Package documentation.
@@ -29,11 +30,12 @@ Overview of submission:
 Complete listing of files
 -------------------------
 
-Altogether there are 69 directories and 491 files.
+Altogether there are 69 directories and 492 files.
 
 	QuOp_MPI
 	├── MANIFEST.in
 	├── README.rst
+	├── CONTRIBUTORS.md
 	├── benchmarks
 	│   ├── README.md
 	│   ├── plots
