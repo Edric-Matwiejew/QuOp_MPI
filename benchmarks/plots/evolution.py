@@ -143,7 +143,6 @@ qwoa_files = [
     "8_qwoa_evolution.csv",
     "10_qwoa_evolution.csv",
     "12_qwoa_evolution.csv",
-    "14_qwoa_evolution.csv",
 ]
 
 evolution_multi(
@@ -170,7 +169,6 @@ qaoa_files = [
     "8_qaoa_evolution.csv",
     "10_qaoa_evolution.csv",
     "12_qaoa_evolution.csv",
-    "14_qaoa_evolution.csv",
 ]
 
 evolution_multi(
