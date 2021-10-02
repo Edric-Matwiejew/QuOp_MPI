@@ -18,8 +18,8 @@ https://quop-mpi.readthedocs.io.
 
 QuOp_MPI has provided numerical results for:
 
-- Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based vehicle routing optimisation. arXiv:2109.14907 [physics, physics:quant-ph] (2021).
-- Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based portfolio optimisation. Quantum 5, 513 (2021).
+#. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based vehicle routing optimisation. arXiv:2109.14907 [physics, physics:quant-ph] (2021).
+#. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based portfolio optimisation. Quantum 5, 513 (2021).
 
 General Dependencies
 --------------------
