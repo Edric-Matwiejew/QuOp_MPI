@@ -368,7 +368,7 @@ class Ansatz:
 
     def get_expectation_value(self):
         """
-        :math:`\langle \hat{Q} \\rangle =  \langle \\boldsymbol{\\theta} | \\boldsymbol{\\theta} \\rangle`
+        :math:`\langle \hat{Q} \\rangle =  \langle \\boldsymbol{\\theta} | \hat{Q} | \\boldsymbol{\\theta} \\rangle`
 
         :return: The expectation value of the quality operator, returned to all MPI nodes.
         :rtype: float
