@@ -14,7 +14,7 @@ https://arxiv.org/abs/1912.07353 for the theoretical background.
 QuOp_MPI’s complete documentation is hosted at
 https://quop-mpi.readthedocs.io.
 
-** Publications **
+**Publications**
 
 QuOp_MPI has provided numerical results for:
 
