@@ -39,7 +39,7 @@ Python Dependencies
 
 -  numpy
 -  scipy
--  h5py (which has been `built against parallel HDF5<https://docs.h5py.org/en/stable/build.html#building-against-parallel-hdf5>`_)
+-  h5py (which has been `built against parallel HDF5 <https://docs.h5py.org/en/stable/build.html#building-against-parallel-hdf5>`_)
 -  nlopt
 -  networkx (To run included example programs.)
 
