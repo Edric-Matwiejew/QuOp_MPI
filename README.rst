@@ -52,7 +52,8 @@ https://github.com/Edric-Matwiejew/QuOp_MPI. Then:
 ::
 
     python3 setup.py sdist bdist_wheel
-    pip3 install quop_mpi-0.0.1.tar.gz
+    cd dist
+    pip3 install quop_mpi-1.0.0.tar.gz
 
 Before importing QuOp_MPI in a python script, ensure that the path to
 the FFTW and HDF5 libraries is present in the LD_LIBRARY_PATH environment variable.
