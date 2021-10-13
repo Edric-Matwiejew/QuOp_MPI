@@ -8,9 +8,10 @@ import subprocess
 
 from setuptools import find_packages, setup, Command
 from setuptools.command.build_ext import build_ext
+from setuptools.command.sdist import sdist
+from setuptools import Command
 
-
-class Build(build_ext):
+class Build_Ext(build_ext):
 
     def run(self):
 
@@ -38,6 +39,36 @@ class Build(build_ext):
             sys.exit(-1)
 
         build_ext.run(self)
+
+class Sdist(sdist):
+    def run(self):
+        self.run_command("build_ext")
+        return super().run()
+
+class Clean(Command):
+    """ Run 'make clean' in source directory.
+    """
+
+    description = 'delete built extension modules'
+
+    user_options = [
+            ]
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+
+        if (
+            subprocess.call(
+                'make -C src clean', shell=True
+            )
+            != 0
+        ):
+            sys.exit(-1)
 
 
 # Package meta-data.
@@ -89,12 +120,14 @@ setup(
     url=URL,
     packages=find_packages(),
     package_data={
-        "quop_mpi": ["*" + EXTENSION],
+        "quop_mpi": ["__lib/*" + EXTENSION],
     },
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     license="GPLv3",
     cmdclass={
-        "build_ext": Build,
+        "build_ext": Build_Ext,
+        "sdist":Sdist,
+        "clean":Clean
     },
 )
