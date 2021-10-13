@@ -13,30 +13,38 @@ from setuptools import Command
 
 class Build_Ext(build_ext):
 
-    def run(self):
+    def find_pkg(ENV, lib, prefix, pk_option):
 
-        def parse_paths(paths, prefix):
+        if ENV in os.environ:
 
-            existant = []
-            for path in paths:
-                if os.path.exists(path):
-                    existant.append(path)
+            env = f"-{prefix}/{os.environ[ENV]}"
 
-            for i in range(len(existant)):
-                existant[i] = " {}{}".format(prefix, existant[i])
+        else:
 
-            return "".join(existant)
+            env = subprocess.getoutput(f"pkg-config {pk_option} {lib}")
 
-        lib = parse_paths(self.library_dirs, "-L")
-        include = parse_paths(self.include_dirs, "-I")
+            if f"No package '{lib}' found" in env:
 
-        if (
-            subprocess.call(
-                'make -C src LIB="{}" INCLUDE="{}"'.format(lib, include), shell=True
-            )
-            != 0
-        ):
-            sys.exit(-1)
+                raise ValueError(
+                    f"Package {lib} not found in the pkg-config search path.\
+                    \nIf {lib} is installed try specifying the path using the '{ENV}' enviroment variable."
+                )
+
+        return env
+
+    Lfftw3 = find_pkg("FFTW3_LIB", "fftw3", "L", "--libs-only-L")
+    Ifftw3 = find_pkg("FFTW3_INCLUDE", "fftw3", "I", "--cflags-only-I")
+    Lhdf5 = find_pkg("HDF5_LIB", "hdf5", "L", "--libs-only-L")
+    Ihdf5 = find_pkg("HDF5_INCLUDE", "hdf5", "I", "--cflags-only-I")
+
+    if (
+        subprocess.call(
+            f"make -C src LIB='{Lfftw3} {Lhdf5}' INCLUDE='{Ifftw3} {Ihdf5}'", shell=True
+        )
+        != 0
+    ):
+        sys.exit(-1)
+
 
         build_ext.run(self)
 
