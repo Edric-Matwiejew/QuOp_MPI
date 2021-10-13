@@ -7,14 +7,17 @@ Introduction
 ------------
 
 QuOp_MPI is a Python 3 module for parallel distributed memory simulation
-of quantum variational algorithms on arbitrary mixing
-graphs. See https://arxiv.org/abs/1804.08227 and
-https://arxiv.org/abs/1912.07353 for the theoretical background.
+of quantum variational algorithms with arbitrary phase-shift and mixing
+graphs. The design, usage and performence of QuOp_MPI is covered in an
+`article which is accessible as a preprint on arXiv <https://arxiv.org/abs/2110.03963>`_.
 
-QuOp_MPI’s complete documentation is hosted at
-https://quop-mpi.readthedocs.io.
+QuOp_MPI’s `documentation is hosted on Read the Docs <https://quop-mpi.readthedocs.io>`_.
 
 **Publications**
+
+Preprint Article:
+
+#.Matwiejew, E. & Wang, J. B. QuOp_MPI: a framework for parallel simulation of quantum variational algorithms. (2021).
 
 QuOp_MPI has provided numerical results for:
 
@@ -29,25 +32,23 @@ General Dependencies
 -  HDF5 configured with –enable-fortran, –enable-parallel, and
    –enable-shared.
 
-During installation, setup.py assumes that the include and lib directories
-containing the FTW and HDf5 shared object libraries are located in /usr/local,
-or /usr this file may need to be modified for your system.
+When building the exeternal modules, by default setup.py searches the lib and include directories of /usr/local and /usr for the FFTW and HDF5 library and header files, these paths may be modified by editing 'setup.cfg'. 
 
 Python Dependencies
 -------------------
 
 -  numpy
 -  scipy
--  h5py
+-  h5py (which has been `built against parallel HDF5<https://docs.h5py.org/en/stable/build.html#building-against-parallel-hdf5>`_)
 -  nlopt
 -  networkx (To run included example programs.)
 
 Installation on Unix-Like Systems
 ---------------------------------
 
-If the general and python dependencies are satisfied, QuOp_MPI can be
+If the above described General and Python dependencies are satisfied, QuOp_MPI can be
 installed by downloading or cloning the program from
-https://github.com/Edric-Matwiejew/QuOp_MPI. Then:
+https://github.com/Edric-Matwiejew/QuOp_MPI and, from within the QuOp_MPI directory, executing the following:
 
 ::
 
@@ -55,9 +56,9 @@ https://github.com/Edric-Matwiejew/QuOp_MPI. Then:
     cd dist
     pip3 install quop_mpi-1.0.0.tar.gz
 
-Before importing QuOp_MPI in a python script, ensure that the path to
-the FFTW and HDF5 libraries is present in the LD_LIBRARY_PATH environment variable.
-If they are not present:
+Ensure that the path to the FFTW and HDF5 libraries is present in the LD_LIBRARY_PATH environment variable.
+
+If they are not present, execute the following command or (even better) append it to your .bashrc:
 
 ::
 
@@ -68,8 +69,7 @@ The file 'setup.cfg' sets the FFTW and HDF5 library and include paths.
 Documentation
 -------------
 
-To generate a local copy of the documentation, if not already present,
-install sphinx, sphinx-rtd-theme and m2r. On systems using pip:
+To generate a local copy of the documentation, install sphinx, sphinx-rtd-theme and m2r. On systems using pip:
 
 ::
 
@@ -87,11 +87,8 @@ Detailed installation on Windows
 --------------------------------
 
 QuOp_MPI has been developed for Unix-like systems. While, in principle,
-it is perfectly possible to install QuOp_MPI on a Windows system, this
-is not currently supported. If you wish to run QuOp_MPI on Windows 10 it
-is advised that the user install the Linux Subsystem for windows, choose
-Ubuntu as the installed Linux distribution and proceed with the
-installation method detailed below.
+it is possible to install QuOp_MPI on a Windows system, this
+is not currently supported. The recommended method for using QuOp_MPI on Windows 10 is to install the Linux Subsystem for Windows, choose Ubuntu as the Linux distribution and proceed with the installation instructions detailed below.
 
 Detailed installation on Ubuntu 18.04.4
 ---------------------------------------
