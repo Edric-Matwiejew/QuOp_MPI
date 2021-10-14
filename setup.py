@@ -57,7 +57,7 @@ class Build_Ext(build_ext):
     if "" in Lpaths:
         Lpaths.append("-L/usr/lib")
     if "" in Ipaths:
-       ILpaths.append("-I/usr/include")
+        Ipaths.append("-I/usr/include")
 
     if (
         subprocess.call(
