@@ -1,3 +1,5 @@
+import mpi4py.MPI
+import h5py
 from quop_mpi.algorithm import qaoa
 from quop_mpi import observable
 from quop_mpi.toolkit import I, Z

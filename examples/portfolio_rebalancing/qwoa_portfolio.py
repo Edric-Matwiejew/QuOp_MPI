@@ -1,3 +1,5 @@
+import mpi4py.MPI
+import h5py
 from quop_mpi.algorithm import qwoa
 from quop_mpi import observable
 import pandas as pd

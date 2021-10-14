@@ -1,3 +1,5 @@
+import mpi4py.MPI
+import h5py
 from quop_mpi.algorithm import qaoa
 import numpy as np
 import networkx as nx

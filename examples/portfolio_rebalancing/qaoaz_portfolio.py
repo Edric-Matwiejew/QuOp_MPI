@@ -1,3 +1,5 @@
+import mpi4py.MPI
+import h5py
 from quop_mpi import Ansatz, observable, state, param
 from quop_mpi.propagator import diagonal, sparse
 from quop_mpi.toolkit import kron, kron_power

@@ -1,3 +1,5 @@
+import mpi4py.MPI
+import h5py
 from quop_mpi import Ansatz
 from quop_mpi.propagator import diagonal, sparse
 from quop_mpi.observable import serial
@@ -46,7 +48,7 @@ alg = Ansatz(system_size)
 alg.set_unitaries([UQ, UW])
 
 alg.set_observables(serial, {"function": maxcut_qualities, "args": [computed_terms]})
-
+alg.set_depth(2)
 alg.execute()
 alg.print_optimiser_result()
 alg.save("maxcut_extended", "depth 2", "w")
