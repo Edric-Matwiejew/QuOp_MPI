@@ -152,7 +152,7 @@ setup(
     },
     install_requires=REQUIRED,
     extras_require=EXTRAS,
-
+    include_package_data=True,
     license="GPLv3",
     cmdclass={
         "build_ext": Build_Ext,
