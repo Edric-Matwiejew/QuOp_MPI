@@ -22,7 +22,7 @@ sudo python3 -m pip install wheel numpy scipy mpi4py nlopt pandas
 # Importing a version of H5Py which is built against a different version of
 # HDF5 with cause a QuOp_MPI to crash when writing simulation results to disk.
 # Build h5py against the local version of HDF5:
-sudo CC="mpicc" HDF5_PKGCONFIG_NAME="hdf5-mpich" python3 -m pip -v install --no-cache --no-binary=h5py h5py
+sudo CC="mpicc" MPI="ON" HDF5_PKGCONFIG_NAME="hdf5-mpich" python3 -m pip -v install --no-cache --no-binary=h5py h5py
 
 # Install optional python modules needed to run the examples:
 sudo python3 -m pip install pandas-datareader networkx

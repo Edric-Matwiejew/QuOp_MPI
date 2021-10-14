@@ -34,7 +34,16 @@ Installation
 
 ::
 
-    sudo apt-get install build-essential pkg-config python3-pip cython git <mpich/open-mpi> libhdf5-<mpich/openmpi>-dev libfftw3-dev libfftw3-mpi-dev
+    sudo apt-get update -qq && apt-get -y  --no-install-recommends install \
+    build-essential \
+    pkg-config \
+    python3-pip \
+    python3-dev \
+    <mpich/open-mpi>\
+    libhdf5-<mpich/openmpi>-dev \
+    libfftw3-dev \
+    libfftw3-mpi-dev
+
 
 **MacOS**
 
@@ -48,16 +57,23 @@ Using the `homebrew <https://brew.sh/>`_ package manager:
 
 ::
 
-    python3 -m pip install wheel numpy pandas pandas-datareader scipy networkx matplotlib nlopt mpi4py
+    python3 -m pip install setuptools
+    sudo python3 -m pip install wheel numpy scipy mpi4py nlopt pandas
 
 Install `h5py built against parallel HDF5 <https://docs.h5py.org/en/stable/build.html#building-against-parallel-hdf5>`_:
 
 ::
 
-    CC=mpicc HDF5_MPI="ON" python3 -m pip install --no-binary=h5py h5py
+    sudo CC="mpicc" MPI="ON" HDF5_PKGCONFIG_NAME="hdf5-mpich" python3 -m pip -v install --no-cache --no-binary=h5py h5py
 
 .. warning::
     Importing an h5py installation built against a different, or non-parallel, version of HDF5 will cause QuOp_MPI to crash when attempting to save simulation results.
+
+Install optional Python dependancies needed to run the example programs:
+
+::
+
+    sudo python3 -m pip install pandas-datareader networkx
 
 2. Install QuOp_MPI
 -------------------
@@ -74,18 +90,13 @@ Install `h5py built against parallel HDF5 <https://docs.h5py.org/en/stable/build
     python3 -m pip install quop_mpi-1.0.0.tar.gz
 
 
-When building the external modules, by default setup.py searches the lib and include directories of /usr/local and /usr for the FFTW and HDF5 library and header files, these paths may be modified by editing 'setup.cfg'.
-
-
-Ensure that the path to the FFTW and HDF5 libraries is present in the LD_LIBRARY_PATH environment variable.
-
-If they are not present, execute the following command or (even better) append it to your .bashrc:
+Test the installation by running an example:
 
 ::
 
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path to HDF5 lib>:<path to FFTW lib>
-
-See 'Editing .bashrc' below for instruction on how to edit .bashrc.
+    cd ../
+    cd examples/maxcut
+    python3 maxcut.py
 
 Building QuOp_MPI's Documentation
 =================================
