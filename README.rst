@@ -87,7 +87,7 @@ Install optional Python dependancies needed to run the example programs:
     cd QuOp_MPI
     python3 setup.py sdist bdist_wheel
     cd dist
-    python3 -m pip install quop_mpi-1.0.0.tar.gz
+    python3 -m pip install quop_mpi-1.0.1.tar.gz
 
 
 Test the installation by running an example:
