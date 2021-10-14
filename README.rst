@@ -57,7 +57,7 @@ Using the `homebrew <https://brew.sh/>`_ package manager:
 
 ::
 
-    python3 -m pip install setuptools
+    sudo python3 -m pip install setuptools
     sudo python3 -m pip install wheel numpy scipy mpi4py nlopt pandas
 
 Install `h5py built against parallel HDF5 <https://docs.h5py.org/en/stable/build.html#building-against-parallel-hdf5>`_:
