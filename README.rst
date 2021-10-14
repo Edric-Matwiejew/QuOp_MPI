@@ -37,6 +37,7 @@ Installation
     sudo apt-get update -qq && apt-get -y  --no-install-recommends install \
     build-essential \
     pkg-config \
+    git \
     python3-pip \
     python3-dev \
     <mpich/open-mpi>\
