@@ -54,14 +54,14 @@ class Build_Ext(build_ext):
     # pkg-config may return an empty string if the libraries are present
     # in a deafult search path. If that happens, set deafults:
 
-    if "" in Lpaths:
+    if '' in Lpaths:
         Lpaths.append("-L/usr/lib")
-    if "" in Ipaths:
+    if '' in Ipaths:
         Ipaths.append("-I/usr/include")
 
     if (
         subprocess.call(
-            f"make -C src LIB='{Lfftw3} {Lhdf5}' INCLUDE='{Ifftw3} {Ihdf5}'", shell=True
+            f"make -C src LIB='{' '.join(Lpaths)}' INCLUDE='{' '.join(Ipaths)}'", shell=True
         )
         != 0
     ):
