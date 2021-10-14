@@ -106,7 +106,7 @@ URL = "https://github.com/Edric-Matwiejew/QuOp_MPI"
 EMAIL = "edric.matwiejew@research.uwa.au"
 AUTHOR = "Edric Matwiejew"
 REQUIRES_PYTHON = ">=3.6.0"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # What packages are required for this module to be exeuted?
 REQUIRED = [
