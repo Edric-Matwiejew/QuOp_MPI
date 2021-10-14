@@ -32,7 +32,7 @@ sudo python3 setup.py sdist bdist_wheel
 
 # Install QuOp_MPI:
 cd dist
-sudo python3 -m pip install quop_mpi-1.0.0.tar.gz
+sudo python3 -m pip install quop_mpi-1.0.1.tar.gz
 
 # Test the installation by running an example:
 cd ../
