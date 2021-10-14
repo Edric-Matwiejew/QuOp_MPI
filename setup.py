@@ -21,6 +21,17 @@ class Build_Ext(build_ext):
 
         else:
 
+            pkgconfig_exists = subprocess.getoutput("which pkg-config")
+
+            if pkgconfig_exists == "":
+                raise RuntimeError(
+                "Package pkg-config not found.\n\
+                 If environment variables 'FFTW3_LIB',\
+                 'FFTW3_INCLUDE', 'HDF5_LIB' and 'HDF5_INCLUDE'\
+                 are not set, installation of QuOp_MPI requires\
+                 pkg-config."
+                 )
+
             env = subprocess.getoutput(f"pkg-config {pk_option} {lib}")
 
             if f"No package '{lib}' found" in env:
@@ -37,6 +48,17 @@ class Build_Ext(build_ext):
     Lhdf5 = find_pkg("HDF5_LIB", "hdf5", "L", "--libs-only-L")
     Ihdf5 = find_pkg("HDF5_INCLUDE", "hdf5", "I", "--cflags-only-I")
 
+    Lpaths = [Lfftw3, Lhdf5]
+    Ipaths = [Ifftw3, Ihdf5]
+
+    # pkg-config may return an empty string if the libraries are present
+    # in a deafult search path. If that happens, set deafults:
+
+    if "" in Lpaths:
+        Lpaths.append("-L/usr/lib")
+    if "" in Ipaths:
+       ILpaths.append("-I/usr/include")
+
     if (
         subprocess.call(
             f"make -C src LIB='{Lfftw3} {Lhdf5}' INCLUDE='{Ifftw3} {Ihdf5}'", shell=True
@@ -44,7 +66,6 @@ class Build_Ext(build_ext):
         != 0
     ):
         sys.exit(-1)
-
 
         build_ext.run(self)
 
@@ -56,7 +77,6 @@ class Sdist(sdist):
 class Clean(Command):
     """ Run 'make clean' in source directory.
     """
-
     description = 'delete built extension modules'
 
     user_options = [
@@ -132,6 +152,7 @@ setup(
     },
     install_requires=REQUIRED,
     extras_require=EXTRAS,
+
     license="GPLv3",
     cmdclass={
         "build_ext": Build_Ext,
