@@ -15,14 +15,13 @@ libfftw3-mpi-dev
 
 # required
 sudo python3 -m pip install setuptools
-sudo python3 -m pip install wheel numpy scipy mpi4py
-sudo CC=mpicc HDF5_MPI="ON" python3 -m pip -v install --no-binary=h5py h5py
+sudo python3 -m pip install wheel numpy scipy mpi4py h5py
 
 # recommended
 sudo python3 -m pip install nlopt pandas
 
 # optional (to run examples)
-sudo python3 -m pip pandas-datareader networkx
+sudo python3 -m pip install pandas-datareader networkx
 sudo python3 setup.py sdist bdist_wheel
 
 # build the package and install QuOp_MPI
