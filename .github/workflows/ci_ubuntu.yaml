@@ -18,7 +18,6 @@ jobs:
         py-arch:
           - x64
         mpi:
-          - mpich
           - openmpi
         os:
           - ubuntu-18.04
@@ -38,11 +37,7 @@ jobs:
       uses: mpi4py/setup-mpi@v1
       with:
         mpi: ${{ matrix.mpi }}
-        
-    - name: Install HDF5 and FFTW parallel libraries (mpich).
-      if: matrix.mpi == 'mpich'
-      run: sudo apt install -y pkg-config libhdf5-mpich-dev libfftw3-dev libfftw3-mpi-dev
-    
+           
     - name: Install HDF5 and FFTW parallel libraries (open-mpi).
       if: matrix.mpi == 'openmpi'
       run: sudo apt install -y -q pkg-config libhdf5-openmpi-dev libfftw3-dev libfftw3-mpi-dev
