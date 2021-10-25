@@ -1,4 +1,4 @@
-name: Builds (Ubuntu 18.04)
+name: Builds
 
 on:
   push:
