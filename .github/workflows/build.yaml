@@ -1,4 +1,4 @@
-name: 'Devlopment Builds'
+name: 'Builds'
 
 on:
   push:
