@@ -17,7 +17,7 @@ class Build_Ext(build_ext):
 
         if ENV in os.environ:
 
-            env = f"-{prefix}/{os.environ[ENV]}"
+            env = f"-{prefix}{os.environ[ENV]}"
 
         else:
 
