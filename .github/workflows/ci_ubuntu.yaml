@@ -1,4 +1,4 @@
-name: Build (Ubuntu 18.04)
+name: Builds (Ubuntu 18.04)
 
 on:
   push:
@@ -15,6 +15,8 @@ jobs:
         py-version:
           - 3.6
           - 3.7
+          - 3.8
+          - 3.9
         py-arch:
           - x64
         mpi:
