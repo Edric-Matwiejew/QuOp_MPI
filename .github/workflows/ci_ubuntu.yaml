@@ -41,8 +41,13 @@ jobs:
       with:
         mpi: ${{ matrix.mpi }}
         
-    - name: Install HDF5 and FFTW parallel libraries.
-      run: bash -x install_fftw_hdf5.sh ${{ matrix.mpi }}
+    - name: Install HDF5 and FFTW parallel libraries (mpich).
+      if: matrix.mpi == 'mpich'
+      run: sudo apt install -y pkg-config libhdf5-mpich-dev libfftw3-dev libfftw3-mpi-dev
+    
+    - name: Install HDF5 and FFTW parallel libraries (open-mpi).
+      if: matrix.mpi == 'openmpi'
+      run: sudo apt install -y -q pkg-config libhdf5-openmpi-dev libfftw3-dev libfftw3-mpi-dev
 
     - name: Use Python ${{ matrix.py-version }} ${{ matrix.py-arch }}
       uses: actions/setup-python@v2
