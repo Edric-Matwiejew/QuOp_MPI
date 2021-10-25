@@ -1,4 +1,4 @@
-|Documentation_Status| |DOI|
+|Documentation_Status| |DOI| |Builds_Ubuntu|
 
 ========
 QuOp_MPI
@@ -46,15 +46,7 @@ Installation
     libfftw3-mpi-dev
 
 
-**MacOS**
-
-Using the `homebrew <https://brew.sh/>`_ package manager:
-
-::
-
-    brew install gcc python wget pkg-config <mpich/open-mpi> swing guile octave hdf5-mpi fftw
-
-**Debian-Based Systems and MacOS**
+**Debian-Based Systems**
 
 ::
 
@@ -79,7 +71,7 @@ Install optional Python dependancies needed to run the example programs:
 2. Install QuOp_MPI
 -------------------
 
-**Debian-Based-Systems and MacOS**
+**Debian-Based-Systems**
 
 ::
 
@@ -117,7 +109,7 @@ And in ~/QuOp_MPI:
 Building FFTW3 and HDF5 From Source
 ===================================
 
-If parallel versions of FFTW3 and HDF5 packages are not available on your system, these packages can be built from source. For a comprehensive overview of their installation, please consult the documentation provided by the FFTW and HDF5 projects. The below commands should work with most Debian-Based and MacOS systems:
+If parallel versions of FFTW3 and HDF5 packages are not available on your system, these packages can be built from source. For a comprehensive overview of their installation, please consult the documentation provided by the FFTW and HDF5 projects. The below commands should work with most Unix-like systems:
 
 ::
 
@@ -167,3 +159,6 @@ report via Github. If you would like to get in touch, email me at edric.matwieje
 
 .. |DOI| image:: https://zenodo.org/badge/233372703.svg
    :target: https://zenodo.org/badge/latestdoi/233372703
+   
+.. |Builds_Ubuntu| image:: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/ci_ubuntu.yaml/badge.svg
+    :target: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/ci_ubuntu.yaml
