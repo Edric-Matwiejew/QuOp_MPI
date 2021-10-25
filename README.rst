@@ -27,9 +27,6 @@ Installation
 1. Install Dependencies
 -----------------------
 
-.. note::
-    Edit the below commands to choose between MPI implementations Open-MPI or MPICH (e.g. <mpich/open-mpi> -> mpich).
-
 **Debian-Based Systems**
 
 ::
@@ -40,8 +37,8 @@ Installation
     git \
     python3-pip \
     python3-dev \
-    <mpich/open-mpi>\
-    libhdf5-<mpich/openmpi>-dev \
+    open-mpi\
+    libhdf5-openmpi-dev \
     libfftw3-dev \
     libfftw3-mpi-dev
 
@@ -57,7 +54,7 @@ Install `h5py built against parallel HDF5 <https://docs.h5py.org/en/stable/build
 
 ::
 
-    sudo CC="mpicc" MPI="ON" HDF5_PKGCONFIG_NAME="hdf5-mpich" python3 -m pip -v install --no-cache --no-binary=h5py h5py
+    sudo CC="mpicc" MPI="ON" HDF5_PKGCONFIG_NAME="hdf5-openmpi" python3 -m pip -v install --no-cache --no-binary=h5py h5py
 
 .. warning::
     Importing an h5py installation built against a different, or non-parallel, version of HDF5 will cause QuOp_MPI to crash when attempting to save simulation results.
