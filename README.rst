@@ -157,5 +157,5 @@ report via Github. If you would like to get in touch, email me at edric.matwieje
 .. |DOI| image:: https://zenodo.org/badge/233372703.svg
    :target: https://zenodo.org/badge/latestdoi/233372703
    
-.. |Builds| image:: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/ci_ubuntu.yaml/badge.svg
-    :target: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/ci_ubuntu.yaml
+.. |Builds| image:: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/build.yaml/badge.svg
+    :target: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/build.yaml
