@@ -1,4 +1,4 @@
-name: 'Builds'
+name: 'Devlopment Builds'
 
 on:
   push:
@@ -21,6 +21,7 @@ jobs:
           - x64
         mpi:
           - openmpi
+          - mpich
         os:
           - ubuntu-18.04
           
@@ -42,6 +43,10 @@ jobs:
            
     - name: Install HDF5 and FFTW parallel libraries (open-mpi).
       if: matrix.mpi == 'openmpi'
+      run: sudo apt install -y -q pkg-config libhdf5-openmpi-dev libfftw3-dev libfftw3-mpi-dev
+      
+    - name: Install HDF5 and FFTW parallel libraries (mpich).
+      if: matrix.mpi == 'mpich'
       run: sudo apt install -y -q pkg-config libhdf5-openmpi-dev libfftw3-dev libfftw3-mpi-dev
 
     - name: Use Python ${{ matrix.py-version }} ${{ matrix.py-arch }}
