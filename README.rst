@@ -1,4 +1,4 @@
-|Documentation_Status| |DOI| |Builds|
+|Documentation_Status| |Builds| |DOI|
 
 ========
 QuOp_MPI
