@@ -7,7 +7,7 @@ QuOp_MPI
 Introduction
 ============
 
-QuOp_MPI is a Python 3 module for parallel distributed-memory simulation of quantum variational algorithms with arbitrary phase-shift and mixing operators. The design, usage and performance of QuOp_MPI are covered in an `article which is accessible as a preprint on arXiv <https://arxiv.org/abs/2110.03963>`_. QuOp_MPI’s `documentation is hosted on Read the Docs <https://quop-mpi.readthedocs.io>`_.
+QuOp_MPI is a Python 3 module for parallel distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators. The design, usage and performance of QuOp_MPI are covered in an `article which is accessible as a preprint on arXiv <https://arxiv.org/abs/2110.03963>`_. QuOp_MPI’s `documentation is hosted on Read the Docs <https://quop-mpi.readthedocs.io>`_.
 
 Publications
 ------------
