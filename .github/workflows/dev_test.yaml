@@ -70,9 +70,7 @@ jobs:
 
     - name: Install QuOp_MPI
       run: |
-        cd quop_mpi-py${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
         python -m pip install dist/quop_mpi*whl
-        cd ../
 
     - name: Run examples
       run: |
