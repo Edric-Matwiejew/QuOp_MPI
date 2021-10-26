@@ -72,7 +72,7 @@ jobs:
     - name: Install QuOp_MPI
       run: |
         cd /home/runner/work/QuOp_MPI/QuOp_MPI
-        python -m pip install dist/quop_mpi*whl
+        python -m pip install quop_mpi*whl
 
     - name: Run examples
       run: |
