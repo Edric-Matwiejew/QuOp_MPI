@@ -118,6 +118,7 @@ REQUIRED = [
     "networkx",
     "pandas",
     "pandas-datareader",
+    "matplotlib"
 ]
 
 # What packages are optional?
