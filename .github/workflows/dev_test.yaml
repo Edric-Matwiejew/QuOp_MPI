@@ -93,4 +93,4 @@ jobs:
       uses: actions/upload-artifact@v1
       with:
         name: example_plots${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
-        path: examples/**/*.png
+        path: /home/runner/work/QuOp_MPI/QuOp_MPI/examples/*.png
