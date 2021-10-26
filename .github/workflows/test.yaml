@@ -2,7 +2,7 @@ name: 'Test'
 
 on:
   workflow_run:
-    workflows: ["Devlopment Builds"]
+    workflows: ['Development Builds']
     branches: [dev]
     types:
       - completed
