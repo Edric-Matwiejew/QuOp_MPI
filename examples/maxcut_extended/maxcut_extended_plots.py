@@ -3,10 +3,7 @@ import numpy as np
 import h5py as h5
 import networkx as nx
 
-plt.rcParams["text.usetex"] = True
 plt.rcParams["font.size"] = 16
-plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
-plt.rcParams["mathtext.fontset"] = "cm"
 
 figure_size = (5, 4)
 
