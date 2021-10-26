@@ -87,10 +87,10 @@ jobs:
         mpiexec -n 2 python examples/portfolio_rebalancing/qwoa_portfolio.py
         mpiexec -n 2 python examples/portfolio_rebalancing/qaoaz_portfolio.py
         python examples/portfolio_rebalancing/portfolio_plots.py
-        ls examples/**/*
+        ls
         
     - name: Upload example plots artifacts
       uses: actions/upload-artifact@v1
       with:
         name: example_plots${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
-        path: /home/runner/work/QuOp_MPI/QuOp_MPI/examples/*.png
+        path: /home/runner/work/QuOp_MPI/QuOp_MPI/*.png
