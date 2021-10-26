@@ -63,14 +63,14 @@ jobs:
 
     - name: Download artifact from most recent build
       uses: dawidd6/action-download-artifact@v2
-      branch: dev
-      name: quop_mpi-py${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
+      with:
+        workflow: dev_build.yaml
+        branch: dev
+        name: quop_mpi-py${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
 
     - name: Install QuOp_MPI
       run: |
-        cd quop_mpi-py${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
         python -m pip install dist/quop_mpi*whl
-        cd ../
 
     - name: Run examples
       run: |
@@ -90,3 +90,4 @@ jobs:
       with:
         name: example_plots${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
         path: examples/**/*.png
+        
