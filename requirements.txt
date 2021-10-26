@@ -6,3 +6,4 @@ h5py
 nlopt
 pandas
 pandas-datareader
+matplotlib
