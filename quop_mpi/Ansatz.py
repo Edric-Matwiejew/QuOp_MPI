@@ -828,6 +828,9 @@ class Ansatz:
 
         self.__pre_or_post()
 
+        if isinstance(x,list):
+            x = np.array(x, dtype = np.float64)
+
         if self.colours[self.COMM.Get_rank()] != -1:
 
             self.final_state[: self.local_i] = self.ansatz_initial_state[: self.local_i]
