@@ -826,6 +826,8 @@ class Ansatz:
         :type x: array, float
         """
 
+        self.__pre_or_post()
+
         if self.colours[self.COMM.Get_rank()] != -1:
 
             self.final_state[: self.local_i] = self.ansatz_initial_state[: self.local_i]
