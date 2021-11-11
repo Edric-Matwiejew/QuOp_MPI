@@ -809,10 +809,10 @@ class Ansatz:
             if self.log:
                 self.__post_log()
 
-        if self.setup_unitaries:
+        if not self.setup_unitaries:
             self.__post_unitaries()
 
-        if self.setup_parallel:
+        if not self.setup_parallel:
             self.__post_parallel()
 
         self.post_called = True
