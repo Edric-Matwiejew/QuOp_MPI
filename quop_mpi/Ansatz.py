@@ -41,6 +41,7 @@ class Ansatz:
         # can be set using methods in the system class
         # but default values are used if not set
         self.ansatz_depth = 1  # ansatz circuit depth
+        self.total_params = None
         self.initial_state_type = None
         self.optimiser = (
             None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
@@ -803,16 +804,17 @@ class Ansatz:
                 if self.COMM.Get_rank() in self.jac_ranks:
                     MPI.Comm.Free(self.COMM_JAC)
 
+
     def post(self):
 
         if not self.benchmarking:
             if self.log:
                 self.__post_log()
 
-        if self.setup_unitaries:
+        if not self.setup_unitaries:
             self.__post_unitaries()
 
-        if self.setup_parallel:
+        if not self.setup_parallel:
             self.__post_parallel()
 
         self.post_called = True
@@ -825,6 +827,8 @@ class Ansatz:
         :param x: :math:`|\\boldsymbol{\\theta}| D` variational parameters.
         :type x: array, float
         """
+
+        #TODO: handle call to evolve state where the depth as not been previously set.
 
         self.__pre_or_post()
 
