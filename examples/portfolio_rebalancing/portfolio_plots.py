@@ -1,13 +1,9 @@
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 import numpy as np
 import h5py as h5
 import pandas as pd
 
-plt.rcParams["text.usetex"] = True
 plt.rcParams["font.size"] = 16
-plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
-plt.rcParams["mathtext.fontset"] = "cm"
 
 figure_size = (5, 4)
 
@@ -56,8 +52,8 @@ plt.plot(list(range(1, 6)), qaoaz_fun_mean, "--", color="tab:orange")
 plt.plot(list(range(1, 6)), qwoa_fun_mean, "--", color="tab:blue")
 
 plt.xticks([i for i in range(qwoa_depth_min, qwoa_depth_max + 1)])
-plt.xlabel("Depth ($D$)")
-plt.ylabel(r"$\langle \boldsymbol{\theta}_f | \hat{Q} | \boldsymbol{\theta}_f \rangle$")
+plt.xlabel("depth (D)")
+plt.ylabel("quality expectation value")
 
 plt.grid(which="major", linestyle="--")
 plt.legend(fontsize="medium", framealpha=1, borderpad=0.1)

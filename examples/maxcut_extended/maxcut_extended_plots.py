@@ -3,10 +3,7 @@ import numpy as np
 import h5py as h5
 import networkx as nx
 
-plt.rcParams["text.usetex"] = True
 plt.rcParams["font.size"] = 16
-plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
-plt.rcParams["mathtext.fontset"] = "cm"
 
 figure_size = (5, 4)
 
@@ -34,9 +31,9 @@ for i in range(system_size):
 plt.figure(figsize=figure_size)
 plt.bar(unique, bins, hatch=".", color="tab:green")
 plt.xticks(unique)
-plt.xlabel(r"$|q_i|$")
+plt.xlabel("solution quality (absolute value)")
 plt.ylabel(
-    r"$\sum_{s \in \{q_i\}} | \langle s | \boldsymbol{\theta}_f \rangle_\text{ex-QAOA} |^2$"
+     "probability"
 )
 plt.tight_layout()
 plt.savefig("maxcut_extended_qaoa_probabilities", dpi=200)

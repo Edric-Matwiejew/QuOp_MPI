@@ -1,13 +1,9 @@
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 import numpy as np
 import h5py as h5
 import networkx as nx
 
-plt.rcParams["text.usetex"] = True
-plt.rcParams["font.size"] = 16
-plt.rcParams["text.latex.preamble"] = r"\usepackage{bm} \usepackage{amsmath}"
-plt.rcParams["mathtext.fontset"] = "cm"
+plt.rcParams['font.size'] = 16
 
 figure_size = (5, 4)
 
@@ -18,21 +14,21 @@ Graph = nx.circular_ladder_graph(4)
 
 G = nx.to_scipy_sparse_matrix(Graph)
 
-maxcut = h5.File("maxcut.h5", "r")
-final_state = np.array(maxcut["depth 2/final_state"]).view(np.complex128)
-qualities = np.abs(np.array(maxcut["depth 2/observables"]).view(np.float64))
+maxcut = h5.File('maxcut.h5', 'r')
+final_state = np.array(maxcut['depth 2/final_state']).view(np.complex128)
+qualities = np.abs(np.array(maxcut['depth 2/observables']).view(np.float64))
 unique, counts = np.unique(qualities, return_counts=True)
 
-print("Starting expectation value: {}".format(-np.mean(qualities)))
-print("Minimum quality: {}".format(np.min(-qualities)))
+print('Starting expectation value: {}'.format(-np.mean(qualities)))
+print('Minimum quality: {}'.format(np.min(-qualities)))
 
 plt.figure(figsize=figure_size)
-plt.bar(unique, counts * (1 / len(qualities)), hatch="-")
+plt.bar(unique, counts * (1 / len(qualities)), hatch='-')
 plt.xticks(unique)
-plt.xlabel(r"$|q_i|$")
-plt.ylabel(r"$\sum_{s \in \{q_i\}} | \langle s | \psi_0 \rangle |^2$")
+plt.xlabel('solution quality (absolute value)')
+plt.ylabel('probability')
 plt.tight_layout()
-plt.savefig("maxcut_starting_probabilities", dpi=200)
+plt.savefig('maxcut_starting_probabilities', dpi=200)
 plt.clf()
 
 probability = np.abs(final_state) ** 2
@@ -42,21 +38,21 @@ for i in range(system_size):
     bins[quality_index] += probability[i]
 
 plt.figure(figsize=figure_size)
-plt.bar(unique, bins, color="orange", hatch="x")
+plt.bar(unique, bins, color='orange', hatch='x')
 plt.xticks(unique)
-plt.xlabel(r"$|q_i|$")
+plt.xlabel('solution quality (absolute value)')
 plt.ylabel(
-    r"$\sum_{s \in \{q_i\}} | \langle s | \boldsymbol{\theta}_f \rangle_\text{QAOA} |^2$"
+    'probability'
 )
 plt.tight_layout()
-plt.savefig("maxcut_qaoa_probabilities", dpi=200)
+plt.savefig('maxcut_qaoa_probabilities', dpi=200)
 plt.clf()
 
 best_index = np.argmax(probability)
 binary = np.binary_repr(best_index, width=8)
 
 print(
-    "Most probable solution: \n \t Index: {} \n \t Bit-String: {} \n \t Quality: {}".format(
+    'Most probable solution: \n \t Index: {} \n \t Bit-String: {} \n \t Quality: {}'.format(
         best_index, binary, -qualities[best_index]
     )
 )
@@ -64,18 +60,18 @@ print(
 colours = []
 for bit in binary:
     if int(bit) == 0:
-        colours.append("Purple")
+        colours.append('Purple')
     else:
-        colours.append("green")
+        colours.append('green')
 
 edge_width = []
 edge_colours = []
 for edge in Graph.edges:
     if binary[edge[0]] != binary[edge[1]]:
-        edge_colours.append("orange")
+        edge_colours.append('orange')
         edge_width.append(5)
     else:
-        edge_colours.append("black")
+        edge_colours.append('black')
         edge_width.append(1)
 
 nx.draw(
@@ -83,8 +79,8 @@ nx.draw(
     node_color=colours,
     edge_color=edge_colours,
     width=edge_width,
-    font_color="white",
+    font_color='white',
     with_labels=True,
 )
 
-plt.savefig("maxcut_solution", dpi=200)
+plt.savefig('maxcut_solution', dpi=200)
