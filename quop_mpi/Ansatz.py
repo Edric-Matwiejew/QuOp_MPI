@@ -224,7 +224,7 @@ class Ansatz:
         self.setup_optimiser = True
 
     def set_depth(self, depth):
-        """Define the circuit depth, :math`D`.
+        """Define the circuit depth, :math:`D`.
 
         :param depth: Number of ansatz repetitions.
         :type depth: integer
