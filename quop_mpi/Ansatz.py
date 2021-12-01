@@ -483,8 +483,8 @@ class Ansatz:
 
         Types of parallelisation methods include:
 
-        * "global": The global MPI communicator simulates :meth:`|\\boldsymbol{\\theta} \\rangle_\\text{ANZ}`.
-        * "jacobian": The global MPI communicator is partitioned into a sub-communicator calculating :math:`\\boldsymbol{\\theta} \\rangle_\\text{ANZ}` and sub-communicators calculating terms in the objective function gradient.
+        * "global": The global MPI communicator simulates :math:`|\\boldsymbol{\\theta} \\rangle_\\text{ANZ}`.
+        * "jacobian": The global MPI communicator is partitioned into a sub-communicator calculating :math:`|\\boldsymbol{\\theta} \\rangle_\\text{ANZ}` and sub-communicators calculating terms in the objective function gradient.
         * "jacobian-local": Create MPI sub-communicators as described above, but group MPI ranks based on CPU ID.
 
         Type of gradient approximations include:
