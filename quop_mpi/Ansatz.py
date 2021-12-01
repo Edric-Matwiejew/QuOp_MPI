@@ -300,7 +300,7 @@ class Ansatz:
     def set_initial_state(self, function, kwargs=None):
         """Define the initial quantum state.
 
-        :param function; A function that returns a local partition of the quantum state vector :math"`|\psi_0\\rangle_\\text{ANZ}`.
+        :param function: A function that returns a local partition of the quantum state vector :math:`|\psi_0\\rangle_\\text{ANZ}`.
         :type function: callable
 
         :type kwargs: Keyword arguments passed to the function.
