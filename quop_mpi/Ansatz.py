@@ -224,7 +224,7 @@ class Ansatz:
         self.setup_optimiser = True
 
     def set_depth(self, depth):
-        """Define the circuit depth, :math`D`.
+        """Define the circuit depth, :math:`D`.
 
         :param depth: Number of ansatz repetitions.
         :type depth: integer
@@ -300,7 +300,7 @@ class Ansatz:
     def set_initial_state(self, function, kwargs=None):
         """Define the initial quantum state.
 
-        :param function; A function that returns a local partition of the quantum state vector :math"`|\psi_0\\rangle_\\text{ANZ}`.
+        :param function: A function that returns a local partition of the quantum state vector :math:`|\psi_0\\rangle_\\text{ANZ}`.
         :type function: callable
 
         :type kwargs: Keyword arguments passed to the function.
@@ -483,8 +483,8 @@ class Ansatz:
 
         Types of parallelisation methods include:
 
-        * "global": The global MPI communicator simulates :meth:`|\\boldsymbol{\\theta} \\rangle_\\text{ANZ}`.
-        * "jacobian": The global MPI communicator is partitioned into a sub-communicator calculating :math:`\\boldsymbol{\\theta} \\rangle_\\text{ANZ}` and sub-communicators calculating terms in the objective function gradient.
+        * "global": The global MPI communicator simulates :math:`|\\boldsymbol{\\theta} \\rangle_\\text{ANZ}`.
+        * "jacobian": The global MPI communicator is partitioned into a sub-communicator calculating :math:`|\\boldsymbol{\\theta} \\rangle_\\text{ANZ}` and sub-communicators calculating terms in the objective function gradient.
         * "jacobian-local": Create MPI sub-communicators as described above, but group MPI ranks based on CPU ID.
 
         Type of gradient approximations include:
