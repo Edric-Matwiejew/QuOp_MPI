@@ -2,7 +2,7 @@
 
 # A QuOp_MPI installation script for QuOp_MPI on Ubuntu 20.04.
 # This script requires super-user access - use at your own risk!
-# Execute the script from within the 'QuOp_MPI' directory.
+# Execute the script from within the 'QuOp_MPI/installation_scripts' directory.
 
 apt-get update && apt-get -y  --no-install-recommends install \
 	build-essential \
@@ -24,6 +24,7 @@ export MPI="ON"
 export HDF5_PKGCONFIG_NAME="hdf5-openmpi" 
 python3 -m pip -v install --no-cache --no-binary=h5py h5py
 
+cd ../
 python3 setup.py sdist bdist_wheel
 cd dist
 python3 -m pip install quop_mpi-1.0.1.tar.gz
@@ -31,4 +32,4 @@ python3 -m pip install quop_mpi-1.0.1.tar.gz
 cd ../
 cd examples/maxcut
 python3 maxcut.py
-cd ../
+cd ../../
