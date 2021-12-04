@@ -46,7 +46,7 @@ Installation
 
 ::
 
-apt-get update && apt-get -y  --no-install-recommends install \
+	sudo apt-get update && apt-get -y  --no-install-recommends install \
 	build-essential \
 	gfortran \
 	pkg-config \
