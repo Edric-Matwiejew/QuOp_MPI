@@ -3,6 +3,7 @@ From: pawsey/mpich-base:3.1.4_ubuntu18.04
 
 %post
     apt-get update -qq && apt-get -y --no-install-recommends install \
+    vim \
     build-essential \
     cython \
     python3-dev \
@@ -10,7 +11,7 @@ From: pawsey/mpich-base:3.1.4_ubuntu18.04
     python3-setuptools \
     wget \
     git \
-    octave \
+	octave \
     && apt-get clean all \
     && rm -rf /var/lib/apt/lists/*
 
