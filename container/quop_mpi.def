@@ -1,5 +1,5 @@
 BootStrap: docker
-From: pawsey/mpi-base:3.1.4
+From: pawsey/mpich-base:3.1.4_ubuntu18.04
 
 %post
 	apt-get update -qq && apt-get -y  --no-install-recommends install \
@@ -8,8 +8,6 @@ From: pawsey/mpi-base:3.1.4
 	python3-pip \ 
 	python3-dev \
 	git \ 
-	mpich \
-	libhdf5-mpich-dev \
 	libfftw3-dev \ 
 	libfftw3-mpi-dev
 
