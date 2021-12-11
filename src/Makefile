@@ -5,9 +5,9 @@ DEBUG ?= FALSE
 FC = mpifort
 
 ifeq ($(DEBUG),TRUE)
-	FCFLAGS = -O0 -g -fcheck=array-temps,bounds,do,mem,pointer,recursion -Wall -Wextra -Wconversion -pedantic
+	FCFLAGS := -O0 -g -fcheck=array-temps,bounds,do,mem,pointer,recursion -Wall -Wextra -Wconversion -pedantic
 else
-	FCFLAGS = -O3 -ffast-math -funroll-loops
+	FCFLAGS := -O3 -ffast-math -funroll-loops
 endif
 
 EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
