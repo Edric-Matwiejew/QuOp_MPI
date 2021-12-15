@@ -193,7 +193,7 @@ class Ansatz:
                                 ['fun','nfev','success'])
 
 
-        :param optimiser: 'scipy' to use the SciPy or 'nlopt' to use NLopt.
+        :param optimiser: 'scipy' to use the SciPy, 'nlopt' to use NLopt, or a callable QuOp_MPI-compatible optimisation function.
         :type optimiser: string
 
         :param optimiser_args: Arguments to pass to the optimiser.
@@ -207,12 +207,12 @@ class Ansatz:
 
         if optimiser == "scipy":
             from scipy.optimize import minimize as sp_minimize
-
             self.optimiser = sp_minimize
         elif optimiser == "nlopt":
             from quop_mpi.__utils.__nlopt_wrap import minimize as nlopt_minimize
-
             self.optimiser = nlopt_minimize
+        elif callable(optimiser):
+            self.optimsier = optimsier
 
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
