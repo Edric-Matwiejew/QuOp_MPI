@@ -9,14 +9,16 @@ from mpi4py import MPI
 from .__utils.__interface import interface
 from .__utils.__mpi import shrink_communicator, gather_array
     
-def forward_differences(x, var, evaluate, expectation):
+def forward_differences(variational_parameters, var, evaluate):
+    x = variational_parameters
     h = 1.4901161193847656e-08
     expectation = evaluate(x)
     x[var] += h
     expectation_forward = evaluate(x)
     return (expectation_forward - expectation)/h
     
-def central(x, var, evaluate):
+def central(variational_parameters, var, evaluate):
+    x = variational_parameters
     h = 1.4901161193847656e-08
     expectation = evaluate(x)
     x_back = copy(x)
@@ -84,6 +86,7 @@ class Ansatz:
         self.ansatz_initial_state = None  # initial state before algorithm evolution
         self.final_state = None  # quantum state during and after simulation
         self.jacobian_input = None # for parallel jacobian evaluation
+        self.var = None  # for parallel jacobian evaluation
         self.benchmarking = False  # indicates whether the benchmark method is running
         self.last_evaluated = np.empty(0) # last set of variational parameters passed to 'evolve_state'.
 
@@ -148,8 +151,9 @@ class Ansatz:
         ]
             
         self.jacobian_parameters = [
-            "expectation",
             "evaluate",
+            "var",
+            "variational_parameters",
             "system_size",
             "seed",
             "MPI_COMM",
@@ -246,7 +250,7 @@ class Ansatz:
         self.optimiser_log = optimiser_log
 
         if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
-            if optimiser_args.has_key("jac"):
+            if "jac" in optimiser_args:
                 self.jacobian_input = [copy(self.optimiser_args["jac"])]
                 self.optimiser_args["jac"] = self.__mpi_jacobian
             else:
@@ -921,7 +925,7 @@ class Ansatz:
         # returns the expectation value given variational parameters 'x'
         if not np.array_equal(self.last_evaluated, x):
             self.evolve_state(x)
-        return self.get_epectation_value()
+        return self.__get_expectation_value()
         
     def execute(self, variational_parameters=None):
         """Execute the QVA algorithm.
@@ -1607,13 +1611,14 @@ class Ansatz:
             self.COMM_JAC.barrier()
             return
 
-        x = self.COMM_JAC.bcast(x, 0)
+        self.variational_parameters = self.COMM_JAC.bcast(x, 0)
 
         partials = []
  
         if self.COMM.Get_rank() != 0:
             for var in self.var_map[self.colours[self.COMM.Get_rank()]]:
-                partials.append(self.jacobian(x, var))
+                self.jacobian.update_parameters()
+                partials.append(self.jacobian.call())
 
         opt_root = self.comm_opt_roots[self.colours[self.COMM.Get_rank()]]
 
