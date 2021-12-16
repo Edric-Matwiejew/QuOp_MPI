@@ -250,8 +250,8 @@ class Ansatz:
                 self.jacobian_input = [copy(self.optimiser_args["jac"])]
                 self.optimiser_args["jac"] = self.__mpi_jacobian
             else:
-                warn("optimiser_args does not have a 'jac' key, defaulting to the 'global' parallelisation scheme.")
-                self.set_parallel("global")
+                self.jacobian_input = [forward_differences]
+                self.optimiser_args["jac"] = self.__mpi_jacobian
                
         self.setup_optimiser = True
         
