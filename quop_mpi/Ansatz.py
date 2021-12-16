@@ -1,13 +1,31 @@
 import os
 import csv
 import atexit
+from warnings import warn
 from copy import copy, deepcopy
 from time import time
 import numpy as np
 from mpi4py import MPI
 from .__utils.__interface import interface
 from .__utils.__mpi import shrink_communicator, gather_array
-
+    
+def forward_differences(x, var, evaluate, expectation):
+    h = 1.4901161193847656e-08
+    expectation = evaluate(x)
+    x[var] += h
+    expectation_forward = evaluate(x)
+    return (expectation_forward - expectation)/h
+    
+def central(x, var, evaluate):
+    h = 1.4901161193847656e-08
+    expectation = evaluate(x)
+    x_back = copy(x)
+    x_forward = copy(x)
+    x_back[var] -= h
+    x_forward[var] += h
+    expectation_back = evaluate(x_back)
+    expectation_forward = evaluate(x_forward)
+    return  (expectation_forward - 2 * self.expectation + expectation_back)/ h
 
 class Ansatz:
 
@@ -65,7 +83,9 @@ class Ansatz:
         self.initial_state_input = None
         self.ansatz_initial_state = None  # initial state before algorithm evolution
         self.final_state = None  # quantum state during and after simulation
+        self.jacobian_input = None # for parallel jacobian evaluation
         self.benchmarking = False  # indicates whether the benchmark method is running
+        self.last_evaluated = np.empty(0) # last set of variational parameters passed to 'evolve_state'.
 
         self.pre_called = False
         self.post_called = False
@@ -125,6 +145,14 @@ class Ansatz:
 
         self.objective_map_parameters = [
             "expectation",
+        ]
+            
+        self.jacobian_parameters = [
+            "expectation",
+            "evaluate",
+            "system_size",
+            "seed",
+            "MPI_COMM",
         ]
 
         atexit.register(self.__exit)
@@ -218,10 +246,24 @@ class Ansatz:
         self.optimiser_log = optimiser_log
 
         if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
-            if "jac" not in self.optimiser_args or self.optimiser_args["jac"]:
+            if optimiser_args.has_key("jac"):
+                self.jacobian_input = [copy(self.optimiser_args["jac"])]
                 self.optimiser_args["jac"] = self.__mpi_jacobian
-
+            else:
+                warn("optimiser_args does not have a 'jac' key, defaulting to the 'global' parallelisation scheme.")
+                self.set_parallel("global")
+               
         self.setup_optimiser = True
+        
+    def __parse_jacobian(self):
+        
+        self.jacobian = interface(
+            self,
+            self.jacobian_input[0],
+            self.jacobian_parameters,
+            "jacobian",
+            self.COMM_OPT
+        )
 
     def set_depth(self, depth):
         """Define the circuit depth, :math:`D`.
@@ -729,6 +771,9 @@ class Ansatz:
                     {"method": "BFGS", 'options':{'gtol':1e-3}},
                     ["fun", "nfev", "success"],
                 )
+                
+            if self.jacobian_input is not None:
+                self.__parse_jacobian()
 
     def __gen_objective_map(self):
 
@@ -870,7 +915,14 @@ class Ansatz:
 
             if self.COMM_OPT.Get_rank() == 0:
                 self.n_evolutions += 1
-
+                self.last_evaluated = x
+                
+    def evaluate(self, x):
+        # returns the expectation value given variational parameters 'x'
+        if not np.array_equal(self.last_evaluated, x):
+            self.evolve_state(x)
+        return self.get_epectation_value()
+        
     def execute(self, variational_parameters=None):
         """Execute the QVA algorithm.
 
@@ -1556,56 +1608,12 @@ class Ansatz:
             return
 
         x = self.COMM_JAC.bcast(x, 0)
-        h_default = 1.4901161193847656e-08
-
-        # if the jacobian is called before evaluation of the objective function
-        if self.colours[self.COMM.Get_rank()] != 0:
-            self.evolve_state(x)
-            self.expectation = self.__get_expectation_value()
-
-        if self.jac_method == "forward":
-            x_jac_temp = np.empty(len(x))
-        elif self.jac_method == "central":
-            x_jac_temp_1 = np.empty(len(x))
-            x_jac_temp_2 = np.empty(len(x))
 
         partials = []
-
+ 
         if self.COMM.Get_rank() != 0:
-
-            h = np.min(np.abs(x)) * np.sqrt(self.jac_tol)
-
-            if self.__is_zero(h):
-                h = h_default
-
             for var in self.var_map[self.colours[self.COMM.Get_rank()]]:
-
-                if self.jac_method == "forward":
-                    x_jac_temp[:] = x
-                    x_jac_temp[var] += h
-                    self.evolve_state(x_jac_temp)
-                    partials.append(
-                        (self.__get_expectation_value() - self.expectation) / h
-                    )
-
-                elif self.jac_method == "central":
-                    h = h / 2
-                    x_jac_temp_1[:] = x
-                    x_jac_temp_2[:] = x
-                    x_jac_temp_1[var] += h
-                    x_jac_temp_2[var] -= h
-                    self.evolve_state(x_jac_temp_1)
-                    expectation_forward = self.__get_expectation_value()
-                    self.evolve_state(x_jac_temp_2)
-                    expectation_backward = self.__get_expectation_value()
-                    partials.append(
-                        (
-                            expectation_forward
-                            - 2 * self.expectation
-                            + expectation_backward
-                        )
-                        / h
-                    )
+                partials.append(self.jacobian(x, var))
 
         opt_root = self.comm_opt_roots[self.colours[self.COMM.Get_rank()]]
 
