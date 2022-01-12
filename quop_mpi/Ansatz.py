@@ -244,7 +244,7 @@ class Ansatz:
             from quop_mpi.__utils.__nlopt_wrap import minimize as nlopt_minimize
             self.optimiser = nlopt_minimize
         elif callable(optimiser):
-            self.optimsier = optimsier
+            self.optimsier = optimiser
 
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
