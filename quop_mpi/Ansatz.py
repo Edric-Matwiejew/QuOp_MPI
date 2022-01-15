@@ -237,25 +237,24 @@ class Ansatz:
         if optimiser_args is None:
             optimiser_args = {}
 
+        if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
+            if "jac" in optimiser_args:
+                self.jacobian_input = [copy(optimiser_args["jac"])]
+                optimiser_args["jac"] = self.__mpi_jacobian
+            else:
+                self.jacobian_input = [forward_differences]
+                optimiser_args["jac"] = self.__mpi_jacobian
+
         if optimiser == "scipy":
-            from scipy.optimize import minimize as sp_minimize
-            self.optimiser = sp_minimize
+            from .optimiser import ScipyOptimiser
+            self.optimiser = ScipyOptimiser(**optimiser_args)
         elif optimiser == "nlopt":
-            from quop_mpi.__utils.__nlopt_wrap import minimize as nlopt_minimize
-            self.optimiser = nlopt_minimize
+            from .optimiser import NloptOptimiser
+            self.optimiser = NloptOptimiser(**optimiser_args)
         elif callable(optimiser):
             self.optimsier = optimsier
 
-        self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
-
-        if (self.parallel == "jacobian") or (self.parallel == "jacobian_local"):
-            if "jac" in optimiser_args:
-                self.jacobian_input = [copy(self.optimiser_args["jac"])]
-                self.optimiser_args["jac"] = self.__mpi_jacobian
-            else:
-                self.jacobian_input = [forward_differences]
-                self.optimiser_args["jac"] = self.__mpi_jacobian
                
         self.setup_optimiser = True
         
@@ -979,8 +978,7 @@ class Ansatz:
 
                     self.result = self.optimiser(
                         self.__objective,
-                        self.variational_parameters,
-                        **self.optimiser_args
+                        self.variational_parameters
                     )
 
                     self.stop = True

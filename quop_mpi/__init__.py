@@ -6,5 +6,6 @@ from . import state
 from . import param
 from . import toolkit
 from . import algorithm
+from . import optimiser
 
-__all__ = ["Unitary", "Ansatz", "propagator", "observable", "state", "param", "toolkit", "algorithm"]
+__all__ = ["Unitary", "Ansatz", "propagator", "observable", "state", "param", "toolkit", "algorithm", "optimiser"]
