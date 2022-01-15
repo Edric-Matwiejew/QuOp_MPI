@@ -33,11 +33,12 @@ Installation
 
     sudo apt-get update -qq && apt-get -y  --no-install-recommends install \
     build-essential \
+    gfortran \
     pkg-config \
     git \
     python3-pip \
     python3-dev \
-    open-mpi\
+    libopenmpi-dev \
     libhdf5-openmpi-dev \
     libfftw3-dev \
     libfftw3-mpi-dev
