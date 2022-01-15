@@ -8,8 +8,7 @@ class interface():
     This class takes an user-input function, instance of a class and
     list of class attributes. It binds the function's positional parameters
     to corresponding class attributes where matches are found; creating
-    a partially bound function. Unmatched positional parameters will raise
-    a RuntimeError.
+    a partially bound function.
 
     Function keyword parameters are not bound. They are expected to be defined
     when calling the partially bound function or to have  appropriate default values.

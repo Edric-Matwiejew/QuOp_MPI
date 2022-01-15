@@ -27,23 +27,39 @@ Installation
 1. Install Dependencies
 -----------------------
 
-**Debian-Based Systems**
+**Ubuntu (18.04)**
 
 ::
 
     sudo apt-get update -qq && apt-get -y  --no-install-recommends install \
     build-essential \
+    gfortran \
     pkg-config \
     git \
     python3-pip \
     python3-dev \
-    open-mpi\
+    libopenmpi-dev \
     libhdf5-openmpi-dev \
     libfftw3-dev \
     libfftw3-mpi-dev
 
+**Ubuntu (20.04)**
 
-**Debian-Based Systems**
+::
+
+	sudo apt-get update && apt-get -y  --no-install-recommends install \
+	build-essential \
+	gfortran \
+	pkg-config \
+	git \
+	python3-pip \
+	python3-dev \
+	libopenmpi-dev \
+	libhdf5-openmpi-dev \
+	libfftw3-dev \
+	libfftw3-mpi-dev
+
+**Python Dependencies**
 
 ::
 
@@ -67,8 +83,6 @@ Install optional Python dependancies needed to run the example programs:
 
 2. Install QuOp_MPI
 -------------------
-
-**Debian-Based-Systems**
 
 ::
 
