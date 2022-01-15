@@ -2,7 +2,7 @@ PYTHON_CALL ?= python3
 
 DEBUG ?= FALSE
 
-FC ?= mpifort
+FC = mpifort
 
 ifeq ($(DEBUG),TRUE)
 	FCFLAGS += -O0 -g -fcheck=array-temps,bounds,do,mem,pointer,recursion -Wall -Wextra -Wconversion -pedantic
