@@ -8,15 +8,17 @@ import numpy as np
 from mpi4py import MPI
 from .__utils.__interface import interface
 from .__utils.__mpi import shrink_communicator, gather_array
-    
+
+
 def forward_differences(variational_parameters, var, evaluate):
     x = variational_parameters
     h = 1.4901161193847656e-08
     expectation = evaluate(x)
     x[var] += h
     expectation_forward = evaluate(x)
-    return (expectation_forward - expectation)/h
-    
+    return (expectation_forward - expectation) / h
+
+
 def central(variational_parameters, var, evaluate):
     x = variational_parameters
     h = 1.4901161193847656e-08
@@ -27,7 +29,8 @@ def central(variational_parameters, var, evaluate):
     x_forward[var] += h
     expectation_back = evaluate(x_back)
     expectation_forward = evaluate(x_forward)
-    return  (expectation_forward - 2 * self.expectation + expectation_back)/ h
+    return (expectation_forward - 2 * expectation + expectation_back) / h
+
 
 class Ansatz:
 
@@ -85,10 +88,12 @@ class Ansatz:
         self.initial_state_input = None
         self.ansatz_initial_state = None  # initial state before algorithm evolution
         self.final_state = None  # quantum state during and after simulation
-        self.jacobian_input = None # for parallel jacobian evaluation
+        self.jacobian_input = None  # for parallel jacobian evaluation
         self.var = None  # for parallel jacobian evaluation
         self.benchmarking = False  # indicates whether the benchmark method is running
-        self.last_evaluated = np.empty(0) # last set of variational parameters passed to 'evolve_state'.
+        self.last_evaluated = np.empty(
+            0
+        )  # last set of variational parameters passed to 'evolve_state'.
 
         self.pre_called = False
         self.post_called = False
@@ -146,10 +151,8 @@ class Ansatz:
             "MPI_COMM",
         ]
 
-        self.objective_map_parameters = [
-            "expectation",
-        ]
-            
+        self.objective_map_parameters = ["expectation"]
+
         self.jacobian_parameters = [
             "evaluate",
             "var",
@@ -239,12 +242,14 @@ class Ansatz:
 
         if optimiser == "scipy":
             from scipy.optimize import minimize as sp_minimize
+
             self.optimiser = sp_minimize
         elif optimiser == "nlopt":
             from quop_mpi.__utils.__nlopt_wrap import minimize as nlopt_minimize
+
             self.optimiser = nlopt_minimize
         elif callable(optimiser):
-            self.optimsier = optimsier
+            self.optimiser = optimiser
 
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
@@ -256,17 +261,17 @@ class Ansatz:
             else:
                 self.jacobian_input = [forward_differences]
                 self.optimiser_args["jac"] = self.__mpi_jacobian
-               
+
         self.setup_optimiser = True
-        
+
     def __parse_jacobian(self):
-        
+
         self.jacobian = interface(
             self,
             self.jacobian_input[0],
             self.jacobian_parameters,
             "jacobian",
-            self.COMM_OPT
+            self.COMM_OPT,
         )
 
     def set_depth(self, depth):
@@ -550,7 +555,9 @@ class Ansatz:
 
         if parallel in ["jacobian", "jacobian_local", "global"]:
 
-            self.parallel = parallel  # type of MPI parallelisation: "global", "jacobian" or "jacobian_local"
+            self.parallel = (
+                parallel
+            )  # type of MPI parallelisation: "global", "jacobian" or "jacobian_local"
             self.jac_method = method
             self.jac_tol = tol
 
@@ -772,10 +779,10 @@ class Ansatz:
 
                 self.set_optimiser(
                     "scipy",
-                    {"method": "BFGS", 'options':{'gtol':1e-3}},
+                    {"method": "BFGS", "options": {"gtol": 1e-3}},
                     ["fun", "nfev", "success"],
                 )
-                
+
             if self.jacobian_input is not None:
                 self.__parse_jacobian()
 
@@ -853,7 +860,6 @@ class Ansatz:
                 if self.COMM.Get_rank() in self.jac_ranks:
                     MPI.Comm.Free(self.COMM_JAC)
 
-
     def post(self):
 
         if not self.benchmarking:
@@ -877,12 +883,12 @@ class Ansatz:
         :type x: array, float
         """
 
-        #TODO: handle call to evolve state where the depth as not been previously set.
+        # TODO: handle call to evolve state where the depth as not been previously set.
 
         self.__pre_or_post()
 
-        if isinstance(x,list):
-            x = np.array(x, dtype = np.float64)
+        if isinstance(x, list):
+            x = np.array(x, dtype=np.float64)
 
         if self.colours[self.COMM.Get_rank()] != -1:
 
@@ -897,9 +903,9 @@ class Ansatz:
                     param_slice = params[self.param_map[i] : self.param_map[i + 1]]
 
                     if unitary.operator_n_params > 0:
-                        evolution_parameter = param_slice[:-unitary.operator_n_params]
+                        evolution_parameter = param_slice[: -unitary.operator_n_params]
                         unitary.variational_parameters = param_slice[
-                                unitary.unitary_n_params::
+                            unitary.unitary_n_params : :
                         ]
 
                         unitary.gen_operator()
@@ -920,13 +926,13 @@ class Ansatz:
             if self.COMM_OPT.Get_rank() == 0:
                 self.n_evolutions += 1
                 self.last_evaluated = x
-                
+
     def evaluate(self, x):
         # returns the expectation value given variational parameters 'x'
         if not np.array_equal(self.last_evaluated, x):
             self.evolve_state(x)
         return self.__get_expectation_value()
-        
+
     def execute(self, variational_parameters=None):
         """Execute the QVA algorithm.
 
@@ -1157,9 +1163,7 @@ class Ansatz:
         if self.colours[self.COMM.Get_rank()] != -1:
             if self.colours[self.COMM.Get_rank()] == 0:
                 return gather_array(
-                    self.final_state,
-                    self.unitaries[0].partition_table,
-                    self.COMM_OPT,
+                    self.final_state, self.unitaries[0].partition_table, self.COMM_OPT
                 )
 
     def get_probabilities(self):
@@ -1578,9 +1582,7 @@ class Ansatz:
         if self.colours[self.COMM.Get_rank()] != -1:
 
             self.COMM_OPT = MPI.Comm.Split(
-                self.COMM,
-                self.colours[self.COMM.Get_rank()],
-                self.COMM.Get_rank(),
+                self.COMM, self.colours[self.COMM.Get_rank()], self.COMM.Get_rank()
             )
 
         self.var_map = [[] for _ in range(len(self.comm_opt_mapping))]
@@ -1614,7 +1616,7 @@ class Ansatz:
         self.variational_parameters = self.COMM_JAC.bcast(x, 0)
 
         partials = []
- 
+
         if self.COMM.Get_rank() != 0:
             for var in self.var_map[self.colours[self.COMM.Get_rank()]]:
                 self.jacobian.update_parameters()
@@ -1629,9 +1631,7 @@ class Ansatz:
                 if root > 0:
                     for var in mapping:
                         self.COMM.Recv(
-                            [jacobian[var : var + 1], MPI.DOUBLE],
-                            source=root,
-                            tag=var,
+                            [jacobian[var : var + 1], MPI.DOUBLE], source=root, tag=var
                         )
 
         elif self.COMM_OPT.Get_rank() == 0:
