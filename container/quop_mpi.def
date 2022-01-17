@@ -1,32 +1,46 @@
 BootStrap: docker
-From: pawsey/mpi-base:3.1.4
+From: pawsey/mpich-base:3.1.4_ubuntu18.04
 
 %post
-	apt-get update -qq && apt-get -y  --no-install-recommends install \
-	build-essential \
-	pkg-config \ 
-	python3-pip \ 
-	python3-dev \
-	git \ 
-	mpich \
-	libhdf5-mpich-dev \
-	libfftw3-dev \ 
-	libfftw3-mpi-dev
+    apt-get update -qq && apt-get -y --no-install-recommends install \
+    vim \
+    build-essential \
+    cython \
+    python3-dev \
+    python3-pip \
+    python3-setuptools \
+    wget \
+    git \
+ 	octave \
+    && apt-get clean all \
+    && rm -rf /var/lib/apt/lists/*
 
-	python3 -m pip install setuptools
-	python3 -m pip install wheel numpy scipy mpi4py nlopt pandas
+    wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.6/src/hdf5-1.10.6.tar.gz
+    tar -xvf hdf5*
+    cd hdf5*
+    ./configure --enable-fortran --enable-shared --enable-parallel --prefix=/usr/
+    make && make install
+    cd
 
-	export CC="mpicc"
-	export MPI="ON"
-	export HDF5_PKGCONFIG_NAME="hdf5-mpich"
-	python3 -m pip -v install --no-cache --no-binary=h5py h5py
+    wget http://www.fftw.org/fftw-3.3.8.tar.gz
+    tar -xvf fftw*
+    cd fftw*
+    ./configure --enable-mpi --enable-fortran --enable-shared --prefix=/usr/
+    make && make install
+    cd
 
-	cd ~/
-	git clone https://github.com/Edric-Matwiejew/QuOp_MPI
-	cd QuOp_MPI
-	python3 setup.py sdist bdist_wheel
-	cd dist
-	python3 -m pip install quop_mpi-1.0.1.tar.gz
+    pip3 --no-cache-dir install \
+    wheel \
+    h5py \
+    pillow \
+    matplotlib \
+    mpi4py \
+    numpy \
+    networkx \
+    pandas \
+    scipy \
+    pandas \
+    pandas-datareader \
 
 %labels
     Edric Matwiejew

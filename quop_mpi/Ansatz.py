@@ -249,7 +249,7 @@ class Ansatz:
 
             self.optimiser = nlopt_minimize
         elif callable(optimiser):
-            self.optimsier = optimsier
+            self.optimiser = optimiser
 
         self.optimiser_args = optimiser_args
         self.optimiser_log = optimiser_log
