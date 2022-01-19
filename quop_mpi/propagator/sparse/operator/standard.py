@@ -31,7 +31,7 @@ def hypercube(
     W_row_starts, W_col_indexes, W_values = hypercube(
         n_qubits,
         lb + 1,
-        ub + 1)
+        ub)
 
     return [W_row_starts], [W_col_indexes], [W_values]
 
