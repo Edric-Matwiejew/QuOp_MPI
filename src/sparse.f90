@@ -1179,19 +1179,25 @@ module Sparse
         allocate(row_indexes(A%row_starts(lb):A%row_starts(ub + 1) - 1))
         allocate(values(A%row_starts(lb):A%row_starts(ub + 1) - 1))
 
+        !$omp parallel do private(j)
         do i = lb, ub
             do j = A%row_starts(i), A%row_starts(i + 1) - 1
                 row_indexes(j) = i
             enddo
         enddo
+        !$omp end parallel do
 
+        !$omp simd
         do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
             column_indexes(i) = A%col_indexes(i)
         enddo
+        !$omp end simd
 
+        !$omp simd
         do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
             values(i) = A%values(i)
         enddo
+        !$omp end simd
 
         allocate(send_counts(flock))
 
@@ -1199,6 +1205,7 @@ module Sparse
 
         allocate(target_rank(A%row_starts(lb):A%row_starts(ub + 1) - 1))
 
+        !$omp parallel do private(j) firstprivate(partition_table) reduction(+:send_counts)
         do i = lbound(column_indexes, 1), ubound(column_indexes, 1)
 
             do j = flock, 1, -1
@@ -1209,6 +1216,7 @@ module Sparse
                 endif
             enddo
         enddo
+        !$omp end parallel do
 
         allocate(send_disps(flock))
 
@@ -1335,11 +1343,13 @@ module Sparse
         A_T%row_starts(lb) = elements_per_rank(rank + 1)
         A_T%row_starts(lb + 1:ub + 1) = 0
 
+        !TODO 
         do i = element_lb_T, element_ub_T
             A_T%row_starts(column_indexes_in(i) + 1) = &
                 A_T%row_starts(column_indexes_in(i) + 1) + 1
         enddo
 
+        !TODO
         do i = lb + 1, ub + 1
             A_T%row_starts(i) = A_T%row_starts(i) + A_T%row_starts(i - 1)
         enddo
@@ -1689,6 +1699,8 @@ module Sparse
         ! MPI environment
         integer :: ierr
 
+        
+
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
 
@@ -1724,11 +1736,9 @@ module Sparse
 
         u_resize(lb:ub) = u_local
 
-        !$omp parallel do
         do i = 1, num_send
             send_values(i) = u_resize(A%RHS_send_inds(i))
         enddo
-        !$omp end parallel do
 
         call MPI_alltoallv( send_values, &
                             A%num_send_inds, &
@@ -1746,14 +1756,15 @@ module Sparse
         v_local = 0
 
 
-        !$omp parallel do
+        !$omp parallel do schedule(static)
         do i = lb, ub
-            do j = A%row_starts(i), A%row_starts(i + 1) - 1
+            !do j = A%row_starts(i), A%row_starts(i + 1) - 1
 
-                v_local(i) = A%values(j)*u_resize(A%local_col_inds(j)) &
-                    + v_local(i)
+            !    v_local(i) = A%values(j)*u_resize(A%local_col_inds(j)) &
+            !        + v_local(i)
 
-            enddo
+            !enddo
+            v_local(i) = spmv_inner_loop(A, u_resize, i)
         enddo
         !$omp end parallel do
 
@@ -1764,6 +1775,40 @@ module Sparse
         endif
 
     end subroutine SpMV_Series
+
+    function spmv_inner_loop(A, u, row)
+
+        complex(dp) :: spmv_inner_loop
+        type(CSR), intent(in) :: A
+        complex(dp), dimension(:), allocatable, intent(in) :: u
+        integer, intent(in)  :: row
+        
+        integer :: unroll = 3
+        complex(dp), dimension(3) :: vals
+
+        integer :: col
+        complex(dp) :: A_value, u_value
+
+        integer :: i,j
+
+        vals = cmplx(0, 0, dp)
+
+        do i = A%row_starts(row), A%row_starts(row + 1) - unroll - 1, unroll
+            do j = 1, unroll
+                col = A%local_col_inds(i + j - 1)
+                A_value = A%values(i + j - 1)
+                u_value = u(col)
+                vals(j) = vals(j) + A_value * u_value
+            enddo
+        enddo
+
+        spmv_inner_loop = cmplx(0,0,dp)
+
+        do i = 1, unroll
+            spmv_inner_loop = spmv_inner_loop + vals(i)
+        enddo
+
+    end function spmv_inner_loop
 
     !> @brief Sort the rows of a distributed CSR matrix.
 
