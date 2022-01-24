@@ -64,6 +64,7 @@ module sparse_graphs
                         base_cols(n_row_nz - i + 1) = cols - i
                 enddo
 
+                !$omp parallel do private(j)
                 do i = lb, ub
                         do j = 1, idx
 
@@ -88,6 +89,7 @@ module sparse_graphs
 
                         enddo 
                 enddo
+                !$omp end parallel do
 
                 call Sort_CSR(A)
 

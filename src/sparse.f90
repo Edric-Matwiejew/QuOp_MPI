@@ -1191,9 +1191,9 @@ module Sparse
         do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
             column_indexes(i) = A%col_indexes(i)
         enddo
-        !$omp end simd
+        !$omp end simd 
 
-        !$omp simd
+        !$omp simd 
         do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
             values(i) = A%values(i)
         enddo
@@ -1343,13 +1343,13 @@ module Sparse
         A_T%row_starts(lb) = elements_per_rank(rank + 1)
         A_T%row_starts(lb + 1:ub + 1) = 0
 
-        !TODO 
+        !$omp parallel do
         do i = element_lb_T, element_ub_T
             A_T%row_starts(column_indexes_in(i) + 1) = &
                 A_T%row_starts(column_indexes_in(i) + 1) + 1
         enddo
+        !$omp end parallel do
 
-        !TODO
         do i = lb + 1, ub + 1
             A_T%row_starts(i) = A_T%row_starts(i) + A_T%row_starts(i - 1)
         enddo
@@ -1629,7 +1629,7 @@ module Sparse
 
             C_local = 0
 
-            !$omp parallel do
+            !$omp parallel do private(j,k)
             do i = lb, ub
                 do j = A%row_starts(i), A%row_starts(i + 1) - 1
                     do k = 1, B_col
@@ -1734,7 +1734,11 @@ module Sparse
             return
         endif
 
-        u_resize(lb:ub) = u_local
+        !$omp simd
+        do i = lb, ub
+                u_resize(i) = u_local(i)
+        enddo
+        !$omp end simd
 
         do i = 1, num_send
             send_values(i) = u_resize(A%RHS_send_inds(i))
@@ -1758,12 +1762,6 @@ module Sparse
 
         !$omp parallel do schedule(static)
         do i = lb, ub
-            !do j = A%row_starts(i), A%row_starts(i + 1) - 1
-
-            !    v_local(i) = A%values(j)*u_resize(A%local_col_inds(j)) &
-            !        + v_local(i)
-
-            !enddo
             v_local(i) = spmv_inner_loop(A, u_resize, i)
         enddo
         !$omp end parallel do
@@ -1783,8 +1781,8 @@ module Sparse
         complex(dp), dimension(:), allocatable, intent(in) :: u
         integer, intent(in)  :: row
         
-        integer :: unroll = 3
-        complex(dp), dimension(3) :: vals
+        integer :: unroll = 10 
+        complex(dp), dimension(10) :: vals
 
         integer :: col
         complex(dp) :: A_value, u_value
@@ -1793,14 +1791,23 @@ module Sparse
 
         vals = cmplx(0, 0, dp)
 
-        do i = A%row_starts(row), A%row_starts(row + 1) - unroll - 1, unroll
-            do j = 1, unroll
-                col = A%local_col_inds(i + j - 1)
-                A_value = A%values(i + j - 1)
-                u_value = u(col)
-                vals(j) = vals(j) + A_value * u_value
-            enddo
-        enddo
+               j = 1
+               do i = A%row_starts(row), A%row_starts(row + 1)
+                        col = A%local_col_inds(i)
+                        A_value = A%values(i)
+                        u_value = u(col)
+                        vals(j) = vals(j) + A_value * u_value
+                        j = j + 1
+                enddo
+
+                do i = A%row_starts(row) + unroll, A%row_starts(row + 1) - unroll - 1, unroll
+                    do j = 1, unroll
+                        col = A%local_col_inds(i + j - 1)
+                        A_value = A%values(i + j - 1)
+                        u_value = u(col)
+                        vals(j) = vals(j) + A_value * u_value
+                    enddo
+                enddo
 
         spmv_inner_loop = cmplx(0,0,dp)
 
