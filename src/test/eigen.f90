@@ -6,7 +6,7 @@ program eigen
 
     implicit none
 
-    integer :: cols = 10000
+    integer :: cols = 2**20
     type(CSR) :: A
     complex(dp), dimension(:), allocatable :: c
     integer :: i, j, el = 20
@@ -99,10 +99,11 @@ program eigen
         do i = A%row_starts(1), A%row_starts(2) - 1
             lambda = lambda + exp(pi_coef)**((A%col_indexes(i) - 1)*j)*A%values(i)
         enddo
-        if (abs(b_k1_norm - lambda) < 1e-3 ) then
+        if (abs(b_k1_norm) - abs(lambda) < 1e-3 ) then
                 write(*,'(A30,I2,A16)') "SpMV_Series test PASSED with ", flock, " MPI processes."
         else
                 write(*,'(A30,I2,A16)') "SpMV_Series test FAILED with ", flock, " MPI processes."
+                write(*,*) lambda, b_k1_norm
         endif
 
     endif

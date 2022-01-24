@@ -9,7 +9,7 @@ program dagger
         complex(dp), dimension(:), allocatable :: c
         integer, dimension(:), allocatable :: partition_table
         
-        integer :: cols = 2 ** 10, n = 12
+        integer :: cols = 2 ** 16, n = 20
         integer :: i, j
 
         !MPI
