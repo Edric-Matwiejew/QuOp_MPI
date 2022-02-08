@@ -1784,15 +1784,17 @@ module Sparse
         integer :: unroll = 10 
         complex(dp), dimension(10) :: vals
 
-        integer :: col
+        integer :: col, upper
         complex(dp) :: A_value, u_value
 
         integer :: i,j
 
         vals = cmplx(0, 0, dp)
 
+        upper = min(A%row_starts(row) + unroll, A%row_starts(row + 1))
+
                j = 1
-               do i = A%row_starts(row), A%row_starts(row + 1)
+               do i = A%row_starts(row), upper
                         col = A%local_col_inds(i)
                         A_value = A%values(i)
                         u_value = u(col)
