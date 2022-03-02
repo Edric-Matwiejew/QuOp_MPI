@@ -570,7 +570,7 @@ module Sparse
         integer, intent(in) :: MPI_communicator !< @param MPU communicator over which to distribute.
 
         integer, dimension(:), allocatable :: block_lens, disps
-        integer(dp), dimension(:), allocatable :: block_lens_vals, disps_vals
+        integer, dimension(:), allocatable :: block_lens_vals, disps_vals
 
         integer :: lb, ub
         integer(dp) :: lb_vals, ub_vals
@@ -646,8 +646,8 @@ module Sparse
 
             do i = 1, flock
 
-                block_lens_vals(i) = A%row_starts(partition_table(i + 1)) &
-                                        - A%row_starts(partition_table(i))
+                block_lens_vals(i) = int(A%row_starts(partition_table(i + 1)) &
+                                        - A%row_starts(partition_table(i)), sp)
 
             enddo
 
