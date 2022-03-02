@@ -12,7 +12,7 @@ subroutine hypercube(   N, &
     integer(sp), intent(in) :: N
     integer(sp), intent(in) :: lb
     integer(sp), intent(in) :: ub
-    integer(sp), target, dimension(ub - lb + 2), intent(out) :: row_starts
+    integer(dp), target, dimension(ub - lb + 2), intent(out) :: row_starts
     integer(sp), target, dimension((ub - lb + 1)*N), intent(out) :: col_indexes
     complex(dp), target, dimension((ub - lb + 1)*N), intent(out) :: values
 

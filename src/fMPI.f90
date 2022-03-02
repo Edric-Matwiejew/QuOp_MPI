@@ -19,7 +19,7 @@ subroutine rec_a(   M_rows, &
         integer, intent(in) :: M_rows
         integer, intent(in) :: M_n_row_starts
         integer, intent(in) :: M_n_col_indexes
-        integer, dimension(M_n_row_starts), target, intent(in) :: M_row_starts
+        integer(dp), dimension(M_n_row_starts), target, intent(in) :: M_row_starts
         integer, dimension(M_n_col_indexes), target, intent(in) :: M_col_indexes
         integer, intent(in) :: flock
         integer, dimension(flock + 1), intent(in) :: partition_table
@@ -34,7 +34,7 @@ subroutine rec_a(   M_rows, &
         integer :: rank, ierr
 
         integer :: lb, ub
-        integer :: lb_elements, ub_elements
+        integer(dp) :: lb_elements, ub_elements
 
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
@@ -83,7 +83,7 @@ subroutine rec_b(   M_rows, &
         integer, intent(in) :: M_nnz
         integer, intent(in) :: M_n_row_starts
         integer, intent(in) :: num_send
-        integer, dimension(M_n_row_starts), target, intent(in) :: M_row_starts
+        integer(dp), dimension(M_n_row_starts), target, intent(in) :: M_row_starts
         integer, intent(in) :: flock
         integer, dimension(M_nnz), target, intent(in) :: M_col_indexes
         integer, dimension(flock), target, intent(in) :: M_rec_disps
@@ -100,7 +100,7 @@ subroutine rec_b(   M_rows, &
         integer :: rank, ierr
 
         integer :: lb, ub
-        integer :: lb_elements, ub_elements
+        integer(dp) :: lb_elements, ub_elements
 
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
@@ -161,7 +161,7 @@ subroutine one_norm_series( M_rows, &
         integer, intent(in) :: M_n_local_col_indexes
         integer, intent(in) :: M_n_row_starts
         integer, intent(in) :: M_sends
-        integer, dimension(M_n_row_starts), target, intent(in) :: M_row_starts
+        integer(dp), dimension(M_n_row_starts), target, intent(in) :: M_row_starts
         integer, dimension(M_n_col_indexes), target, intent(in) :: M_col_indexes
         complex(dp), dimension(M_n_values), target, intent(in) :: M_values
         integer, intent(in) :: flock
@@ -186,7 +186,7 @@ subroutine one_norm_series( M_rows, &
         integer :: rank, ierr
 
         integer :: lb, ub
-        integer :: lb_elements, ub_elements
+        integer(dp) :: lb_elements, ub_elements
 
         integer, parameter :: l = 3
         integer, parameter :: pmax = 8
@@ -294,7 +294,7 @@ subroutine step(M_rows, &
         integer, intent(in) :: n_rho0_v
         integer, intent(in) :: n_rhot_v
         integer, intent(in) :: M_sends
-        integer, dimension(M_n_row_starts), target, intent(in) :: M_row_starts
+        integer(dp), dimension(M_n_row_starts), target, intent(in) :: M_row_starts
         integer, dimension(M_n_col_indexes), target, intent(in) :: M_col_indexes
         complex(dp), dimension(M_n_values), target, intent(in) :: M_values
         integer, intent(in) :: flock
@@ -318,7 +318,7 @@ subroutine step(M_rows, &
         integer :: rank, ierr
 
         integer :: lb, ub
-        integer :: lb_elements, ub_elements
+        integer(dp) :: lb_elements, ub_elements
 
         real(dp) :: start, finish
 

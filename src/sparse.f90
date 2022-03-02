@@ -39,7 +39,7 @@ module Sparse
         integer :: rows
         integer :: columns
         character(len=2) :: structure
-        integer, dimension(:), pointer :: row_starts => null()
+        integer(dp), dimension(:), pointer :: row_starts => null()
         integer, dimension(:), pointer :: col_indexes => null()
         complex(dp), dimension(:), pointer :: values => null()
 
@@ -108,7 +108,7 @@ module Sparse
 
     subroutine Prefix_Sum(array)
 
-            integer, dimension(:), intent(inout) :: array
+            integer(dp), dimension(:), intent(inout) :: array
 
             integer :: i
 
@@ -183,7 +183,7 @@ module Sparse
             nnz_per_rank(i) = nnz_per_rank(i) + nnz_per_rank(i - 1)
         enddo
 
-        B%row_starts(lower_bound) = nnz_per_rank(rank + 1)
+        B%row_starts(lower_bound) = int(nnz_per_rank(rank + 1), dp)
 
         call prefix_sum(B%row_starts)
 
@@ -372,7 +372,8 @@ module Sparse
         integer :: A_D_row_ind, A_D_col_ind
         complex(dp) val
 
-        integer :: i, j
+        integer :: i
+        integer(dp) :: j
 
         nnz = size(A%col_indexes,1)
 
@@ -569,9 +570,10 @@ module Sparse
         integer, intent(in) :: MPI_communicator !< @param MPU communicator over which to distribute.
 
         integer, dimension(:), allocatable :: block_lens, disps
-        integer, dimension(:), allocatable :: block_lens_vals, disps_vals
+        integer(dp), dimension(:), allocatable :: block_lens_vals, disps_vals
 
-        integer :: lb, ub, lb_vals, ub_vals
+        integer :: lb, ub
+        integer(dp) :: lb_vals, ub_vals
 
         integer :: i
 
@@ -623,7 +625,7 @@ module Sparse
         call MPI_scatterv(  A%row_starts, &
                             block_lens, &
                             disps, &
-                            MPI_integer, &
+                            MPI_long, &
                             A_local%row_starts, &
                             block_lens(rank + 1), &
                             MPI_integer, &
@@ -1157,7 +1159,8 @@ module Sparse
 
         integer, dimension(:), allocatable :: target_rank
 
-        integer :: i, j
+        integer :: i, k
+        integer(dp) :: j
 
         !MPI_Environment
         integer :: rank
@@ -1179,25 +1182,19 @@ module Sparse
         allocate(row_indexes(A%row_starts(lb):A%row_starts(ub + 1) - 1))
         allocate(values(A%row_starts(lb):A%row_starts(ub + 1) - 1))
 
-        !$omp parallel do private(j)
         do i = lb, ub
             do j = A%row_starts(i), A%row_starts(i + 1) - 1
                 row_indexes(j) = i
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp simd
-        do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
-            column_indexes(i) = A%col_indexes(i)
+        do j = A%row_starts(lb), A%row_starts(ub + 1) - 1
+            column_indexes(j) = A%col_indexes(j)
         enddo
-        !$omp end simd 
 
-        !$omp simd 
-        do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
-            values(i) = A%values(i)
+        do j = A%row_starts(lb), A%row_starts(ub + 1) - 1
+            values(j) = A%values(j)
         enddo
-        !$omp end simd
 
         allocate(send_counts(flock))
 
@@ -1205,18 +1202,16 @@ module Sparse
 
         allocate(target_rank(A%row_starts(lb):A%row_starts(ub + 1) - 1))
 
-        !$omp parallel do private(j) firstprivate(partition_table) reduction(+:send_counts)
         do i = lbound(column_indexes, 1), ubound(column_indexes, 1)
 
-            do j = flock, 1, -1
-                if (column_indexes(i) >= partition_table(j)) then
-                    send_counts(j) = send_counts(j) + 1
-                    target_rank(i) = j
+            do k = flock, 1, -1
+                if (column_indexes(i) >= partition_table(k)) then
+                    send_counts(k) = send_counts(k) + 1
+                    target_rank(i) = k
                     exit
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         allocate(send_disps(flock))
 
@@ -1343,12 +1338,10 @@ module Sparse
         A_T%row_starts(lb) = elements_per_rank(rank + 1)
         A_T%row_starts(lb + 1:ub + 1) = 0
 
-        !$omp parallel do
         do i = element_lb_T, element_ub_T
             A_T%row_starts(column_indexes_in(i) + 1) = &
                 A_T%row_starts(column_indexes_in(i) + 1) + 1
         enddo
-        !$omp end parallel do
 
         do i = lb + 1, ub + 1
             A_T%row_starts(i) = A_T%row_starts(i) + A_T%row_starts(i - 1)
@@ -1579,7 +1572,7 @@ module Sparse
 
         integer ::  B_col
 
-        integer :: i, j, k, l
+        integer(dp) :: i, j, k, l
 
         ! MPI environment
         integer :: ierr
@@ -1629,7 +1622,7 @@ module Sparse
 
             C_local = 0
 
-            !$omp parallel do private(j,k)
+            !$omp parallel do
             do i = lb, ub
                 do j = A%row_starts(i), A%row_starts(i + 1) - 1
                     do k = 1, B_col
@@ -1694,12 +1687,10 @@ module Sparse
         integer :: lb, ub, lb_resize, ub_resize
         integer :: num_send, num_rec
 
-        integer :: i, j
+        integer(dp) :: i, j
 
         ! MPI environment
         integer :: ierr
-
-        
 
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
@@ -1734,15 +1725,13 @@ module Sparse
             return
         endif
 
-        !$omp simd
-        do i = lb, ub
-                u_resize(i) = u_local(i)
-        enddo
-        !$omp end simd
+        u_resize(lb:ub) = u_local
 
+        !$omp parallel do
         do i = 1, num_send
             send_values(i) = u_resize(A%RHS_send_inds(i))
         enddo
+        !$omp end parallel do
 
         call MPI_alltoallv( send_values, &
                             A%num_send_inds, &
@@ -1760,9 +1749,14 @@ module Sparse
         v_local = 0
 
 
-        !$omp parallel do schedule(static)
+        !$omp parallel do
         do i = lb, ub
-            v_local(i) = spmv_inner_loop(A, u_resize, i)
+            do j = A%row_starts(i), A%row_starts(i + 1) - 1
+
+                v_local(i) = A%values(j)*u_resize(A%local_col_inds(j)) &
+                    + v_local(i)
+
+            enddo
         enddo
         !$omp end parallel do
 
@@ -1774,51 +1768,6 @@ module Sparse
 
     end subroutine SpMV_Series
 
-    function spmv_inner_loop(A, u, row)
-
-        complex(dp) :: spmv_inner_loop
-        type(CSR), intent(in) :: A
-        complex(dp), dimension(:), allocatable, intent(in) :: u
-        integer, intent(in)  :: row
-        
-        integer :: unroll = 10 
-        complex(dp), dimension(10) :: vals
-
-        integer :: col, upper
-        complex(dp) :: A_value, u_value
-
-        integer :: i,j
-
-        vals = cmplx(0, 0, dp)
-
-        upper = min(A%row_starts(row) + unroll, A%row_starts(row + 1))
-
-               j = 1
-               do i = A%row_starts(row), upper
-                        col = A%local_col_inds(i)
-                        A_value = A%values(i)
-                        u_value = u(col)
-                        vals(j) = vals(j) + A_value * u_value
-                        j = j + 1
-                enddo
-
-                do i = A%row_starts(row) + unroll, A%row_starts(row + 1) - unroll - 1, unroll
-                    do j = 1, unroll
-                        col = A%local_col_inds(i + j - 1)
-                        A_value = A%values(i + j - 1)
-                        u_value = u(col)
-                        vals(j) = vals(j) + A_value * u_value
-                    enddo
-                enddo
-
-        spmv_inner_loop = cmplx(0,0,dp)
-
-        do i = 1, unroll
-            spmv_inner_loop = spmv_inner_loop + vals(i)
-        enddo
-
-    end function spmv_inner_loop
-
     !> @brief Sort the rows of a distributed CSR matrix.
 
     subroutine Merge_CSR(   column_indexes, &
@@ -1829,13 +1778,13 @@ module Sparse
 
         integer, intent(inout), dimension(:) :: column_indexes
         complex(dp), intent(inout), dimension(:) :: values
-        integer, intent(in) :: start
-        integer, intent(in) :: mid
-        integer, intent(in) :: finish
+        integer(dp), intent(in) :: start
+        integer(dp), intent(in) :: mid
+        integer(dp), intent(in) :: finish
 
         integer, dimension(:), allocatable :: col_ind_temp
         complex(dp), dimension(:), allocatable :: val_temp
-        integer :: i, j, k
+        integer(dp) :: i, j, k
 
         allocate(col_ind_temp(finish - start + 1))
         allocate(val_temp(finish - start + 1))
@@ -1924,10 +1873,10 @@ module Sparse
 
         integer, intent(inout), dimension(:) :: column_indexes
         complex(dp), intent(inout), dimension(:) :: values
-        integer, intent(in) :: start
-        integer, intent(in) :: finish
+        integer(dp), intent(in) :: start
+        integer(dp), intent(in) :: finish
 
-        integer :: mid
+        integer(dp) :: mid
 
         if (start < finish) then
             if (finish - start >= 512) then
@@ -1968,7 +1917,7 @@ module Sparse
 
             call Merge_Sort_CSR(A%col_indexes(A%row_starts(i):A%row_starts(i + 1) - 1), &
                                 A%values(A%row_starts(i):A%row_starts(i + 1) - 1), &
-                                1, &
+                                int(1, dp), &
                                 A%row_starts(i + 1) - A%row_starts(i))
 
         enddo

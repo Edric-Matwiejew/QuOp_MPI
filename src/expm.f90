@@ -470,7 +470,8 @@ module Expm
         real(qp) :: tol, epsilon_tol
         real(qp) :: c_1, c_2
 
-        integer :: i, j, lb, ub
+        integer :: j, lb, ub
+        integer(dp) :: i
 
         integer :: rank
         integer :: ierr

@@ -460,8 +460,8 @@ module One_Norms
 
         real(dp), dimension(:), allocatable :: one_norms_local, one_norms
 
-        integer :: lb_elements, ub_elements
-        integer :: i, j
+        integer(dp) :: lb_elements, ub_elements
+        integer(dp) :: i, j
 
         !MPI ENVIRONMENT
         integer :: rank
