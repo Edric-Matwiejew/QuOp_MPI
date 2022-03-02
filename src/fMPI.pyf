@@ -7,7 +7,7 @@ python module fMPI ! in
 		        integer intent(in) :: m_rows
 		        integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
 		        integer, optional,intent(in),check(len(m_col_indexes)>=m_n_col_indexes),depend(m_col_indexes) :: m_n_col_indexes=len(m_col_indexes)
-		        integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+		        integer(kind=dp), target,dimension(m_n_row_starts),intent(in) :: m_row_starts
 		        integer, target,dimension(m_n_col_indexes),intent(in) :: m_col_indexes
 		        integer, optional,intent(in),check((len(partition_table)-1)>=flock),depend(partition_table) :: flock=(len(partition_table)-1)
 		        integer dimension(flock + 1),intent(in) :: partition_table
@@ -23,7 +23,7 @@ python module fMPI ! in
 		        integer, optional,intent(in),check(len(m_col_indexes)>=m_nnz),depend(m_col_indexes) :: m_nnz=len(m_col_indexes)
 		        integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
 		        integer intent(in) :: num_send
-		        integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+		        integer(kind=dp), target,dimension(m_n_row_starts),intent(in) :: m_row_starts
 		        integer, target,dimension(m_nnz),intent(in) :: m_col_indexes
 		        integer, target,dimension(flock),intent(in) :: m_num_rec_inds
 		        integer, target,dimension(flock),intent(in),depend(flock) :: m_rec_disps
@@ -42,7 +42,7 @@ python module fMPI ! in
 		        integer, optional,intent(in),check(len(m_local_col_inds)>=m_n_local_col_indexes),depend(m_local_col_inds) :: m_n_local_col_indexes=len(m_local_col_inds)
 		        integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
 		        integer, optional,intent(in),check(len(m_rhs_send_inds)>=m_sends),depend(m_rhs_send_inds) :: m_sends=len(m_rhs_send_inds)
-		        integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+		        integer(kind=dp), target,dimension(m_n_row_starts),intent(in) :: m_row_starts
 		        integer, target,dimension(m_n_col_indexes),intent(in) :: m_col_indexes
 		        complex(kind=dp), target,dimension(m_n_values),intent(in) :: m_values
 		        integer, target,dimension(flock),intent(in) :: m_num_rec_inds
@@ -65,7 +65,7 @@ python module fMPI ! in
 		        integer, optional,intent(in),check(len(rho0_v)>=n_rho0_v),depend(rho0_v) :: n_rho0_v=len(rho0_v)
 		        integer intent(in) :: n_rhot_v
 		        integer, optional,intent(in),check(len(m_rhs_send_inds)>=m_sends),depend(m_rhs_send_inds) :: m_sends=len(m_rhs_send_inds)
-		        integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+		        integer(kind=dp), target,dimension(m_n_row_starts),intent(in) :: m_row_starts
 		        integer, target,dimension(m_n_col_indexes),intent(in) :: m_col_indexes
 		        complex(kind=dp), target,dimension(m_n_values),intent(in) :: m_values
 		        integer, target,dimension(flock),intent(in) :: m_num_rec_inds
