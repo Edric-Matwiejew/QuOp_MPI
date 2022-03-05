@@ -458,62 +458,72 @@ module One_Norms
         integer, dimension(:), intent(in) :: partition_table
         integer :: MPI_communicator
 
-        real(dp), dimension(:), allocatable :: one_norms_local, one_norms
+        real(dp) :: norm_local
+        real(dp), dimension(:), allocatable :: one_norms_local
 
-        integer(dp) :: lb_elements, ub_elements
-        integer(dp) :: i, j
+        integer :: lb, ub
+        integer :: i
+        integer(dp) :: j
 
         !MPI ENVIRONMENT
         integer :: rank
         integer :: ierr
         integer :: MASTER = 0
 
+        ! This assumes that the matrix is symmetrical 
+
         call MPI_comm_rank(MPI_communicator, rank, ierr)
 
-        lb_elements = A%row_starts(partition_table(rank + 1))
-        ub_elements = A%row_starts(partition_table(rank + 2)) - 1
+        !lb_elements = A%row_starts(partition_table(rank + 1))
+        !ub_elements = A%row_starts(partition_table(rank + 2)) - 1
 
-        allocate(one_norms_local(A%columns))
+        lb = partition_table(rank + 1)
+        ub = partition_table(rank + 2) - 1
 
-        if (rank == 0) then
-            allocate(one_norms(A%columns))
-        else
-            allocate(one_norms(0))
-        endif
+        allocate(one_norms_local(lb:ub))
+
+        !if (rank == 0) then
+        !    allocate(one_norms(A%columns))
+        !else
+        !    allocate(one_norms(0))
+        !endif
 
         one_norms_local = 0
 
-        do j = lb_elements, ub_elements
-            one_norms_local(A%col_indexes(j)) = abs(A%values(j)) + &
-                one_norms_local(A%col_indexes(j))
+        do i = lb, ub
+            do j = A%row_starts(i), A%row_starts(i + 1) - 1
+                one_norms_local(i) = abs(A%values(j)) + &
+                    one_norms_local(i)
+            enddo
         enddo
 
-        call mpi_reduce(one_norms_local, &
-                        one_norms, &
-                        A%columns, &
-                        mpi_double, &
-                        mpi_sum, &
-                        MASTER, &
-                        MPI_communicator, &
-                        ierr)
+        norm_local = maxval(one_norms_local)
 
-        if (rank == 0) then
+        call mpi_allreduce( norm_local, &
+                            norm, &
+                            1, &
+                            mpi_double, &
+                            mpi_max, &
+                            MPI_communicator, &
+                            ierr)
 
-            norm = 0
-            do i = 1, A%columns
-                if (one_norms(i) > norm) then
-                    norm = one_norms(i)
-                endif
-            enddo
+        !if (rank == 0) then
 
-        endif
+        !    norm = 0
+        !    do i = 1, A%columns
+        !        if (one_norms(i) > norm) then
+        !            norm = one_norms(i)
+        !        endif
+        !    enddo
 
-        call MPI_bcast(norm, &
-                        1, &
-                        mpi_double, &
-                        MASTER, &
-                        MPI_communicator, &
-                        ierr)
+        !endif
+
+        !call MPI_bcast(norm, &
+        !                1, &
+        !                mpi_double, &
+        !                MASTER, &
+        !                MPI_communicator, &
+        !                ierr)
 
     end subroutine
 
