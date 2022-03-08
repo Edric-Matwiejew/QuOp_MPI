@@ -9,21 +9,19 @@ import networkx as nx
 
 graph = nx.circular_ladder_graph(4)
 
-qubits = graph.number_of_nodes()
-system_size = 2 ** qubits
+n_qubits = graph.number_of_nodes()
+system_size = 2 ** n_qubits
 
-def maxcut_qualities(graph, qubits):
+def maxcut_qualities(graph, n_qubits):
     C = 0
     for edge in graph.edges():
-        C += 0.5*(I(qubits) + (Z(edge[0], qubits) @ Z(edge[1], qubits)))
-    print('maxcut', C.diagonal())
+        C += 0.5*(I(n_qubits) + (Z(edge[0], n_qubits) @ Z(edge[1], n_qubits)))
     return C.diagonal()
 
 alg = qaoa(system_size)
 
-alg.set_qualities(observable.serial, {"function": maxcut_qualities, "args": [graph, qubits]})
+alg.set_qualities(observable.serial, {"function": maxcut_qualities, "args": [graph, n_qubits]})
 
-alg.verbose_objective = True
 alg.set_depth(2)
 alg.execute()
 alg.print_optimiser_result()
