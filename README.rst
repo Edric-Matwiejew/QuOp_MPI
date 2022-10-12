@@ -22,7 +22,7 @@ QuOp_MPI has provided numerical results for:
 
 #. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum Walk-Based Vehicle Routing Optimisation. Frontiers in Physics 9, (2021).
 #. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based portfolio optimisation. Quantum 5, 513 (2021). **(see examples/portfolio)**
-# Matwiejew, E., Pye, J., & Wang J. B. Quantum Optimisation for Continuous Multivariable Functions by a  Structured Search (2022) **(see examples/multivariable)**
+#. Matwiejew, E., Pye, J., & Wang J. B. Quantum Optimisation for Continuous Multivariable Functions by a  Structured Search (2022) **(see examples/multivariable)**
 
 
 
