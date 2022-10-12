@@ -22,6 +22,10 @@ $(OBJDIR)/%.o: %.f90
 
 %.o: %.mod
 
+$(PYDIR)/fCQAOA$(EXT_SUFFIX): fCQAOA.f90 $(PYDIR)/mixers_mpi$(EXT_SUFFIX)
+	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="$(FCFLAGS)" -c fCQAOA.pyf $(LIB) -lhdf5_fortran -lfftw3 -lfftw3_mpi $(INCLUDE) -m fCQAOA fCQAOA.f90
+	mv fCQAOA$(EXT_SUFFIX) $(PYDIR)
+
 $(PYDIR)/mixers_mpi$(EXT_SUFFIX):  mixers_mpi.f90 $(PYDIR)/fqwoa_mpi$(EXT_SUFFIX)
 	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="$(FCFLAGS)" -c -m mixers_mpi mixers_mpi.f90
 	mv mixers_mpi$(EXT_SUFFIX) $(PYDIR)

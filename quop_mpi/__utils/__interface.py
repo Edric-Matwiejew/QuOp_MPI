@@ -8,8 +8,7 @@ class interface():
     This class takes an user-input function, instance of a class and
     list of class attributes. It binds the function's positional parameters
     to corresponding class attributes where matches are found; creating
-    a partially bound function. Unmatched positional parameters will raise
-    a RuntimeError.
+    a partially bound function.
 
     Function keyword parameters are not bound. They are expected to be defined
     when calling the partially bound function or to have  appropriate default values.
@@ -25,14 +24,13 @@ class interface():
     """
     def __init__(
             self,
-            obj,
+            objs,
             function,
-            avaliable_parameters,
             function_name,
             MPI_COMM):
 
         self.function_name = function_name
-        self.avaliable_parameters = avaliable_parameters
+        #self.avaliable_parameters = avaliable_parameters
 
         self.rank = MPI_COMM.Get_rank()
 
@@ -48,7 +46,7 @@ class interface():
 
         self.function = function
         self.positional_params = positional_params
-        self.obj = obj
+        self.objs = objs
 
         self.update_parameters()
 
@@ -56,9 +54,13 @@ class interface():
 
         self.args = []
         for positional_param in self.positional_params:
-            if not positional_param in self.avaliable_parameters:
-                self.args.append(None)
-            else:
-                self.args.append(getattr(self.obj, positional_param))
+            #if not positional_param in self.avaliable_parameters:
+            #    self.args.append(None)
+            #else:
+            for obj in self.objs:
+                param_value = getattr(obj, positional_param, None)
+                if param_value is not None:
+                    self.args.append(param_value)
+                    break
 
         self.call= partial(self.function, *self.args)

@@ -52,29 +52,29 @@ class Unitary:
         self.unitary_type = None
         self.planner = False
 
-        self.operator_parameters = [
-            "operator_function",
-            "system_size",
-            "local_alloc",
-            "local_i",
-            "local_i_offset",
-            "local_o",
-            "local_o_offset",
-            "partition_table",
-            "lb",
-            "ub",
-            "variational_parameters",
-            "seed",
-            "MPI_COMM",
-        ]
+        #self.operator_parameters = [
+        #    "operator_function",
+        #    "system_size",
+        #    "alloc_local",
+        #    "local_i",
+        #    "local_i_offset",
+        #    "local_o",
+        #    "local_o_offset",
+        #    "partition_table",
+        #    "lb",
+        #    "ub",
+        #    "variational_parameters",
+        #    "seed",
+        #    "MPI_COMM",
+        #]
 
-        self.parameter_function_parameters = [
-            "system_size",
-            "operator",
-            "n_params",
-            "seed",
-            "MPI_COMM",
-        ]
+        #self.parameter_function_parameters = [
+        #    "system_size",
+        #    "operator",
+        #    "n_params",
+        #    "seed",
+        #    "MPI_COMM",
+        #]
 
         self.system_size = None
         self.operator = None
@@ -97,9 +97,8 @@ class Unitary:
     def parse_operator_function(self):
 
         self.parsed_operator_function = interface(
-            self,
+            [self],
             self.operator_function,
-            self.operator_parameters,
             "operator",
             self.MPI_COMM,
         )
@@ -112,9 +111,8 @@ class Unitary:
             self.parameter_function = uniform
 
         self.parsed_parameter_function = interface(
-            self,
+            [self],
             self.parameter_function,
-            self.parameter_function_parameters,
             "initial parameters",
             self.MPI_COMM,
         )

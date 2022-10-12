@@ -10,30 +10,32 @@ class qwoa(phase_and_mixer):
     See :class:`phase_and_mixer`.
     """
 
-    def pre(self):
+    def setup(self):
 
-        if self.operator_function is None:
-            raise RuntimeError(
-                "Rank {}: Solution qualities not defined.".format(self.rank)
+        if not self.setup_called:
+
+            if self.operator_function is None:
+                raise RuntimeError(
+                    "Rank {}: Solution qualities not defined.".format(self.rank)
+                )
+
+            if self.param_function is None:
+                from ..param.rand import uniform
+
+                self.set_params(uniform)
+
+            UQ = diagonal.unitary(
+                self.operator_function,
+                operator_kwargs=self.operator_function_kwargs,
+                parameter_function=self.param_function,
             )
 
-        if self.param_function is None:
-            from ..param.rand import uniform
+            UW = circulant.unitary(
+                circulant.operator.complete,
+                parameter_function=self.param_function,
+                parameter_kwargs=self.param_kwargs,
+            )
 
-            self.set_params(uniform)
+            self.set_unitaries([UQ, UW])
 
-        UQ = diagonal.unitary(
-            self.operator_function,
-            operator_kwargs=self.operator_function_kwargs,
-            parameter_function=self.param_function,
-        )
-
-        UW = circulant.unitary(
-            circulant.operator.complete,
-            parameter_function=self.param_function,
-            parameter_kwargs=self.param_kwargs,
-        )
-
-        self.set_unitaries([UQ, UW])
-
-        super().pre()
+        super().setup()

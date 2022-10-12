@@ -4,37 +4,39 @@ from .phase_and_mixer import phase_and_mixer
 
 
 class qaoa(phase_and_mixer):
-    """A pre-defined :class:`Ansatz` that implements the Quantum Approximation
+    """A __setup-defined :class:`Ansatz` that implements the Quantum Approximation
     Optimisation Algorithm.
 
     See :class:`phase_and_mixer`.
     """
 
-    def pre(self):
+    def setup(self):
 
-        if self.operator_function is None:
-            raise RuntimeError(
-                "Rank {}: Solution qualities not defined.".format(self.rank)
+        if not self.setup_called:
+
+            if self.operator_function is None:
+                raise RuntimeError(
+                    "Rank {}: Solution qualities not defined.".format(self.rank)
+                )
+
+            if self.param_function is None:
+
+                from ..param.rand import uniform
+
+                self.set_params(uniform)
+
+            UQ = diagonal.unitary(
+                self.operator_function,
+                operator_kwargs=self.operator_function_kwargs,
+                parameter_function=self.param_function,
             )
 
-        if self.param_function is None:
+            UW = sparse.unitary(
+                sparse.operator.hypercube,
+                parameter_function=self.param_function,
+                parameter_kwargs=self.param_kwargs,
+            )
 
-            from ..param.rand import uniform
+            self.set_unitaries([UQ, UW])
 
-            self.set_params(uniform)
-
-        UQ = diagonal.unitary(
-            self.operator_function,
-            operator_kwargs=self.operator_function_kwargs,
-            parameter_function=self.param_function,
-        )
-
-        UW = sparse.unitary(
-            sparse.operator.hypercube,
-            parameter_function=self.param_function,
-            parameter_kwargs=self.param_kwargs,
-        )
-
-        self.set_unitaries([UQ, UW])
-
-        super().pre()
+        super().setup()

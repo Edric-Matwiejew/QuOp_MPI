@@ -1,0 +1,101 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module dist_vector__user__routines 
+    interface dist_vector_user_interface 
+        subroutine f(grid_point,f_temp,n_dim) ! in :fCQAOA:src/fCQAOA.f90:continuous:dist_vector:unknown_interface
+            real(kind=dp) dimension(n_dim) :: grid_point
+            complex(kind=dp), intent(out) :: f_temp
+            integer(kind=sp), optional,intent(in),check(len(grid_point)>=n_dim),depend(grid_point) :: n_dim=len(grid_point)
+        end subroutine f
+    end interface dist_vector_user_interface
+end python module dist_vector__user__routines
+python module fCQAOA ! in 
+    interface  ! in :fCQAOA
+        module continuous ! in :fCQAOA:src/fCQAOA.f90
+            use mpi
+            complex(kind=dp), parameter,optional :: ci=cmplx(0.0_dp, 1.0_dp, dp)
+            real(kind=dp), parameter,optional :: pi=4.0_dp*atan(1.0_dp)
+            subroutine plan_partition(n_dim,ns,mpi_communicator,alloc_local,local_i,local_i_offset,local_n0,local_n0_offset,strides) ! in :fCQAOA:src/fCQAOA.f90:continuous
+                integer(kind=sp), optional,intent(in),check(len(ns)>=n_dim),depend(ns) :: n_dim=len(ns)
+                integer(kind=dp) dimension(n_dim),intent(in) :: ns
+                integer(kind=sp) intent(in) :: mpi_communicator
+                integer(kind=dp) intent(out) :: alloc_local
+                integer(kind=dp) intent(out) :: local_i
+                integer(kind=dp) intent(out) :: local_i_offset
+                integer(kind=dp) intent(out) :: local_n0
+                integer(kind=dp) intent(out) :: local_n0_offset
+                integer(kind=dp) dimension(n_dim),intent(out),depend(n_dim) :: strides
+            end subroutine plan_partition
+            subroutine evolve_ft(n,n_dim,ns,alloc_local,local_i,local_i_offset,local_n0,strides,n_t,t,n_max,eigenvalues,phase_k,phase_q,state,mpi_communicator,flag) ! in :fCQAOA:src/fCQAOA.f90:continuous
+                integer(kind=sp) intent(in) :: n
+                integer(kind=sp), optional,intent(in),check(len(ns)>=n_dim),depend(ns) :: n_dim=len(ns)
+                integer(kind=dp) dimension(n_dim),intent(in) :: ns
+                integer(kind=dp), optional,intent(in),check(len(state)>=alloc_local),depend(state) :: alloc_local=len(state)
+                integer(kind=dp), optional,intent(in),check(len(phase_k)>=local_i),depend(phase_k) :: local_i=len(phase_k)
+                integer(kind=dp) intent(in) :: local_i_offset
+                integer(kind=dp) intent(in) :: local_n0
+                integer(kind=sp) dimension(n_dim),intent(in),depend(n_dim) :: strides
+                integer(kind=sp), optional,intent(in),check(len(t)>=n_t),depend(t) :: n_t=len(t)
+                real(kind=dp) dimension(n_t),intent(in) :: t
+                integer(kind=sp), optional,intent(in),check(shape(eigenvalues,0)==n_max),depend(eigenvalues) :: n_max=shape(eigenvalues,0)
+                complex(kind=dp) dimension(n_max,n_dim),intent(in),depend(n_dim) :: eigenvalues
+                complex(kind=dp) dimension(local_i),intent(in) :: phase_k
+                complex(kind=dp) dimension(local_i),intent(in),depend(local_i) :: phase_q
+                complex(kind=dp), target,dimension(alloc_local),intent(inout) :: state
+                integer(kind=sp) intent(in) :: mpi_communicator
+                integer(kind=sp) intent(in) :: flag
+            end subroutine evolve_ft
+            subroutine evolve_n_dft(n,n_dim,ns,alloc_local,local_i,local_i_offset,local_n0,strides,n_t,t,n_max,eigenvalues,state,mpi_communicator,flag) ! in :fCQAOA:src/fCQAOA.f90:continuous
+                integer(kind=sp) intent(in) :: n
+                integer(kind=sp), optional,intent(in),check(len(ns)>=n_dim),depend(ns) :: n_dim=len(ns)
+                integer(kind=dp) dimension(n_dim),intent(in) :: ns
+                integer(kind=dp), optional,intent(in),check(len(state)>=alloc_local),depend(state) :: alloc_local=len(state)
+                integer(kind=dp) intent(in) :: local_i
+                integer(kind=dp) intent(in) :: local_i_offset
+                integer(kind=dp) intent(in) :: local_n0
+                integer(kind=sp) dimension(n_dim),intent(in),depend(n_dim) :: strides
+                integer(kind=sp), optional,intent(in),check(len(t)>=n_t),depend(t) :: n_t=len(t)
+                real(kind=dp) dimension(n_t),intent(in) :: t
+                integer(kind=sp), optional,intent(in),check(shape(eigenvalues,0)==n_max),depend(eigenvalues) :: n_max=shape(eigenvalues,0)
+                complex(kind=dp) dimension(n_max,n_dim),intent(in),depend(n_dim) :: eigenvalues
+                complex(kind=dp), target,dimension(alloc_local),intent(inout) :: state
+                integer(kind=sp) intent(in) :: mpi_communicator
+                integer(kind=sp) intent(in) :: flag
+            end subroutine evolve_n_dft
+            subroutine dist_vector(f,n_dim,ns,strides,deltas,mins,local_i_offset,local_i,vec) ! in :fCQAOA:src/fCQAOA.f90:continuous
+                use dist_vector__user__routines
+                external f
+                integer(kind=sp), optional,intent(in),check(len(ns)>=n_dim),depend(ns) :: n_dim=len(ns)
+                integer(kind=dp) dimension(n_dim),intent(in) :: ns
+                integer(kind=sp) dimension(n_dim),intent(in),depend(n_dim) :: strides
+                real(kind=dp) dimension(n_dim),intent(in),depend(n_dim) :: deltas
+                real(kind=dp) dimension(n_dim),intent(in),depend(n_dim) :: mins
+                integer intent(in) :: local_i_offset
+                integer, optional,intent(in),check(len(vec)>=local_i),depend(vec) :: local_i=len(vec)
+                complex(kind=dp) dimension(local_i),intent(inout) :: vec
+            end subroutine dist_vector
+            subroutine get_index(i,n_dim,ns,strides,inds) ! in :fCQAOA:src/fCQAOA.f90:continuous
+                integer(kind=sp) intent(in) :: i
+                integer(kind=sp), optional,intent(in),check(len(ns)>=n_dim),depend(ns) :: n_dim=len(ns)
+                integer(kind=dp) dimension(n_dim),intent(in) :: ns
+                integer(kind=sp) dimension(n_dim),intent(in),depend(n_dim) :: strides
+                real(kind=dp) dimension(n_dim),intent(out),depend(n_dim) :: inds
+            end subroutine get_index
+            subroutine gen_local_grid(n,n_dim,ns,strides,deltas,mins,local_i_offset,local_i,local_grid) ! in :fCQAOA:src/fCQAOA.f90:continuous
+                integer(kind=dp) intent(in) :: n
+                integer(kind=sp), optional,intent(in),check(len(ns)>=n_dim),depend(ns) :: n_dim=len(ns)
+                integer(kind=dp) dimension(n_dim),intent(in) :: ns
+                integer(kind=sp) dimension(n_dim),intent(in),depend(n_dim) :: strides
+                real(kind=dp) dimension(n_dim),intent(in),depend(n_dim) :: deltas
+                real(kind=dp) dimension(n_dim),intent(in),depend(n_dim) :: mins
+                integer intent(in) :: local_i_offset
+                integer intent(in) :: local_i
+                real(kind=dp) dimension(local_i,n_dim),intent(out),depend(local_i,n_dim) :: local_grid
+            end subroutine gen_local_grid
+        end module continuous
+    end interface 
+end python module fCQAOA
+
+! This file was auto-generated with f2py (version:1.21.3).
+! See http://cens.ioc.ee/projects/f2py2e/
