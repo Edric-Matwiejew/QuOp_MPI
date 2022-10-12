@@ -9,8 +9,8 @@ Introduction
 
 QuOp_MPI is a Python 3 module for parallel distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators. The design, usage and performance of QuOp_MPI are covered in an `article which is accessible as a preprint on arXiv <https://arxiv.org/abs/2110.03963>`_. QuOp_MPI’s `documentation is hosted on Read the Docs <https://quop-mpi.readthedocs.io>`_.
 
-Related Publications
---------------------
+Publications
+------------
 
 Package Development:
 
@@ -21,7 +21,8 @@ Package Development:
 QuOp_MPI has provided numerical results for:
 
 #. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum Walk-Based Vehicle Routing Optimisation. Frontiers in Physics 9, (2021).
-#. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based portfolio optimisation. Quantum 5, 513 (2021).
+#. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based portfolio optimisation. Quantum 5, 513 (2021). **(see examples/portfolio)**
+# Matwiejew, E., Pye, J., & Wang J. B. Quantum Optimisation for Continuous Multivariable Functions by a  Structured Search (2022) **(see examples/multivariable)**
 
 
 
