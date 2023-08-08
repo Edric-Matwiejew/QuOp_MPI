@@ -152,7 +152,7 @@ module continuous
             do i = local_i_offset + 1, local_i + local_i_offset
                 call get_index(i, n_dim, Ns, strides, inds)
                 do j = 1, n_dim
-                        mixer(i - local_i*rank) = t_temp(j)*(mixer(i - local_i*rank) + eigenvalues(inds(j),j))
+                        mixer(i - local_i*rank) = mixer(i - local_i*rank) + t_temp(j)*eigenvalues(inds(j),j)
                 enddo
             enddo
 
