@@ -1,38 +1,56 @@
-from importlib import import_module
+from __future__ import annotations
 import numpy as np
 from quop_mpi.__utils.__mpi import __scatter_1D_array
 
+####################################
+# imports and classes for type hints
+####################################
+
+from mpi4py import MPI
+from typing import Callable, Union, Iterable
+
+Intracomm = MPI.Intracomm
+iterable = Iterable
+
+####################################
+
 def uniform(
-        system_size,
-        partition_table,
-        seed,
-        MPI_COMM,
-        low = 0,
-        high = 1):
+        system_size: int,
+        partition_table: int,
+        seed: int,
+        MPI_COMM: Intracomm,
+        low: float = 0,
+        high: float = 1) -> np.ndarray[np.float64]:
+    """Generate the diagonal of a :term:`phase-shift unitary` :term:`operator`
+    from a uniform distribution.
 
-    """Generates :math:`\hat{O})` where the :math:`o_{ii}` are sampled from a
-    random distribution uniformly distributed between (`low`, `high`].
+    An :term:`Operator Function` for the
+    :class:`quop_mpi.propagator.diagonal.unitary` class. The :literal:`low` and :literal:`high`
+    arguments may be defined in a corresponding :term:`FunctionDict` on
+    initialisation of the :literal:`unitary` instance.
 
-    :param system_size: Size of the quantum system :math:`N`.
-    :type system_size: integer
+    Parameters
+    ----------
+    system_size : int
+        :term:`system size` of the simulated :term:`QVA`, :class:`quop_mpi.Unitary` attribute
+    partition_table : int
+        describes the parallel partitioning scheme, :class:`quop_mpi.Unitary` attribute
+    seed : int
+        seeds the random number generator, :class:`quop_mpi.Unitary` attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Unitary` attribute
+    low : float, optional
+        lower bound of the uniform distribution (inclusive), by default 0
+    high : float, optional
+        upper bound of the uniform distribution (exclusive), by default 1
 
-    :param partition_table: Parallel partitioning scheme.
-    :type partition_table: array, integer
-
-    :param seed: Set the state of the random number generator.
-    :type seed: integer
-
-    :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{O})` is distributed.
-    :type MPI_COMM: MPI4py communicator object
-
-    :param low: Lower bound of the uniform distribution.
-    :type low: optional, float, default = 0
-
-    :param high: Upper bound of the uniform distribution.
-    :type high: optional, float, default = 1
+    Returns
+    -------
+    ndarray[float64]
+        a 1-d real array or list of 1-D real arrays containing a :literal:`local_i`
+        elements of the :term:`operator` diagonal with global index offset
+        :literal:`local_i_offset`
     """
-
-
     if MPI_COMM.Get_rank() == 0:
 
         np.random.seed(seed)

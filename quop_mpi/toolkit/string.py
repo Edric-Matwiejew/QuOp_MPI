@@ -1,19 +1,22 @@
+from __future__ import annotations
 import numpy as np
 from .kronecker import kron
 
 zero = np.array([1, 0])
 one = np.array([0,1])
 
-def string(state):
-    """Generate a quantum state-vector from a bit-string representation of the
-    state. For example, '01' is parsed as :math:`|0\\rangle \otimes
-    |1\\rangle`.
+def string(state: str) -> np.ndarray[np.complex128]:
+    """Generate an :term:`initial state` from a bit-string representation.
 
-    :param state: A bit string state.
-    :type state: string
+    Parameters
+    ----------
+    state : str
+        a bit string state.
 
-    :return: The parsed quantum state.
-    :rtype: array, complex
+    Returns
+    -------
+    ndarray[complex128]
+        the parsed quantum state
     """
 
     terms = []

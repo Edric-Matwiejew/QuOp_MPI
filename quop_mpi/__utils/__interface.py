@@ -3,7 +3,8 @@ from inspect import signature
 from functools import partial
 import numpy as np
 
-class interface():
+
+class interface:
     """
     This class takes an user-input function, instance of a class and
     list of class attributes. It binds the function's positional parameters
@@ -22,27 +23,21 @@ class interface():
         interface.update_parameters()
 
     """
-    def __init__(
-            self,
-            objs,
-            function,
-            function_name,
-            MPI_COMM):
+
+    def __init__(self, objs, function, function_name, MPI_COMM):
 
         self.function_name = function_name
-        #self.avaliable_parameters = avaliable_parameters
 
         self.rank = MPI_COMM.Get_rank()
 
         function_signature = signature(function)
         function_parameters = function_signature.parameters
 
-        positional_params = []
-        for param in function_parameters.values():
-            if param.default == param.empty:
-                positional_params.append(str(param))
-
-        n_positional_params = len(positional_params)
+        positional_params = [
+            str(param)
+            for param in function_parameters.values()
+            if param.default == param.empty
+        ]
 
         self.function = function
         self.positional_params = positional_params
@@ -54,13 +49,9 @@ class interface():
 
         self.args = []
         for positional_param in self.positional_params:
-            #if not positional_param in self.avaliable_parameters:
-            #    self.args.append(None)
-            #else:
             for obj in self.objs:
-                param_value = getattr(obj, positional_param, None)
+                param_value = getattr(obj, positional_param.split(":")[0], None)
                 if param_value is not None:
                     self.args.append(param_value)
                     break
-
-        self.call= partial(self.function, *self.args)
+        self.call = partial(self.function, *self.args)

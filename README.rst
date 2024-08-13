@@ -1,5 +1,3 @@
-|Documentation_Status| |Build| |DOI|
-
 ========
 QuOp_MPI
 ========
@@ -7,83 +5,48 @@ QuOp_MPI
 Introduction
 ============
 
-QuOp_MPI is a Python 3 module for parallel distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators. The design, usage and performance of QuOp_MPI are covered in an `article which is accessible as a preprint on arXiv <https://arxiv.org/abs/2110.03963>`_. QuOp_MPI’s `documentation is hosted on Read the Docs <https://quop-mpi.readthedocs.io>`_.
+QuOp_MPI is a Python 3 module for parallel distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators. The design, usage and performance of QuOp_MPI are covered in an `article which is accessible as a preprint on arXiv <https://arxiv.org/abs/2110.03963>`_.
 
-Publications
-------------
+Related Publications
+--------------------
 
 Package Development:
 
 #. Matwiejew, E. & Wang, J. B. QuOp_MPI: A framework for parallel simulation of quantum variational algorithms. Journal of Computational Science 62, 101711 (2022).
 #. Matwiejew, E. & Wang, J. QSW_MPI: A framework for parallel simulation of quantum stochastic walks. Computer Physics Communications 107724 (2020)
 
-
 QuOp_MPI has provided numerical results for:
 
 #. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum Walk-Based Vehicle Routing Optimisation. Frontiers in Physics 9, (2021).
-#. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based portfolio optimisation. Quantum 5, 513 (2021). **(examples/portfolio)**
-#. Matwiejew, E., Pye, J., & Wang J. B. Quantum Optimisation for Continuous Multivariable Functions by a  Structured Search, Preprint at https://arxiv.org/abs/2210.06227 (2022) **(examples/multivariable)**
-
-
+#. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. Quantum walk-based portfolio optimisation. Quantum 5, 513 (2021).
+#. Matwiejew, E., Pye J. & Wang J. B. Quantum Optimisation for Continuous Multivariable Functions by a Structured Search. arXiv:2210.06227, (2022).
 
 Installation
 ============
 
-1. Install Dependencies
------------------------
+Build Dependencies
+------------------
 
-**Debian-Based Systems**
+Building QuOp_MPI requires:
 
-::
+* GCC 7+.
+* MPI (Open-MPI or MPICH).
+* HDF5 (configured with --enable-fortran --enable-shared --enable-parallel).
+* FFTW3 (configured --enable-fortran --enable-shard --enable-mpi).
+* Python 3.11+.
+* Cmake 3.9+.
 
-    sudo apt-get update -qq && apt-get -y  --no-install-recommends install \
-    build-essential \
-    pkg-config \
-    git \
-    python3-pip \
-    python3-dev \
-    open-mpi\
-    libhdf5-openmpi-dev \
-    libfftw3-dev \
-    libfftw3-mpi-dev
+These can be installed through the package manager of most Linux distributions, or the Homebrew third-party package manager elsewhere. Example install scripts are included in :code:`installation_scripts`.
 
+Package Installation
+--------------------
 
-**Debian-Based Systems**
+Build and install:
 
 ::
-
-    sudo python3 -m pip install setuptools
-    sudo python3 -m pip install wheel numpy scipy mpi4py nlopt pandas
-
-Install `h5py built against parallel HDF5 <https://docs.h5py.org/en/stable/build.html#building-against-parallel-hdf5>`_:
-
-::
-
-    sudo CC="mpicc" MPI="ON" HDF5_PKGCONFIG_NAME="hdf5-openmpi" python3 -m pip -v install --no-cache --no-binary=h5py h5py
-
-.. warning::
-    Importing an h5py installation built against a different, or non-parallel, version of HDF5 will cause QuOp_MPI to crash when attempting to save simulation results.
-
-Install optional Python dependancies needed to run the example programs:
-
-::
-
-    sudo python3 -m pip install pandas-datareader networkx
-
-2. Install QuOp_MPI
--------------------
-
-**Debian-Based-Systems**
-
-::
-
-    cd ~/
-    git clone https://github.com/Edric-Matwiejew/QuOp_MPI
-    cd QuOp_MPI
-    python3 setup.py sdist bdist_wheel
-    cd dist
-    python3 -m pip install quop_mpi-*.tar.gz
-
+        
+    FC=mpifort python -m setup bdist_wheel
+    python3.11 -m pip install dist/QuOp_MPI-*.whl
 
 Test the installation by running an example:
 
@@ -91,18 +54,18 @@ Test the installation by running an example:
 
     cd ../
     cd examples/maxcut
-    python3 maxcut.py
-
-Building QuOp_MPI's Documentation
-=================================
+    mpiexec -N 2 python3 maxcut.py
+    
+Documentation
+=============
 
 Install the documentation build dependencies:
 
 ::
 
-    python3 -m pip install sphinx sphinx-rtd-theme m2r
+    pip install .[docs]
 
-And in ~/QuOp_MPI:
+Then:
 
 ::
 
@@ -155,12 +118,3 @@ Contact Information
 
 If you encounter a bug, please submit a
 report via Github. If you would like to get in touch, email me at edric.matwiejew@research.uwa.edu.au.
-
-.. |Documentation_Status| image:: https://readthedocs.org/projects/quop-mpi/badge/?version=latest
-   :target: https://quop-mpi.readthedocs.io/en/latest/?badge=latest
-
-.. |DOI| image:: https://zenodo.org/badge/233372703.svg
-   :target: https://zenodo.org/badge/latestdoi/233372703
-   
-.. |Build| image:: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/build.yaml/badge.svg?branch=default&event=push
-    :target: https://github.com/Edric-Matwiejew/QuOp_MPI/actions/workflows/build.yaml

@@ -1,18 +1,22 @@
+from __future__ import annotations
 from copy import copy
 import numpy as np
 from scipy import sparse as __sparse
 
-def kron(terms):
-    """Calculate :math:`A \otimes B \otimes C \otimes...`.
+def kron(terms: list['sparse']) -> 'csr_matrix':
+    """Compute the tensor (Kronecker) product of a sequence of sparse matrices.
 
-    :param terms: A list of square sparse matrices.
-    :type terms: list, Scipy sparse matrix
+    Parameters
+    ----------
+    terms : list[sparse]
+        a list of scipy sparse matrices
 
-    :return: The Kronecker product of the input matrices ordered from left to right.
-    :rtype: Scipy sparse matrix
+    Returns
+    -------
+    csr_matrix
+        the tensor product of ``terms``, computed from left to right
     """
-
-    if len(terms) == 0:
+    if not terms:
         return 1
 
     if len(terms) == 1:
@@ -34,17 +38,21 @@ def kron(terms):
 
         return out.tocsr()
 
-def kron_power(term, n):
-    """Calculate :math:`A^{\otimes n}`.
+#"""Compute the tensor (Kronecker) product of ``n`` instances of a sparse matrix.
+def kron_power(term: 'sparse', n: int) -> 'csr_matrix':
+    """Compute the tensor (Kronecker) product of ``n`` instances of a sparse matrix.
 
-    :param term: :math:`A`.
-    :type term: Scipy sparse matrix
+    Parameters
+    ----------
+    term : sparse
+        a scipy sparse matrix
+    n : int
+        length of the tensor product sequence
 
-    :param n: :math:`n`.
-    :type n: integer
-
-    :return: :math:`A^{\otimes n}`.
-    :rtype: Scipy sparse matrix
+    Returns
+    -------
+    csr_matrix
+       tensor product of ``n`` occurences of ``term`` 
     """
     return kron([term for _ in range(n)])
 

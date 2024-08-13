@@ -24,7 +24,7 @@ author = 'Edric Matwiejew'
 autodoc_mock_imports = ["mpi4py", "h5py","nlopt", "quop_mpi.__lib"]
 
 # The full version, including alpha/beta/rc tags
-release = '1.1.0'
+release = '1.2.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -32,7 +32,21 @@ release = '1.1.0'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc']
+extensions = ['numpydoc', 'sphinx.ext.graphviz', 'sphinx.ext.mathjax', 'sphinxcontrib.bibtex']
+mathjax3_config = {
+  'tex' : {
+    'macros' : {
+      'bm': ["{\\boldsymbol #1}",1],
+      'Bar': ["{\\bar #1}", 1],
+      'dag': ["\\dagger"],
+      'QWOA{}': ["QWOA"],
+      }
+    } 
+}
+bibtex_bibfiles = ['bibliography.bib']
+autosummary_generate = False
+numpydoc_show_class_members = False
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -56,3 +70,6 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 master_doc = 'index'
+
+def setup(app):
+    app.add_css_file('custom.css')

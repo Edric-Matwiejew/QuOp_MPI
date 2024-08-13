@@ -1,35 +1,70 @@
-from importlib import import_module
+# cspell:words cartesian coeff
+from __future__ import annotations
 import numpy as np
-from quop_mpi.__utils.__mpi import __scatter_1D_array
+from mpi4py import MPI
+from ....__utils.__mpi import __scatter_1D_array
+#from ....__lib import fCQAOA
+from ....__lib import cartesian as cart
+
+####################################
+# imports and classes for type hints
+####################################
+
+from typing import Callable, Union, Iterable
+
+Intracomm = MPI.Intracomm
+iterable = Iterable
+
+####################################
 
 def serial(
-        partition_table,
-        MPI_COMM,
-        variational_parameters,
-        function = None,
-        args = None,
-        kwargs = None,
-        ):
-    """
-    Defines :math:`\hat{O}` via a serial function. The serial `function` is called at `rank = 0` of MPI communicator `MPI_COMM` and its output is distributed over `MPI_COMM` as described by `partition_table`. Argument `partition_table` is a class attribute of the :class:`Unitary` class.
+    partition_table: list[int],
+    MPI_COMM: Intracomm,
+    variational_parameters: np.ndarray[np.float64],
+    function: Callable,
+    *args,
+    **kwargs,
+) -> Union[np.ndarray[np.float64], list[np.ndarray[np.float64]]]:
+    """Generate the diagonal of the :term:`operator` for one or more sequential
+    :term:`phase-shift unitaries<phase-shift unitary>` using a serial Python
+    function.
 
-    :param partition_table: Describes the parallel partitioning scheme.
-    :type partition_table: array, integer
+    An :term:`Operator Function` for the
+    :class:`quop_mpi.propagator.diagonal.unitary` class. The :literal:`function`
+    argument must be defined in a corresponding :term:`FunctionDict` on
+    initialisation of the :literal:`unitary` instance. Additional positional and
+    keyword arguments contained in the FunctionDict are passed to :literal:`function`. 
 
-    :param MPI_COMM: MPI communicator
-    :type MPI_COMM: MPI4py communicator object
+    The :literal:`function` argument must conform to the signature, 
 
-    :param variational_parameters: Number of variational_parameters :math:`\\theta` associated with :math:`\hat{O}`, should match :class:`~Unitary.operator_n_params`.
-    :type variational_parameters: integer
+        .. code-block:: python
 
-    :param function: Function that returns :math:`\\text{diag}(\hat{O})`.
-    :type function: callable
+            def function(*args, *kwargs) -> (ndarray[float64] | list[ndarray[float64]])
 
-    :param args: Positional arguments associated with `function`.
-    :type args: optional, list, default = None
+    where the output is a 1-D real array of type :literal:`ndarray[float64]` 
+    and length :term:`system size`, or :literal:`list` containing one or more 1-D 
+    real arrays of type :literal:`ndarray[float64]` and length :literal:`system_size`.
 
-    :param kwargs: Keyword arguments associated with `function`.
-    :type kwargs: optional, dictionary, default = None
+    Parameters
+    ----------
+    partition_table : list[int]
+        describes the parallel partitioning scheme, :class:`quop_mpi.Ansatz` attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    variational_parameters : ndarray[float64]
+        :term:`operator parameters <operator parameter>`, passed to :literal:`function` if
+        :literal:`unitary.operator_n_params > 0`, :class:`quop_mpi.Unitary` attribute 
+    function : Callable
+        returns one or more :literal:`ndarray[float64]` of size :term:`system size`
+        corresponding to the diagonal of the operator of one or more phase-shift
+        unitaries
+
+    Returns
+    -------
+    ndarray[float64] or list[ndarray[float64]]
+        a 1-d real array or list of 1-D real arrays containing a :literal:`local_i`
+        elements of the :term:`operator` diagonal with global index offset
+        :literal:`local_i_offset`
     """
     if args is None:
         args = []
@@ -38,81 +73,70 @@ def serial(
 
     if MPI_COMM.Get_rank() == 0:
 
-        if variational_parameters is not None:
-            input_args = [*args, variational_parameters]
-        else:
-            input_args = args
-
-        if len(input_args) == 0 and len(kwargs) == 0:
-            operator = function()
-        elif len(kwargs) != 0 and len(args) == 0:
-            operator = function(*kwargs)
-        elif len(args) != 0 and len(kwargs) == 0:
-            operator = function(*input_args)
-        else:
-            operator = function(*input_args, **kwargs)
+        operator = function(*variational_parameters, *args, **kwargs)
 
         operator_array = isinstance(operator[0], np.ndarray)
 
-        if operator_array:
-            n_terms = len(operator)
-        else:
-            n_terms = 1
-
+        n_terms = len(operator) if operator_array else 1
     else:
         operator = None
         n_terms = None
 
     n_terms = MPI_COMM.bcast(n_terms, 0)
 
-    if n_terms > 1:
-
-        terms = []
-
-        for i in range(n_terms):
-            if MPI_COMM.Get_rank() == 0:
-                terms.append(__scatter_1D_array(operator[i], partition_table, MPI_COMM, np.float64))
-            else:
-                terms.append(__scatter_1D_array(None, partition_table, MPI_COMM, np.float64))
-
-        return terms
-
-    else:
-
+    if n_terms <= 1:
         return __scatter_1D_array(operator, partition_table, MPI_COMM, np.float64)
 
+    terms = []
+
+    for i in range(n_terms):
+        if MPI_COMM.Get_rank() == 0:
+            terms.append(
+                __scatter_1D_array(operator[i], partition_table, MPI_COMM, np.float64)
+            )
+        else:
+            terms.append(
+                __scatter_1D_array(None, partition_table, MPI_COMM, np.float64)
+            )
+
+    return terms
+
+
 def csv(
-        system_size,
-        partition_table,
-        MPI_COMM,
-        filename = None,
-        **kwargs):
+    partition_table: list[int], MPI_COMM: Intracomm, filename: Callable, *args, **kwargs
+) -> np.ndarray[np.float64]:
+    """Load the diagonal of a :term:`phase-shift unitary` using 
+    `pandas <https://pandas.pydata.org/>`_.
 
-    """Import :math:`\\text{diag}(\hat{O})` from a CSV file.
+    An :term:`Operator Function` for the
+    :class:`quop_mpi.propagate.diagonal.unitary` class. The :literal:`filename` argument must
+    be defined in a corresponding :term:`FunctionDict` on initialisation of the
+    :literal:`unitary` instance. Additional keyword arguments in the :literal:`FunctionDict`
+    are passed to the 
+    `pandas.read_csv <https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html>`_
+    method.
 
-    :param system_size: Size of the quantum system :math:`N`.
-    :type system_size: integer
+    Parameters
+    ----------
+    partition_table : list[int]
+        describes the parallel partitioning scheme, :class:`quop_mpi.Ansatz`
+        attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    filename : Callable
+        path to a :literal:`*.csv` file
 
-    :param partition_table: Array describing the parallel partitioning scheme.
-    :type partition_table: array, integer
-
-    :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{O})` is partitioned.
-    :type MPI_COMM: MPI4py communicator object
-
-    :param partition_table: Array describing the parallel partitioning scheme.
-    :type partition_table: array, integer
-
-    :param filename: The location of the CSV file.
-    :type filename: string
-
-    :param \*\*kwargs: An arbitrary number of keyword arguments passed to the Pandas `read_csv` function.
+    Returns
+    -------
+    ndarray[float64]
+        a 1-D real array containing :literal:`local_i` elements of the operator
+        diagonal with global index offset :literal:`local_i_offset`
     """
-
-    import pandas as pd
-
     if MPI_COMM.Get_rank() == 0:
-        data_df = pd.read_csv(filename, **kwargs)
-        diagonals = data_df.to_numpy(dtype = np.complex128)
+        import pandas as pd
+
+        data_df = pd.read_csv(filename, *args, **kwargs)
+        diagonals = data_df.to_numpy(dtype=np.complex128)
     else:
         diagonals = None
 
@@ -120,61 +144,313 @@ def csv(
 
 
 def hdf5(
+    partition_table: int, MPI_COMM: Intracomm, filename: str, dataset_name: str
+) -> np.ndarray[np.float64]:
+    """Load the diagonal of a :term:`phase-shift unitary` using 
+    `HDF5 for Python <https://docs.h5py.org/en/latest/index.html>`_.
+
+
+    An :term:`Operator Function` for the
+    :class:`quop_mpi.propagate.diagonal.unitary` class. The :literal:`filename` and
+    :literal:`dataset_name` arguments must be defined in a corresponding
+    :term:`FunctionDict` on initialisation of the :literal:`unitary` instance.
+    Additional positional and keyword arguments in the :literal:`FunctionDict` are
+    passed to the `h5py.File <https://docs.h5py.org/en/latest/high/file.html>`_
+    method.
+
+    Parameters
+    ----------
+    partition_table : int
+        describes the parallel partitioning scheme, :class:`quop_mpi.Ansatz`
+        attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    filename : str
+        path to a :literal:`*.h5 file` 
+    dataset_name : str
+        path to the dataset containing a :literal:`ndarray[float64]` of size
+        :term:`system size`
+
+    Returns
+    -------
+    np.ndarray[np.float64]
+        a 1-D real array containing :literal:`local_i` elements of the operator
+        diagonal with global index offset :literal:`local_i_offset`
+    """
+    if MPI_COMM.Get_rank() == 0:
+        import h5py as h5
+
+        f = h5.File(filename, "r")
+        operator = np.array(f[dataset_name]).view(np.float64)
+        f.close()
+    else:
+        operator = None
+
+    return __scatter_1D_array(operator, partition_table, MPI_COMM, np.float64)
+
+
+def array(
+    partition_table: list[int], MPI_COMM: Intracomm, array: np.ndarray[np.float64]
+) -> np.ndarray[np.float64]:
+    """Define the diagonal of the :term:`phase-shift unitary` using a Numpy
+    array.
+
+    An :term:`Operator Function` for the
+    :class:`quop_mpi.propagate.diagonal.unitary` class. 
+
+    .. note::
+
+        For memory efficiency, :literal:`array` can be present as an :literal:`ndarray[float64]` at 
+        :literal:`MPI_COMM.rank == 0` only and :literal:`None` at all other ranks in :literal:`MPI_COMM`.  
+
+    Parameters
+    ----------
+    partition_table : list[int]
+        describes the parallel partitioning scheme, :class:`quop_mpi.Ansatz`
+        attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    array : np.ndarray[np.float64]
+        a 1-D real array of size :term:`system size`
+
+    Returns
+    -------
+    ndarray[float64]
+        a 1-D real array containing :literal:`local_i` elements of the operator
+        diagonal with global index offset :literal:`local_i_offset`
+    """
+    return __scatter_1D_array(array, partition_table, MPI_COMM, np.float64)
+
+
+def setup_cartesian(Ns: list[int], bounds: list[list[float]]) -> list[list[float]]:
+    """Compute the step-size and minimum coordinate values in each dimension of
+    a Cartesian grid.
+
+    See Also
+    --------
+
+    cartesian
+    
+    cartesian_scaled
+
+    Parameters
+    ----------
+    Ns : list[int]
+        the number of qubits assigned to each dimension of the Cartesian grid
+        such that there is :literal:`2 ** Ns[d]` grid points per dimension :literal:`d`
+    bounds : list[list[float]]
+        the lower and upper bounds of each dimension where 
+        :literal:`len(Ns) == len(bounds)`
+
+    Returns
+    -------
+    list[list[float]]
+        the step-size, :literal:`deltas`, and the minimum, :literal:`mins`, in each Cartesian
+        coordinate
+    """
+    d = len(Ns)
+    Ls = np.array(
+        [bound[1] - bound[0] for bound in bounds], dtype=np.float64
+    )  # length in each dimension
+    Ns = np.array([2**n for n in Ns], dtype=int)  # number of grid point per dimension
+    deltas = Ls / (Ns - 1)  # grid step-size in each dimension
+    mins = np.array(
+        [bound[0] for bound in bounds], dtype=np.float64
+    )  # minimum grid value in each dimension
+
+    return [deltas, mins]
+
+
+def cartesian(
+    system_size: int,
+    local_i: int,
+    local_i_offset: int,
+    Ns: list[int],
+    deltas: list[float],
+    mins: list[float],
+    function: Callable,
+    *args,
+    **kwargs,
+) -> np.ndarray[np.float64]:
+    """TODO:UPDATE Generate the diagonal of a :term:`phase-shift unitary` :term:`operator`
+    using a Python function defined in discrete Cartesian coordinates.
+
+    An :term:`Observables Function`. Depending on wether :term:`QVA` simulation
+    is defined using the :literal:`Ansatz` class directly or with a predefined
+    :literal:`Ansatz` subclass from the :literal:`algorithm` submodule, the following
+    arguments must be defined in a corresponding :term:`FunctionDict` on
+    initialisation of the :literal:`unitary` instance:
+
+
+        * :class:`quop_mpi.Ansatz`: :literal:`Ns`, :literal:`deltas`, :literal:`mins` and :literal:`function`
+
+        * algorithms in :mod:`quop_mpi.algorithm.combinatorial`: :literal:`Ns`, :literal:`deltas`, :literal:`mins` and :literal:`function`
+
+        * :class:`quop_mpi.algorithm.multivariable.qmoa`: :literal:`deltas`, :literal:`mins` and :literal:`function`
+
+        * :class:`quop_mpi.algorithm.multivariable.qowe`: :literal:`function`
+
+    Additional positional and keyword arguments in the :literal:`FunctionDict` are
+    passed to :literal:`function`.
+
+    The :literal:`function` argument must conform to the signature, 
+
+        .. code-block:: python
+
+            def function(x: ndarray[float64], *args, *kwargs) -> float
+
+        where :literal:`x` is a 1-D array containing a :literal:`len(Ns)` -dimensional grid
+        point.
+
+    See Also
+    --------
+    setup_cartesian
+        compute :literal:`deltas` and :literal:`mins`
+    cartesian_scaled 
+        alternative to :literal:`cartesian`, scales :literal:`function` between :literal:`0` and an
+        upper bound.
+
+
+    Parameters
+    ----------
+    system_size : int
+        size of the simulated QVA
+    local_i : int
+        size of the local :term:`system state` partition,
+        :class:`quop_mpi.Unitary` attribute
+    local_i_offset : int
+        global index offset of the local system state partition,
+        :class:`quop_mpi.Unitary` attribute
+    Ns : list[int]
+        the number of qubits assigned to each dimension of the cartesian grid
+        such that there is :literal:`2 ** Ns[d]` grid points per dimension :literal:`d`
+    deltas : list[float]
+        step size in each Cartesian coordinate
+    mins : list[float]
+        lower bound of each Cartesian coordinate 
+    function : Callable
+        a Python function that takes a list of :literal:`len(Ns)` real coordinate
+        values and returns a :literal:`float`
+
+
+    Returns
+    -------
+    ndarray[float64]
+        a 1-D real array containing :literal:`local_i` elements of the operator
+        diagonal with global index offset :literal:`local_i_offset`
+    """
+
+    strides = np.empty(len(Ns), dtype=int)
+    strides[-1] = 1
+    for i in range(len(Ns) - 2, -1, -1):
+        strides[i] = strides[i + 1] * Ns[i]
+
+    x = cart.cartesian.gen_local_grid(
+        system_size, Ns, strides, deltas, mins, local_i_offset, local_i
+    )
+
+    return np.array(function(x, *args, *kwargs), dtype = np.float64)
+
+
+def cartesian_scaled(
+    system_size: int,
+    local_i: int,
+    local_i_offset: int,
+    MPI_COMM: Intracomm,
+    Ns: list[int],
+    deltas: list[float],
+    mins: list[float],
+    function: Callable,
+    coeff: float,
+    *args,
+    **kwargs,
+) -> np.ndarray[np.float64]:
+    """Generate the diagonal of a :term:`phase-shift unitary` :term:`operator`
+    using a Python function defined in discrete Cartesian coordinates with the
+    function scaled between :literal:`0` and :literal:`coeff`.
+
+    An :term:`Observables Function`. Depending on wether :term:`QVA` simulation
+    is defined using the :literal:`Ansatz` class directly or with a predefined
+    :literal:`Ansatz` subclass from the :literal:`algorithm` submodule, the following
+    arguments must be defined in a corresponding :term:`FunctionDict` on
+    initialisation of the :literal:`unitary` instance:
+
+
+        * :class:`quop_mpi.Ansatz`: :literal:`Ns`, :literal:`deltas`, :literal:`mins`, :literal:`function` and :literal:`coeff`
+
+        * algorithms in :mod:`quop_mpi.algorithm.combinatorial`: :literal:`Ns`, :literal:`deltas`, :literal:`mins`, :literal:`function` and :literal:`coeff`
+
+        * :class:`quop_mpi.algorithm.multivariable.qmoa`: :literal:`deltas`, :literal:`mins`, :literal:`function` and :literal:`coeff`
+
+        * :class:`quop_mpi.algorithm.multivariable.qowe`: :literal:`function` and :literal:`coeff`
+
+    Additional positional and keyword arguments in the :literal:`FunctionDict` are
+    passed to :literal:`function`.
+
+    The :literal:`function` argument must conform to the signature, 
+
+        .. code-block:: python
+
+            def function(x: ndarray[float64], *args, *kwargs) -> float
+
+        where :literal:`x` is a 1-D array containing a :literal:`len(Ns)` -dimensional grid
+        point.
+
+    See Also
+    --------
+    setup_cartesian
+        compute :literal:`deltas` and :literal:`mins`
+    cartesian_scaled 
+        alternative to :literal:`cartesian_scaled`,  does not scale :literal:`function`
+
+    Parameters
+    ----------
+    system_size : int
+        size of the simulated QVA
+    local_i : int
+        size of the local :term:`system state` partition,
+        :class:`quop_mpi.Unitary` attribute
+    local_i_offset : int
+        global index offset of the local system state partition,
+        :class:`quop_mpi.Unitary` attribute
+    Ns : list[int]
+        the number of qubits assigned to each dimension of the cartesian grid
+        such that there is :literal:`2 ** Ns[d]` grid points per dimension :literal:`d`
+    deltas : list[float]
+        step size in each Cartesian coordinate
+    mins : list[float]
+        lower bound of each Cartesian coordinate 
+    function : Callable
+        a Python function that takes a list of :literal:`len(Ns)` real coordinate
+        values and returns a :literal:`float`
+    coeff : float
+        a positive real number, the upper bound of the scaling range
+
+    Returns
+    -------
+    ndarray[float64]
+        a 1-D real array containing :literal:`local_i` elements of the operator
+        diagonal with global index offset :literal:`local_i_offset`
+    """
+    f = cartesian(
+        system_size,
         local_i,
         local_i_offset,
         MPI_COMM,
-        filename = None,
-        dataset_name = None):
+        Ns,
+        deltas,
+        mins,
+        function,
+        *args,
+        **kwargs,
+    )
 
-    """Import :math:`\\text{diag}(\hat{O})` from a HDF5 file.
+    f_max = MPI_COMM.allreduce(np.max(f), op=MPI.MAX)
+    f_min = MPI_COMM.allreduce(np.min(f), op=MPI.MIN)
 
-    :param local_i: Number of elements in the local partition of :math:`\\text{diag}(\hat{O})`.
-    :type local_i: integer
+    f = coeff * (f - f_min) / (f_max - f_min)
 
-    :param local_i_offset: Number of elements preceeding the local partition.
-    :param local_i_offset: integer
+    return f
 
-    :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{O})` is partitioned.
-    :type MPI_COMM: MPI4py communicator object
-
-    :param filename: Path to the HDF5 file.
-    :type filename: string
-
-    :param dataset_name: Path to :math:`\\text{diag}(\hat{O})` in the HDF5 file.
-    :type dataset_name: string
-    """
-
-    import h5py as h5
-
-    f = h5.File(filename, 'r')
-
-    operator = np.array(f[dataset_name][local_i_offset:local_i_offset + local_i]).view(np.float64)
-
-    f.close()
-
-    return operator
-
-def array(
-        system_size,
-        partition_table,
-        MPI_COMM,
-        array = None
-        ):
-
-    """
-    Define :math:`\\text{diag}(\hat{O})` using an array defined at MPI rank = 0.
-
-    :param system_size: Size of the quantum system :math:`N`.
-    :type system_size: integer
-
-    :param partition_table: Array describing the parallel partitioning scheme.
-    :type partition_table: array, integer
-
-    :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{O})` is partitioned.
-    :type MPI_COMM: MPI4py communicator object
-
-    :param array: Array defining :math:`\\text{diag}(\hat{O})`.
-    :type array: array, float
-
-    """
-    return __scatter_1D_array(array, partition_table, MPI_COMM, np.float64)
+def observables():
+    return np.empty(1, dtype = np.float64)

@@ -1,65 +1,90 @@
+from __future__ import annotations
 import numpy as np
 from scipy import sparse as __sparse
 
+y = __sparse.coo_matrix(np.array([[0, -1j], [1j, 0]]))
+x = __sparse.coo_matrix(np.array([[0,1],[1,0]]))
+z = __sparse.coo_matrix(np.array([[1, 0], [0, -1]]))
+
 def __pauli_term(matrix, index, n_qubits):
 
-    kron_terms = [__sparse.coo_matrix(np.identity(2)) for _ in range(n_qubits)]
-    kron_terms[index] = __sparse.coo_matrix(matrix)
-
-    for i in range(1, n_qubits):
-        kron_terms[0] = __sparse.kron(kron_terms[0], kron_terms[i], format = 'coo')
+    kron_terms = []
+    if index > 0:
+        kron_terms.append(__sparse.identity(2**index))
+    kron_terms.append(matrix)
+    if index != (n_qubits - 1):
+        kron_terms.append(__sparse.identity(2**(n_qubits - index - 1)))
+    
+    for i in range(1, len(kron_terms)):
+        kron_terms[0] = __sparse.kron(kron_terms[0], kron_terms[i])
 
     return kron_terms[0].tocsr()
 
-def I(n_qubits):
-    """Generate :math:`I \in \mathbb{R}^{n \\times n}`.
+def I(n_qubits: int) -> 'csr_matrix':
+    """Generate a sparse identity matrix of size ``2 ** n_qubits``.
 
-    :param n_qubits: :math:`n`
-    :type n_qubits: integer
+    Parameters
+    ----------
+    n_qubits: int
+        generate the identity operator for ``n_qubits``
 
-    :return:  :math:`I \in \mathbb{R}^{n \\times n}`
-    :rtype: Scipy sparse matrix
+    Returns
+    -------
+    csr_matrix 
+        the identity operator for ``n_qubits``
     """
     return __sparse.identity(2**n_qubits, format = 'csr')
 
-def X(index, n_qubits):
-    """Generate a sparse operator that applies a Pauli-X gate to qubit `index`
-    in a state space of `n_qubits` qubits.
+def X(index: int, n_qubits: int) -> 'csr_matrix':
+    """Generate the Pauli X operator acting on qubit ``index`` in a system of
+    ``n_qubits``.
 
-    :param index: Index of the target qubit.
-    :type index: integer
+    Parameters
+    ----------
+    index : int
+        index of the qubit to which the X operator is applied
+    n_qubits : int
+        total number of qubits in the system
 
-    :param n_qubits: Number of qubits.
-    :type n_qubits: integer
+    Returns
+    -------
+    csr_matrix
+        the Pauli X operator acting on qubit ``index`` in a system of ``n_qubits``
     """
-    x = np.array([[0,1],[1,0]])
     return __pauli_term(x, index, n_qubits)
 
-def Y(index, n_qubits):
-    """Generate a sparse operator that applies a Pauli-Y gate to qubit `index`
-    in a state space of `n_qubits` qubits.
+def Y(index: int, n_qubits: int) -> 'csr_matrix':
+    """Generate the Pauli Y operator acting on qubit ``index`` in a system of
+    ``n_qubits``.
 
-    :param index: Index of the target qubit.
-    :type index: integer
+    Parameters
+    ----------
+    index : int
+        index of the qubit to which the Y operator is applied
+    n_qubits : int
+        total number of qubits in the system
 
-    :param n_qubits: Number of qubits.
-    :type n_qubits: integer
+    Returns
+    -------
+    csr_matrix
+        the Pauli Y operator acting on qubit ``index`` in a system of ``n_qubits``
     """
-
-    y = np.array([[0, -1j], [1j, 0]])
     return __pauli_term(y, index, n_qubits)
 
-def Z(index, n_qubits):
-    """Generate a sparse operator that applies a Pauli-Z gate to qubit `index`
-    in a state space of `n_qubits` qubits.
+def Z(index: int, n_qubits: int):
+    """Generate the Pauli Z operator acting on qubit ``index`` in a system of
+    ``n_qubits``.
 
-    :param index: Index of the target qubit.
-    :type index: integer
+    Parameters
+    ----------
+    index : int
+        index of the qubit to which the Z operator is applied
+    n_qubits : int
+        total number of qubits in the system
 
-    :param n_qubits: Number of qubits.
-    :type n_qubits: integer
+    Returns
+    -------
+    csr_matrix
+        the Pauli Z operator acting on qubit ``index`` in a system of ``n_qubits``
     """
-    z = np.array([[1, 0], [0, -1]])
     return __pauli_term(z, index, n_qubits)
-
-

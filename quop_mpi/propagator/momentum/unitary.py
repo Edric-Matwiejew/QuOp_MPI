@@ -1,41 +1,73 @@
-from importlib import import_module
 import numpy as np
 from ...Unitary import Unitary
-
+#from ...__lib import fCQAOA
 
 class unitary(Unitary):
-    """Implements a mixing unitary with a circulant matrix operator exponent.
+    """Implements the :ref:`QOWE <QOWE>` :term:`mixing unitary`.
 
-    See :class:`Unitary` for more information.
-    """
+    .. warning::
 
+        ``unitary`` instances of type ``'momentum`` require that the ``size`` of
+        the MPI communicator assocaited with :class:`quop_mpi.Ansatz` class be
+        a factor of the first grid dimension (``Ns[0] % size == 0``). 
+
+    **Inhertance Diagram:**
+
+        .. graphviz::
+
+            digraph "sphinx-ext-graphviz" {
+                rankdir="LR"; node [fontsize="10"];
+                Unitary[label="quop_mpi.Unitary", shape="rectangle"];
+                unitary[label="quop_mpi.propagator.momentum.unitary",
+                shape="rectangle"];
+    
+                Unitary -> unitary;
+            }
+
+    See :class:`quop_mpi.Unitary`.
+
+    Attributes
+    ----------
+    unitary_type
+        ``'momentum'``
+    planner
+        ``True``
+    unitary_n_params
+        ``len(Ns)``
+
+    Parameters
+    ----------
+    Ns : list[int]
+        the number of grid points in each dimension of the Cartesian grid in position and momentum space
+    minsq : list[float]
+        the minimum of each Cartesian coordinate in position space
+    minsk : list[float]
+        the minimum of each Cartesian coordinate in momentum space
+    deltasq : list[float]
+        the step-size in each Cartesian coordinate in position space
+    deltask : list[float]
+        the step-size in each Cartesian coordinate in momentum space
+    *args and **kwargs:
+        passed to the initialisation method of :class:`quop_mpi.Unitary`
+        """
     def __init__(
         self,
-        Ns,
-        minsq,
-        minsk,
-        deltasq,
-        deltask,
-        operator_function,
-        operator_n_params=0,
-        operator_kwargs=None,
-        parameter_function=None,
-        parameter_kwargs=None,
-        unitary_n_params = None,
+        Ns: list[int],
+        minsq: list[float],
+        minsk: list[float],
+        deltasq: list[float],
+        deltask: list[float],
+        *args,
+        **kwargs
     ):
 
         super().__init__(
-            operator_function,
-            operator_n_params,
-            operator_kwargs,
-            parameter_function,
-            parameter_kwargs,
-            unitary_n_params =  unitary_n_params,
+            *args,
+            **kwargs
         )
 
         # check Ns against N
-        self.fCQAOA = import_module("quop_mpi.__lib.fCQAOA")
-        self.evolve = self.fCQAOA.continuous.evolve_ft
+        self.evolve = fCQAOA.fcqaoa.evolve_ft
         
         # should be system_size
         self.Ns = Ns
@@ -84,7 +116,7 @@ class unitary(Unitary):
     def plan(self, system_size, MPI_COMM):
 
         self.MPI_COMM = MPI_COMM
-        part = self.fCQAOA.continuous.plan_partition(self.Ns, self.MPI_COMM.py2f())
+        part = fCQAOA.fcqaoa.plan_partition(self.Ns, self.MPI_COMM.py2f())
        
         self.alloc_local = part[0]
         self.local_i = part[1]
@@ -116,14 +148,13 @@ class unitary(Unitary):
         def phase_k(x):
             return np.exp(-1.0j*np.sum(x*self.minsq))
         
-        
         def phase_q(x):
             return np.exp(1.0j*np.sum(x*self.minsk))
 
         self.pk = np.empty(shape = [self.local_i], dtype = np.complex128)
         self.pq = np.empty(shape = [self.local_i], dtype = np.complex128)
         
-        self.fCQAOA.continuous.dist_vector(
+        fCQAOA.fcqaoa.dist_vector(
                 phase_k,
                 self.Ns,
                 self.strides,
@@ -132,7 +163,7 @@ class unitary(Unitary):
                 self.local_i_offset,
                 self.pk)
         
-        self.fCQAOA.continuous.dist_vector(
+        fCQAOA.fcqaoa.dist_vector(
                 phase_q,
                 self.Ns,
                 self.strides,

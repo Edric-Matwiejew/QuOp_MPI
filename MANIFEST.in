@@ -1,4 +1,0 @@
-include README.md
-include CONTRIBUTORS.md
-graft src
-prune src/obj

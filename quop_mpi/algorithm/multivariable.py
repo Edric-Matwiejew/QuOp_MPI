@@ -17,33 +17,45 @@ class multivariable(Ansatz):
 
         self.set_unitaries([self.UQ, self.UW])
 
-    def set_qualities(self, function):
+    def set_qualities(self, function, operator_dict = None):
 
-        self.UQ.operator_kwargs = {"function":function}
+        self.UQ.operator_function = function
+        self.UQ.operator_dict = operator_dict
         self.set_observables(0)
 
     def set_mixer(self, Cs):
-        self.UW.operator_kwargs = {"Ns":self.Ns, "Cs":Cs}
+        self.UW.operator_dict = {"args": [], "kwargs": {"Ns":self.Ns, "Cs":Cs}}
 
-    def get_maximum_point(self):
+    def set_params(self, param_function, kwargs=None):
+        if kwargs is None:
+            kwargs = {}
 
-        if self.colours[self.COMM.Get_rank()] != -1:
+        self.UW.parameter_function = param_function
+        self.UW.parameter_dict = kwargs
+ 
+        self.UQ.parameter_function = param_function
+        self.UQ.parameter_dict = kwargs
 
-            probs = np.abs(self.final_state) ** 2
-            indx = np.argmax(probs)
-            maxes = self.COMM_OPT.gather(probs[indx], root=0)
-            indxs = self.COMM_OPT.gather(indx + self.local_i_offset, root=0)
+    # call to function is not valid
+    #def get_maximum_point(self):
 
-            if self.COMM_OPT.Get_rank() == 0:
+    #    if self.colours[self.COMM.Get_rank()] != -1:
 
-                best = np.argmax(maxes)
-                inds = self.unitaries[1].fCQAOA.continuous.get_index(
-                    indxs[best] + 1, self.Ns, self.UW.strides
-                )
-                grid_points = (inds - 1) * self.deltas
-                grid_points += self.mins
-                best_value = self.UQ.operator_kwargs['function'](grid_points)
-                return best_value, grid_points, maxes[best]
+    #        probs = np.abs(self.final_state) ** 2
+    #        indx = np.argmax(probs)
+    #        maxes = self.COMM_OPT.gather(probs[indx], root=0)
+    #        indxs = self.COMM_OPT.gather(indx + self.local_i_offset, root=0)
+
+    #        if self.COMM_OPT.Get_rank() == 0:
+
+    #            best = np.argmax(maxes)
+    #            inds = self.unitaries[1].fCQAOA.continuous.get_index(
+    #                indxs[best] + 1, self.Ns, self.UW.strides
+    #            )
+    #            grid_points = (inds - 1) * self.deltas
+    #            grid_points += self.mins
+    #            best_value = self.UQ.operator_dict['function'](grid_points)
+    #            return best_value, grid_points, maxes[best]
 
     def grid_point_from_index(self, index):
 
@@ -66,12 +78,11 @@ class multivariable(Ansatz):
         if self.colours[self.COMM.Get_rank()] == 0:
             self.observables = np.real(self.observables)
 
-            from quop_mpi.__lib import fqwoa_mpi
             import h5py
 
             if self.COMM_OPT.Get_rank() == 0:
 
-                qgrid = fCQAOA.continuous.gen_local_grid(
+                qgrid = fCQAOA.fcqaoa.gen_local_grid(
                     self.system_size,
                     self.Ns,
                     self.UW.strides,
@@ -117,22 +128,44 @@ class qmoa(multivariable):
             deltas,
             mins,
             discrete.operator.grid,
-            operator_kwargs = {"function": None},
+            operator_dict = {"args":[], "kwargs":{"function": None}},
             parameter_function=uniform,
         )
         
         self.UW = composite.unitary(
             Ns,
             composite.operator.ith,
-            operator_kwargs={
+            operator_dict={
+                "args":[],
+                "kwargs":{
                 "Ns": Ns,
-                "Cs": Ns,
+                "Cs": Ns},
             },
             parameter_function=uniform,
             unitary_n_params = self.UW_n_params,
         )
 
         self.set_unitaries([self.UQ, self.UW])
+
+        self.param_function = None
+
+
+    def set_params(self, param_function, kwargs=None):
+        """
+        Define the initial parameters :math:`\\boldsymbol{\\theta} = \{\\vec{\gamma}, \\vec{t}\}`.
+
+        :param param_function: Function that accepts `n_params` as one of its positional arguments and returns an array of size `n_params`.
+        :type param_function: array, float
+
+        :param kwargs: Keyword arguments associated with `param_function`.
+        :type kwargs: optional, dictionary, default = None
+        """
+        if kwargs is None:
+            kwargs = {}
+
+        self.param_function
+        self.param_kwargs = kwargs
+
 
 class qowe(multivariable):
 
@@ -165,7 +198,10 @@ class qowe(multivariable):
             self.deltas,
             self.mins,
             discrete.operator.grid,
-            operator_kwargs = {"function": None},
+            operator_dict = {
+                "args":[],
+                "kwargs":{"function": None}
+                },
             parameter_function=uniform,
         )
         

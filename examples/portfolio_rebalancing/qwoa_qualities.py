@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import pandas_datareader.data as web
+from portfolio import get_stock_data
 
 
 def qwoa_portfolio(
@@ -9,44 +9,9 @@ def qwoa_portfolio(
     risk=0.5,
     penalty=1,
     choose=None,
-    start_date="1/01/2017",
-    end_date="12/31/2018",
+    start_date="2020-01-01",
+    end_date="2020-12-31",
 ):
-
-    if stocks is None:
-
-        stocks = [
-            "AMP.AX",
-            "ANZ.AX",
-            "AMC.AX",
-            "BHP.AX",
-            "BXB.AX",
-            "CBA.AX",
-            "CSL.AX",
-            "IAG.AX",
-            "MQG.AX",
-            "GMG.AX",
-            "NAB.AX",
-            "RIO.AX",
-            "SCG.AX",
-            "S32.AX",
-            "TLS.AX",
-            "WES.AX",
-            "BKL.AX",
-            "CMW.AX",
-            "HUB.AX",
-            "ALU.AX",
-            "SUL.AX",
-            "TPM.AX",
-            "APE.AX",
-            "OSH.AX",
-            "IPH.AX",
-            "SGR.AX",
-            "BEN.AX",
-            "HVN.AX",
-            "QAN.AX",
-            "BKW.AX",
-        ][0:n_stocks]
 
     if choose is None:
 
@@ -54,9 +19,7 @@ def qwoa_portfolio(
 
     n_qubits = 2 * n_stocks
 
-    data = web.DataReader(stocks, data_source="yahoo", start=start_date, end=end_date)[
-        "Adj Close"
-    ]
+    data = get_stock_data(n_stocks, start_date, end_date, stocks)
 
     stock_ret = data.pct_change()
     mean_returns = stock_ret.mean()  # Avg returns and covariance calculations

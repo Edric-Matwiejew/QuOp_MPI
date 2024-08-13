@@ -1,33 +1,49 @@
-from importlib import import_module
+from __future__ import annotations
 import numpy as np
 from ..__utils.__mpi import __scatter_1D_array
 
+####################################
+# imports and classes for type hints
+####################################
+
+from mpi4py import MPI
+from typing import Callable, Union, Iterable
+
+Intracomm = MPI.Intracomm
+
+####################################
+
 
 def serial(
-    partition_table,
-    MPI_COMM,
-    function=None,
-    args=None,
-    kwargs=None,
-):
+    partition_table: list[int],
+    MPI_COMM: Intracomm,
+    function: Callable,
+    *args,
+    **kwargs
+) -> np.ndarray[np.float64]:
+    """Generate :term:`observables` using a serial python function.
 
-    """
-    Defines :math:`\hat{Q}` via a serial function. The serial `function` is called at `rank = 0` of MPI communicator `MPI_COMM` and its output is distributed over `MPI_COMM` as described by `partition_table`. Argument `partition_table` is a class attribute of the :class:`Unitary` class.
+    An :term:`Observables Function`. The :literal:`function` argument must be passed to
+     :meth:`quop_mpi.Ansatz.set_observables` in a :term:`FunctionDict`. Additional
+    positional and keyword arguments in the :literal:`FunctionDict` are passed to
+     :literal:`function`.
 
-    :param partition_table: Describes the parallel partitioning scheme.
-    :type partition_table: array, integer
+    Parameters
+    ----------
+    partition_table : list[int]
+        1-D array describing the global partitioning scheme, 
+         :class:`quop_mpi.Ansatz` attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    function : Callable
+        Python function returning a 1-D real array of :term:`system size` 
+         observable values
 
-    :param MPI_COMM: MPI communicator
-    :type MPI_COMM: MPI4py communicator object
-
-    :param function: Function that returns :math:`\\text{diag}(\hat{Q})`.
-    :type function: callable
-
-    :param args: Positional arguments associated with `function`.
-    :type args: optional, list, default = None
-
-    :param kwargs: Keyword arguments associated with `function`.
-    :type kwargs: optional, dictionary, default = None
+    Returns
+    -------
+    ndarray[float64]
+        :literal:`local_i` observable values with global index offset
+        :literal:`local_i_offset` (see :meth:`quop_mpi.Ansatz`)
     """
 
     if args is None:
@@ -36,114 +52,113 @@ def serial(
         kwargs = {}
 
     if MPI_COMM.Get_rank() == 0:
-
-        if len(args) == 0 and len(kwargs) == 0:
-            operator = function()
-        elif len(kwargs) != 0 and len(args) == 0:
-            operator = function(*kwargs)
-        elif len(args) != 0 and len(kwargs) == 0:
-            operator = function(*args)
-        else:
-            operator = function(*args, **kwargs)
-
+        operator = function(*args, **kwargs)
         operator_array = isinstance(operator[0], np.ndarray)
-
-        if operator_array:
-            n_terms = len(operator)
-        else:
-            n_terms = 1
-
+        n_terms = len(operator) if operator_array else 1
     else:
         operator = None
         n_terms = None
 
     n_terms = MPI_COMM.bcast(n_terms, 0)
 
-    if n_terms > 1:
-
-        terms = []
-
-        for i in range(n_terms):
-            if MPI_COMM.Get_rank() == 0:
-                terms.append(
-                    __scatter_1D_array(
-                        operator[i], partition_table, MPI_COMM, np.float64
-                    )
-                )
-            else:
-                terms.append(
-                    __scatter_1D_array(None, partition_table, MPI_COMM, np.float64)
-                )
-
-        return terms
-
-    else:
-
+    if n_terms <= 1:
         return __scatter_1D_array(operator, partition_table, MPI_COMM, np.float64)
+    terms = []
+
+    for i in range(n_terms):
+        if MPI_COMM.Get_rank() == 0:
+            terms.append(
+                __scatter_1D_array(operator[i], partition_table, MPI_COMM, np.float64)
+            )
+        else:
+            terms.append(
+                __scatter_1D_array(None, partition_table, MPI_COMM, np.float64)
+            )
+
+    return terms
 
 
-def csv(system_size, partition_table, MPI_COMM, filename=None, **kwargs):
+#TODO Update docstring
+def csv(
+    partition_table: list[int], MPI_COMM: Intracomm, *args, **kwargs) -> np.ndarray[np.float64]:
+    """Load :term:`observables` from a :literal:`*.csv` using `pandas
+    <https://pandas.pydata.org/>`_.
 
-    """Import :math:`\\text{diag}(\hat{Q})` from a CSV file.
+    An :term:`Observables Function`. The :literal:`filename` argument must be passed to
+    :meth:`quop_mpi.Ansatz.set_observables` in a :term:`FunctionDict`. Additional
+    keyword arguments in the :literal:`FunctionDict` are passed to the `pandas.read_csv
+    <https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html>`_ method.
 
-    :param system_size: Size of the quantum system :math:`N`.
-    :type system_size: integer
+    Parameters
+    ----------
+    partition_table : list[int]
+        1-D array describing the global partitioning scheme,
+        :class:`quop_mpi.Ansatz` attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    filename : str
+        path to a :literal:`*csv` file
 
-    :param partition_table: Array describing the parallel partitioning scheme.
-    :type partition_table: array, integer
-
-    :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{Q})` is partitioned.
-    :type MPI_COMM: MPI4py communicator object
-
-    :param partition_table: Array describing the parallel partitioning scheme.
-    :type partition_table: array, integer
-
-    :param filename: The location of the CSV file.
-    :type filename: string
-
-    :param \*\*kwargs: An arbitrary number of keyword arguments passed to the Pandas `read_csv` function.
+    Returns
+    -------
+    ndarray[float64]
+        :literal:`local_i` observable values with global index offset
+        :literal:`local_i_offset` (see :meth:`quop_mpi.Ansatz`)
     """
 
     import pandas as pd
 
     if MPI_COMM.Get_rank() == 0:
-        data_df = pd.read_csv(filename, **kwargs)
+        data_df = pd.read_csv(*args, **kwargs)
         diagonals = data_df.to_numpy(dtype=np.complex128)
     else:
         diagonals = None
 
+    MPI_COMM.barrier()
+
     return __scatter_1D_array(diagonals, partition_table, MPI_COMM, np.float64)
 
 
-def hdf5(partition_table, MPI_COMM, filename=None, dataset_name=None):
+def hdf5(
+    partition_table: list[int],
+    MPI_COMM: Intracomm,
+    filename: str,
+    dataset_name: str,
+    **kwargs
+) -> np.ndarray[np.float64]:
+    """Load :term:`observables` from a :literal:`*.h5` file using `HDF5 for Python <https://docs.h5py.org/en/latest/index.html>`_.
 
-    """Import :math:`\\text{diag}(\hat{Q})` from a HDF5 file.
+    An :term:`Observables Function`. The :literal:`filename` and :literal:`dataset_name`
+    arguments must be passed to :meth:`quop_mpi.Ansatz.set_observables` in a
+    :term:`FunctionDict`. Additional positional and keyword arguments in the
+    :literal:`FunctionDict` are passed to the `h5py.File <https://docs.h5py.org/en/latest/high/file.html>`_ method.
 
-    :param local_i: Number of elements in the local partition of :math:`\\text{diag}(\hat{Q})`.
-    :type local_i: integer
+    Parameters
+    ----------
+    partition_table : list[int]
+        1-D array describing the global partitioning scheme,
+        :class:`quop_mpi.Ansatz` attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    filename : str
+        path to a :literal:`*.h5` file
+    dataset_name : str
+        path to the dataset in :literal:`filename` containing an ndarray[float64] of
+        :term:`system size` observables.
 
-    :param local_i_offset: Number of elements preceding the local partition.
-    :param local_i_offset: integer
-
-    :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{Q})` is partitioned.
-    :type MPI_COMM: MPI4py communicator object
-
-    :param filename: Path to the HDF5 file.
-    :type filename: string
-
-    :param dataset_name: Path to :math:`\\text{diag}(\hat{Q})` in the HDF5 file.
-    :type dataset_name: string
+    Returns
+    -------
+    ndarray[float64]
+        :literal:`local_i` observable values with global index offset
+        :literal:`local_i_offset` (see :meth:`quop_mpi.Ansatz`)
     """
 
     import h5py as h5
 
     if MPI_COMM.rank == 0:
-        f = h5.File(filename, "r")
+        f = h5.File(filename, "r", **kwargs)
 
-        operator = np.array(
-            f[dataset_name],
-            dtype = np.float64
-        )
+        operator = np.array(f[dataset_name], dtype=np.float64)
 
         f.close()
 
@@ -153,23 +168,29 @@ def hdf5(partition_table, MPI_COMM, filename=None, dataset_name=None):
     return __scatter_1D_array(operator, partition_table, MPI_COMM, np.float64)
 
 
-def array(system_size, partition_table, MPI_COMM, array=None):
+def array(
+    partition_table: list[int],
+    MPI_COMM: Intracomm,
+    array: Union[list[float], np.ndarray[float]],
+) -> np.ndarray[np.float64]:
+    """Define :term:`observables` with a NumPy ndarray.
 
-    """
-    Define :math:`\\text{diag}(\hat{Q})` using an array defined at MPI rank = 0.
+    An :term:`Observables Function`. The :literal:`array` argument must be passed to
+    :meth:`quop_mpi.Ansatz.set_observables` in a :term:`FunctionDict` . 
 
-    :param system_size: Size of the quantum system :math:`N`.
-    :type system_size: integer
+    Parameters
+    ----------
+    partition_table : list[int]
+        1-D array describing the global partitioning scheme, :class:`quop_mpi.Ansatz` attribute
+    MPI_COMM : Intracomm
+        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+    array : Union[list[float], ndarray[float]]
+        a 1-D real array containing :term:`system size` observable values
 
-    :param partition_table: Array describing the parallel partitioning scheme.
-    :type partition_table: array, integer
-
-    :param MPI_COMM: MPI communicator over which :math:`\\text{diag}(\hat{Q})` is partitioned.
-    :type MPI_COMM: MPI4py communicator object
-
-    :param array: Array defining :math:`\\text{diag}(\hat{Q})`.
-    :type array: array, float
-
+    Returns
+    -------
+    ndarray[float64]
+        :literal:`local_i` observable values with global index offset :literal:`local_i_offset` (see :meth:`quop_mpi.Ansatz`)
     """
 
     return __scatter_1D_array(array, partition_table, MPI_COMM, np.float64)

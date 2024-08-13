@@ -1,114 +1,47 @@
 from importlib import import_module
 import numpy as np
+from ... import config
 from ...Unitary import Unitary
-
+from ...__lib.propagator import propagator
 
 class unitary(Unitary):
-    """Implements a mixing unitary with a circulant matrix operator exponent.
 
-    See :class:`Unitary` for more information.
-    """
+    def __init__(self, *args, **kwargs):
 
-    def __init__(
-        self,
-        operator_function,
-        operator_n_params=0,
-        operator_kwargs=None,
-        parameter_function=None,
-        parameter_kwargs=None,
-    ):
-
-        super().__init__(
-            operator_function,
-            operator_n_params,
-            operator_kwargs,
-            parameter_function,
-            parameter_kwargs,
-        )
-
-        self.fqwoa_mpi = import_module("quop_mpi.__lib.fqwoa_mpi")
-        self.evolve_circulant = self.fqwoa_mpi.evolve_circulant
+        super().__init__(*args, **kwargs)
 
         self.unitary_type = "circulant"
-        self.planner = True
-        self.planned = False
 
-        self.dummy_eigs = np.empty(1, dtype=np.float64)
+        self.context = None
 
-    def __fftw_plan(self):
+        #TODO check number of unitary params
 
-        """Calls FFTW subroutines which set up the ancillary data structures
-        needed to efficiently perform 1D parallel Fourier and inverse Fourier
-        transforms."""
+    def assign_backend(self, backend):
 
-        self.initial_state = self.final_state
-
-        self.evolve_circulant(
-            self.system_size,
-            self.local_i,
-            0,
-            self.dummy_eigs,
-            self.initial_state,
-            self.final_state,
-            self.MPI_COMM.py2f(),
-            1,
-        )
-
-        self.planned = True
+        self.propagator_module = backend.circulant_propagator
+        self.propagators = [propagator(self.propagator_module.propagator_wrapper)]
 
     def plan(self, system_size, MPI_COMM):
 
-        local_sizes = self.fqwoa_mpi.mpi_local_size(system_size, MPI_COMM.py2f())
+        size = MPI_COMM.Get_size()
+        rank = MPI_COMM.Get_rank()
 
-        self.local_o = local_sizes[3]
-        self.local_o_offset = local_sizes[4]
+        local_i = int(system_size // size + np.ceil((system_size % size) // (rank + 1) / size))
 
-        return local_sizes[1], local_sizes[0]
+        return local_i, local_i
+
 
     def copy_plan(self, ex_unitary):
-
-        try:
-
-            self.local_o = ex_unitary.local_o
-            self.local_o_offset = ex_unitary.local_o_offset
-
-        except:
-
-            raise ValueError("Input unitary does not propagate using FFTW")
+        pass
 
     def gen_operator(self, *args):
 
-        if not self.planned:
-            self.__fftw_plan()
-
+        self.propagators[0].plan(self.context)
         super().gen_operator(*args)
+        self.propagators[0].gen_operator([np.real(self.operator).astype(np.float64)])
 
-    def propagate(self, x):
-
-        self.evolve_circulant(
-            self.system_size,
-            self.local_i,
-            np.abs(x, dtype=np.float64),
-            self.operator,
-            self.initial_state,
-            self.final_state,
-            self.MPI_COMM.py2f(),
-            0,
-        )
+    def propagate(self, t):
+        self.propagators[0].propagate(t[0])
 
     def destroy(self):
-
-        if self.planned:
-
-            self.evolve_circulant(
-                self.system_size,
-                self.local_i,
-                0,
-                self.dummy_eigs,
-                self.initial_state,
-                self.final_state,
-                self.MPI_COMM.py2f(),
-                -1,
-            )
-
-            self.planned = False
+        self.propagators[0].destroy()
