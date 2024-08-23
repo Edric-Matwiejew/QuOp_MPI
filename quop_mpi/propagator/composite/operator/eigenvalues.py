@@ -44,7 +44,7 @@ def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:
     eigenvalues = np.zeros((np.max(Ns), len(Ns)), dtype = np.float64)
 
     for i, (N, C)  in enumerate(zip(Ns, Cs)):
-        eigenvalues[:N,i] = circulant_eigenvalues.graph(N, N, 0, C)
+        eigenvalues[:N,i] = circulant_eigenvalues.graph(N, C)
     return np.asfortranarray(eigenvalues)
 
  

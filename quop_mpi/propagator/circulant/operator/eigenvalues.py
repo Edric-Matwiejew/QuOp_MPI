@@ -32,6 +32,7 @@ def complete(system_size: int) -> np.ndarray[np.float64]:
     #return fqwoa_mpi.fqwoa_mpi.graph_eigenvalues(graph_array, local_i, local_i_offset)
 
 #TODO update docstring, document case for complete graph
+#TODO UPDATE DOCSTRING
 def graph(
         system_size: int,
         i: int = 1) -> np.ndarray[np.float64]:
