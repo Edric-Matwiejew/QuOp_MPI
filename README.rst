@@ -46,7 +46,7 @@ Build and install:
 ::
         
     FC=mpifort python -m setup bdist_wheel
-    python3.11 -m pip install dist/QuOp_MPI-*.whl
+    python -m pip install dist/QuOp_MPI-*.whl
 
 Test the installation by running an example:
 
