@@ -155,7 +155,7 @@ class qmoa(multivariable):
             ``1``,  ``Cs[j] == 1`` cycle graph,  ``Cs[j] > system_size // 2``
             complete graph
         """
-        self.UW.operator_dict = {"args": [], "kwargs": {"Ns":self.Ns, "Cs":Cs}}
+        self.UW.operator_dict = {"args": [], "kwargs": {"Cs":Cs}}
 
 class qowe(multivariable):
 
