@@ -24,6 +24,7 @@ set(FFTW_DOUBLE_LIB ${FFTW_DOUBLE_LIB} CACHE STRING "")
 set(FFTW_DOUBLE_MPI_LIB ${FFTW_FOUND} CACHE STRING "")
 
 add_library(mpi_context OBJECT mpi_context.f90)
+target_link_libraries(mpi_context PUBLIC MPI::MPI_Fortran)
 
 
 set(depends mpi_context)
@@ -32,7 +33,7 @@ set(definitions context=mpi_backend context_type=mpi_context)
 add_f2py_library(
 	MODULE_NAME mpi_context
 	DEPENDS "${depends}" 
-	DEFINITIONS "${definitions}" 
+	DEFINITIONS ${definitions}
 	SRC ${CONTEXT_WRAPPER}
 	INSTALL_SUBDIR mpi
 	)
