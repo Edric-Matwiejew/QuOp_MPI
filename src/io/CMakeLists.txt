@@ -11,11 +11,11 @@ set(HDF5_ERROR_INSTRUCTIONS "\
 \nIf parallel HDF5 is installed on your system, pass its library and include directories to CMake. 
 For example, if building the QuOp_MPI extension modules via pip:
 
-$:python3 -m pip install . -DHDF5_Fortran_LIBRARIES=<path to lib dir>\\ -DHDF5_Fortran_INCLUDE_DIR=<path to include dir>
+$:CMAKE_ARGS=\"-DHDF5_Fortran_LIBRARIES=<path to lib dir> -DHDF5_Fortran_INCLUDE_DIR=<path to include dir>\" python3 -m pip install . 
 
 Or, if calling CMake directly:
 
-$:cmake -B build -S . -DHDF5_Fortran_LIBRARIES=<path to lib dir>\\ -DHDF5_Fortran_INCLUDE_DIR=<path to include dir>
+$:cmake -B build -S . -DHDF5_Fortran_LIBRARIES=<path to lib dir> -DHDF5_Fortran_INCLUDE_DIR=<path to include dir>
 \
 ")
 
@@ -34,5 +34,5 @@ add_f2py_library(
 	MODULE_NAME parallel_io 
 	SRC ${CMAKE_CURRENT_SOURCE_DIR}/io.f90 
 	INCLUDE_DIRS "${HDF5_Fortran_INCLUDE_DIRS}"
-	LIBRARIES "${HDF5_Fortran_LIBRARIES}"
+	LIBRARIES "${HDF5_Fortran_LIBRARIES}" MPI::MPI_Fortran
 	)

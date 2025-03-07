@@ -1,4 +1,3 @@
-### setup project ###
 cmake_minimum_required(VERSION 3.18...3.25)
 
 project(QuOp_MPI,
@@ -7,8 +6,6 @@ project(QuOp_MPI,
   LANGUAGES C Fortran
 )
 
-#add_library(QuOP_MPI INTERFACE)
-
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   message(
     FATAL_ERROR
@@ -16,9 +13,7 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   )
 endif()
 
-# User-settable options.
 set(MPI_BACKEND $ENV{MPI_BACKEND} CACHE STRING "Build mpi backend.")
-set(FC $ENV{FC} CACHE STRING "Fortran MPI compiler-wrapper, e.g.: ftn (Cray), mpifort (other).")
 set(GPU_AWARE_MPI $ENV{GPU_AWARE_MPI} CACHE STRING "Link against GPU-aware MPI.")
 set(MPI_GTL_LIB_DIR $ENV{MPI_GTL_LIB_DIR} CACHE STRING "Link path for GPU-aware MPI.")
 set(WAVEFRONT_BACKEND $ENV{WAVEFRONT_BACKEND} CACHE STRING "Build wavefront backend.")
@@ -31,6 +26,8 @@ set(CUDA_PATH $ENV{CUDA_PATH} CACHE STRING "Path to CUDA installation.")
 set(OFFLOAD_ARCH $ENV{OFFLOAD_ARCH} CACHE STRING "Target GPU architecture, e.g.: sm_86.")
 set(SHAFFT_PATH $ENV{SHAFFT_PATH} CACHE STRING "Path to HIFFTND installation.")
 set(BUILD $ENV{BUILD} CACHE STRING "Build type, RELEASE or DEBUG.")
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(NOT DEFINED ENV{MPI_BACKEND})
   set(MPI_BACKEND ON)
@@ -52,7 +49,17 @@ set(CMAKE_BUILD_TYPE ${BUILD})
 
 include(CMakePrintHelpers)
 
-include(FindMPI)
+find_package(MPI REQUIRED COMPONENTS Fortran)
+
+if(MPI_FOUND)
+    message(STATUS "Found MPI: ${MPI_Fortran_INCLUDE_DIRS}")
+    include_directories(${MPI_Fortran_INCLUDE_DIRS})
+    link_directories(${MPI_Fortran_LIBRARY_DIRS})
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${MPI_Fortran_COMPILE_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}")
+else()
+    message(FATAL_ERROR "MPI not found! Ensure OpenMPI/MPICH is installed.")
+endif()
 
 if(DEFINED ENV{CRAYPE_VERSION})
   message("Cray PE detected")
@@ -65,39 +72,7 @@ if(${GPU_AWARE_MPI})
   set(ENV{MPICH_GPU_SUPPORT_ENABLED} 1)
 endif()
 
-# Configure the Fortran compiler for MPI
-set(CMAKE_Fortran_COMPILER ${MPI_Fortran_COMPILER})
-include_directories(${MPI_Fortran_INCLUDE_PATH})
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
-include_directories(${MPI_Fortran_INCLUDE_PATH})
-link_directories(${MPI_Fortran_LINK_FLAGS})
-
-# Set global compile options
-add_compile_options(${MPI_Fortran_COMPILE_FLAGS})
-if(${MPI_BACKEND})
-  message("-- MPI backend selected")
-  message(CHECK_START "Checking whether Fortran compiler ${CMAKE_Fortran_COMPILER} is configured for MPI.")
-  file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.f90
-    "program main
-    use mpi
-    implicit none
-    integer :: ierr
-    call mpi_init(ierr)
-    call mpi_finalize(ierr)
-    end program main
-  ")
-  try_compile(
-    MPI_TEST 
-    ${CMAKE_BINARY_DIR} 
-    ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.f90 
-    OUTPUT_VARIABLE OUTPUT 
-    ) 
-  if(NOT MPI_TEST)
-    cmake_print_variables(OUTPUT)
-    cmake_print_variables(FC)
-    message(FATAL_ERROR "MPI compiler ${CMAKE_Fortran_COMPILER} is not configured correctly")
-  endif()
-endif()
 
 if(${WAVEFRONT_BACKEND})
   message("-- Wavefront backend selected")

@@ -51,7 +51,7 @@ class unitary(Unitary):
 
         self.propagators = []
         for i in range(self.unitary_n_params):
-            self.propagators.append(propagator(self.propagator_module.propagator_wrapper))
+            self.propagators.append(propagator(self.propagator_module.diagonal_propagator_wrapper))
 
     def plan(self, system_size, MPI_COMM):
 

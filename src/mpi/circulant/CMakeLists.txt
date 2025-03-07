@@ -13,7 +13,7 @@ target_include_directories(
 )
 
 set(depends mpi_circulant_operators mpi_context mpi_circulant sparse_vector)
-set(definitions context=mpi_backend context_type=mpi_context propagator=mpi_circulant propagator_type=circulant_propagator)
+set(definitions context=mpi_backend context_type=mpi_context propagator=mpi_circulant propagator_type=circulant_propagator propagator_wrapper=circulant_propagator_wrapper)
 
 add_f2py_library(
 	MODULE_NAME mpi_circulant_propagator 

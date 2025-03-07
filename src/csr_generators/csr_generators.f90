@@ -5,6 +5,10 @@ module csr_generators
 
 
         implicit none
+
+        private
+
+        public :: hypercube, qmoa_mixer
         
         contains
 
@@ -141,115 +145,3 @@ module csr_generators
 
 end module csr_generators
 
-!program qmoa_mixer
-!
-!use MPI
-!use, intrinsic :: iso_fortran_env, only: sp => real32, dp => real64
-!use :: iso_c_binding
-!
-!implicit none
-!
-!real(dp), dimension(:,:), allocatable, target:: G1, G2, G3
-!real(dp), dimension(:,:), pointer :: G
-!
-!type(c_ptr), dimension(:), allocatable :: G_ptrs
-!
-!
-!integer(dp), dimension(:), allocatable :: Ns, strides, inds
-!integer(dp) :: system_size, n_dim, qubits_per_dim, elements_per_row
-!integer(dp) :: local_i, local_i_offset
-!
-!integer(dp), dimension(:), allocatable :: row_starts, col_indexes
-!complex(dp), dimension(:), allocatable :: values
-!
-!integer(sp) :: rank, flock, ierr
-!
-!integer(dp) :: i, j, k, indx, bak_indx
-!
-!call MPI_INIT(ierr)
-!call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-!call MPI_COMM_SIZE(MPI_COMM_WORLD, flock, ierr)
-!
-!n_dim = 3
-!
-!qubits_per_dim =  8 
-!system_size = 2**(n_dim*qubits_per_dim)
-!
-!allocate(Ns(n_dim), G_ptrs(n_dim), strides(n_dim), inds(n_dim))
-!
-!Ns = 2**qubits_per_dim
-!
-!strides(1) = 1
-!do i = 2, n_dim
-!    strides(i) = strides(i - 1)*Ns(i - 1)
-!enddo 
-!
-!local_i = system_size / flock
-!local_i_offset = rank*local_i
-!if (rank + 1 == flock) then
-!    local_i = system_size - local_i_offset
-!endif
-!
-!allocate(G1(Ns(1), Ns(1)))
-!allocate(G2(Ns(2), Ns(2)))
-!allocate(G3(Ns(3), Ns(3)))
-!
-!G1(:,:) = 1.0_dp
-!G2(:,:) = 1.0_dp
-!G3(:,:) = 1.0_dp
-!
-!do i = 1, Ns(1)
-!        G1(i,i) = 0.0_dp
-!        G2(i,i) = 0.0_dp
-!        G3(i,i) = 0.0_dp
-!    enddo
-!
-!G_ptrs(1) = c_loc(G1)
-!G_ptrs(2) = c_loc(G2)
-!G_ptrs(3) = c_loc(G3)
-!
-!elements_per_row = 0
-!do i = 1, n_dim
-!    call c_f_pointer(G_ptrs(i), G, [Ns(i), Ns(i)])
-!    do j = 1, Ns(i)
-!        if (G(j,1) > 0.0_dp) then
-!            elements_per_row = elements_per_row + 1
-!        endif
-!    enddo
-!enddo
-!
-!allocate(row_starts(local_i + 1))
-!allocate(col_indexes(elements_per_row*local_i))
-!allocate(values(elements_per_row*local_i))
-!
-!row_starts(1) = local_i_offset*elements_per_row + 1
-!do i = 1, local_i
-!    row_starts(i + 1) = row_starts(i) + elements_per_row
-!enddo
-!
-!indx = 1
-!do i = local_i_offset + 1, local_i_offset + local_i
-!    do j = 1, n_dim
-!        inds(j) = mod((i - 1) / strides(j), Ns(j)) + 1
-!    enddo
-!    do j = 1, n_dim
-!        bak_indx = inds(j)
-!        call c_f_pointer(G_ptrs(j), G, [Ns(j), Ns(j)])
-!        do k = 1, Ns(j)
-!            inds(j) = k
-!            if (k == bak_indx) cycle
-!            if (G(bak_indx, k) > 0.0_dp) then
-!                col_indexes(indx) =sum(inds * strides)
-!                values(indx) = G(bak_indx, k)
-!                indx = indx + 1
-!            endif
-!        enddo
-!        inds(j) = bak_indx
-!    enddo
-!enddo
-!
-!!deallocate(G_ptrs)
-!
-!call MPI_FINALIZE(ierr)
-!
-!end program qmoa_mixer

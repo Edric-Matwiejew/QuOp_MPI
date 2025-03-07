@@ -1,13 +1,14 @@
 [project]
 name = "QuOp_MPI"
-requires-python = ">=3.11"
+version = "1.2.1"
+requires-python = "~=3.11"
 authors = [
     {name = "Edric Matwiejew", email = "edric.matwiejew@research.uwa.edu.au"}
 ]
 description = "A parallel framework for the design and simulation of quantum variational algorithms"
 readme = "README.rst"
 classifiers = [
-    "Development Status :: 3 - Alpha", 
+    "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: GNU General Public License v3.0 (GPLv3)",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
@@ -16,7 +17,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics"
 ]
 dependencies = [
-    "numpy>=1.21",
+    "numpy<1.26",
     "mpi4py>=3.1.2",
     "scipy>=1.9.1",
     "h5py>=3.0.0",
@@ -24,23 +25,21 @@ dependencies = [
     "networkx>=2.8.6"
 ]
 
-version = "1.2.0"
-
 [build-system]
 requires = [
     "build",
     "wheel",
     "ninja",
-    "scikit-build>0.13.0",
+    "scikit-build==0.13.0",
     "cmake>=3.18",
-    "numpy>=1.21, <1.26.0",
+    "numpy<1.26",
+    "setuptools>=42,<=68.0.0"
 ]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 examples = [
-    "pandas-datareader==0.10.0",
-    "yfinance==0.2.12",
+    "yfinance==0.2.54",
     "matplotlib>=3.6.0",
     "seaborn>=0.11.2",
     "jupyter-client>=6.1.2",
@@ -51,4 +50,13 @@ docs = [
     "sphinxcontrib-bibtex==2.5.0",
     "sphinx-rtd-theme==1.2.0"
 ]
-
+all = [
+    "yfinance==0.2.54",
+    "matplotlib>=3.6.0",
+    "seaborn>=0.11.2",
+    "jupyter-client>=6.1.2",
+    "jupyter-core>=4.6.3",
+    "numpydoc==1.5.0",
+    "sphinxcontrib-bibtex==2.5.0",
+    "sphinx-rtd-theme==1.2.0"
+]
