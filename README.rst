@@ -8,7 +8,7 @@ QuOp_MPI is a Python 3 module designed for parallel, distributed-memory simulati
 
 **Current Version:** 2.0.0
 
-For an in-depth discussion on design, usage, and performance, please refer to the preprint on arXiv:  
+For an in-depth discussion on design, usage, and performance, please refer to the preprint on arXiv:
 `Design and Performance of QuOp_MPI <https://arxiv.org/abs/2110.03963>`_.
 
 Related Publications
@@ -36,7 +36,8 @@ Before installing QuOp_MPI, ensure that the following system dependencies are me
 - **FFTW3:** Configured with `--enable-fortran --enable-shared --enable-mpi`.
 - **Python:** 3.11+
 
-These prerequisites can be installed using your Linux package manager or via Homebrew on macOS. Example installation scripts are available in the `installation_scripts` directory.
+You can install these prerequisites using your Linux package manager or Homebrew on macOS. Instructions for building HDF5 and FFTW3 from source are provided later in this README.
+
 
 Package Installation
 --------------------
@@ -48,8 +49,7 @@ First, install the following build dependencies:
     python -m pip install --upgrade pip setuptools
     python -m pip install scikit-build cmake ninja
 
-Then proceed to one of the build methods below.
-
+Next, choose one of the following build methods:
 
 **Standard Build:**
 
@@ -58,6 +58,14 @@ To install from source (ensure that all build prerequisites are set), run:
 .. code-block:: bash
 
     python -m pip install .
+
+.. note::
+
+    If you encounter installation issues on a repeated build, try removing the `_skbuild` directory:
+
+    .. code-block:: bash
+
+       rm -rf _skbuild
 
 **Development Build:**
 
@@ -71,34 +79,34 @@ For development or modifying QuOp_MPI, use the following steps:
 
 Optional Dependencies
 ---------------------
-QuOp_MPI provides optional dependencies for documentation and examples. You can install them as follows:
+QuOp_MPI provides optional dependencies for documentation and examples.  
 
-- **Using pip extras:**  
-  Install both sets with:
-  
+- **Install all optional dependencies at once:**
+
   .. code-block:: bash
-  
-     python -m pip install '.[docs,examples]'
-  
-  Or, if you’ve defined an "all" extra in your pyproject.toml:
-  
-  .. code-block:: bash
-  
+
      python -m pip install '.[all]'
-  
-- **Manually:**  
-  For docs:
-  
-  .. code-block:: bash
-  
-     python -m pip install numpydoc==1.5.0 sphinxcontrib-bibtex==2.5.0 sphinx-rtd-theme==1.2.0
-  
-  For examples:
-  
-  .. code-block:: bash
-  
-     python -m pip install pandas-datareader==0.10.0 yfinance==0.2.12 matplotlib>=3.6.0 seaborn>=0.11.2 jupyter-client>=6.1.2 jupyter-core>=4.6.3
 
+- **Install specific dependencies:**
+  - **For documentation:**
+  
+    .. code-block:: bash
+
+       python -m pip install '.[docs]'
+
+  - **For examples:**
+
+    .. code-block:: bash
+
+       python -m pip install '.[examples]'
+
+- **Manual installation:**  
+  If you prefer, install dependencies manually:
+
+  .. code-block:: bash
+
+     python -m pip install numpydoc==1.5.0 sphinxcontrib-bibtex==2.5.0 sphinx-rtd-theme==1.2.0
+     python -m pip install pandas-datareader==0.10.0 yfinance==0.2.12 matplotlib>=3.6.0 seaborn>=0.11.2 jupyter-client>=6.1.2 jupyter-core>=4.6.3
 
 Usage Examples
 --------------
@@ -111,7 +119,7 @@ After installation, you can test the package using one of the provided examples.
 
 Documentation
 =============
-The documentation is built using Sphinx. With the optional build dependencies installed (see above), generate the docs:
+The documentation is built using Sphinx. After installing the optional documentation dependencies, generate the docs with:
 
 .. code-block:: bash
 
@@ -163,3 +171,4 @@ For bug reports or inquiries, please submit an issue on GitHub or contact:
 
 Edric Matwiejew  
 Email: edric.matwiejew@research.uwa.edu.au
+
