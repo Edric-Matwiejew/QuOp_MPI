@@ -52,7 +52,7 @@ class unitary(Unitary):
 
         self.propagators = []
         for i in range(self.unitary_n_params):
-            self.propagators.append(propagator(self.propagator_module.propagator_wrapper))
+            self.propagators.append(propagator(self.propagator_module.sparse_propagator_wrapper))
 
     def plan(self, system_size, MPI_COMM):
 
@@ -81,7 +81,6 @@ class unitary(Unitary):
             propagator.gen_operator(operator_args)
 
     def propagate(self, ts):
-
         for i, (t, propagator) in enumerate(zip(ts, self.propagators)):
             propagator.propagate(np.abs(t))
             if i < len(ts) - 1:

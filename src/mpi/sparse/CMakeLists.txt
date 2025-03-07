@@ -19,7 +19,7 @@ add_dependencies(mpi_sparse expm one_norms sparse)
 add_dependencies(mpi_sparse expm)
 
 set(depends mpi_sparse expm one_norms sparse mpi_context)
-set(definitions context=mpi_backend context_type=mpi_context propagator=mpi_sparse propagator_type=sparse_propagator)
+set(definitions context=mpi_backend context_type=mpi_context propagator=mpi_sparse propagator_type=sparse_propagator propagator_wrapper=sparse_propagator_wrapper)
 
 add_f2py_library(
 	MODULE_NAME mpi_sparse_propagator

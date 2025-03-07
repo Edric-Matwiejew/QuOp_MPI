@@ -23,7 +23,7 @@ class unitary(Unitary):
     def assign_backend(self, backend):
 
         self.propagator_module = backend.composite_propagator
-        self.propagators = [propagator(self.propagator_module.propagator_wrapper)]
+        self.propagators = [propagator(self.propagator_module.composite_propagator_wrapper)]
 
     def plan(self, system_size, MPI_COMM):
 

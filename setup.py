@@ -11,6 +11,6 @@ setup(
     packages=find_packages(where='.'),
     cmake_languages=["Fortran", "C"],
     cmake_args=["-DSKBUILD=TRUE"],
-    cmake_install_dir="quop_mpi",
+    cmake_install_dir=".",
 )
 

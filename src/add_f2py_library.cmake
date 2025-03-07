@@ -12,20 +12,51 @@ function(add_f2py_library)
     set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/modules")
   endif()
 
-  set(f2py_cmap          "${CMAKE_SOURCE_DIR}/src/.f2py_f2cmap")
-  set(module_pyf         "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}.pyf")
+  set(f2py_cmap           "${CMAKE_SOURCE_DIR}/src/.f2py_f2cmap")
+  set(module_pyf          "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}.pyf")
   set(module_f2py_wrapper "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}-f2pywrappers2.f90")
   set(module_f2py_c       "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}module.c")
+
+  #  Always force a rebuild (touch a stamp file each time).
+  set(PREPROCESS_STAMP "${CMAKE_CURRENT_BINARY_DIR}/force_rebuild_stamp_${F2PY_LIBRARY_MODULE_NAME}.txt")
+  add_custom_target(force_rebuild_${F2PY_LIBRARY_MODULE_NAME} ALL
+    COMMAND ${CMAKE_COMMAND} -E touch ${PREPROCESS_STAMP}
+    COMMENT "Forcing rebuild of preprocessed source for ${F2PY_LIBRARY_MODULE_NAME}"
+  )
+
+  set(F2PY_PP_DEFINITIONS "")
+  foreach(def ${F2PY_LIBRARY_DEFINITIONS})
+    list(APPEND F2PY_PP_DEFINITIONS "-D${def}")
+  endforeach()
+
+  set(F2PY_PP_INCLUDES "")
+  foreach(inc ${F2PY_LIBRARY_INCLUDE_DIRS})
+    list(APPEND F2PY_PP_INCLUDES "-I${inc}")
+  endforeach()
+
+  set(PREPROCESSED_SRC "${CMAKE_CURRENT_BINARY_DIR}/preprocessed_${F2PY_LIBRARY_MODULE_NAME}.F90")
+
+  add_custom_command(
+    OUTPUT "${PREPROCESSED_SRC}"
+    COMMAND ${CMAKE_Fortran_COMPILER}
+        -cpp -E
+        ${F2PY_PP_DEFINITIONS}
+        ${F2PY_PP_INCLUDES}
+        "${F2PY_LIBRARY_SRC}"
+        -o "${PREPROCESSED_SRC}"
+    DEPENDS "${F2PY_LIBRARY_SRC}" "${PREPROCESS_STAMP}"
+    COMMENT "Preprocessing ${F2PY_LIBRARY_SRC} with Fortran compiler and definitions"
+  )
 
   add_custom_command(
     OUTPUT  "${module_pyf}"
     COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py
             -h "${module_pyf}"
-            "${F2PY_LIBRARY_SRC}"
+            "${PREPROCESSED_SRC}"
             --overwrite-signature
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    DEPENDS "${F2PY_LIBRARY_SRC}"
-    COMMENT "Generating .pyf file using numpy.f2py"
+    DEPENDS "${PREPROCESSED_SRC}"
+    COMMENT "Generating .pyf file using numpy.f2py with preprocessed source"
     VERBATIM
   )
 
@@ -48,7 +79,10 @@ function(add_f2py_library)
     COMMENT "Generating all f2py intermediary files for ${F2PY_LIBRARY_MODULE_NAME}"
   )
 
-  add_library("${F2PY_LIBRARY_MODULE_NAME}module" OBJECT "${F2PY_LIBRARY_SRC}")
+  add_library("${F2PY_LIBRARY_MODULE_NAME}module" OBJECT "${PREPROCESSED_SRC}")
+  add_dependencies("${F2PY_LIBRARY_MODULE_NAME}module"
+    force_rebuild_${F2PY_LIBRARY_MODULE_NAME})
+
   target_include_directories("${F2PY_LIBRARY_MODULE_NAME}module"
     PRIVATE
       ${F2PY_LIBRARY_INCLUDE_DIRS}
@@ -68,7 +102,8 @@ function(add_f2py_library)
   )
 
   if(DEFINED F2PY_LIBRARY_DEPENDS)
-    add_dependencies("${F2PY_LIBRARY_MODULE_NAME}module" ${F2PY_LIBRARY_DEPENDS})
+    add_dependencies("${F2PY_LIBRARY_MODULE_NAME}module"
+      ${F2PY_LIBRARY_DEPENDS})
   endif()
 
   add_library("${F2PY_LIBRARY_MODULE_NAME}wrapper" OBJECT "${module_f2py_wrapper}")
@@ -81,7 +116,6 @@ function(add_f2py_library)
       ${F2PY_LIBRARY_INCLUDE_DIRS}
       "${CMAKE_Fortran_MODULE_DIRECTORY}"
   )
-  add_dependencies("${F2PY_LIBRARY_MODULE_NAME}wrapper" "${F2PY_LIBRARY_MODULE_NAME}module")
 
   add_dependencies("${F2PY_LIBRARY_MODULE_NAME}module"  ${generate_f2py_target_name})
   add_dependencies("${F2PY_LIBRARY_MODULE_NAME}wrapper" ${generate_f2py_target_name})
@@ -95,7 +129,7 @@ function(add_f2py_library)
 
   set_target_properties("${f2py_target_name}"
     PROPERTIES
-      PREFIX ""
+      PREFIX ""  # remove "lib" prefix for Python extension
       OUTPUT_NAME "${F2PY_LIBRARY_MODULE_NAME}.${Python3_SOABI}"
       SUFFIX ".so"
       LINKER_LANGUAGE Fortran
@@ -127,17 +161,20 @@ function(add_f2py_library)
 
   install(
     TARGETS "${f2py_target_name}"
-    DESTINATION "__lib/${F2PY_LIBRARY_INSTALL_SUBDIR}"
+    DESTINATION "quop_mpi/__lib/${F2PY_LIBRARY_INSTALL_SUBDIR}"
   )
 
   if(NOT DEFINED Python3_EXECUTABLE)
-    set(Python3_EXECUTABLE "${Python3_EXECUTABLE}" CACHE STRING "Path to the Python 3 executable")
+    set(Python3_EXECUTABLE "${Python3_EXECUTABLE}" CACHE STRING
+        "Path to the Python 3 executable")
   endif()
   if(NOT DEFINED Python3_NumPy_INCLUDE_DIRS)
-    set(Python3_NumPy_INCLUDE_DIRS "${Python3_NumPy_INCLUDE_DIRS}" CACHE STRING "Path to Python3 NumPy include directories")
+    set(Python3_NumPy_INCLUDE_DIRS "${Python3_NumPy_INCLUDE_DIRS}" CACHE STRING
+        "Path to Python3 NumPy include directories")
   endif()
   if(NOT DEFINED F2PY_INCLUDE_DIR)
-    set(F2PY_INCLUDE_DIR "${F2PY_INCLUDE_DIR}" CACHE STRING "Path to F2PY include directory")
+    set(F2PY_INCLUDE_DIR "${F2PY_INCLUDE_DIR}" CACHE STRING
+        "Path to F2PY include directory")
   endif()
 
 endfunction()
