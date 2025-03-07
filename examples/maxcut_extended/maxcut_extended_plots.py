@@ -12,7 +12,7 @@ system_size = 2 ** nodes
 
 Graph = nx.circular_ladder_graph(4)
 
-G = nx.to_scipy_sparse_matrix(Graph)
+G = nx.to_scipy_sparse_array(Graph)
 
 maxcut = h5.File("maxcut_extended.h5", "r")
 final_state = np.array(maxcut["depth 2/final_state"]).view(np.complex128)
