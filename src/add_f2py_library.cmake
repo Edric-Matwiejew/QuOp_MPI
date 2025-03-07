@@ -17,12 +17,7 @@ function(add_f2py_library)
   set(module_f2py_wrapper "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}-f2pywrappers2.f90")
   set(module_f2py_c       "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}module.c")
 
-  #  Always force a rebuild (touch a stamp file each time).
-  set(PREPROCESS_STAMP "${CMAKE_CURRENT_BINARY_DIR}/force_rebuild_stamp_${F2PY_LIBRARY_MODULE_NAME}.txt")
-  add_custom_target(force_rebuild_${F2PY_LIBRARY_MODULE_NAME} ALL
-    COMMAND ${CMAKE_COMMAND} -E touch ${PREPROCESS_STAMP}
-    COMMENT "Forcing rebuild of preprocessed source for ${F2PY_LIBRARY_MODULE_NAME}"
-  )
+  # Removed forced rebuild stamp and target
 
   set(F2PY_PP_DEFINITIONS "")
   foreach(def ${F2PY_LIBRARY_DEFINITIONS})
@@ -44,7 +39,7 @@ function(add_f2py_library)
         ${F2PY_PP_INCLUDES}
         "${F2PY_LIBRARY_SRC}"
         -o "${PREPROCESSED_SRC}"
-    DEPENDS "${F2PY_LIBRARY_SRC}" "${PREPROCESS_STAMP}"
+    DEPENDS "${F2PY_LIBRARY_SRC}"
     COMMENT "Preprocessing ${F2PY_LIBRARY_SRC} with Fortran compiler and definitions"
   )
 
@@ -80,8 +75,7 @@ function(add_f2py_library)
   )
 
   add_library("${F2PY_LIBRARY_MODULE_NAME}module" OBJECT "${PREPROCESSED_SRC}")
-  add_dependencies("${F2PY_LIBRARY_MODULE_NAME}module"
-    force_rebuild_${F2PY_LIBRARY_MODULE_NAME})
+  add_dependencies("${F2PY_LIBRARY_MODULE_NAME}module" ${generate_f2py_target_name})
 
   target_include_directories("${F2PY_LIBRARY_MODULE_NAME}module"
     PRIVATE
@@ -165,16 +159,13 @@ function(add_f2py_library)
   )
 
   if(NOT DEFINED Python3_EXECUTABLE)
-    set(Python3_EXECUTABLE "${Python3_EXECUTABLE}" CACHE STRING
-        "Path to the Python 3 executable")
+    set(Python3_EXECUTABLE "${Python3_EXECUTABLE}" CACHE STRING "Path to the Python 3 executable")
   endif()
   if(NOT DEFINED Python3_NumPy_INCLUDE_DIRS)
-    set(Python3_NumPy_INCLUDE_DIRS "${Python3_NumPy_INCLUDE_DIRS}" CACHE STRING
-        "Path to Python3 NumPy include directories")
+    set(Python3_NumPy_INCLUDE_DIRS "${Python3_NumPy_INCLUDE_DIRS}" CACHE STRING "Path to Python3 NumPy include directories")
   endif()
   if(NOT DEFINED F2PY_INCLUDE_DIR)
-    set(F2PY_INCLUDE_DIR "${F2PY_INCLUDE_DIR}" CACHE STRING
-        "Path to F2PY include directory")
+    set(F2PY_INCLUDE_DIR "${F2PY_INCLUDE_DIR}" CACHE STRING "Path to F2PY include directory")
   endif()
 
 endfunction()
