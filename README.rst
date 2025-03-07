@@ -2,32 +2,35 @@ QuOp_MPI
 ========
 
 A Parallel Framework for Quantum Variational Algorithms
-=========================================================
+-------------------------------------------------------
 
 QuOp_MPI is a Python 3 module designed for parallel, distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators.
 
 **Current Version:** 1.2.1
 
-For an in-depth discussion on design, usage, and performance, please refer to the preprint on arXiv:
+For an in-depth discussion on design, usage, and performance, please refer to the preprint on arXiv:  
 `Design and Performance of QuOp_MPI <https://arxiv.org/abs/2110.03963>`_.
 
 Related Publications
 --------------------
+
 **Package Development:**
 
-#. Matwiejew, E. & Wang, J. B. *QuOp_MPI: A framework for parallel simulation of quantum variational algorithms.* Journal of Computational Science 62, 101711 (2022).
-#. Matwiejew, E. & Wang, J. *QSW_MPI: A framework for parallel simulation of quantum stochastic walks.* Computer Physics Communications 107724 (2020).
+1. Matwiejew, E. & Wang, J. B. *QuOp_MPI: A framework for parallel simulation of quantum variational algorithms.* Journal of Computational Science 62, 101711 (2022).
+2. Matwiejew, E. & Wang, J. *QSW_MPI: A framework for parallel simulation of quantum stochastic walks.* Computer Physics Communications 107724 (2020).
 
 **Numerical Results Provided by QuOp_MPI:**
 
-#. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum Walk-Based Vehicle Routing Optimisation.* Frontiers in Physics 9, (2021).
-#. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum walk-based portfolio optimisation.* Quantum 5, 513 (2021).
-#. Matwiejew, E., Pye J. & Wang J. B. *Quantum Optimisation for Continuous Multivariable Functions by a Structured Search.* arXiv:2210.06227 (2022).
+1. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum Walk-Based Vehicle Routing Optimisation.* Frontiers in Physics 9, (2021).
+2. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum walk-based portfolio optimisation.* Quantum 5, 513 (2021).
+3. Matwiejew, E., Pye J. & Wang J. B. *Quantum Optimisation for Continuous Multivariable Functions by a Structured Search.* arXiv:2210.06227 (2022).
 
 Installation
 ============
+
 Prerequisites
 -------------
+
 Before installing QuOp_MPI, ensure that the following system dependencies are met:
 
 - **Compiler:** GCC 7+ with Fortran support (e.g., using `mpifort`).
@@ -37,7 +40,6 @@ Before installing QuOp_MPI, ensure that the following system dependencies are me
 - **Python:** 3.11+
 
 You can install these prerequisites using your Linux package manager or Homebrew on macOS. Instructions for building HDF5 and FFTW3 from source are provided later in this README.
-
 
 Package Installation
 --------------------
@@ -79,6 +81,7 @@ For development or modifying QuOp_MPI, use the following steps:
 
 Optional Dependencies
 ---------------------
+
 QuOp_MPI provides optional dependencies for documentation and examples.  
 
 - **Install all optional dependencies at once:**
@@ -86,19 +89,6 @@ QuOp_MPI provides optional dependencies for documentation and examples.
   .. code-block:: bash
 
      python -m pip install '.[all]'
-
-- **Install specific dependencies:**
-  - **For documentation:**
-  
-    .. code-block:: bash
-
-       python -m pip install '.[docs]'
-
-  - **For examples:**
-
-    .. code-block:: bash
-
-       python -m pip install '.[examples]'
 
 - **Manual installation:**  
   If you prefer, install dependencies manually:
@@ -110,6 +100,7 @@ QuOp_MPI provides optional dependencies for documentation and examples.
 
 Usage Examples
 --------------
+
 After installation, you can test the package using one of the provided examples. For instance, to run the maxcut example:
 
 .. code-block:: bash
@@ -119,6 +110,7 @@ After installation, you can test the package using one of the provided examples.
 
 Documentation
 =============
+
 The documentation is built using Sphinx. After installing the optional documentation dependencies, generate the docs with:
 
 .. code-block:: bash
@@ -127,6 +119,7 @@ The documentation is built using Sphinx. After installing the optional documenta
 
 Building FFTW3 and HDF5 From Source
 ===================================
+
 If pre-built parallel versions of FFTW3 and HDF5 are not available on your system, compile them from source as follows:
 
 .. code-block:: bash
@@ -149,6 +142,7 @@ If pre-built parallel versions of FFTW3 and HDF5 are not available on your syste
 
 Environment Setup
 =================
+
 If QuOp_MPI is unable to locate the HDF5 or FFTW shared libraries, update your library path. Add the following line to your ~/.bashrc:
 
 .. code-block:: bash
@@ -163,12 +157,13 @@ Then, reload your environment:
 
 License
 =======
+
 QuOp_MPI is distributed under the GNU General Public License v3.0 (GPLv3). The full license text is available in the LICENSE file.
 
 Contact Information
 ===================
+
 For bug reports or inquiries, please submit an issue on GitHub or contact:
 
 Edric Matwiejew  
 Email: edric.matwiejew@research.uwa.edu.au
-
