@@ -1,6 +1,6 @@
 [project]
 name = "QuOp_MPI"
-version = "2.0.0"
+version = "1.2.1"
 requires-python = "~=3.11"
 authors = [
     {name = "Edric Matwiejew", email = "edric.matwiejew@research.uwa.edu.au"}

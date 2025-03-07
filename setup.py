@@ -6,7 +6,7 @@ from setuptools import find_packages
 
 setup(
     name="QuOp_MPI",
-    version="2.0.0",
+    version="1.2.1",
     description="A parallel framework for the design and simulation of quantum variational algorithms.",
     packages=find_packages(where='.'),
     cmake_languages=["Fortran", "C"],
