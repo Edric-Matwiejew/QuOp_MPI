@@ -49,13 +49,17 @@ set(CMAKE_BUILD_TYPE ${BUILD})
 
 include(CMakePrintHelpers)
 
-find_package(MPI REQUIRED Fortran)
+find_package(MPI REQUIRED COMPONENTS Fortran)
 
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${MPI_Fortran_COMPILE_FLAGS}")
-
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}")
-
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}")
+if(MPI_FOUND)
+    message(STATUS "Found MPI: ${MPI_Fortran_INCLUDE_DIRS}")
+    include_directories(${MPI_Fortran_INCLUDE_DIRS})
+    link_directories(${MPI_Fortran_LIBRARY_DIRS})
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${MPI_Fortran_COMPILE_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}")
+else()
+    message(FATAL_ERROR "MPI not found! Ensure OpenMPI/MPICH is installed.")
+endif()
 
 if(DEFINED ENV{CRAYPE_VERSION})
   message("Cray PE detected")
