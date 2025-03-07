@@ -60,8 +60,8 @@ alg = Ansatz(system_size)
 alg.set_unitaries([UQ, UW])
 alg.set_observables(qaoaz_portfolio)
 alg.set_initial_state(state.serial, {"args": [parity_state, n_qubits, 2]})
-
+alg.verbose_objective = True
 alg.set_log("qaoaz_portfolio_log", "qaoaz", action="w")
 alg.benchmark(
-    range(1, 6), 3, param_persist=True, filename="qaoaz_portfolio", save_action="w"
+    range(1, 6), 5, param_persist=True, filename="qaoaz_portfolio", save_action="w"
 )

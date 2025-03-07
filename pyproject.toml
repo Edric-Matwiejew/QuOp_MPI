@@ -39,7 +39,6 @@ build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 examples = [
-    "pandas-datareader==0.10.0",
     "yfinance==0.2.54",
     "matplotlib>=3.6.0",
     "seaborn>=0.11.2",

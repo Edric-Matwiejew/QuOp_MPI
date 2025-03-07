@@ -1,6 +1,6 @@
 from quop_mpi.algorithm.combinatorial import qwoa, csv
 
-system_size = 31
+system_size = 30
 alg = qwoa(system_size)
 
 alg.set_qualities(
@@ -14,7 +14,7 @@ alg.set_qualities(
 alg.set_log("qwoa_portfolio_log", "qwoa", action="w")
 alg.benchmark(
     range(1, 6),
-    3,
+    5,
     param_persist=True,
     filename="qwoa_portfolio",
     save_action="w"
