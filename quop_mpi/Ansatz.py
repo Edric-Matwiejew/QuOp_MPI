@@ -122,7 +122,7 @@ def central(
     x_forward[var] += h
     expectation_back = evaluate(x_back)
     expectation_forward = evaluate(x_forward)
-    return (expectation_forward - expectation_back) / 2 * h
+    return (expectation_forward - expectation_back) / (2 * h)
 
 
 ###################
