@@ -1044,7 +1044,7 @@ class Ansatz:
 
         if self.subcomms.in_subcomm():
 
-            if self.initial_state_input is None:
+            if self.initial_state_dict is None:
                 from .state import equal
                 self.set_initial_state(equal)
 
