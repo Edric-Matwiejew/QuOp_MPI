@@ -216,7 +216,7 @@ class Ansatz:
     def __init__(self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD):
 
         self.system_size = system_size
-        self.MPI_COMM_WORLD = MPI.Comm.Dup(MPI_communicator)
+        self.MPI_COMM_WORLD = MPI_communicator.Dup()
 
         # variables that must be set by the 'pre' method of the child class
         self.alloc_local = None
