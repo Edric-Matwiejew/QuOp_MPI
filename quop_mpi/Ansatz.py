@@ -1889,7 +1889,7 @@ class Ansatz:
             global index offset :meth:`~quop_mpi.Ansatz.local_i_offset`
         """
         self.local_probabilities = (
-            np.abs(self.context.state[: self.local_i], dtype=np.float64) ** 2
+            (np.abs(self.context.state[: self.local_i]) ** 2).astype(np.float64)
         )
         return self.local_probabilities
 
