@@ -85,8 +85,9 @@ def forward_differences(
         approximate partial derivative
     """
     expectation = evaluate(variational_parameters)
-    variational_parameters[var] += h
-    expectation_forward = evaluate(variational_parameters)
+    x = variational_parameters.copy()
+    x[var] += h
+    expectation_forward = evaluate(x)
     return (expectation_forward - expectation) / h
 
 
