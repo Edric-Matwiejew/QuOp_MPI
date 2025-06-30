@@ -116,7 +116,6 @@ def central(
     float
         approximate partial derivative.
     """
-    expectation = evaluate(variational_parameters)
     x_back = copy(variational_parameters)
     x_forward = copy(variational_parameters)
     x_back[var] -= h
