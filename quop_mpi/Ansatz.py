@@ -237,6 +237,9 @@ class Ansatz:
         self.optimiser = (
             None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
         )
+        self.optimiser = (
+            None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
+        )
 
         self.setup_log = False  # whether results will be recorded in a *.log file.
 
