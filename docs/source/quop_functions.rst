@@ -74,27 +74,64 @@ QuOp Functions
 
                 return initial_state
 
-    Free Parameters Function
-        Returns an array of integers that specifies a subset of :term:`free parameters`.
-        Passed to :meth:`quop_mpi.Ansatz.set_free_params`.
-
-        See :class:`quop_mpi.Ansatz` for a selected list of available attributes,
-
-        **Typical Structure**
-
+    Parameter Map Function
+        Defines a mapping from a reduced “free” parameter vector to the full
+        variational-parameter vector used by a :term:`QVA`.  This allows you to
+        optimise only a subset of parameters while reconstructing the complete
+        vector internally.
+    
+        A Parameter Map Function is passed to
+        :meth:`quop_mpi.Ansatz.set_parameter_map` together with an optional
+        :term:`FunctionDict` of extra arguments.  At runtime the free vector
+        is bound via the same interface machinery used by other QuOp Functions.
+    
+        **FunctionDict usage:**
+    
         .. code-block:: python
-
-            def free_params_function(
-                ansatz_depth : int,
-                total_params : int,
+        
+            mapping_dict : {"args": List[Any], "kwargs": Dict[str,Any]}
+    
+        Any entries in `"args"` and `"kwargs"` will be forwarded to your map
+        function after the free-vector argument.
+    
+        **Typical structure:**
+    
+        .. code-block:: python
+        
+            def parameter_map_function(
+                ansatz_depth: int, # number of iterations
+                total_params: int, # parameters per ansatz iteration
+                free_vec: np.ndarray,
                 *args,
                 **kwargs
-            ) -> List[int]
-
-            ...
-
-                return free_params
+            ) -> np.ndarray:
+                """
+                Return full_vec of shape (ansatz_depth * total_params,)
+                by embedding or expanding the entries in free_vec according
+                to your chosen scheme.
+                """
+                # e.g. start with a copy of the previous full vector or zeros
+                full_vec = np.zeros(ansatz_depth * total_params, dtype=np.float64)
     
+                # insert free parameters into selected indices
+                for idx, var_idx in enumerate(free_indices):
+                    full_vec[var_idx] = free_vec[idx]
+    
+                # optionally fill remaining entries via some rule
+                # full_vec[other_indices] = ...
+    
+                return full_vec
+    
+        When you call
+    
+        .. code-block:: python
+        
+            ansatz.set_parameter_map(parameter_map_function, mapping_dict)
+    
+        the `parameter_map_function` will be bound to the `Ansatz` instance and
+        invoked automatically whenever variational parameters must be expanded
+        from the free vector.
+   
     Sampling Function
         Returns an :term:`objective function` value computed from batches of
         :term:`observables` values that are sampled based on the probability
