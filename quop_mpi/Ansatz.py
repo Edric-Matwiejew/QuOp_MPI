@@ -85,8 +85,9 @@ def forward_differences(
         approximate partial derivative
     """
     expectation = evaluate(variational_parameters)
-    variational_parameters[var] += h
-    expectation_forward = evaluate(variational_parameters)
+    x = variational_parameters.copy()
+    x[var] += h
+    expectation_forward = evaluate(x)
     return (expectation_forward - expectation) / h
 
 
@@ -115,14 +116,13 @@ def central(
     float
         approximate partial derivative.
     """
-    expectation = evaluate(variational_parameters)
     x_back = copy(variational_parameters)
     x_forward = copy(variational_parameters)
     x_back[var] -= h
     x_forward[var] += h
     expectation_back = evaluate(x_back)
     expectation_forward = evaluate(x_forward)
-    return (expectation_forward - expectation_back) / 2 * h
+    return (expectation_forward - expectation_back) / (2 * h)
 
 
 ###################
@@ -215,7 +215,7 @@ class Ansatz:
     def __init__(self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD):
 
         self.system_size = system_size
-        self.MPI_COMM_WORLD = MPI.Comm.Dup(MPI_communicator)
+        self.MPI_COMM_WORLD = MPI_communicator.Dup()
 
         # variables that must be set by the 'pre' method of the child class
         self.alloc_local = None
@@ -318,13 +318,72 @@ class Ansatz:
         self.var_map = None
         self.reset = False
 
-        self.free_params = None
-        self.free_params_function = None
-        self.free_params_dict = None
+        self._has_param_map        = False                # flag
+        self._param_map_raw        = lambda x, *a, **k: x # identity fallback
+        self._param_map_parsed     = None                 # interface-wrapped fn
+        self.param_map_dict        = {"args": [], "kwargs": {}}
+        self._need_bind_param_map  = False                # postpone binding until SUBCOMM exists
 
 
 
         atexit.register(self.__exit)
+
+    def set_parameter_map(
+        self,
+        mapping_fn: Callable[[np.ndarray], np.ndarray],
+        mapping_dict: dict | None = None,
+    ):
+        """Register a mapping from a subset of optimisable parameters to the full
+        set of variational parameters.
+
+        Parameters
+        ----------
+        mapping_fn : callable
+            ``mapping_fn(free_vec, *args, **kwargs) -> full_vec``.
+            *free_vec* is the vector presented to the optimiser;
+            *full_vec* must have length ``ansatz_depth * total_params``.
+        mapping_dict : FunctionDict, optional
+            FunctionDict supplying extra positional and keyword arguments
+            to the mapping function.
+        """
+
+        if self.jacobian_input is not None:
+            raise ValueError(
+                "Cannot set a parameter‐mapping function when a parallel Jacobian is configured."
+            )
+
+        self._has_param_map = True
+        self._param_map_raw = mapping_fn
+        self.__parse_function_dict__(mapping_dict, "param_map_dict")
+        self._need_bind_param_map = True
+
+    def __to_full(self, vec: np.ndarray) -> np.ndarray:
+        """Ensure vec is the full‑length parameter vector.
+        Applies the user mapping if necessary.
+        """
+        full_len = self.ansatz_depth * self.total_params
+        vec = np.asarray(vec, dtype=np.float64)
+
+        if not self._has_param_map:
+            if vec.size != full_len:
+                raise ValueError(
+                    f"Expected {full_len} variational parameters (ansatz_depth={self.ansatz_depth}, total_params={self.total_params}), got {vec.size}"
+                )
+            return vec
+
+        # otherwise, map the parameters
+        self._param_map_parsed.update_parameters()
+        full_vec = self._param_map_parsed.call(
+            vec,
+            *self.param_map_dict["args"],
+            **self.param_map_dict["kwargs"],
+        )
+        full_vec = np.asarray(full_vec, dtype=np.float64)
+        if full_vec.size != full_len:
+            raise ValueError(
+                f"Parameter mapping returned {full_vec.size} parameters. Expected {full_len} variational parameters (ansatz_depth={self.ansatz_depth}, total_params={self.total_params}), got {vec.size}"
+            )
+        return full_vec
 
     def __exit(self):
         """Called on program exit or on destruction of an :class:`~quop_mpi.Ansatz` instance.
@@ -373,7 +432,6 @@ class Ansatz:
             self.__gen_depth()
             self.setup_depth = False
 
-        self.__update_free_params()
         self.__update_var_map()
 
         if self.setup_observables:
@@ -400,6 +458,15 @@ class Ansatz:
             self.__gen_log()
             self.setup_log = False
 
+        if self._need_bind_param_map:
+            self._param_map_parsed = interface(
+                [self],
+                self._param_map_raw,
+                "parameter map",
+                self.subcomms.SUBCOMM,
+            )
+            self._need_bind_param_map = False
+
         for method in self.pre_execution_methods:
             method()
 
@@ -412,9 +479,11 @@ class Ansatz:
         self.quop_result["qubits"] = copy(np.log2(self.system_size))
         self.quop_result["system size"] = copy(self.system_size)
         self.quop_result["ansatz_depth"] = copy(self.ansatz_depth)
-        self.quop_result["free params"] = copy(self.free_params)
-        self.quop_result["variational parameters"] = deepcopy(
-            self.variational_parameters
+        self.quop_result["varitional_parameters"] = deepcopy(
+            self.result["x"]
+        )
+        self.quop_result["mapped_parameters"] = deepcopy(
+            self.__to_full(self.result["x"])
         )
         self.quop_result["final state norm"] = copy(self.state_norm)
         self.quop_result["execution time"] = copy(self.time)
@@ -919,6 +988,11 @@ class Ansatz:
             default :literal:`np.sqrt(np.finfo(float).eps)`
         """
 
+        if self._has_param_map:
+            raise ValueError(
+                "Cannot configure parallel Jacobian when a parameter‐mapping function is set."
+            )
+
         self.nodes_per_subcomm = nodes_per_subcomm
         self.processes_per_node = processes_per_node
         self.maxcomm = maxcomm
@@ -1032,7 +1106,6 @@ class Ansatz:
     def __gen_depth(self):
         """Computes the total number of variational parameters at the current
         ansatz depth."""
-
         self.n_variational_parameters = self.total_params * self.ansatz_depth
 
     def __gen_initial_state(self):
@@ -1043,7 +1116,7 @@ class Ansatz:
 
         if self.subcomms.in_subcomm():
 
-            if self.initial_state_input is None:
+            if self.initial_state_dict is None:
                 from .state import equal
                 self.set_initial_state(equal)
 
@@ -1155,7 +1228,6 @@ class Ansatz:
 
             self.__initialise_context()
 
-            self.__gen_free_params()
             self.setup_depth = True
             self.setup_observables = True
             self.setup_initial_state = True
@@ -1241,6 +1313,8 @@ class Ansatz:
             x = np.array(x, dtype=np.float64)
 
         if self.subcomms.in_subcomm():
+
+            x = self.__to_full(x) # apply parameter mapping if present
 
             self.context.state = self.ansatz_initial_state.astype(np.complex128)
             params_split = np.split(x, self.ansatz_depth)
@@ -1334,17 +1408,14 @@ class Ansatz:
             self.destroy()
             self.setup()
 
-            if variational_parameters is not None:
-                self.variational_parameters = np.array(
-                    variational_parameters, dtype=np.float64
-                )
-
-                self.set_depth(len(variational_parameters) // self.total_params)
-
             self.__pre()
 
+            self.variational_parameters = variational_parameters
             if self.variational_parameters is None:
-                self.variational_parameters = self.gen_initial_params(self.ansatz_depth)
+                if self._has_param_map:
+                    raise ValueError ("Parameter map function is set, intial parameters must be supplied to execute.")
+                else:
+                    self.variational_parameters = self.gen_initial_params(self.ansatz_depth)
 
         if self.subcomms.in_subcomm():
 
@@ -1361,7 +1432,7 @@ class Ansatz:
                 else:
 
                     while not self.stop:
-                        self.__free_params_objective(None)
+                        self.__objective(None)
 
                 self.__post()
 
@@ -1383,26 +1454,14 @@ class Ansatz:
         self.neval_mpi_jac = 0
 
         self.time = time()
-        x = self.__get_free_params()
 
-        if len(x) > 0:
-
-            self.result = self.optimiser(
-                self.__free_params_objective, x, **self.optimiser_args
-            )
-
-        else:
-            # if there are no free parameters, just compute the value
-            # of the objective function and then stop.
-            self.result = {"fun": None}
-            self.result["fun"] = self.objective(self.variational_parameters)
-            self.result["nfev"] = 1
-            self.result["success"] = "N/A"
-            self.result["x"] = copy(self.variational_parameters)
+        self.result = self.optimiser(
+            self.__objective, self.variational_parameters, **self.optimiser_args
+        )
 
         self.stop = True
 
-        self.__free_params_objective(None)
+        self.__objective(None)
 
         if self.subcomms.get_n_subcomms() > 1:
             self.__mpi_jacobian(None)
@@ -1443,6 +1502,7 @@ class Ansatz:
         self,
         ansatz_depths: iterable[int],
         repeats: int,
+        initial_parameters: Union[list[float], np.ndarray[float]] = None,
         param_persist: bool = False,
         verbose: bool = True,
         filename: str = None,
@@ -1451,52 +1511,58 @@ class Ansatz:
         time_limit: int = None,
         suspend_path: str = None,
     ):
-        """A method by which to study how a :term:`QVA` performs as the number
-        of :term:`ansatz iterations<ansatz depth>` increases.
+        """A method by which to study how a QVA performs as the number
+        of ansatz iterations<ansatz depth> increases.
 
         Parameters
         ----------
         ansatz_depths : iterable[int]
-            integers specifying a sequence of :term:`ansatz depths<ansatz depth>`
+            integers specifying a sequence of ansatz depths<ansatz depth>
         repeats : int
-            number of repeats at each :term:`ansatz depth`
+            number of repeats at each ansatz depth
+        initial_parameters: list[float] or ndarray[float], optional
+            ** Must be defined if a parameter mapping function is set. **
+            initial variational parameter values, if not present these are generated
+            using the default parameter generation methods of the ansatz unitaries.
         param_persist : bool, optional
-            if :literal:`True` the :term:`optimised<optimiser>` 
-            :term:`variational parameter <variational parameters>` values which achieved
-            the lowest :term:`objective function` value  for all repeats at
-            :literal:`ansatz_depth` will be used as starting parameters for the first
-            :literal:`ansatz_depth * total_params` at :literal:`ansatz_depth += 1`
+            if True the optimised variational parameter values which achieved
+            the lowest objective function value for all repeats at ansatz_depth
+            will be used as starting parameters for the first
+            ansatz_depth * total_params at ansatz_depth += 1. if a parameter
+            map is set, the initial parameters will update whenever the 
+            objective function reaches a new minimum.
         verbose : bool, optional
-            if :literal:`True`, print current the :term:`ansatz depth`, repeat number and 
-            :term:`optimisation<optimiser>` results by default :literal:`True`
+            if True, print current the ansatz depth, repeat number and
+            optimisation results (default True)
         filename : str or None, optional
-            name of :literal:`*.h5` file in which to :meth:`~quop_mpi.Ansatz.system.save` the
-            optimised :term:`system state` and :term:`observables`
+            name of *.h5 file in which to save the optimised system state and observables
         label : str, optional
-            if :literal:`filename` is not :literal:`None`, :literal:`*.h5` data will be saved as
-            "filename/label_depth_repeat", by default :literal:`"test"`
+            if filename is not None, *.h5 data will be saved as
+            "filename/label_depth_repeat" (default "test")
         save_action : {'a', 'w'}, optional
-            action taken during first file write: 'a' to append, 'w' to
-            overwrite, by default 'a'
+            action taken during first file write: 'a' to append, 'w' to overwrite (default 'a')
         time_limit : int or None, optional
-            total allocated in-program time in seconds, if the time of the
-            previous simulation exceeds the time remaining, the benchmark is
-            suspended
+            total allocated in-program time in seconds; if exceeded, the benchmark is suspended
         suspend_path : str or None, optional
-            path to the suspend file if :literal:`time_limit` is not :literal:`None`
+            path to the suspend file if time_limit is not None
         """
+
+        if self._has_param_map and initial_parameters is None:
+            raise ValueError(
+                "Parameter map is set: you must supply initial_parameters (the free-vector) to benchmark()"
+            )
+
+        best_obj = np.inf
+        previous_params = None
+
+        if initial_parameters is not None:
+            self.variational_parameters = np.asarray(initial_parameters, dtype=np.float64)
 
         self.destroy()
         self.setup()
-
-        ansatz_depth_temp = deepcopy(
-            self.ansatz_depth
-        )  # return to this value after benchmarking
-
+        ansatz_depth_temp = deepcopy(self.ansatz_depth)
         self.benchmarking = True
-
         suspend_path = "suspend" if suspend_path is None else suspend_path
-
         self.tracker = job_tracker(
             repeats,
             list(ansatz_depths)[-1],
@@ -1505,23 +1571,17 @@ class Ansatz:
             seed=self.seed,
             suspend_path=suspend_path,
         )
-
-        previous_params = None
-
         first = not self.tracker.got_match
 
         while not self.tracker.complete:
-
             repeat, depth = self.tracker.get_job()
             self.set_seed(self.tracker.get_seed())
             self.ansatz_depth = depth
             self.set_depth(depth)
 
             if repeat == 1 or first:
-
                 self.set_depth(depth)
                 first = False
-
                 if (
                     self.subcomms.get_subcomm_index() == 0
                     and verbose
@@ -1530,71 +1590,76 @@ class Ansatz:
                     print(f"Starting depth = {depth}:", flush=True)
 
             self.__pre()
-
             self.repeat = repeat
 
             if self.subcomms.get_subcomm_index() == 0:
-
-                if (not param_persist) or (depth == 1):
-                    self.variational_parameters = self.__gen_initial_params(
-                        depth
-                    )
-                
-                else:
-
-                    if self.subcomms.SUBCOMM.Get_rank() == 0:
-                        n_previous = len(self.tracker.results_dict[depth - 1])
+                # Choose starting vector
+                if self._has_param_map:
+                    if repeat == 1:
+                        # initial_parameters already set above
+                        pass
+                    elif param_persist and previous_params is not None:
+                        self.variational_parameters = previous_params.copy()
                     else:
-                        n_previous = None
-
-                    n_previous = self.subcomms.SUBCOMM.bcast(n_previous, root = 0)
-
-                    if n_previous > 0:
-
-                        if self.subcomms.SUBCOMM.Get_rank() == 0:
-                            if (
-                                self.tracker.job_list[self.tracker.job_index][1]
-                                != self.tracker.job_list[self.tracker.job_index - 1][1]
-                            ) or (previous_params is None):
-                                funs = [
-                                    result["fun"]
-                                    for result in self.tracker.results_dict[depth - 1]
-                                ]
-                                xs = [
-                                    result["variational parameters"]
-                                    for result in self.tracker.results_dict[depth - 1]
-                                ]
-
-                            previous_params = xs[np.argmin(funs)]
-                        else:
-                            previous_params = None
-
-                        previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root = 0)
-
-                        self.variational_parameters = np.empty(
-                            depth * self.total_params, dtype=np.float64
-                            )
-
-                        self.variational_parameters[
-                            : len(previous_params)
-                            ] = previous_params
-
-                        new_params = self.__gen_initial_params(1)
-
-                        self.variational_parameters[
-                            -self.total_params :
-                        ] = new_params
-
-                    else:
-
-                        self.variational_parameters = (
-                            self.__gen_initial_params()
+                        # always restart from the original supplied free-vector
+                        self.variational_parameters = np.asarray(
+                            initial_parameters, dtype=np.float64
                         )
+                else:
+                    # Unmapped case
+                    if (not param_persist) or (depth == 1):
+                        self.variational_parameters = self.__gen_initial_params(depth)
+                    else:
+                        # Persist full-vector between repeats/depths
+                        if self.subcomms.SUBCOMM.Get_rank() == 0:
+                            n_previous = len(self.tracker.results_dict[depth - 1])
+                        else:
+                            n_previous = None
+                        n_previous = self.subcomms.SUBCOMM.bcast(n_previous, root=0)
+
+                        if n_previous > 0:
+                            if self.subcomms.SUBCOMM.Get_rank() == 0:
+                                if (
+                                    self.tracker.job_list[self.tracker.job_index][1]
+                                    != self.tracker.job_list[self.tracker.job_index - 1][1]
+                                ) or (previous_params is None):
+                                    funs = [
+                                        result["fun"]
+                                        for result in self.tracker.results_dict[depth - 1]
+                                    ]
+                                    xs = [
+                                        result["variational parameters"]
+                                        for result in self.tracker.results_dict[depth - 1]
+                                    ]
+                                    previous_params = xs[np.argmin(funs)]
+                            else:
+                                previous_params = None
+
+                            previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root=0)
+
+                            self.variational_parameters = np.empty(
+                                depth * self.total_params, dtype=np.float64
+                            )
+                            # fill with best from last depth
+                            self.variational_parameters[: len(previous_params)] = previous_params
+                            # new parameters for the final layer
+                            new_params = self.__gen_initial_params(1)
+                            self.variational_parameters[-self.total_params :] = new_params
+                        else:
+                            self.variational_parameters = self.__gen_initial_params()
 
                 if verbose and self.subcomms.SUBCOMM.Get_rank() == 0:
                     print(f"{repeat} of {repeats} at depth {depth}...", flush=True)
 
                 self.execute()
+
+                # If mapped, capture and persist the improved initial parameters on improvement
+                if self._has_param_map:
+                    current_free = self.result["x"]
+                    current_obj = self.quop_result["fun"]
+                    if current_obj < best_obj:
+                        best_obj = current_obj
+                        previous_params = current_free.copy()
 
                 if verbose:
                     self.print_result()
@@ -1603,13 +1668,13 @@ class Ansatz:
                     if first:
                         self.save(
                             ensure_path_and_extension(filename, "h5"),
-                            f"{label}_{str(depth)}_{str(repeat)}",
+                            f"{label}_{depth}_{repeat}",
                             action=save_action,
                         )
                     else:
                         self.save(
                             ensure_path_and_extension(filename, "h5"),
-                            f"{label}_{str(depth)}_{str(repeat)}",
+                            f"{label}_{depth}_{repeat}",
                             action="a",
                         )
 
@@ -1617,12 +1682,12 @@ class Ansatz:
                 first = False
 
             else:
-
                 self.execute()
                 self.tracker.update(None)
 
         self.benchmarking = False
         self.ansatz_depth = ansatz_depth_temp
+
 
     def get_final_state(self) -> Union[np.ndarray[np.complex128], None]:
         """Gather the :term:`final state` to rank 0 of the :literal:`Ansatz` MPI subcommunicator.
@@ -1888,7 +1953,7 @@ class Ansatz:
             global index offset :meth:`~quop_mpi.Ansatz.local_i_offset`
         """
         self.local_probabilities = (
-            np.abs(self.context.state[: self.local_i], dtype=np.float64) ** 2
+            (np.abs(self.context.state[: self.local_i]) ** 2).astype(np.float64)
         )
         return self.local_probabilities
 
@@ -1920,13 +1985,11 @@ class Ansatz:
         if self.sampling:
             return self.__sample_expectation_value()
 
-        #self.__get_local_probabilities()
+        self.__get_local_probabilities()
 
-        #local_expectation = np.dot(self.local_probabilities, self.observables)
+        local_expectation = np.dot(self.local_probabilities, self.observables)
 
-        #return np.real(self.subcomms.SUBCOMM.allreduce(local_expectation, op=MPI.SUM))
-
-        return self.context.get_expectation_value()
+        return np.real(self.subcomms.SUBCOMM.allreduce(local_expectation, op=MPI.SUM))
 
     def __objective(
         self, variational_parameters: Union[list[float], np.ndarray[float]]
@@ -2130,141 +2193,3 @@ class Ansatz:
 
         else:
             return None
-
-    def __is_zero(self, x: float) -> bool:
-        """Check if float is equivalent to zero up to double precision.
-
-        Parameters
-        ----------
-        x : float
-            a real number
-
-        Returns
-        -------
-        bool
-            wether :literal:`x` is functionally zero
-        """
-        return (x >= -np.finfo(np.float64).eps) and (x <= np.finfo(np.float64).eps)
-
-    def set_free_params(
-        self, function: Callable, free_params_dict: dict = None
-    ):
-        """Optimise over a subset of the :term:`free variational parameters
-        <free parameters>`.
-
-        Parameters
-        ----------
-        function : callable
-            :term:`Free Parameters Function`
-        free_params_dict : dict, optional
-            :term:`FunctionDict` for the Free Parameters Function
-
-        Examples
-        --------
-
-        A Free Params Function that restricts :term:`optimisation<optimiser>` to
-        the last :term:`ansatz iteration<ansatz depth>`:
-
-        .. code-block:: python
-
-            def last_ansatz_iteration(total_params, ansatz_depth):
-               return list(
-                   range((ansatz_depth - 1) * total_params, ansatz_depth * total_params)
-               )
-        """
-        self.__parse_function_dict__(free_params_dict, "free_params_dict")
-        self.free_params_function = function
-
-    def __gen_free_params(self):
-        """Initial generation of free parameter indexes."""
-
-        if not self.subcomms.in_subcomm():
-            return
-
-        if callable(self.free_params_function) and not isinstance(
-            self.free_params_function, interface
-        ):
-
-            self.free_params_function = interface(
-                [self], self.free_params_function, "free_params", self.subcomms.SUBCOMM
-            )
-
-        elif self.free_params_function is not None:
-
-            self.free_params = self.free_params_function
-
-        else:
-
-            self.free_params = list(range(self.ansatz_depth * self.total_params))
-            self.n_free_params = len(self.free_params)
-
-    def __update_free_params(self):
-        """Update free parameter indexes."""
-
-        if isinstance(self.free_params_function, interface):
-
-            self.free_params_function.update_parameters()
-
-            self.free_params = self.free_params_function.call(
-                *self.free_params_dict["args"], **self.free_params_dict["kwargs"]
-            )
-
-        else:
-
-            self.free_params = list(range(self.ansatz_depth * self.total_params))
-
-        self.n_free_params = len(self.free_params)
-
-    def __get_free_params(self):
-        return [self.variational_parameters[index] for index in self.free_params]
-
-    def __place_free_params(
-        self, all_params: np.ndarray[float], params: np.ndarray[float]
-    ) -> np.ndarray[np.float64]:
-        """Maps a subset of free parameters to the full set of variational
-        parameters.
-
-        Array :literal:`params` is mapped to positions in :literal:`all_params` based on indexes
-        contained in the  :meth:`~quop_mpi.Ansatz.free_params` attribute.
-
-        Parameters
-        ----------
-        all_params : ndarray[float]
-            1-D real array of variational parameters
-        params : ndarray[float]
-            1-D real array of variational parameters
-
-        Returns
-        -------
-        ndarray[float64]
-            variational parameters with updated free parameters
-        """
-
-        for index, param in zip(self.free_params, params):
-            all_params[index] = param
-        return all_params
-
-    def __free_params_objective(self, params: np.ndarray[float]) -> Union[float, None]:
-        """Maps a subset of free parameters to the full set of variational
-        parameters.
-
-        Parameters
-        ----------
-        params : ndarray[float]
-            1-D real array of variational parameters
-
-        Returns
-        -------
-        float or None
-            returns the objective function value to rank 0 in MPI.COMM_WORLD,
-            None otherwise
-        """
-
-        if self.subcomms.SUBCOMM.Get_rank() != 0 or params is None:
-            return self.__objective(None)
-
-        self.variational_parameters = self.__place_free_params(
-            self.variational_parameters, params
-        )
-
-        return self.__objective(self.variational_parameters)
