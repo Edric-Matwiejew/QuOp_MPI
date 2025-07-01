@@ -1403,7 +1403,6 @@ class Ansatz:
             self.__pre()
 
             self.variational_parameters = variational_parameters
-
             if self.variational_parameters is None:
                 if self._has_param_map:
                     raise ValueError ("Parameter map function is set, intial parameters must be supplied to execute.")
@@ -2203,7 +2202,7 @@ class Ansatz:
                 variational_parameters, root=0
             )
 
-            self.__evolve_state(variational_parameters)
+            self.__evolve_state(self.variational_parameters)
 
             self.expectation = self.get_expectation_value()
 
@@ -2328,7 +2327,7 @@ class Ansatz:
             self.variational_parameters, 0
         )
 
-        self.__to_full(x)
+        #self.__to_full(x)
 
         x = self.subcomms.JACCOMM.bcast(x, 0)
 
