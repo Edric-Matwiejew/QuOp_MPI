@@ -6,7 +6,7 @@ A Parallel Framework for Quantum Variational Algorithms
 
 QuOp_MPI is a Python 3 module designed for parallel, distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators.
 
-**Current Version:** 1.2.1
+**Current Version:** 1.3.0
 
 For an in-depth discussion on design, usage, and performance, please refer to the `preprint on arXiv <https://arxiv.org/abs/2110.03963>`_.
 
