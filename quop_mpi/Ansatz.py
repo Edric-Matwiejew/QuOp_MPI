@@ -1413,7 +1413,7 @@ class Ansatz:
             self.variational_parameters = variational_parameters
             if self.variational_parameters is None:
                 if self._has_param_map:
-                    raise ValueError ("Parameter map function is set, intial parameters must be supplied to execute.")
+                    raise ValueError ("Parameter map function is set, initial parameters must be supplied to execute.")
                 else:
                     self.variational_parameters = self.gen_initial_params(self.ansatz_depth)
 
