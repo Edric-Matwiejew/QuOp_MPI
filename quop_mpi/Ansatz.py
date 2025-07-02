@@ -1410,7 +1410,8 @@ class Ansatz:
 
             self.__pre()
 
-            self.variational_parameters = variational_parameters
+            self.variational_parameters = self.MPI_COMM_WORLD(variational_parameters)
+
             if self.variational_parameters is None:
                 if self._has_param_map:
                     raise ValueError ("Parameter map function is set, initial parameters must be supplied to execute.")
