@@ -1,6 +1,6 @@
 [project]
 name = "QuOp_MPI"
-version = "1.2.1"
+version = "1.3.0"
 requires-python = "~=3.11"
 authors = [
     {name = "Edric Matwiejew", email = "edric.matwiejew@research.uwa.edu.au"}
@@ -31,7 +31,7 @@ requires = [
     "wheel",
     "ninja",
     "scikit-build==0.13.0",
-    "cmake>=3.18",
+    "cmake>=3.5,<4",
     "numpy<1.26",
     "setuptools>=42,<=68.0.0"
 ]
