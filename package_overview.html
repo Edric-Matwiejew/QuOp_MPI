@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Package Overview &mdash; QuOp_MPI 1.3.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=1f29e9d3"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script>window.MathJax = {"tex": {"macros": {"bm": ["{\\boldsymbol #1}", 1], "Bar": ["{\\bar #1}", 1], "dag": ["\\dagger"], "QWOA{}": ["QWOA"]}}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Examples" href="examples.html" />
+    <link rel="prev" title="Theoretical Background" href="theoretical_background.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html">QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#documentation">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#building-fftw3-and-hdf5-from-source">Building FFTW3 and HDF5 From Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#environment-setup">Environment Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#license">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#contact-information">Contact Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Package Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#qva-simulation">QVA Simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#predefined-algorithms">Predefined Algorithms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#user-defined-algorithms">User-Defined Algorithms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adaptive-operator-and-optimisation-schemes">Adaptive Operator and Optimisation Schemes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#parallelisation-schemes">Parallelisation Schemes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quantum-simulation">Quantum Simulation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gradient-evaluation">Gradient Evaluation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ansatz-swarms">Ansatz Swarms</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#parallel-overview">Parallel Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#support-for-clusters-with-job-scheduling">Support for Clusters with Job-Scheduling</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quop_mpi.html">quop_mpi</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developing_for_quop.html">Developing for QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Package Overview</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/package_overview.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="package-overview">
+<h1>Package Overview<a class="headerlink" href="#package-overview" title="Link to this heading"></a></h1>
+<p>QuOp_MPI provides an objected-oriented framework for the design and simulation of <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVAs</span></a>. It enables researchers with any level of parallel programming experience to design simulation workflows that are efficiently scalable on massively parallel systems.</p>
+<section id="qva-simulation">
+<h2>QVA Simulation<a class="headerlink" href="#qva-simulation" title="Link to this heading"></a></h2>
+<section id="predefined-algorithms">
+<h3>Predefined Algorithms<a class="headerlink" href="#predefined-algorithms" title="Link to this heading"></a></h3>
+<p>For combinatorial optimisation problems:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.combinatorial.qaoa" title="quop_mpi.algorithm.combinatorial.qaoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">qaoa</span></code></a> (see <a class="reference internal" href="theoretical_background.html#qaoa"><span class="std std-ref">QAOA</span></a> and the <a class="reference internal" href="examples.html#maxcut"><span class="std std-ref">maxcut with QAOA</span></a>)</p></li>
+<li><p><a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.combinatorial.qwoa" title="quop_mpi.algorithm.combinatorial.qwoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">qwoa</span></code></a> (see <a class="reference internal" href="theoretical_background.html#qwoa"><span class="std std-ref">QWOA</span></a> and the <a class="reference internal" href="examples.html#portfolio"><span class="std std-ref">portfolio rebalancing with QWOA</span></a> example)</p></li>
+</ul>
+<p>For the optimisation of continuous multivariable functions.</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.multivariable.qowe" title="quop_mpi.algorithm.multivariable.qowe"><code class="xref py py-class docutils literal notranslate"><span class="pre">qowe</span></code></a> (see <a class="reference internal" href="theoretical_background.html#qowe"><span class="std std-ref">QOWE</span></a>)</p></li>
+<li><p><a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.multivariable.qmoa" title="quop_mpi.algorithm.multivariable.qmoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">qmoa</span></code></a> (see <a class="reference internal" href="theoretical_background.html#qmoa"><span class="std std-ref">QMOA</span></a>)</p></li>
+</ul>
+</section>
+<section id="user-defined-algorithms">
+<h3>User-Defined Algorithms<a class="headerlink" href="#user-defined-algorithms" title="Link to this heading"></a></h3>
+<p>Novel QVAs may be designed by working directly with the <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> class and <a class="reference internal" href="quop_mpi.html#module-quop_mpi.propagator" title="quop_mpi.propagator"><code class="xref py py-mod docutils literal notranslate"><span class="pre">propagator</span></code></a> submodules. See,</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="examples.html#maxcut"><span class="std std-ref">Maxcut with the Ex-QAOA</span></a> (also <a class="reference internal" href="theoretical_background.html#ex-qaoa"><span class="std std-ref">Extended-QAOA</span></a>).</p></li>
+<li><p><a class="reference internal" href="examples.html#portfolio"><span class="std std-ref">Portfolio optimisation with the QAOAz</span></a> (also <a class="reference internal" href="theoretical_background.html#qaoaz"><span class="std std-ref">QAOAz</span></a>).</p></li>
+</ul>
+</section>
+<section id="adaptive-operator-and-optimisation-schemes">
+<h3>Adaptive Operator and Optimisation Schemes<a class="headerlink" href="#adaptive-operator-and-optimisation-schemes" title="Link to this heading"></a></h3>
+<p>The QuOp_MPI <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> and <a class="reference internal" href="quop_mpi.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a> classes are configured via <a class="reference internal" href="quop_functions.html#term-QuOp-Function"><span class="xref std std-term">QuOp Functions</span></a>. These allow the implementation of arbitrarily parameterised operators and adaptive optimisation schemes. QuOp_MPI includes default QuOp Functions that support the interfacing of user-defined serial Python functions with its <a class="reference internal" href="#parallel-qva"><span class="std std-ref">parallelisation scheme for QVA simulation</span></a>. Users may also define MPI-compatible custom QuOp Functions with minimal parallel programming experience.</p>
+</section>
+</section>
+<section id="parallelisation-schemes">
+<h2>Parallelisation Schemes<a class="headerlink" href="#parallelisation-schemes" title="Link to this heading"></a></h2>
+<p>QuOp_MPI implements several MPI-based parallelisation schemes, which are all mutually compatible. Of these, <a class="reference internal" href="#parallel-qva"><span class="std std-ref">parallel Quantum simulation</span></a> is relevant to <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation on personal computers, workstations and clusters. While <a class="reference internal" href="#parallel-gradient"><span class="std std-ref">parallel gradient computation</span></a> and <a class="reference internal" href="#parallel-swarm"><span class="std std-ref">Ansatz swarms</span></a> support simulation workflows on clusters.</p>
+<section id="quantum-simulation">
+<span id="parallel-qva"></span><h3>Quantum Simulation<a class="headerlink" href="#quantum-simulation" title="Link to this heading"></a></h3>
+<p>For an MPI (sub)communicator with <span class="math notranslate nohighlight">\(m\)</span> processes with integer ID <span class="math notranslate nohighlight">\(\text{rank} \in (0,...,m-1)\)</span>, the <a class="reference internal" href="glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> and <a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a> of a simulated <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> are partitioned over an MPI (sub)communicator with,</p>
+<div class="math notranslate nohighlight">
+\[\text{local_i}\]</div>
+<p>elements per rank and a global index offset of,</p>
+<div class="math notranslate nohighlight">
+\[\text{local_i_offset} = \sum_{i&lt;\text{rank}} \text{local_i}.\]</div>
+<p>These distributed arrays are acted on by instances of the <a class="reference internal" href="quop_mpi.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a> class, which provides an interface to efficient Python extensions which compute the action of the QVA unitaries in MPI parallel.</p>
+</section>
+<section id="gradient-evaluation">
+<span id="parallel-gradient"></span><h3>Gradient Evaluation<a class="headerlink" href="#gradient-evaluation" title="Link to this heading"></a></h3>
+<p>For <a class="reference internal" href="glossary.html#term-optimiser"><span class="xref std std-term">optimisation</span></a> methods that make use of gradient information, computation of the <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> gradient may be carried out in MPI parallel by duplicating an <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> over multiple MPI subcommunicators (see <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.set_parallel_jacobian" title="quop_mpi.Ansatz.set_parallel_jacobian"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_parallel_jacobian()</span></code></a>).</p>
+</section>
+<section id="ansatz-swarms">
+<span id="parallel-swarm"></span><h3>Ansatz Swarms<a class="headerlink" href="#ansatz-swarms" title="Link to this heading"></a></h3>
+<p>Optimisation of QVA <a class="reference internal" href="glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> over a large search domain, or other QVA meta-optimisation tasks can be accelerated through creation of an <a class="reference internal" href="quop_mpi.html#quop_mpi.meta.swarm" title="quop_mpi.meta.swarm"><code class="xref py py-class docutils literal notranslate"><span class="pre">swarm</span></code></a>, which manages multiple QVA simulation instances.</p>
+</section>
+</section>
+<section id="parallel-overview">
+<h2>Parallel Overview<a class="headerlink" href="#parallel-overview" title="Link to this heading"></a></h2>
+<p>The diagram below depicts a <a class="reference internal" href="quop_mpi.html#quop_mpi.meta.swarm" title="quop_mpi.meta.swarm"><code class="xref py py-class docutils literal notranslate"><span class="pre">swarm</span></code></a> of two <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation instances with parallel gradient evaluation (see <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.set_parallel_jacobian" title="quop_mpi.Ansatz.set_parallel_jacobian"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_parallel_jacobian()</span></code></a>). Each QVA simulation occurs over three MPI subcommunicators with two of the subcommunicators carrying out computation of the partial derivatives of the <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> and the remaining managing <a class="reference internal" href="glossary.html#term-optimiser"><span class="xref std std-term">optimisation</span></a> of the <a class="reference internal" href="glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> and evaluation of the objective function. The six <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> subcommunicators call the <a class="reference internal" href="quop_mpi.html#quop_mpi.Unitary.propagate" title="quop_mpi.Unitary.propagate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">propagate()</span></code></a> method of <a class="reference internal" href="quop_mpi.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a> instances which compute the action of the QVA’s <a class="reference internal" href="glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift</span></a> and <a class="reference internal" href="glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing</span></a> unitaries in MPI parallel.</p>
+<blockquote>
+<div><div class="graphviz"><img src="_images/graphviz-427bfad401a86f0bc099eb52e33d904005f767c5.png" alt="digraph &quot;sphinx-ext-graphviz&quot; {
+    node [fontsize=&quot;10&quot;];
+
+    mpi[label=&quot;MPI.COMM_WORLD\n12 nodes, 1536 cores&quot;, shape=oval]
+
+    swarm[label=&quot;Interrelated QVA simulations.\n(swarm)&quot;, shape=&quot;trapezium&quot;];
+
+    ansatz_0[label=&quot;QVA Simulation 1\n(Ansatz)&quot;,shape=&quot;invhouse&quot;];
+    ansatz_N[label=&quot;QVA Simulation 2\n(Ansatz)&quot;,shape=&quot;invhouse&quot;];
+
+    gradient_0_0[label=&quot;Gradient\ncomputation.\n(Ansatz)&quot;,shape=&quot;rectangle&quot;];
+    gradient_0_N[label=&quot;Gradient\ncomputation.\n(Ansatz)&quot;,shape=&quot;rectangle&quot;];
+    gradient_N_0[label=&quot;Gradient\ncomputation.\n(Ansatz)&quot;,shape=&quot;rectangle&quot;];
+    gradient_N_N[label=&quot;Gradient\ncomputation.\n(Ansatz)&quot;,shape=&quot;rectangle&quot;];
+
+    propagation_0[label=&quot;Objective function\nminimisation.\n(Ansatz)&quot;,shape=&quot;rectangle&quot;];
+    propagation_N[label=&quot;Objective function\nminimisation.\n(Ansatz)&quot;,shape=&quot;rectangle&quot;];
+
+    propagation_gradient_0_0[label=&quot;Parallel quantum\nstate propagation\n(Unitary)&quot;, shape=&quot;rectangle&quot;];
+    propagation_gradient_0_N[label=&quot;Parallel quantum\nstate propagation\n(Unitary)&quot;, shape=&quot;rectangle&quot;];
+    propagation_gradient_N_0[label=&quot;Parallel quantum\nstate propagation\n(Unitary)&quot;, shape=&quot;rectangle&quot;];
+    propagation_gradient_N_N[label=&quot;Parallel quantum\nstate propagation\n(Unitary)&quot;, shape=&quot;rectangle&quot;];
+
+    obj_propagation_0[label=&quot;Parallel quantum\nstate propagation\n(Unitary)&quot;, shape=&quot;rectangle&quot;];
+    obj_propagation_N[label=&quot;Parallel quantum\nstate propagation\n(Unitary)&quot;, shape=&quot;rectangle&quot;];
+
+    mpi -&gt; swarm [style=dashed, dir=none];
+
+    swarm-&gt; ansatz_0 [label=768];
+    swarm-&gt; ansatz_N [label=768];
+
+    ansatz_0 -&gt; propagation_0 [label=256];
+    ansatz_N -&gt; propagation_N [label=256];
+
+    propagation_0 -&gt; obj_propagation_0 [style=dashed, dir=none];
+    propagation_N -&gt; obj_propagation_N [style=dashed, dir=none];
+
+    ansatz_0 -&gt; gradient_0_0 [label=256];
+    ansatz_0 -&gt; gradient_0_N [label=256];
+
+    ansatz_N -&gt; gradient_N_0 [label=256];
+    ansatz_N -&gt; gradient_N_N [label=256];
+
+    gradient_0_0 -&gt; propagation_gradient_0_0 [style=&quot;dashed&quot;, dir=&quot;none&quot;];
+    gradient_0_N -&gt; propagation_gradient_0_N [style=&quot;dashed&quot;, dir=&quot;none&quot;];
+    gradient_N_0 -&gt; propagation_gradient_N_0 [style=&quot;dashed&quot;, dir=&quot;none&quot;];
+    gradient_N_N -&gt; propagation_gradient_N_N [style=&quot;dashed&quot;, dir=&quot;none&quot;];
+
+}" class="graphviz" /></div>
+</div></blockquote>
+<p class="center"><em>Example parallel structure for QuOp_MPI running on a cluster with 128 cores per node. Solid arrows indicate splitting of an MPI (sub)communicator and dashed lines sharing of an MPI (sub)communicator. Numbered edges indicate MPI subcommunicator size. Relevant QuOp_MPI classes are indicated in parenthesises.</em></p>
+</section>
+<section id="support-for-clusters-with-job-scheduling">
+<h2>Support for Clusters with Job-Scheduling<a class="headerlink" href="#support-for-clusters-with-job-scheduling" title="Link to this heading"></a></h2>
+<p>For clusters with time-limited job-scheduling, the <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.benchmark" title="quop_mpi.Ansatz.benchmark"><code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code></a>, <a class="reference internal" href="quop_mpi.html#quop_mpi.meta.swarm.execute_swarm" title="quop_mpi.meta.swarm.execute_swarm"><code class="xref py py-meth docutils literal notranslate"><span class="pre">execute_swarm()</span></code></a> and <a class="reference internal" href="quop_mpi.html#quop_mpi.meta.swarm.benchmark_swarm" title="quop_mpi.meta.swarm.benchmark_swarm"><code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark_swarm()</span></code></a> methods support automated job-suspension and resumption.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="theoretical_background.html" class="btn btn-neutral float-left" title="Theoretical Background" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

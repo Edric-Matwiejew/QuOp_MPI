@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Theoretical Background &mdash; QuOp_MPI 1.3.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=1f29e9d3"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script>window.MathJax = {"tex": {"macros": {"bm": ["{\\boldsymbol #1}", 1], "Bar": ["{\\bar #1}", 1], "dag": ["\\dagger"], "QWOA{}": ["QWOA"]}}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Package Overview" href="package_overview.html" />
+    <link rel="prev" title="QuOp_MPI" href="readme_link.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html">QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#documentation">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#building-fftw3-and-hdf5-from-source">Building FFTW3 and HDF5 From Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#environment-setup">Environment Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#license">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#contact-information">Contact Information</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Theoretical Background</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#combinatorial-optimisation">Combinatorial Optimisation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quantum-variational-algorithms">Quantum Variational Algorithms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#combinatorial-optimisation-with-qvas">Combinatorial Optimisation with QVAs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#unconstrained-optimisation">Unconstrained Optimisation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qaoa">QAOA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extended-qaoa">Extended-QAOA</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#constrained-optimisation">Constrained Optimisation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qaoaz">QAOAz</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qwoa">QWOA</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#multivariable-optimisation">Multivariable Optimisation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#the-continuous-multivariable-optimisation-problem">The Continuous Multivariable Optimisation Problem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#qvas-for-optimisation-of-continuous-multivariable-functions">QVAs for Optimisation of Continuous Multivariable Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#qaoa-multivariable">QAOA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#qowe">QOWE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#qmoa">QMOA</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quop_mpi.html">quop_mpi</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developing_for_quop.html">Developing for QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Theoretical Background</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/theoretical_background.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="theoretical-background">
+<h1>Theoretical Background<a class="headerlink" href="#theoretical-background" title="Link to this heading"></a></h1>
+<p>The following sections contain exerts from:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Matwiejew, E. &amp; Wang, J. B. QuOp_MPI: A framework for parallel simulation of quantum variational algorithms. Journal of Computational Science 62, 101711 (2022).</p></li>
+<li><p>Matwiejew, E., Pye J. &amp; Wang J. B. Quantum Optimisation for Continuous Multivariable Functions by a Structured Search. arXiv:2210.06227, (2022).</p></li>
+</ul>
+</div></blockquote>
+<p>Which are availble as preprints on arXiv.</p>
+<section id="combinatorial-optimisation">
+<h2>Combinatorial Optimisation<a class="headerlink" href="#combinatorial-optimisation" title="Link to this heading"></a></h2>
+<section id="quantum-variational-algorithms">
+<h3>Quantum Variational Algorithms<a class="headerlink" href="#quantum-variational-algorithms" title="Link to this heading"></a></h3>
+<p>For a quantum system of size <span class="math notranslate nohighlight">\(N = 2^n\)</span>, where integer <span class="math notranslate nohighlight">\(n\)</span> is
+a number of qubits with basis states
+<span class="math notranslate nohighlight">\({\left\{{\lvert 0\rangle} = \begin{pmatrix}   0 \\ 1 \end{pmatrix},{\lvert 1\rangle} = \begin{pmatrix}   1 \\ 0 \end{pmatrix}\right\}}\)</span>,
+QuOp_MPI defines a generalised QVA as</p>
+<div class="math notranslate nohighlight" id="equation-eq-variational-generic">
+<span class="eqno">(1)<a class="headerlink" href="#equation-eq-variational-generic" title="Link to this equation"></a></span>\[{{\lvert\bm{\theta}\rangle}}=\left( \prod_{i = 1}^{p}{\hat{U}_{}}(\theta_i) \right){{\lvert\psi_0\rangle}}\]</div>
+<p>where <span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}} \in \mathbb{C}^{N}\)</span> is an
+initial quantum state with basis states
+<span class="math notranslate nohighlight">\({\left\{{\lvert i\rangle}\right\}}_{i=0,...,N-1}\)</span>,
+<span class="math notranslate nohighlight">\({\hat{U}_{}} \in \mathbb{C}^{N \times N}\)</span> is the
+ansatz unitary , integer <span class="math notranslate nohighlight">\(p \geq 0\)</span> specifies the number of
+applications of <span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span> to
+<span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}}\)</span> (the ‘depth’) and
+<span class="math notranslate nohighlight">\(\bm{\theta}= \{ \theta_i \in \mathbb{R} \}\)</span> is an ordered set of
+classically tunable values that parameterise
+<span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span>. The ansatz unitary
+<span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span> and initial quantum state
+<span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}}\)</span> together define a specific QVA.</p>
+<p>A Quantum Variational Algorithm is executed by repeatedly preparing
+<span class="math notranslate nohighlight">\({{\lvert\bm{\theta}\rangle}}\)</span> and measuring the
+expectation value</p>
+<div class="math notranslate nohighlight" id="equation-eq-objective-generic">
+<span class="eqno">(2)<a class="headerlink" href="#equation-eq-objective-generic" title="Link to this equation"></a></span>\[f(\bm{\theta}) = {\langle\bm{\theta}\rvert} \hat{Q}{\lvert\bm{\theta}\rangle}_\text,\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{Q}\in \mathbb{R}^{N \times N}\)</span> is a diagonal matrix
+operator with entries <span class="math notranslate nohighlight">\(\text{diag}(\hat{Q}) = q_i\)</span> that specify
+the ‘quality’ associated with quantum state <span class="math notranslate nohighlight">\({\lvert i\rangle}\)</span>.
+The variational parameters <span class="math notranslate nohighlight">\(\bm{\theta}\)</span> are updated using a
+classical optimiser with the objective being minimisation of
+<span class="math notranslate nohighlight">\(f\)</span>.</p>
+<p>The ansatz operator <span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span> specifies a sequence of
+alternating unitaries. This can include phase-shifts</p>
+<div class="math notranslate nohighlight" id="equation-eq-phase-shift-generic">
+<span class="eqno">(3)<a class="headerlink" href="#equation-eq-phase-shift-generic" title="Link to this equation"></a></span>\[{\hat{U}_{\text{phase}}}(\gamma) = \exp(-\text{i} \gamma \hat{O}),\]</div>
+<p>where
+<span class="math notranslate nohighlight">\(\hat{O} = \sum_{i=0}^{N-1} o_i {\lvert i\rangle}{\langle i\rvert}\)</span>
+is a diagonal phase-shift matrix operator,
+<span class="math notranslate nohighlight">\(\gamma \in \bm{\theta}\)</span> and <span class="math notranslate nohighlight">\(\hat{U}_\text{phase}\)</span>
+applies a phase-shift proportional to <span class="math notranslate nohighlight">\(o_i\)</span>, as well as
+mixing-unitaries</p>
+<div class="math notranslate nohighlight" id="equation-eq-mixing-generic">
+<span class="eqno">(4)<a class="headerlink" href="#equation-eq-mixing-generic" title="Link to this equation"></a></span>\[{\hat{U}_{\text{mix}}}(t) = \exp(-\text{i} t \hat{W}),\]</div>
+<p>where <span class="math notranslate nohighlight">\(t \in \bm{\theta}\)</span> is non-negative and
+<span class="math notranslate nohighlight">\(\hat{W} = \sum_{{i,j} = 0}^{n-1}w_{ij}{\lvert j\rangle}{\langle i\rvert}\)</span>
+is a mixing matrix operator in which non-diagonal entries specify
+coupling between states <span class="math notranslate nohighlight">\({\lvert i\rangle}\)</span> and
+<span class="math notranslate nohighlight">\({\lvert j\rangle}\)</span>. Mixing-unitaries <span class="math notranslate nohighlight">\(\hat{U}_\text{mix}\)</span>
+drive the transfer of probability amplitude between quantum states,
+during which encoded phase differences contribute to constructive and
+destructive interference.</p>
+<p>Phase-shift operators <span class="math notranslate nohighlight">\(\hat{O}\)</span> and mixing operators
+<span class="math notranslate nohighlight">\(\hat{W}\)</span> may also be parameterised by <span class="math notranslate nohighlight">\(\bm{\theta}\)</span>. As
+these operators are time-independent Hamiltonians of the time-evolution
+operator, changes to the corresponding <span class="math notranslate nohighlight">\(\theta_i\)</span> alter the
+element-wise magnitudes or structure of the matrix exponent before
+preparation of <span class="math notranslate nohighlight">\({{\lvert\bm{\theta}\rangle}}\)</span>.</p>
+<p>Typically, the ansatz unitary <span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span> is applied
+<span class="math notranslate nohighlight">\(p\)</span> times to <span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}}\)</span> with each
+repetition parameterised by subset
+<span class="math notranslate nohighlight">\(\theta \subseteq \bm{\theta}\)</span>. Doing so increases the potential
+for constructive and destructive inference to concentrate probability
+amplitude at high-quality solutions; at the expense of classical
+optimisation over a larger parameter space and a deeper quantum circuit.
+In practice, a QVA must balance the improved convergence afforded by
+increases to <span class="math notranslate nohighlight">\(p\)</span> against the ability of the quantum hardware to
+maintain coherence over a longer sequence of quantum operations.</p>
+<p>The following sections introduce four distinct QVAs for
+solving constrained and unconstrained COPs. We summarise here the
+following notational conventions for a given QVA:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(n\)</span>: the number of qubits.</p></li>
+<li><p><span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}}\)</span>: the initial quantum state
+vector.</p></li>
+<li><p><span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span>: a sequence of phase-shift and mixing
+operators.</p></li>
+<li><p><span class="math notranslate nohighlight">\({\lvert\psi\rangle}\)</span>: <span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}}\)</span>
+after <span class="math notranslate nohighlight">\(p \geq 0\)</span> applications of <span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span>.</p></li>
+<li><p><span class="math notranslate nohighlight">\({{\lvert\bm{\theta}\rangle}}\)</span>:
+<span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}}\)</span> after <span class="math notranslate nohighlight">\(p \geq 1\)</span>
+applications of <span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\bm{\theta}\)</span>: classically tunable variables parameterising
+<span class="math notranslate nohighlight">\({\hat{U}_{}}\)</span> with starting values
+<span class="math notranslate nohighlight">\(\bm{\theta}_0\)</span> and optimised values <span class="math notranslate nohighlight">\(\bm{\theta}_f\)</span>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(f\)</span>: the ansatz objective function.</p></li>
+</ul>
+</section>
+<section id="combinatorial-optimisation-with-qvas">
+<h3>Combinatorial Optimisation with QVAs<a class="headerlink" href="#combinatorial-optimisation-with-qvas" title="Link to this heading"></a></h3>
+<p>Combinatorial optimisation problems seek optimal solutions
+<span class="math notranslate nohighlight">\({\Bar{s}}\)</span> of the form,</p>
+<div class="math notranslate nohighlight">
+\[{\Bar{s}}= \Big\{s\; | \; {C(s)} \in  \min {\left\{{C(s)} \; | \; s\in {\mathcal{S}^\prime}\right\}}\Big\},\]</div>
+<p>where the problem cost-function <span class="math notranslate nohighlight">\({C(s)}\)</span> maps a solution
+<span class="math notranslate nohighlight">\(s\)</span> from an ordered set of problem solutions
+<span class="math notranslate nohighlight">\(\mathcal{S} = {\left\{s_i\right\}}\)</span> to <span class="math notranslate nohighlight">\(\mathbb{R}\)</span>,
+<span class="math notranslate nohighlight">\(s\)</span> is a <span class="math notranslate nohighlight">\(k\)</span>-permutation of discrete elements from a finite
+set <span class="math notranslate nohighlight">\({\bm{\zeta}}\)</span> and</p>
+<div class="math notranslate nohighlight">
+\[{\mathcal{S}^\prime}= {\left\{ s\; | \; s\in {\bm{\chi}}\right\}}\]</div>
+<p>is the problem-specific valid solution space where</p>
+<div class="math notranslate nohighlight">
+\[{\bm{\chi}}= \bigcup_i \Big\{s\; | \; \chi_i(s) = a_i\Big\}\]</div>
+<p>denotes any constraints on <span class="math notranslate nohighlight">\({\Bar{s}}\)</span> and
+<span class="math notranslate nohighlight">\(\bm{a} = {\left\{a_i\right\}}\)</span> defines the constraints.</p>
+<p>Problems of this type are often difficult to solve as
+<span class="math notranslate nohighlight">\({\mathcal{S}}\)</span> grows factorially with
+<span class="math notranslate nohighlight">\({\left|{\bm{\zeta}}\right|}\)</span> and, in general, lacks
+identifiable structure. For this reason, heuristic and metaheuristic
+algorithms are often used to find solutions that satisfy the relaxed
+condition of <span class="math notranslate nohighlight">\({C({\Bar{s}})}\)</span> being a ‘sufficiently low’ local
+minimum.</p>
+<p>To apply a quantum variational algorithm to a given combinatorial
+optimisation problem, an injective map is defined between
+<span class="math notranslate nohighlight">\({\mathcal{S}}\)</span> and <span class="math notranslate nohighlight">\(\mathcal{H}\)</span> with the cost-function
+values forming the diagonal of the quality operator
+<span class="math notranslate nohighlight">\(\text{diag}(\hat{Q})= {C(s_i)}\)</span>. For example, a problem with four
+solutions, <span class="math notranslate nohighlight">\(\mathcal{S} = \{s_0, s_1, s_2, s_3\}\)</span>, maps to a
+two-qubit system as</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{aligned}
+        {\lvert 00\rangle} &amp;= {\lvert 0\rangle} \rightarrow {\lvert s_0\rangle} \\
+        {\lvert 01\rangle} &amp;= {\lvert 1\rangle} \rightarrow {\lvert s_1\rangle} \\
+        {\lvert 10\rangle} &amp;= {\lvert 2\rangle} \rightarrow {\lvert s_2\rangle} \\
+        {\lvert 11\rangle} &amp;= {\lvert 3\rangle} \rightarrow {\lvert s_3\rangle},
+    \end{aligned}\end{split}\]</div>
+<p>where
+<span class="math notranslate nohighlight">\(\text{diag}(\hat{Q})= \Big(C(s_0),C(s_1),C(s_2),C(s_3)\Big)\)</span>.</p>
+<p>For a combinatorial optimisation problem to be efficiently solvable by a
+QVA, it must satisfy three conditions:</p>
+<ol class="arabic simple">
+<li><p>The number of solutions <span class="math notranslate nohighlight">\({\left|{\mathcal{S}}\right|}\)</span> must be
+efficiently computable in order to establish a bound on the size of
+the required Hilbert space <span class="math notranslate nohighlight">\(\mathcal{H}\)</span>.</p></li>
+<li><p>For all solutions <span class="math notranslate nohighlight">\(s\)</span>, <span class="math notranslate nohighlight">\({C(s)}\)</span> must be computable in
+polynomial time .</p></li>
+<li><p>For all solutions <span class="math notranslate nohighlight">\(s\)</span>, <span class="math notranslate nohighlight">\({C(s)}\)</span> must be polynomially
+bounded with respect to <span class="math notranslate nohighlight">\({\left|{\mathcal{S}}\right|}\)</span>.</p></li>
+</ol>
+<p>Conditions one and two ensure that the objective function
+<a class="reference internal" href="#equation-eq-objective-generic">(2)</a> is efficiently
+computable as classical computation of <span class="math notranslate nohighlight">\({C(s)}\)</span> is required to
+compute <span class="math notranslate nohighlight">\(f\)</span> and boundedness in <span class="math notranslate nohighlight">\({C(s)}\)</span> ensures that
+the number of measurements required to accurately compute
+<span class="math notranslate nohighlight">\(f\)</span> does not grow exponentially with
+<span class="math notranslate nohighlight">\({\left|{\mathcal{S}^\prime}\right|}\)</span>
+<span id="id1">[<a class="reference internal" href="bibliography.html#id11" title="Pierluigi Crescenzi, Viggo Kann, Riccardo Silvestri, and linebreak Luca Trevisan. Structure in Approximation Classes. SIAM Journal on Computing, 28:24, 1999.">CKST99</a>]</span>. These conditions constrain
+the application of QVAs to polynomially bounded (PB) COPs in the
+non-deterministic polynomial-time optimisation problem (NPO) complexity
+class (together denoted as NPO-PB)
+<span id="id2">[<a class="reference internal" href="bibliography.html#id11" title="Pierluigi Crescenzi, Viggo Kann, Riccardo Silvestri, and linebreak Luca Trevisan. Structure in Approximation Classes. SIAM Journal on Computing, 28:24, 1999.">CKST99</a>]</span>.</p>
+</section>
+<section id="unconstrained-optimisation">
+<h3>Unconstrained Optimisation<a class="headerlink" href="#unconstrained-optimisation" title="Link to this heading"></a></h3>
+<p>For the case of unconstrained optimisation, the valid solution space
+<span class="math notranslate nohighlight">\({\mathcal{S}^\prime}\)</span> is equivalent to <span class="math notranslate nohighlight">\({\mathcal{S}}\)</span>. For
+these COPs a quantum encoding of <span class="math notranslate nohighlight">\({C(s)}\)</span> is equivalent to the
+bijective map <span class="math notranslate nohighlight">\({\mathcal{S}}\rightarrow \mathcal{H}\)</span>.</p>
+<section id="qaoa">
+<span id="id3"></span><h4>QAOA<a class="headerlink" href="#qaoa" title="Link to this heading"></a></h4>
+<p>The Quantum Approximate Optimisation Algorithm is comprised of two
+alternating unitaries. Firstly the phase-shift-unitary</p>
+<div class="math notranslate nohighlight" id="equation-eq-phase-shift-qaoa">
+<span class="eqno">(5)<a class="headerlink" href="#equation-eq-phase-shift-qaoa" title="Link to this equation"></a></span>\[{\hat{U}_{\text{Q}}}(\gamma_i) = \exp(-\text{i} \gamma_i \hat{Q})\]</div>
+<p>and, secondly, the mixing operator</p>
+<div class="math notranslate nohighlight" id="equation-eq-mixing-qaoa">
+<span class="eqno">(6)<a class="headerlink" href="#equation-eq-mixing-qaoa" title="Link to this equation"></a></span>\[{\hat{U}_{\text{X}}}(t_i) = \exp(- \text{i} t_i \hat{W}_\text{X}),\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{W}_\text{X} = X^{\otimes N}\)</span> and <span class="math notranslate nohighlight">\(X\)</span> is the
+Pauli-<span class="math notranslate nohighlight">\(X\)</span> (or quantum NOT) gate. The mixing operator
+<span class="math notranslate nohighlight">\(\hat{W}_\text{X}\)</span> induces a coupling topology that is equivalent
+to an <span class="math notranslate nohighlight">\(n\)</span>-dimension hypercube graph, as shown in
+Fig. <a class="reference internal" href="#hypercube"><span class="std std-ref">hypercube-mixer</span></a>.</p>
+<figure class="align-center" id="hypercube">
+<a class="reference internal image-reference" href="_static/hypercube.png"><img alt="_static/hypercube.png" src="_static/hypercube.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">background/combinatorial.rst</span>, line 229)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/hypercube.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+<figcaption>
+<p><span class="caption-text">Coupling topology of <span class="math notranslate nohighlight">\(W_\text{X}\)</span> in the QAOA for
+<span class="math notranslate nohighlight">\({\left|{\mathcal{S}}\right|} = 16\)</span> (<span class="math notranslate nohighlight">\(n\)</span> = 4).</span><a class="headerlink" href="#hypercube" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The initial state <span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}_\text{QAOA}}\)</span> is
+prepared as an equal superposition over <span class="math notranslate nohighlight">\(\mathcal{H}\)</span>,</p>
+<div class="math notranslate nohighlight" id="equation-eq-qaoa-initial-state">
+<span class="eqno">(7)<a class="headerlink" href="#equation-eq-qaoa-initial-state" title="Link to this equation"></a></span>\[{\lvert+\rangle} = \frac{1}{\sqrt{n}}\sum_{i = 0}^{n-1}{\lvert i\rangle}.\]</div>
+<p>The final quantum state is then</p>
+<div class="math notranslate nohighlight" id="equation-eq-qaoa">
+<span class="eqno">(8)<a class="headerlink" href="#equation-eq-qaoa" title="Link to this equation"></a></span>\[{{\lvert\bm{\theta}\rangle}_\text{QAOA}} = \left( \prod_{i=1}^{p} {\hat{U}_{\text{X}}}(t_i) {\hat{U}_{\text{Q}}}(\gamma_i)  \right) {\lvert+\rangle},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\bm{\theta}= \{\gamma_i, t_i \}\)</span> and
+<span class="math notranslate nohighlight">\({\left|\bm{\theta}\right|} = 2p\)</span>
+<span id="id4">[<a class="reference internal" href="bibliography.html#id14" title="Edward Farhi, Jeffrey Goldstone, and Sam Gutmann. A Quantum Approximate Optimization Algorithm. arXiv:1411.4028 [quant-ph], 2014.">FGG14</a>]</span>.</p>
+</section>
+<section id="extended-qaoa">
+<span id="ex-qaoa"></span><h4>Extended-QAOA<a class="headerlink" href="#extended-qaoa" title="Link to this heading"></a></h4>
+<p>A variation of the QAOA, ‘extended-QAOA’ (ex-QAOA), utilises a sequence
+of phase-shift unitaries,</p>
+<div class="math notranslate nohighlight" id="equation-eq-phase-shift-qaoa-ex">
+<span class="eqno">(9)<a class="headerlink" href="#equation-eq-phase-shift-qaoa-ex" title="Link to this equation"></a></span>\[{\hat{U}_{\text{Qext}}}(\gamma_{i}) = \prod_{j=1}^{|\Sigma|} \exp(-\text{i} (\gamma_{i})_{j} \Sigma_{j}),\]</div>
+<p>where <span class="math notranslate nohighlight">\(\Sigma_j\)</span> are non-identity terms in a Pauli-gate
+decomposition of <span class="math notranslate nohighlight">\(\hat{Q}\)</span> and <span class="math notranslate nohighlight">\({\left|\Sigma\right|}\)</span> is
+the number of non-identity terms
+<span id="id5">[<a class="reference internal" href="bibliography.html#id22" title="Gian Giacomo Guerreschi and Mikhail Smelyanskiy. Practical optimization for hybrid quantum-classical algorithms. arXiv:1701.01450 [quant-ph], 2017.">GS17</a>]</span>. This increases the number
+of variational parameters to
+<span class="math notranslate nohighlight">\({\left|\bm{\theta}\right|} = (1 + {\left|\Sigma\right|})p\)</span> with
+the intent of achieving a higher degree of convergence to optimal
+solutions at a lower circuit depth.</p>
+<p>The final state of ex-QAOA is</p>
+<div class="math notranslate nohighlight" id="equation-eq-qaoa-ex">
+<span class="eqno">(10)<a class="headerlink" href="#equation-eq-qaoa-ex" title="Link to this equation"></a></span>\[{{\lvert\bm{\theta}\rangle}_\text{ex-QAOA}}= \left( \prod_{i=1}^{p}   \hat{U}_\text{X}(t_i) \hat{U}_\text{Qext}(\gamma_{i,:}) \right) {\lvert+\rangle},\]</div>
+<p>where <span class="math notranslate nohighlight">\({\lvert+\rangle}\)</span> and <span class="math notranslate nohighlight">\(\hat{U}_X\)</span> are defined as in
+<a class="reference internal" href="#equation-eq-mixing-qaoa">(6)</a> and <a class="reference internal" href="#equation-eq-qaoa-initial-state">(7)</a>,
+and <span class="math notranslate nohighlight">\(\bm{\theta}= {\left\{\gamma_{ij}, t_i\right\}}\)</span>.</p>
+</section>
+</section>
+<section id="constrained-optimisation">
+<h3>Constrained Optimisation<a class="headerlink" href="#constrained-optimisation" title="Link to this heading"></a></h3>
+<p>Constrained optimisation problems seek valid solutions
+<span class="math notranslate nohighlight">\({s^\prime}\)</span> from a subset of <span class="math notranslate nohighlight">\({\mathcal{S}}\)</span> as defined by
+constraints <span class="math notranslate nohighlight">\({\bm{\chi}}\)</span>. Encoding of the solution constraints
+<span class="math notranslate nohighlight">\({\bm{\chi}}\)</span> is achieved by restricting the action of the
+mixing-unitaries <span class="math notranslate nohighlight">\({\hat{U}_{\text{mix}}}\)</span> and initialising
+<span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}}\)</span> over a subspace of
+<span class="math notranslate nohighlight">\(\mathcal{H}\)</span>.</p>
+<section id="qaoaz">
+<span id="id6"></span><h4>QAOAz<a class="headerlink" href="#qaoaz" title="Link to this heading"></a></h4>
+<p>The Quantum Alternating Operator Ansatz was developed to solve problems
+for which <span class="math notranslate nohighlight">\({\bm{\chi}}\)</span> creates a correspondence between
+<span class="math notranslate nohighlight">\({\mathcal{S}^\prime}\)</span> and quantum states of equal parity – states
+with the same number of <span class="math notranslate nohighlight">\({\lvert 1\rangle}\)</span> states. This algorithm
+consists of the phase-shift-unitary defined in
+<a class="reference internal" href="#equation-eq-phase-shift-qaoa">(5)</a>, followed by a sequence
+of three <span class="math notranslate nohighlight">\({\hat{U}_{\text{mix}}}\)</span> with mixing operators</p>
+<div class="math notranslate nohighlight" id="equation-eq-parity-terms">
+<span class="eqno">(11)<a class="headerlink" href="#equation-eq-parity-terms" title="Link to this equation"></a></span>\[\begin{split}\begin{aligned}
+    &amp; \hat{B}_\text{odd} = \sum_{a \, \text{odd}}^{N-1} X_{a}X_{a+1} + Y_{a}Y_{a+1} \\
+    &amp; \hat{B}_{\text{even}} = \sum_{a \, \text{even}}^{N}X_aX_{a+1} + Y_aY_{a+1} \\
+    &amp; \hat{B}_\text{last} =
+    \begin{cases}
+    X_NX_1 + Y_NY_1, \, \text{odd} \\
+    I, \, N \text{even},
+    \end{cases}
+\end{aligned}\end{split}\]</div>
+<p>which together form the parity-conserving mixing operator</p>
+<div class="math notranslate nohighlight" id="equation-eq-qaoaz-mixers">
+<span class="eqno">(12)<a class="headerlink" href="#equation-eq-qaoaz-mixers" title="Link to this equation"></a></span>\[{\hat{U}_{\text{parity}}}(t) = e^{-\text{i} t \hat{B}_\text{last}} e^{-\text{i} t \hat{B}_\text{even}} e^{-\text{i} t \hat{B}_\text{odd}}\]</div>
+<p>that mixes probability amplitude between subgraphs of equal parity as
+illustrated in Fig. <a class="reference internal" href="#parity-mixer"><span class="std std-ref">parity-mixer</span></a>.</p>
+<p>By initialising <span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}_\text{QAOAz}}\)</span> in a
+quantum state that satisfies the parity constraint, probability
+amplitude is constrained to <span class="math notranslate nohighlight">\({\mathcal{S}^\prime}\)</span>.</p>
+<p>The state evolution of the QAOAz is</p>
+<div class="math notranslate nohighlight" id="equation-eq-qaoaz">
+<span class="eqno">(13)<a class="headerlink" href="#equation-eq-qaoaz" title="Link to this equation"></a></span>\[{{\lvert\bm{\theta}\rangle}_\text{QAOAz}} = \left( \prod_{i=1}^{p}{\hat{U}_{\text{parity}}}(t_i){\hat{U}_{\text{Q}}}(\gamma_i) \right){{\lvert\psi_0\rangle}_\text{QAOAz}},\]</div>
+<p>where <span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}_\text{QAOAz}}\)</span> is an initial state
+satisfying the parity constraint
+<span id="id7">[<a class="reference internal" href="bibliography.html#id23" title="Stuart Hadfield, Zhihui Wang, Bryan O’Gorman, Eleanor G. Rieffel, Davide Venturelli, and Rupak Biswas. From the Quantum Approximate Optimization Algorithm to a Quantum Alternating Operator Ansatz. Algorithms, 12(2):34, 2019.">HWOGorman+19</a>]</span>.</p>
+<figure class="align-center" id="parity-mixer">
+<a class="reference internal image-reference" href="_static/parity.png"><img alt="_static/parity.png" src="_static/parity.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">background/combinatorial.rst</span>, line 351)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/parity.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+<figcaption>
+<p><span class="caption-text">Coupling topology of <span class="math notranslate nohighlight">\(\hat{W}\)</span> for the QAOAz
+(<span class="math notranslate nohighlight">\(n = 4\)</span>). Note that <span class="math notranslate nohighlight">\(\mathcal{H}\)</span> is partitioned into
+subgraphs of equal state parity.</span><a class="headerlink" href="#parity-mixer" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="qwoa">
+<span id="id8"></span><h4>QWOA<a class="headerlink" href="#qwoa" title="Link to this heading"></a></h4>
+<p>The Quantum Walk-assisted Optimisation Algorithm implements
+<span class="math notranslate nohighlight">\({\bm{\chi}}\)</span> given the existence of an efficient indexing
+algorithm for all <span class="math notranslate nohighlight">\(s\in\ {\mathcal{S}^\prime}\)</span>. Under this
+condition, the QWOA implements an indexing unitary</p>
+<div class="math notranslate nohighlight" id="equation-eq-qwoa-index">
+<span class="eqno">(14)<a class="headerlink" href="#equation-eq-qwoa-index" title="Link to this equation"></a></span>\[\begin{split}{U^{\dag}_{\#}}{\lvert i\rangle} =
+\begin{cases}
+ {\lvert\text{id}_{{\bm{\chi}}}(i)\rangle}, \; {\lvert i\rangle} \in {\lvert{s^\prime}\rangle} \\
+ {\lvert i\rangle}, \; \text{otherwise},
+\end{cases}\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\({U^{\dag}_{\#}}\)</span> maps states corresponding to valid
+solutions <span class="math notranslate nohighlight">\({\lvert{s^\prime}\rangle}\)</span> to indexed states
+<span class="math notranslate nohighlight">\({\lvert\text{id}_{{\bm{\chi}}}(i)\rangle}\)</span>. By preparing
+<span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}_\text{QWOA}}\)</span> as an equal superposition
+over <span class="math notranslate nohighlight">\({\lvert\text{id}_{{\bm{\chi}}}(i)\rangle}\)</span></p>
+<div class="math notranslate nohighlight" id="equation-eq-qwoa-initial-state">
+<span class="eqno">(15)<a class="headerlink" href="#equation-eq-qwoa-initial-state" title="Link to this equation"></a></span>\[{{\lvert\psi_0\rangle}_\text{QWOA}} = \frac{1}{\sqrt{\left|{\mathcal{S}^\prime}\right|}}\sum\limits_{i \in {\mathcal{S}^\prime}} {\lvert i\rangle},\]</div>
+<p>probability amplitude is restricted to the subspace of indexed states.</p>
+<p>The indexing unitary <span class="math notranslate nohighlight">\({U^{\dag}_{\#}}\)</span> and its conjugate
+unindexing unitary <span class="math notranslate nohighlight">\(\hat{U}_\#\)</span> occur either side of a
+mixing-unitary that acts on
+<span class="math notranslate nohighlight">\({\lvert\text{id}_{{\bm{\chi}}}(i)\rangle}\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-eq-qwoa-mixer">
+<span class="eqno">(16)<a class="headerlink" href="#equation-eq-qwoa-mixer" title="Link to this equation"></a></span>\[{\hat{U}_{\text{index}}}(t) = \hat{U}_\# \exp(-i t \hat{W}_\text{QWOA}) \hat{U}_\#^\dag\]</div>
+<p>Where efficiency in the implementation of <span class="math notranslate nohighlight">\({U^{\dag}_{\#}}\)</span>
+dictates that <span class="math notranslate nohighlight">\(\hat{W}_\text{QWOA}\)</span> is circulant. Most commonly,
+<span class="math notranslate nohighlight">\(\hat{W}_\text{QWOA}\)</span> is chosen to be the adjacency matrix of the
+complete graph as it produces a maximal and unbiased coupling over
+<span class="math notranslate nohighlight">\({\lvert{\mathcal{S}^\prime}\rangle}\)</span> (see Fig.
+<a class="reference internal" href="#complete"><span class="std std-ref">complete-mixer</span></a>).</p>
+<p>The state evolution of the QWOA is</p>
+<div class="math notranslate nohighlight" id="equation-eq-qwoa">
+<span class="eqno">(17)<a class="headerlink" href="#equation-eq-qwoa" title="Link to this equation"></a></span>\[{{\lvert\bm{\theta}\rangle}_\text{QWOA}} = \prod_{i = 1}^{p}{\hat{U}_{\text{index}}}(t_i){\hat{U}_{\text{Q}}}(\gamma_i){{\lvert\psi_0\rangle}_\text{QWOA}},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\bm{\theta}= {\left\{\gamma_i, t_i\right\}}\)</span> and there are
+<span class="math notranslate nohighlight">\({\left|\bm{\theta}\right|} = 2p\)</span> variational parameters
+<span id="id9">[<a class="reference internal" href="bibliography.html#id36" title="S. Marsh and J. B. Wang. A quantum walk-assisted approximate algorithm for bounded NP optimisation problems. Quantum Information Processing, 18:61, 2019.">MW19b</a>, <a class="reference internal" href="bibliography.html#id37" title="S. Marsh and J. B. Wang. Combinatorial optimization via highly efficient quantum walks. Physical Review Research, 2(2):023302, 2020.">MW20</a>]</span>.</p>
+<figure class="align-center" id="complete">
+<a class="reference internal image-reference" href="_static/complete.png"><img alt="_static/complete.png" src="_static/complete.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">background/combinatorial.rst</span>, line 420)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/complete.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+<figcaption>
+<p><span class="caption-text">A complete graph mixer, in QWOA with couples all valid solutions in the solution space.</span><a class="headerlink" href="#complete" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+</section>
+<section id="multivariable-optimisation">
+<h2>Multivariable Optimisation<a class="headerlink" href="#multivariable-optimisation" title="Link to this heading"></a></h2>
+<section id="the-continuous-multivariable-optimisation-problem">
+<h3>The Continuous Multivariable Optimisation Problem<a class="headerlink" href="#the-continuous-multivariable-optimisation-problem" title="Link to this heading"></a></h3>
+<p>For a continuous function <span class="math notranslate nohighlight">\(f: X \rightarrow Y\)</span>, where
+<span class="math notranslate nohighlight">\(X \subset \mathbb{R}^D\)</span> and <span class="math notranslate nohighlight">\(Y \subset \mathbb{R}\)</span>,
+continuous-variable optimisation seeks
+<span class="math notranslate nohighlight">\({\bm{x}^*} = (x_0, ..., x_{D-1}) \in X\)</span> satisfying,</p>
+<div class="math notranslate nohighlight" id="equation-optimisation">
+<span class="eqno">(18)<a class="headerlink" href="#equation-optimisation" title="Link to this equation"></a></span>\[f({\bm{x}^*}) \leq f_\text{min} + \epsilon,\]</div>
+<p>where <span class="math notranslate nohighlight">\(f_\text{min}\)</span> is the global minimum of <span class="math notranslate nohighlight">\(f\)</span> and
+<span class="math notranslate nohighlight">\(\epsilon &gt; 0\)</span> defines a region of accepted <span class="math notranslate nohighlight">\(\bm{x}\)</span> near
+<span class="math notranslate nohighlight">\(f_\text{min}\)</span>.</p>
+<p>An encoding of the optimisation problem in a system of qubits consists
+of evaluating <span class="math notranslate nohighlight">\(f\)</span> on a grid of <span class="math notranslate nohighlight">\(K = N^D\)</span> points. In each
+dimension <span class="math notranslate nohighlight">\(d\)</span>, the coordinate is discretised as
+<span class="math notranslate nohighlight">\(x_{d,n_d} = x_{d,0} + n_d \Delta x_d\)</span>, with minimum value
+<span class="math notranslate nohighlight">\(x_{d,0}\)</span>, grid spacing <span class="math notranslate nohighlight">\(\Delta x_d\)</span>, and
+<span class="math notranslate nohighlight">\(n_d = 0, \dots, N-1\)</span>. The complete solution space of discretised
+coordinates <span class="math notranslate nohighlight">\(\bm{x}_k\)</span> is then represented using
+<span class="math notranslate nohighlight">\(\mathcal{O}(\log K)\)</span> qubits by states
+<span class="math notranslate nohighlight">\(\ket{k} \equiv \ket{x_{D-1,n_{D-1}},x_{D-2,n_{D-2}}, \dots, x_{0,n_0}}\)</span>,
+where <span class="math notranslate nohighlight">\(k = 0, \dots, N^D-1\)</span> is a vectorised index for the set
+<span class="math notranslate nohighlight">\((n_0, \dots, n_{D-2}, n_{D-1}) \in \{ 0, \dots, N-1 \}^D\)</span>. For
+optimisation over this discrete space, we denote the global minimum as
+<span class="math notranslate nohighlight">\({\bm{x}^*} \equiv \text{argmin}_{k} f(\bm{x}_k)\)</span>.</p>
+</section>
+<section id="qvas-for-optimisation-of-continuous-multivariable-functions">
+<h3>QVAs for Optimisation of Continuous Multivariable Functions<a class="headerlink" href="#qvas-for-optimisation-of-continuous-multivariable-functions" title="Link to this heading"></a></h3>
+<p>Here we consider QVAs of the form</p>
+<div class="math notranslate nohighlight" id="equation-variational-generic">
+<span class="eqno">(19)<a class="headerlink" href="#equation-variational-generic" title="Link to this equation"></a></span>\[\ket{\bm{t},\bm{\gamma}}=\left( \prod_{i = 1}^{p}\hat{U}(t_i,\gamma_i) \right)\ket{\psi_0},\]</div>
+<p>where the positive integer <span class="math notranslate nohighlight">\(p\)</span> is a fixed number of ansatz
+iterations, <span class="math notranslate nohighlight">\(\hat{U}\)</span> is the ansatz unitary, <span class="math notranslate nohighlight">\(t_i\)</span> and
+<span class="math notranslate nohighlight">\(\gamma_i\)</span> are real-valued variational parameters and,</p>
+<div class="math notranslate nohighlight" id="equation-equal-superposition">
+<span class="eqno">(20)<a class="headerlink" href="#equation-equal-superposition" title="Link to this equation"></a></span>\[\ket{\psi_0} = \frac{1}{\sqrt{K}}\sum_{k = 0}^{K-1}\ket{k},\]</div>
+<p>unless otherwise specified. The ansatz unitary consists of the so-called
+alternating phase-shift, <span class="math notranslate nohighlight">\(\hat{U}_Q\)</span>, and mixing,
+<span class="math notranslate nohighlight">\(\hat{U}_W\)</span>, unitaries,</p>
+<div class="math notranslate nohighlight">
+\[\hat{U}(t,\gamma)=\hat{U}_W(t)\hat{U}_Q(\gamma).\]</div>
+<p>The first of these,</p>
+<div class="math notranslate nohighlight" id="equation-phase-shift">
+<span class="eqno">(21)<a class="headerlink" href="#equation-phase-shift" title="Link to this equation"></a></span>\[\hat{U}_Q(\gamma) = \exp(-\text{i} \gamma \hat{Q}),\]</div>
+<p>applies a phase-shift proportional to</p>
+<div class="math notranslate nohighlight">
+\[\hat{Q} = \sum_{k=0}^{K - 1} f_k \ket{k}\bra{k},\]</div>
+<p>where <span class="math notranslate nohighlight">\(f_k \equiv f(\bm{x}_k)\)</span>. The second unitary,
+<span class="math notranslate nohighlight">\(\hat{U}_W\)</span>, conforms to some structure specific to each
+algorithm. Its role is to drive the transfer of probability amplitudes
+between the solution states. During the mixing stage, phase differences
+encoded by <span class="math notranslate nohighlight">\(\hat{U}_Q\)</span> result in interference that is manipulated
+by varying <span class="math notranslate nohighlight">\((\bm{t}, \bm{\gamma})\)</span>.</p>
+<p>A QVA then proceeds by repeated preparation of
+<span class="math notranslate nohighlight">\(\ket{\bm{t}, \bm{\gamma}}\)</span>. After each iteration,
+<span class="math notranslate nohighlight">\((\bm{t}, \bm{\gamma})\)</span> are tuned using a classical optimisation
+algorithm to minimise the expectation value</p>
+<div class="math notranslate nohighlight">
+\[\langle Q \rangle = \bra{\bm{t}, \bm{\gamma}} \,\hat{Q}\, \ket{\bm{t}, \bm{\gamma}}.\]</div>
+<p>The intended consequence is an increased probability of measuring
+solutions satisfying <a class="reference internal" href="#equation-optimisation">(18)</a>. The
+possible amplification increases with <span class="math notranslate nohighlight">\(p\)</span> at the expense of a
+deeper quantum circuit and larger parameter space for the classical
+optimiser.</p>
+</section>
+<section id="qaoa-multivariable">
+<span id="id10"></span><h3>QAOA<a class="headerlink" href="#qaoa-multivariable" title="Link to this heading"></a></h3>
+<p>The Quantum Approximate Optimisation Algorithm (QAOA) defines the mixing unitary as</p>
+<div class="math notranslate nohighlight" id="equation-qaoa-mixer">
+<span class="eqno">(22)<a class="headerlink" href="#equation-qaoa-mixer" title="Link to this equation"></a></span>\[\hat{U}_{W\text{-QAOA}}(t) = \exp(-\text{i}t \hat{W}),\]</div>
+<p>which is defined by the mixing operator</p>
+<div class="math notranslate nohighlight" id="equation-adjacency">
+<span class="eqno">(23)<a class="headerlink" href="#equation-adjacency" title="Link to this equation"></a></span>\[\hat{W} = \sum_{k,k^\prime=0}^{K-1} w_{kk^\prime} \ket{k}\bra{k^\prime},\]</div>
+<p>where typically <span class="math notranslate nohighlight">\(w_{kk^\prime} \in \{0, 1\}\)</span>. This can be
+interpreted as implementing a continuous-time quantum walk for time
+<span class="math notranslate nohighlight">\(t \geq 0\)</span> over an undirected graph of <span class="math notranslate nohighlight">\(K\)</span> vertices with
+adjacency matrix <span class="math notranslate nohighlight">\(w_{kk^\prime}\)</span>, where <span class="math notranslate nohighlight">\(w_{kk^\prime} = 1\)</span>
+if vertices <span class="math notranslate nohighlight">\(k\)</span> and <span class="math notranslate nohighlight">\(k^\prime\)</span> are connected and
+<span class="math notranslate nohighlight">\(k \neq k^\prime\)</span> <span id="id11">[<a class="reference internal" href="bibliography.html#id23" title="Stuart Hadfield, Zhihui Wang, Bryan O’Gorman, Eleanor G. Rieffel, Davide Venturelli, and Rupak Biswas. From the Quantum Approximate Optimization Algorithm to a Quantum Alternating Operator Ansatz. Algorithms, 12(2):34, 2019.">HWOGorman+19</a>, <a class="reference internal" href="bibliography.html#id38" title="S. Marsh and J. B. Wang. A quantum walk-assisted approximate algorithm for bounded NP optimisation problems. Quantum Inf. Process., 18(3):61, 2019.">MW19a</a>]</span>.
+For a complete graph <span class="math notranslate nohighlight">\(\hat{W}\)</span>, one can write</p>
+<div class="math notranslate nohighlight" id="equation-qaoa-c-op">
+<span class="eqno">(24)<a class="headerlink" href="#equation-qaoa-c-op" title="Link to this equation"></a></span>\[\hat{U}_{W\text{-QAOA}}(t) = e^{it} \left[ \hat{I} + ( e^{-itK} - 1 ) \frac{1}{K} \sum_{k,k'=0}^{K-1} \ket{k} \bra{k'} \right].\]</div>
+<p>The action of a single iteration of
+<span class="math notranslate nohighlight">\(\hat{U}_\text{QAOA}(t, \gamma) = \hat{U}_{W\text{-QAOA}}(t)\hat{U}_Q(\gamma)\)</span>
+then maps the amplitudes of an arbitrary state
+<span class="math notranslate nohighlight">\(\sum_k \alpha_k \ket{k}\)</span> (up to a global phase <span class="math notranslate nohighlight">\(e^{it}\)</span>) as</p>
+<div class="math notranslate nohighlight" id="equation-qaoa-c-amplitude">
+<span class="eqno">(25)<a class="headerlink" href="#equation-qaoa-c-amplitude" title="Link to this equation"></a></span>\[\begin{aligned}
+  \alpha_k \hspace{1mm} \mapsto \hspace{1mm} e^{-i \gamma f_k} \alpha_k + ( e^{-i K t} - 1 ) \left( \frac{1}{K} \sum_{k'=0}^{K-1} e^{-i \gamma f_{k'}} \alpha_{k'} \right).
+\end{aligned}\]</div>
+<p>We see that the second term averages the amplitudes over the entire
+solution space and is the same for all <span class="math notranslate nohighlight">\(k\)</span>. Amplification of a
+particular coefficient <span class="math notranslate nohighlight">\(\alpha_k\)</span> then depends on how this local
+information compares with the global average. This is a useful property
+in the absence of an identified solution space structure, since
+<span class="math notranslate nohighlight">\(k\)</span> is distinguished solely by the locally phase-encoded
+<span class="math notranslate nohighlight">\(f_k\)</span> <span id="id12">[<a class="reference internal" href="bibliography.html#id4" title="Tavis Bennett and Jingbo B. Wang. Quantum optimisation via maximally amplified states. arxiv.org:2111.00796, 2021.">BW21</a>, <a class="reference internal" href="bibliography.html#id60" title="N. Slate, E. Matwiejew, S. Marsh, and J. B. Wang. Quantum walk-based portfolio optimisation. Quantum, 5:513, 2021.">SMMW21</a>]</span>.
+Notice that the unbiased coupling in <a class="reference internal" href="#equation-qaoa-c-op">(24)</a>
+means that amplitudes at any two points <span class="math notranslate nohighlight">\(k\)</span>, <span class="math notranslate nohighlight">\(k'\)</span> with
+<span class="math notranslate nohighlight">\(f_k \approx f_{k'}\)</span> evolve similarly under
+<span class="math notranslate nohighlight">\(\hat{U}_\text{QAOA}(t, \gamma)\)</span>, and will also respond similarly
+to variation in <span class="math notranslate nohighlight">\(t\)</span> and <span class="math notranslate nohighlight">\(\gamma\)</span>. This is a potential
+disadvantage in the context of CMOPs since contours in <span class="math notranslate nohighlight">\(f\)</span> result
+in many degenerate <span class="math notranslate nohighlight">\(f_k\)</span>. Highly degenerate solutions will greatly
+influence the sum in <a class="reference internal" href="#equation-qaoa-c-amplitude">(25)</a>,
+and thus are likely to dominate the optimisation process.</p>
+<p>The QAOA was originally defined with the <span class="math notranslate nohighlight">\(\hat{W}\)</span> structured
+according to a hypercube graph, as a hypercube on <span class="math notranslate nohighlight">\(M\)</span> qubits is
+easily implemented as <span class="math notranslate nohighlight">\(\sum_ {i=0}^{M-1}\hat{X}^{(i)}\)</span>, where
+superscript <span class="math notranslate nohighlight">\((i)\)</span> denotes action on qubit
+<span class="math notranslate nohighlight">\(i\)</span> <span id="id13">[<a class="reference internal" href="bibliography.html#id14" title="Edward Farhi, Jeffrey Goldstone, and Sam Gutmann. A Quantum Approximate Optimization Algorithm. arXiv:1411.4028 [quant-ph], 2014.">FGG14</a>]</span>. For a hypercube graph
+<span class="math notranslate nohighlight">\(\hat{W}\)</span>, the QAOA mixing unitary can be written as:</p>
+<div class="math notranslate nohighlight" id="equation-qaoa-h-op">
+<span class="eqno">(26)<a class="headerlink" href="#equation-qaoa-h-op" title="Link to this equation"></a></span>\[\begin{aligned}
+  \hat{U}_{W\text{-QAOA}}(t) \nonumber = \sum_{w=0}^M (\cos t)^{M-w} (-i \sin t)^w \sum_{k=0}^{K-1} \sum_{b \in \mathcal{B}_w} \ket{k} \bra{k \oplus b},
+\end{aligned}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\mathcal{B}_w\)</span> is the set of bit strings of Hamming weight
+<span class="math notranslate nohighlight">\(w\)</span>, and <span class="math notranslate nohighlight">\(k \oplus b\)</span> denotes bitwise XOR between the binary
+representation of <span class="math notranslate nohighlight">\(k\)</span> and <span class="math notranslate nohighlight">\(b\)</span>. As opposed to
+<a class="reference internal" href="#equation-qaoa-c-op">(24)</a>, the hypercube mixer couples points
+differently according to their respective Hamming distance. Thus, even
+if there are many points with similar <span class="math notranslate nohighlight">\(f_k\)</span> values, amplitudes at
+such points should only respond similarly to variations in <span class="math notranslate nohighlight">\(t\)</span> and
+<span class="math notranslate nohighlight">\(\gamma\)</span> when averages of phase-shifted amplitudes at a fixed
+Hamming distance away are the same. Given a hypercube embedding of the
+solution space grid, this is likely to occur primarily when <span class="math notranslate nohighlight">\(f\)</span>
+has particular structural properties, such as rotational symmetry or
+periodicity.</p>
+<p>In the context of a quantum search over the discretised solution space
+of a CMOP, the hypercube has the desirable property of (at least
+approximate) preservation of the solution space structure, as grids in
+one, two, and three dimensions can be embedded in a
+hypercube <span id="id14">[<a class="reference internal" href="bibliography.html#id49" title="George Ostrouchov. Parallel computing on a hypercube: an overview of the architecture and some applications. In 19th Symposium on the Interface of Computer Science and Statistics. 1987.">Ost87</a>]</span>. Examples of the
+grid embedding induced by <span class="math notranslate nohighlight">\(\hat{U}_{W\text{-QAOA}}\)</span> are shown in
+Fig. <a class="reference internal" href="#hypercube-mixing-structure"><span class="std std-ref">hypercube-mixing-structure</span></a>. Also, a
+hypercube graph has a diameter of <span class="math notranslate nohighlight">\(M\)</span> and <span class="math notranslate nohighlight">\(M\)</span> disjoint paths
+between any two vertices <span id="id15">[<a class="reference internal" href="bibliography.html#id49" title="George Ostrouchov. Parallel computing on a hypercube: an overview of the architecture and some applications. In 19th Symposium on the Interface of Computer Science and Statistics. 1987.">Ost87</a>]</span>,
+so the distance between any two <span class="math notranslate nohighlight">\(\bm{x}_k\)</span> is exponentially
+smaller than <span class="math notranslate nohighlight">\(K\)</span>.</p>
+<table class="docutils align-default" id="hypercube-mixing-structure">
+<tbody>
+<tr class="row-odd"><td><figure class="align-default">
+<img alt="_static/Hypercube_2D.png" src="_static/Hypercube_2D.png" />
+</figure>
+</td>
+<td><figure class="align-default">
+<img alt="_static/Hypercube_3D.png" src="_static/Hypercube_3D.png" />
+</figure>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Examples of the coupling produced on <span class="math notranslate nohighlight">\(\bm{x}_k\)</span> by <span class="math notranslate nohighlight">\(\hat{U}_{W\text{-QAOA}}\)</span> with a hypercube <span class="math notranslate nohighlight">\(\hat{W}\)</span> are shown for a solution space of size <span class="math notranslate nohighlight">\(K=8\)</span> in <span class="math notranslate nohighlight">\(D=2\)</span> and <span class="math notranslate nohighlight">\(D=3\)</span>, respectively. The dashed red line indicates the grid embedding, which in this case is approximate for <span class="math notranslate nohighlight">\(D=2\)</span> and exact for <span class="math notranslate nohighlight">\(D=3\)</span>.</p>
+</section>
+<section id="qowe">
+<span id="id16"></span><h3>QOWE<a class="headerlink" href="#qowe" title="Link to this heading"></a></h3>
+<p>The Quantum Optimisation with Wavepacket Evolution (QOWE) algorithm is based on the approach to continuous-variable optimisation described in
+<span id="id17">[<a class="reference internal" href="bibliography.html#id65" title="Guillaume Verdon, Juan Miguel Arrazola, Kamil Brádler, and Nathan Killoran. A quantum approximate optimization algorithm for continuous problems. arxiv:1902.00409, 2019.">VABK19</a>]</span> which, using continuous quantum variables, consists of the propagation of an initial
+Gaussian wavepacket under a phase-shift followed by the mixing unitary</p>
+<div class="math notranslate nohighlight" id="equation-cts-mixer">
+<span class="eqno">(27)<a class="headerlink" href="#equation-cts-mixer" title="Link to this equation"></a></span>\[\hat{U}(t) = \prod_{d=0}^{D-1} e^{-i t \hat{p}_d^2},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{p}_d\)</span> is the momentum operator conjugate to the
+continuous coordinate <span class="math notranslate nohighlight">\(\hat{x}_d\)</span>. This choice is inspired by
+considering the quantum simulation of a particle evolving under the
+potential <span class="math notranslate nohighlight">\(f(\bm{x})\)</span>.</p>
+<p>Here we examine a discretised form of this algorithm, with the problem
+solution space encoded in <span class="math notranslate nohighlight">\(\ket{k}\)</span>. The state is initialised to a
+discretised Gaussian wavepacket,</p>
+<div class="math notranslate nohighlight" id="equation-wave-packet">
+<span class="eqno">(28)<a class="headerlink" href="#equation-wave-packet" title="Link to this equation"></a></span>\[\ket{\psi_0}=\frac{1}{\sqrt{A}}\sum_{k=0}^{K-1}\prod_{d=0}^{D-1} e^{-\frac{(x_{k}^{(d)} - \mu_d)^2}{2{\sigma_d}^2}}\ket{k}\]</div>
+<p>where <span class="math notranslate nohighlight">\(x_{k}^{(d)}\)</span> is the <span class="math notranslate nohighlight">\(d^{th}\)</span> component of
+<span class="math notranslate nohighlight">\(\bm{x}_k\)</span>, <span class="math notranslate nohighlight">\(\mu_d\)</span> and <span class="math notranslate nohighlight">\(\sigma_d\)</span> are the centre and
+width of the wavepacket in each dimension, and <span class="math notranslate nohighlight">\(A\)</span> is a
+normalising constant. Discretising the mixing unitary requires a
+discrete form of the continuous momentum operator. For our
+implementation of QOWE, we construct a discrete analogue of the
+continuous-variable relationship
+<span class="math notranslate nohighlight">\(\hat{p}_d = \mathcal{F}^{-1} \hat{x}_d \mathcal{F}\)</span> (in each
+dimension), where <span class="math notranslate nohighlight">\(\mathcal{F}\)</span> is the continuous Fourier
+transform. The continuous Fourier transform along a single dimension can
+be approximated on the discretised grid as</p>
+<div class="math notranslate nohighlight">
+\[\mathcal{F} \approx F_d := \sum_{n_d = 0}^{N-1} e^{-i x_{d,0} \kappa_{d,n_d}} \ket{n_d} \bra{n_d} \text{DFT},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\text{DFT}\)</span> is the centred discrete Fourier transform, and
+<span class="math notranslate nohighlight">\(\kappa_{d,n_d} = \kappa_{d,0} + n_d \Delta \kappa_d\)</span> is a
+momentum-space grid point, with
+<span class="math notranslate nohighlight">\(\Delta \kappa_d = \frac{2\pi}{N \Delta x_d}\)</span>,
+<span class="math notranslate nohighlight">\(\kappa_{d,0} = \Delta \kappa_d ( -N + 1 + \lfloor \frac{N-1}{2} \rfloor )\)</span>,
+and <span class="math notranslate nohighlight">\(n_d = 0, \dots, N-1\)</span>. The corresponding Fourier transform
+over the entire discretised solution space is then
+<span class="math notranslate nohighlight">\(F := \otimes_{d=0}^{D-1} F_d\)</span>, and the mixing unitary is</p>
+<div class="math notranslate nohighlight" id="equation-gaussian-mixer">
+<span class="eqno">(29)<a class="headerlink" href="#equation-gaussian-mixer" title="Link to this equation"></a></span>\[\hat{U}_{\vert\kappa_{k}\vert^2}(t) = F^{-1}e^{-\text{i}t \hat{W}_{\kappa}} F\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{W}_{\kappa}\)</span> is the diagonal operator,</p>
+<div class="math notranslate nohighlight" id="equation-momentum-mixer">
+<span class="eqno">(30)<a class="headerlink" href="#equation-momentum-mixer" title="Link to this equation"></a></span>\[\hat{W}_{\kappa}=\sum_{k = 0}^{K-1} \vert\bm{\kappa}_{k}\vert^2 \ket{k}\bra{k},\]</div>
+<p>and where
+<span class="math notranslate nohighlight">\(\bm{\kappa}_k = (\kappa_{0,n_0}, \dots, \kappa_{D-1,n_{D-1}})\)</span> is
+a momentum space grid point with a similar indexing to <span class="math notranslate nohighlight">\(\bm{x}_k\)</span>.</p>
+<p>Applying the phase-shift unitary followed by the first Fourier transform
+in <a class="reference internal" href="#equation-gaussian-mixer">(29)</a> and computational basis
+measurement is related to Jordan’s algorithm for gradient
+computation <span id="id18">[<a class="reference internal" href="bibliography.html#id29" title="S. P. Jordan. Fast quantum algorithm for numerical gradient estimation. Phys. Rev. Lett., 95(5):050501, 2005.">Jor05</a>]</span>. Here, the gradient
+information is used coherently by following the first Fourier transform
+by the remaining two unitaries
+in <a class="reference internal" href="#equation-gaussian-mixer">(29)</a>, instead of performing
+a measurement.</p>
+</section>
+<section id="qmoa">
+<span id="id19"></span><h3>QMOA<a class="headerlink" href="#qmoa" title="Link to this heading"></a></h3>
+<p>The Quantum Multivariable Optimisation Algorithm (QMOA) mixer is taken to be a unitary of separable CTQWs,</p>
+<div class="math notranslate nohighlight" id="equation-nd-walk">
+<span class="eqno">(31)<a class="headerlink" href="#equation-nd-walk" title="Link to this equation"></a></span>\[\hat{U}_{W\text{-QMOA}}(\bm{t}) = \prod_{d=0}^{D-1}\exp(-\text{i}t_d \hat{C}_d),\]</div>
+<p>where <span class="math notranslate nohighlight">\(\bm{t} = (t_0,...t_{D-1})\)</span> with <span class="math notranslate nohighlight">\(t_d \geq 0\)</span> and
+<span class="math notranslate nohighlight">\(\hat{C}_d\)</span> is the adjacency matrix of an undirected graph (see
+<a class="reference internal" href="#equation-adjacency">(23)</a>) connecting vertices along the
+dimension <span class="math notranslate nohighlight">\(d\)</span>. The discretisation of the QOWE mixer is of a
+similar form if the generator of
+<a class="reference internal" href="#equation-gaussian-mixer">(29)</a> is interpreted as a
+composite of complete graphs with complex-valued <span class="math notranslate nohighlight">\(w_{kk'}\)</span>. In
+QMOA, we only consider cases where <span class="math notranslate nohighlight">\(w_{kk'} \in \{ 0, 1 \}\)</span>. With
+<span class="math notranslate nohighlight">\(\hat{C}_d\)</span> as a cycle graph, <span class="math notranslate nohighlight">\(\hat{W}\)</span> is equivalent to a
+finite difference approximation of the Laplacian (i.e., a different
+discretisation of <a class="reference internal" href="#equation-cts-mixer">(27)</a>). However, we
+consider more general graphs that do not correspond to different
+discretisations of <a class="reference internal" href="#equation-cts-mixer">(27)</a>, but do separate
+into independent quantum walks in each dimension. The case where each
+<span class="math notranslate nohighlight">\(\hat{C}_d\)</span> is a complete graph is depicted in
+Fig. <a class="reference internal" href="#qmoa-mixing-structure"><span class="std std-ref">QMOA-mixing-structure</span></a> for a
+two-dimensional <span class="math notranslate nohighlight">\(4 \times 4\)</span> grid.</p>
+<p>Under the condition that <span class="math notranslate nohighlight">\(\hat{C}_d\)</span> is circulant, and therefore
+diagonalised by the coefficient matrix of the discrete Fourier
+transform, <a class="reference internal" href="#equation-nd-walk">(31)</a> is efficiently realisable as</p>
+<div class="math notranslate nohighlight">
+\[(\text{DFT}^{-1})^{\otimes D} \exp\left(- \rm{i} \hat{\Lambda}(\bm{t}) \right) \text{DFT}^{\otimes D},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\text{DFT}\)</span> denotes the discrete Fourier transform and,</p>
+<div class="math notranslate nohighlight" id="equation-circulant-mixer-multi">
+<span class="eqno">(32)<a class="headerlink" href="#equation-circulant-mixer-multi" title="Link to this equation"></a></span>\[\hat{\Lambda}(\bm{t}) = \sum_{d = 0}^{D-1}t_{d}\sum_{n_d=0}^{N - 1}\Lambda_{d,n_d}\ket{x_{d,n_d}}\bra{x_{d,n_d}},\]</div>
+<p>is constructed using the closed form solution for the eigenvalues
+<span class="math notranslate nohighlight">\(\Lambda_{d,n_d}\)</span> of <span class="math notranslate nohighlight">\(\hat{C}_d\)</span>. We note that of the graphs
+introduced for the QAOA, the complete graph is circulant, while the
+hypercube graph is non-circulant. Altogether, the QMOA ansatz unitary
+<span class="math notranslate nohighlight">\(\hat{U}_\text{QMOA}\)</span> has a
+<span class="math notranslate nohighlight">\(\mathcal{O}\left(\text{polylog} \, K\right)\)</span> gate complexity
+resulting from <span class="math notranslate nohighlight">\(D\)</span> instances of the quantum Fourier transform
+<span id="id20">[<a class="reference internal" href="bibliography.html#id25" title="L. Hales and S. Hallgren. An improved quantum Fourier transform algorithm and applications. In Proceedings 41st Annual Symposium on Foundations of Computer Science, 515–525. 2000.">HH00</a>]</span>.</p>
+<p>For complete graphs <span class="math notranslate nohighlight">\(\hat{C}_d\)</span>, the mixing unitary can be written
+as,</p>
+<div class="math notranslate nohighlight">
+\[\begin{aligned}
+  \hat{U}_{W\text{-QMOA}}(\bm{t}) \nonumber
+  = \bigotimes_{d=0}^{D-1} e^{i t_d} \left[ \hat{I} + ( e^{-i t_d N} - 1 ) \frac{1}{N} \sum_{n_d, n_d' = 0}^{N-1} \ket{n_d} \bra{n_d'} \right].
+\end{aligned}\]</div>
+<p>In each dimension, the operator <span class="math notranslate nohighlight">\(\exp(-i t \hat{C}_d)\)</span> applies an
+unbiased coupling between all points within each line parallel to
+coordinate axis <span class="math notranslate nohighlight">\(d\)</span>. The amplitude of a point then evolves
+according to the average amplitude along the corresponding line,
+analogous to <a class="reference internal" href="#equation-qaoa-c-amplitude">(25)</a>. Combining
+the walks in each dimension, along with the phase-shift,
+<span class="math notranslate nohighlight">\(\hat{U}_\text{QMOA}(t, \gamma)=\hat{U}_{W\text{-QMOA}}(t)\hat{U}_Q(\gamma)\)</span>
+causes the amplitude of a point to evolve according to the locally
+phase-encoded <span class="math notranslate nohighlight">\(f_k\)</span> relative to averages of phase-shifted
+amplitudes in the various subspaces containing the point. For example,
+in Fig. <a class="reference internal" href="#qmoa-mixing-structure"><span class="std std-ref">QMOA-mixing-structure</span></a> the coordinate
+subspaces of <span class="math notranslate nohighlight">\(\ket{k=13}\)</span> are the row of points containing
+<span class="math notranslate nohighlight">\(x_{0,3}\)</span> and the column of points containing <span class="math notranslate nohighlight">\(x_{1,1}\)</span>. By
+averaging phase-shifted amplitudes among these subspaces, rather than
+simply over the entire solution space as in
+<a class="reference internal" href="#equation-qaoa-c-op">(24)</a>, as well as using different walk
+times <span class="math notranslate nohighlight">\(t_d\)</span> in each dimension, <span class="math notranslate nohighlight">\(\hat{U}_{W\text{-QWOA}}\)</span> can
+break degeneracies resulting from contours in <span class="math notranslate nohighlight">\(f\)</span> that are
+non-parallel to the coordinate axes. More generally, the evolution of
+amplitudes at any two <span class="math notranslate nohighlight">\(\ket{k}\)</span> will respond similarly to
+variations in <span class="math notranslate nohighlight">\(t_d\)</span> and <span class="math notranslate nohighlight">\(\gamma\)</span> only if there is similarity
+in their locally encoded <span class="math notranslate nohighlight">\(f_k\)</span> and the averages of the
+phase-encoded <span class="math notranslate nohighlight">\(f_k\)</span> in their respective subspaces, which is likely
+to occur only when there is a high degree of symmetry in <span class="math notranslate nohighlight">\(f\)</span>.
+Furthermore, as the minima of a continuous <span class="math notranslate nohighlight">\(f\)</span> are stationary
+points, every line passing through (or near) a minimum will contain
+multiple <span class="math notranslate nohighlight">\(\bm{x}_k\)</span> with <span class="math notranslate nohighlight">\(f_k\)</span> close to the minimum value
+(provided the discretisation is sufficiently dense). Consequently, the
+separable CTQWs have the potential to mutually re-enforce convergence to
+subspaces that contain multiple high-quality solutions.</p>
+<figure class="align-center" id="qmoa-mixing-structure">
+<a class="reference internal image-reference" href="_static/QMOA_Diagram.png"><img alt="_static/QMOA_Diagram.png" src="_static/QMOA_Diagram.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">background/multivariable.rst</span>, line 369)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/QMOA_Diagram.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+<figcaption>
+<p><span class="caption-text">Overview of the QMOA for an arbitrary <span class="math notranslate nohighlight">\(f\)</span> in <span class="math notranslate nohighlight">\(D=2\)</span> discretised over a grid of 16 points. The horizontal and vertical outlines denote the hyperplanes of constant coordinates. The bottom two graphs in (a) illustrate the coupling between these hyperplanes in <span class="math notranslate nohighlight">\(\hat{U}_{W\text{-QMOA}}\)</span> with a complete graph in each dimension.</span><a class="headerlink" href="#qmoa-mixing-structure" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="readme_link.html" class="btn btn-neutral float-left" title="QuOp_MPI" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="package_overview.html" class="btn btn-neutral float-right" title="Package Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

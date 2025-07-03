@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuOp_MPI &mdash; QuOp_MPI 1.3.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=1f29e9d3"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Theoretical Background" href="theoretical_background.html" />
+    <link rel="prev" title="Welcome to QuOp_MPI’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">QuOp_MPI</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#a-parallel-framework-for-quantum-variational-algorithms">A Parallel Framework for Quantum Variational Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#related-publications">Related Publications</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#installation">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#package-installation">Package Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optional-dependencies">Optional Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#usage-examples">Usage Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#documentation">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#building-fftw3-and-hdf5-from-source">Building FFTW3 and HDF5 From Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#environment-setup">Environment Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#license">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#contact-information">Contact Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quop_mpi.html">quop_mpi</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developing_for_quop.html">Developing for QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">QuOp_MPI</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/readme_link.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="quop-mpi">
+<h1>QuOp_MPI<a class="headerlink" href="#quop-mpi" title="Link to this heading"></a></h1>
+<section id="a-parallel-framework-for-quantum-variational-algorithms">
+<h2>A Parallel Framework for Quantum Variational Algorithms<a class="headerlink" href="#a-parallel-framework-for-quantum-variational-algorithms" title="Link to this heading"></a></h2>
+<p>QuOp_MPI is a Python 3 module designed for parallel, distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators.</p>
+<p><strong>Current Version:</strong> 1.3.0</p>
+<p>For an in-depth discussion on design, usage, and performance, please refer to the <a class="reference external" href="https://arxiv.org/abs/2110.03963">preprint on arXiv</a>.</p>
+</section>
+<section id="related-publications">
+<h2>Related Publications<a class="headerlink" href="#related-publications" title="Link to this heading"></a></h2>
+<p><strong>Package Development:</strong></p>
+<ol class="arabic simple">
+<li><p>Matwiejew, E. &amp; Wang, J. B. <em>QuOp_MPI: A framework for parallel simulation of quantum variational algorithms.</em> Journal of Computational Science 62, 101711 (2022).</p></li>
+<li><p>Matwiejew, E. &amp; Wang, J. <em>QSW_MPI: A framework for parallel simulation of quantum stochastic walks.</em> Computer Physics Communications 107724 (2020).</p></li>
+</ol>
+<p><strong>Numerical Results Provided by QuOp_MPI:</strong></p>
+<ol class="arabic simple">
+<li><p>Bennett, T., Matwiejew, E., Marsh, S. &amp; Wang, J. B. <em>Quantum Walk-Based Vehicle Routing Optimisation.</em> Frontiers in Physics 9, (2021).</p></li>
+<li><p>Slate, N., Matwiejew, E., Marsh, S. &amp; Wang, J. B. <em>Quantum walk-based portfolio optimisation.</em> Quantum 5, 513 (2021).</p></li>
+<li><p>Matwiejew, E., Pye J. &amp; Wang J. B. <em>Quantum Optimisation for Continuous Multivariable Functions by a Structured Search.</em> arXiv:2210.06227 (2022).</p></li>
+</ol>
+</section>
+</section>
+<section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
+<p>Before installing QuOp_MPI, ensure that the following system dependencies are met:</p>
+<ul class="simple">
+<li><p><strong>Compiler:</strong> GCC 7+ with Fortran support (e.g., using <cite>mpifort</cite>).</p></li>
+<li><p><strong>MPI:</strong> Open-MPI or MPICH.</p></li>
+<li><p><strong>HDF5:</strong> Configured with <cite>–enable-fortran –enable-shared –enable-parallel</cite>.</p></li>
+<li><p><strong>FFTW3:</strong> Configured with <cite>–enable-fortran –enable-shared –enable-mpi</cite>.</p></li>
+<li><p><strong>Python:</strong> 3.11+</p></li>
+</ul>
+<p>You can install these prerequisites using your Linux package manager or Homebrew on macOS. Instructions for building HDF5 and FFTW3 from source are provided later in this README.</p>
+</section>
+<section id="package-installation">
+<h2>Package Installation<a class="headerlink" href="#package-installation" title="Link to this heading"></a></h2>
+<p>First, install the following build dependencies:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip<span class="w"> </span>setuptools
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>scikit-build<span class="w"> </span>cmake<span class="w"> </span>ninja
+</pre></div>
+</div>
+<p>Next, choose one of the following build methods:</p>
+<p><strong>Standard Build:</strong></p>
+<p>To install from source (ensure that all build prerequisites are set), run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you encounter installation issues on a repeated build, try removing the <cite>_skbuild</cite> directory:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>rm<span class="w"> </span>-rf<span class="w"> </span>_skbuild
+</pre></div>
+</div>
+</div>
+<p><strong>Development Build:</strong></p>
+<p>For development or modifying QuOp_MPI, use the following steps:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-S<span class="w"> </span>.
+cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>install
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</pre></div>
+</div>
+</section>
+<section id="optional-dependencies">
+<h2>Optional Dependencies<a class="headerlink" href="#optional-dependencies" title="Link to this heading"></a></h2>
+<p>QuOp_MPI provides optional dependencies for documentation and examples.</p>
+<ul>
+<li><p><strong>Install all optional dependencies at once:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;.[all]&#39;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Manual installation:</strong>
+If you prefer, install dependencies manually:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">numpydoc</span><span class="o">==</span><span class="m">1</span>.5.0<span class="w"> </span>sphinxcontrib-bibtex<span class="o">==</span><span class="m">2</span>.5.0<span class="w"> </span>sphinx-rtd-theme<span class="o">==</span><span class="m">1</span>.2.0
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>pandas-datareader<span class="o">==</span><span class="m">0</span>.10.0<span class="w"> </span><span class="nv">yfinance</span><span class="o">==</span><span class="m">0</span>.2.12<span class="w"> </span>matplotlib&gt;<span class="o">=</span><span class="m">3</span>.6.0<span class="w"> </span>seaborn&gt;<span class="o">=</span><span class="m">0</span>.11.2<span class="w"> </span>jupyter-client&gt;<span class="o">=</span><span class="m">6</span>.1.2<span class="w"> </span>jupyter-core&gt;<span class="o">=</span><span class="m">4</span>.6.3
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="usage-examples">
+<h2>Usage Examples<a class="headerlink" href="#usage-examples" title="Link to this heading"></a></h2>
+<p>After installation, you can test the package using one of the provided examples. For instance, to run the maxcut example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>examples/maxcut
+mpiexec<span class="w"> </span>-N<span class="w"> </span><span class="m">2</span><span class="w"> </span>python3<span class="w"> </span>maxcut.py
+</pre></div>
+</div>
+</section>
+</section>
+<section id="documentation">
+<h1>Documentation<a class="headerlink" href="#documentation" title="Link to this heading"></a></h1>
+<p>The documentation is built using Sphinx. After installing the optional documentation dependencies, generate the docs with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>setup.py<span class="w"> </span>build_sphinx
+</pre></div>
+</div>
+</section>
+<section id="building-fftw3-and-hdf5-from-source">
+<h1>Building FFTW3 and HDF5 From Source<a class="headerlink" href="#building-fftw3-and-hdf5-from-source" title="Link to this heading"></a></h1>
+<p>If pre-built parallel versions of FFTW3 and HDF5 are not available on your system, compile them from source as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># HDF5</span>
+wget<span class="w"> </span>https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.6/src/hdf5-1.10.6.tar.gz
+tar<span class="w"> </span>-xvf<span class="w"> </span>hdf5-1.10.6.tar.gz
+<span class="nb">cd</span><span class="w"> </span>hdf5-1.10.6
+./configure<span class="w"> </span>--enable-fortran<span class="w"> </span>--enable-shared<span class="w"> </span>--enable-parallel<span class="w"> </span>--prefix<span class="o">=</span>/usr/local
+make<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>make<span class="w"> </span>install
+<span class="nb">cd</span><span class="w"> </span>..
+
+<span class="c1"># FFTW3</span>
+wget<span class="w"> </span>http://www.fftw.org/fftw-3.3.8.tar.gz
+tar<span class="w"> </span>-xvf<span class="w"> </span>fftw-3.3.8.tar.gz
+<span class="nb">cd</span><span class="w"> </span>fftw-3.3.8
+./configure<span class="w"> </span>--enable-mpi<span class="w"> </span>--enable-fortran<span class="w"> </span>--enable-shared<span class="w"> </span>--prefix<span class="o">=</span>/usr/local
+make<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>make<span class="w"> </span>install
+<span class="nb">cd</span><span class="w"> </span>..
+</pre></div>
+</div>
+</section>
+<section id="environment-setup">
+<h1>Environment Setup<a class="headerlink" href="#environment-setup" title="Link to this heading"></a></h1>
+<p>If QuOp_MPI is unable to locate the HDF5 or FFTW shared libraries, update your library path. Add the following line to your ~/.bashrc:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="nv">$LD_LIBRARY_PATH</span>:/usr/local/lib
+</pre></div>
+</div>
+<p>Then, reload your environment:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span>~/.bashrc
+</pre></div>
+</div>
+</section>
+<section id="license">
+<h1>License<a class="headerlink" href="#license" title="Link to this heading"></a></h1>
+<p>QuOp_MPI is distributed under the GNU General Public License v3.0 (GPLv3). The full license text is available in the LICENSE file.</p>
+</section>
+<section id="contact-information">
+<h1>Contact Information<a class="headerlink" href="#contact-information" title="Link to this heading"></a></h1>
+<p>For bug reports or inquiries, please submit an issue on GitHub or contact:</p>
+<p>Edric Matwiejew
+Email: <a class="reference external" href="mailto:edric&#46;matwiejew&#37;&#52;&#48;research&#46;uwa&#46;edu&#46;au">edric<span>&#46;</span>matwiejew<span>&#64;</span>research<span>&#46;</span>uwa<span>&#46;</span>edu<span>&#46;</span>au</a></p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to QuOp_MPI’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="theoretical_background.html" class="btn btn-neutral float-right" title="Theoretical Background" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

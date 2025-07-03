@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Examples &mdash; QuOp_MPI 1.3.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=1f29e9d3"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script>window.MathJax = {"tex": {"macros": {"bm": ["{\\boldsymbol #1}", 1], "Bar": ["{\\bar #1}", 1], "dag": ["\\dagger"], "QWOA{}": ["QWOA"]}}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="quop_mpi" href="quop_mpi.html" />
+    <link rel="prev" title="Package Overview" href="package_overview.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html">QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#documentation">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#building-fftw3-and-hdf5-from-source">Building FFTW3 and HDF5 From Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#environment-setup">Environment Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#license">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html#contact-information">Contact Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="package_overview.html">Package Overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#maxcut">Maxcut</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#qaoa-serial-quality-function">QAOA (Serial Quality Function)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#qaoa-parallel-observables-function">QAOA (Parallel Observables Function)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ex-qaoa">Ex-QAOA</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#portfolio-rebalancing">Portfolio Rebalancing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#qaoaz">QAOAz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#qwoa">QWOA</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quop_mpi.html">quop_mpi</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developing_for_quop.html">Developing for QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Examples</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/examples.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h1>
+<p>The following examples detail the simulation of <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVAs</span></a> for unconstrained and constrained combinatorial optimisation problems.</p>
+<p>The examples are size so they may be easily ran on most personal computers. The examples must be ran using the <code class="docutils literal notranslate"><span class="pre">mpiexec</span></code> or <code class="docutils literal notranslate"><span class="pre">mpirun</span></code> launchers. For example, to run the QAOA maxcut example located in <em>examples/maxcut</em> on a system with 4 CPU cores:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpiexec<span class="w"> </span>-N<span class="w"> </span><span class="m">4</span><span class="w"> </span>python3<span class="w"> </span>maxcut.py
+</pre></div>
+</div>
+<section id="maxcut">
+<span id="id1"></span><h2>Maxcut<a class="headerlink" href="#maxcut" title="Link to this heading"></a></h2>
+<p>The max-cut problem seeks to partition the vertices of a graph such that
+a maximum number of neighbouring nodes are assigned to two disjoint sets
+<span id="id2">[<a class="reference internal" href="bibliography.html#id14" title="Edward Farhi, Jeffrey Goldstone, and Sam Gutmann. A Quantum Approximate Optimization Algorithm. arXiv:1411.4028 [quant-ph], 2014.">FGG14</a>]</span>. A quantum encoding of the
+max-cut problem is a bijective mapping of the vertices of a graph
+<span class="math notranslate nohighlight">\(G\)</span> to <span class="math notranslate nohighlight">\(n\)</span> qubits, with the set membership indicated by the
+corresponding qubit state. For example, a two vertex graph with vertices
+<span class="math notranslate nohighlight">\({\left\{0,1\right\}}\)</span> has a solution space that is completely
+represented by an equal superposition over a two-qubit system:
+<span class="math notranslate nohighlight">\({\left\{{\left\{0,1\right\}}\right\}} \rightarrow {\lvert 00\rangle}\)</span>,
+<span class="math notranslate nohighlight">\({\left\{{\left\{0\right\}},{\left\{1\right\}}\right\}} \rightarrow {\lvert 01\rangle}\)</span>,
+<span class="math notranslate nohighlight">\({\left\{{\left\{0\right\}},{\left\{1\right\}}\right\}} \rightarrow {\lvert 10\rangle}\)</span>
+and
+<span class="math notranslate nohighlight">\({\left\{{\left\{0,1\right\}}\right\}} \rightarrow {\lvert 11\rangle}\)</span>.</p>
+<p>The cost function is then implemented as</p>
+<div class="math notranslate nohighlight" id="equation-maxcut-cost">
+<span class="eqno">(1)<a class="headerlink" href="#equation-maxcut-cost" title="Link to this equation"></a></span>\[    {C(s)} = \sum_{E(i,j)\in G} \frac{1}{2}\left( \mathbb{I} + Z_iZ_j\right),\]</div>
+<p>where <span class="math notranslate nohighlight">\(Z_i\)</span> is a Pauli Z gate acting on the <span class="math notranslate nohighlight">\(i^\text{th}\)</span>
+qubit, <span class="math notranslate nohighlight">\(E(i,j)\)</span> is an edge in <span class="math notranslate nohighlight">\(G\)</span> connecting vertex
+<span class="math notranslate nohighlight">\(i\)</span> to vertex <span class="math notranslate nohighlight">\(j\)</span>, and <span class="math notranslate nohighlight">\(Z_iZ_j\)</span> has eigenvalue
+<span class="math notranslate nohighlight">\(1\)</span> if qubits <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(j\)</span> are in the same state or
+<span class="math notranslate nohighlight">\(-1\)</span> otherwise.</p>
+<section id="qaoa-serial-quality-function">
+<span id="qaoa-maxcut"></span><h3>QAOA (Serial Quality Function)<a class="headerlink" href="#qaoa-serial-quality-function" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><em>examples/maxcut/maxcut.py</em></p></li>
+</ul>
+<p>Here the QAOA is applied to the max-cut problem
+for the graph shown below. The predefined
+<code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> subclass <a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.combinatorial.qaoa" title="quop_mpi.algorithm.combinatorial.qaoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">qaoa</span></code></a> forms the basis of the simulation.</p>
+<figure class="align-center" id="maxcut-graph">
+<a class="reference internal image-reference" href="_static/maxcut_graph.png"><img alt="_static/maxcut_graph.png" src="_static/maxcut_graph.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">/home/runner/work/QuOp_MPI/QuOp_MPI/docs/source/examples.rst</span>, line 55)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/maxcut_graph.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+<figcaption>
+<p><span class="caption-text">Graph for the example maxcut problem. The green and purple vertices indicate one of two optimal vertex partitioning.</span><a class="headerlink" href="#maxcut-graph" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>To generate the graph we use the external package <code class="docutils literal notranslate"><span class="pre">networkx</span></code>.
+And define the cost function as a Python function using the <code class="docutils literal notranslate"><span class="pre">I</span></code> and
+<code class="docutils literal notranslate"><span class="pre">Z</span></code> functions from <a class="reference internal" href="quop_mpi.html#module-quop_mpi.toolkit" title="quop_mpi.toolkit"><code class="xref py py-mod docutils literal notranslate"><span class="pre">toolkit</span></code></a>, we are able to directly
+implement <a class="reference internal" href="#equation-maxcut-cost">(1)</a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.algorithm.combinatorial</span><span class="w"> </span><span class="kn">import</span> <span class="n">qaoa</span><span class="p">,</span> <span class="n">serial</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.toolkit</span><span class="w"> </span><span class="kn">import</span> <span class="n">I</span><span class="p">,</span> <span class="n">Z</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">networkx</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nx</span>
+
+<span class="n">Graph</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">circular_ladder_graph</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+
+<span class="n">vertices</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+<span class="n">system_size</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="n">vertices</span>
+
+<span class="n">G</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">to_scipy_sparse_array</span><span class="p">(</span><span class="n">Graph</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">maxcut_qualities</span><span class="p">(</span><span class="n">G</span><span class="p">):</span>
+    <span class="n">C</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="n">G</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">C</span> <span class="o">+=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">I</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">Z</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)</span> <span class="o">@</span> <span class="n">Z</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">C</span><span class="o">.</span><span class="n">diagonal</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>A <a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.combinatorial.qaoa" title="quop_mpi.algorithm.combinatorial.qaoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">qaoa</span></code></a> instance is instantiated.
+and the <span class="math notranslate nohighlight">\(\text{diag}(\hat{Q})\)</span> (the solution qualities) is defined via the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">set_qualities()</span></code> method. For this, we pass the <a class="reference internal" href="quop_mpi.html#quop_mpi.observable.serial" title="quop_mpi.observable.serial"><code class="xref py py-meth docutils literal notranslate"><span class="pre">serial()</span></code></a>
+<a class="reference internal" href="quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a> along with a dictionary containing <code class="docutils literal notranslate"><span class="pre">maxcut</span> <span class="pre">qualities</span></code> and its
+arguments. The <code class="docutils literal notranslate"><span class="pre">serial</span></code> function assists with memory-efficient
+simulation, by calling the <code class="docutils literal notranslate"><span class="pre">maxcut_qualities</span></code> at the root MPI process and distributing its output over
+Ansatz subcommunicator. The ansatz depth (<span class="math notranslate nohighlight">\(D=2\)</span>) is defined via the <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.set_depth" title="quop_mpi.Ansatz.set_depth"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_depth()</span></code></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span> <span class="o">=</span> <span class="n">qaoa</span><span class="p">(</span><span class="n">system_size</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_qualities</span><span class="p">(</span><span class="n">serial</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;args&#39;</span><span class="p">:[</span><span class="n">maxcut_qualities</span><span class="p">,</span> <span class="n">G</span><span class="p">]})</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_depth</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now that the <code class="docutils literal notranslate"><span class="pre">qaoa</span></code> instance is fully specified, simulation of the
+algorithm (see <a class="reference internal" href="theoretical_background.html#qaoa"><span class="std std-ref">QAOA</span></a>) proceeds via
+<a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.execute" title="quop_mpi.Ansatz.execute"><code class="xref py py-meth docutils literal notranslate"><span class="pre">execute()</span></code></a>. By calling <code class="docutils literal notranslate"><span class="pre">execute</span></code> without specifying
+the initial <a class="reference internal" href="glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> we use the default <a class="reference internal" href="quop_functions.html#term-Parameter-Function"><span class="xref std std-term">Parameter Functions</span></a>, which
+generates <cite>variational parameters</cite> from a uniform distribution over
+<span class="math notranslate nohighlight">\((0 \pi, 2\pi]\)</span>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Finally, the optimiser result is displayed using
+<a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.print_result" title="quop_mpi.Ansatz.print_result"><code class="xref py py-meth docutils literal notranslate"><span class="pre">print_result()</span></code></a> and the simulation results are saved
+to the HDF5 file ‘maxcut.h5’ under the ‘depth 2’ group.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span><span class="o">.</span><span class="n">print_result</span><span class="p">()</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;maxcut&quot;</span><span class="p">,</span> <span class="s2">&quot;depth 2&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The figure below illustrates the initial and final probability distributions with respect
+of the unique values of <span class="math notranslate nohighlight">\(q_i\)</span> (see <a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a>). After application of the QAOA to the
+initial superposition, probability density is concentrated at
+high-quality solutions with the optimal solution
+having the highest probability of measurement.</p>
+<table class="docutils align-default" id="maxcut-qaoa-initial-and-final">
+<tbody>
+<tr class="row-odd"><td><figure class="align-default">
+<img alt="_static/maxcut_starting_probabilities.png" src="_static/maxcut_starting_probabilities.png" />
+</figure>
+</td>
+<td><figure class="align-default">
+<img alt="_static/maxcut_qaoa_probabilities.png" src="_static/maxcut_qaoa_probabilities.png" />
+</figure>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="center"><em>The starting probability of the maxcut problem solution qualities (left) and the equivalent probability distribution after execution of the QAOA.</em></p>
+</section>
+<section id="qaoa-parallel-observables-function">
+<span id="qaoa-parallel-quality"></span><h3>QAOA (Parallel Observables Function)<a class="headerlink" href="#qaoa-parallel-observables-function" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><em>examples/maxcut/maxcut_parallel_qualities.py</em></p></li>
+</ul>
+<p>Here we consider a variation on the above <a class="reference internal" href="#qaoa-maxcut"><span class="std std-ref">QAOA example</span></a>, whereby the cost function given in <a class="reference internal" href="#equation-maxcut-cost">(1)</a> is computed via a user-defined <a class="reference internal" href="quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a>. As, previously we require <code class="xref py py-class docutils literal notranslate"><span class="pre">qaoa</span></code> and <code class="docutils literal notranslate"><span class="pre">networkx</span></code>. We also import <code class="docutils literal notranslate"><span class="pre">NumPy</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.algorithm.combinatorial</span><span class="w"> </span><span class="kn">import</span> <span class="n">qaoa</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">networkx</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nx</span>
+</pre></div>
+</div>
+<p>The graph is generated using <code class="docutils literal notranslate"><span class="pre">networkx</span></code> and the <a class="reference internal" href="glossary.html#term-system-size"><span class="xref std std-term">system size</span></a> computed from the number of graph nodes.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Graph</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">circular_ladder_graph</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">nodes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+<span class="n">system_size</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="n">nodes</span>
+<span class="n">G</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">to_scipy_sparse_array</span><span class="p">(</span><span class="n">Graph</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>An <a class="reference internal" href="quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> is a <a class="reference internal" href="quop_functions.html#term-QuOp-Function"><span class="xref std std-term">QuOp Function</span></a> that returns the matrix <a class="reference internal" href="glossary.html#term-operator"><span class="xref std std-term">operator</span></a> of a <a class="reference internal" href="glossary.html#term-unitary"><span class="xref std std-term">unitary</span></a>. The <a class="reference internal" href="theoretical_background.html#qaoa"><span class="std std-ref">QAOA</span></a> <a class="reference internal" href="glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> has a diagonal matrix operator that contains the solution qualities (which also define the QAOA <a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a>). An Operator Function for the computation of the solution qualities must return a 1-D real array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code>. We are able to compute the maxcut solution qualities in parallel as computation of the quality for any specific solution is independent of the global solution space.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">parallel_maxcut_qualities</span><span class="p">(</span><span class="n">local_i</span><span class="p">,</span> <span class="n">local_i_offset</span><span class="p">,</span> <span class="n">G</span><span class="p">):</span>
+
+    <span class="n">n_qubits</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">qualities</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">local_i</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">local_i_offset</span>
+    <span class="n">finish</span> <span class="o">=</span> <span class="n">local_i_offset</span> <span class="o">+</span> <span class="n">local_i</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">finish</span><span class="p">):</span>
+        <span class="n">bit_string</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">binary_repr</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">n_qubits</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">bj</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bit_string</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">bk</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bit_string</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">G</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">bj</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bk</span><span class="p">):</span>
+                    <span class="n">qualities</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="n">local_i_offset</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">qualities</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">parallel_maxcut_qualities</span></code> <a class="reference internal" href="quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> is passed to <a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.combinatorial.qaoa.set_qualities" title="quop_mpi.algorithm.combinatorial.qaoa.set_qualities"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_qualities()</span></code></a>. As, its <code class="docutils literal notranslate"><span class="pre">local_i</span></code> and <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> arguments are attributes of the <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> class, they will be passed to the function automatically. The <code class="docutils literal notranslate"><span class="pre">G</span></code> argument is specified as an additional positional argument in a corresponding <a class="reference internal" href="quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span> <span class="o">=</span> <span class="n">qaoa</span><span class="p">(</span><span class="n">system_size</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_qualities</span><span class="p">(</span><span class="n">parallel_maxcut_qualities</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;args&#39;</span><span class="p">:[</span><span class="n">G</span><span class="p">]})</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_depth</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">print_result</span><span class="p">()</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;maxcut_parallel_qualities&quot;</span><span class="p">,</span> <span class="s2">&quot;depth 2&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="ex-qaoa">
+<h3>Ex-QAOA<a class="headerlink" href="#ex-qaoa" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><em>examples/maxcut_extended/maxcut_extended.py</em></p></li>
+</ul>
+<p>Here we address the maxcut problem <a class="reference internal" href="#qaoa-maxcut"><span class="std std-ref">defined above</span></a> using the <a class="reference internal" href="theoretical_background.html#ex-qaoa"><span class="std std-ref">Extended-QAOA</span></a>. We will do this by implementing a <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> using the <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> base-class, the <a class="reference internal" href="quop_mpi.html#module-quop_mpi.propagator.diagonal" title="quop_mpi.propagator.diagonal"><code class="xref py py-mod docutils literal notranslate"><span class="pre">diagonal</span></code></a> <code class="docutils literal notranslate"><span class="pre">propagator</span></code> to simulate the action of the Ex-QAOA <a class="reference internal" href="glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> and the <a class="reference internal" href="quop_mpi.html#module-quop_mpi.propagator.sparse" title="quop_mpi.propagator.sparse"><code class="xref py py-class docutils literal notranslate"><span class="pre">sparse</span></code></a> <code class="docutils literal notranslate"><span class="pre">propagator</span></code> to simulate the action of the Ex-QAOA <a class="reference internal" href="glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a>. The <a class="reference internal" href="quop_mpi.html#quop_mpi.observable.serial" title="quop_mpi.observable.serial"><code class="xref py py-meth docutils literal notranslate"><span class="pre">serial()</span></code></a> <a class="reference internal" href="quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a> will be used to interface a serial Python function for computation of the maxcut solution qualities (see <a class="reference internal" href="#equation-maxcut-cost">(1)</a>) with QuOp_MPI. Finally, the <a class="reference internal" href="quop_mpi.html#quop_mpi.toolkit.Z" title="quop_mpi.toolkit.Z"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Z()</span></code></a> Pauli operator function from <a class="reference internal" href="quop_mpi.html#module-quop_mpi.toolkit" title="quop_mpi.toolkit"><code class="xref py py-mod docutils literal notranslate"><span class="pre">toolkit</span></code></a> will be used to efficiently implement the parameterised Ex-QAOA phase-shift unitary matrix <a class="reference internal" href="glossary.html#term-operator"><span class="xref std std-term">operator</span></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">networkx</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ansatz</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.propagator</span><span class="w"> </span><span class="kn">import</span> <span class="n">diagonal</span><span class="p">,</span> <span class="n">sparse</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.observable</span><span class="w"> </span><span class="kn">import</span> <span class="n">serial</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.toolkit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Z</span>
+
+</pre></div>
+</div>
+<p>The problem graph is generated using <code class="docutils literal notranslate"><span class="pre">networkx</span></code> and the <a class="reference internal" href="glossary.html#term-system-size"><span class="xref std std-term">system size</span></a> computed from the number of graph vertices.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">vertices</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+<span class="n">system_size</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="n">vertices</span>
+<span class="n">G</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">to_scipy_sparse_array</span><span class="p">(</span><span class="n">Graph</span><span class="p">)</span>
+<span class="n">n_edges</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">Graph</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">()</span>
+
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">maxcut_terms</span></code> functions implements the Ex-QAOA phase-shift unitary by returning a <code class="docutils literal notranslate"><span class="pre">list</span></code> of 1-D arrays that correspond to the non-identity Pauli terms in the problem cost function (see <code class="xref math math-numref docutils literal notranslate"><span class="pre">qaoa-cost)</span></code>). Each of these terms will associated with a phase-shift unitary with independently parameterised <a class="reference internal" href="glossary.html#term-operator-parameter"><span class="xref std std-term">operator parameters</span></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">maxcut_terms</span><span class="p">(</span><span class="n">G</span><span class="p">):</span>
+    <span class="n">vertices</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">terms</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">G</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="n">G</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">term</span> <span class="o">=</span> <span class="n">Z</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)</span> <span class="o">@</span> <span class="n">Z</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)</span>
+                <span class="n">terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">term</span><span class="o">.</span><span class="n">diagonal</span><span class="p">()))</span>
+    <span class="k">return</span> <span class="n">terms</span>
+</pre></div>
+</div>
+<p>Due to these extra degrees of freedom, the the Ex-QAOA phase-shift unitary does not contain the <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> <a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a>. As such, the observables are independently computed via the <code class="docutils literal notranslate"><span class="pre">max_qualities</span></code> function, which sums the output of <code class="docutils literal notranslate"><span class="pre">maxcut_terms</span></code> returning the solution qualities as defined in <a class="reference internal" href="#equation-maxcut-cost">(1)</a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">maxcut_qualities</span><span class="p">(</span><span class="n">G</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">maxcut_terms</span><span class="p">(</span><span class="n">G</span><span class="p">),</span> <span class="n">axis</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The phase-shift unitary <code class="docutils literal notranslate"><span class="pre">UQ</span></code> is implemented via an instance of the <code class="docutils literal notranslate"><span class="pre">diagonal</span></code> <a class="reference internal" href="quop_mpi.html#quop_mpi.propagator.diagonal.unitary" title="quop_mpi.propagator.diagonal.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">unitary</span></code></a> class. The <code class="docutils literal notranslate"><span class="pre">unitary_n_params</span></code> specifies the number of <a class="reference internal" href="glossary.html#term-unitary-parameter"><span class="xref std std-term">unitary parameters</span></a> associated with the unitary.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">UQ</span> <span class="o">=</span> <span class="n">diagonal</span><span class="o">.</span><span class="n">unitary</span><span class="p">(</span>
+    <span class="n">diagonal</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span>
+    <span class="n">operator_dict</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">maxcut_terms</span><span class="p">,</span> <span class="n">G</span><span class="p">]},</span>
+    <span class="n">unitary_n_params</span><span class="o">=</span><span class="n">n_edges</span>
+<span class="p">)</span>
+
+<span class="n">UW</span> <span class="o">=</span> <span class="n">sparse</span><span class="o">.</span><span class="n">unitary</span><span class="p">(</span><span class="n">sparse</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">hypercube</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <a class="reference internal" href="glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a> is specified by passing <code class="docutils literal notranslate"><span class="pre">[UQ,</span> <span class="pre">UW]</span></code> to <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_unitaries()</span></code></a>. Simulation then proceeds with the default <code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span> <span class="pre">`:term:`initial</span> <span class="pre">state</span></code> (an equal superposition).</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span> <span class="o">=</span> <span class="n">Ansatz</span><span class="p">(</span><span class="n">system_size</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_unitaries</span><span class="p">([</span><span class="n">UQ</span><span class="p">,</span> <span class="n">UW</span><span class="p">])</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_observables</span><span class="p">(</span><span class="n">serial</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">maxcut_qualities</span><span class="p">,</span> <span class="n">G</span><span class="p">]})</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_depth</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">execute</span><span class="p">()</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">print_result</span><span class="p">()</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;maxcut_extended&quot;</span><span class="p">,</span> <span class="s2">&quot;depth 2&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<figure class="align-center" id="maxcut-extended-final-state">
+<a class="reference internal image-reference" href="_static/maxcut_extended_qaoa_probabilities.png"><img alt="_static/maxcut_extended_qaoa_probabilities.png" src="_static/maxcut_extended_qaoa_probabilities.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">/home/runner/work/QuOp_MPI/QuOp_MPI/docs/source/examples.rst</span>, line 178)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/maxcut_extended_qaoa_probabilities.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+<figcaption>
+<p><span class="caption-text">Probability distribution of the maxcut problem solution qualities after execution of the Ex-QAOA.</span><a class="headerlink" href="#maxcut-extended-final-state" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+<section id="portfolio-rebalancing">
+<span id="portfolio"></span><h2>Portfolio Rebalancing<a class="headerlink" href="#portfolio-rebalancing" title="Link to this heading"></a></h2>
+<p>To explore the case of constrained optimisation using the <a class="reference internal" href="theoretical_background.html#qwoa"><span class="std std-ref">QWOA</span></a> and the
+<a class="reference internal" href="theoretical_background.html#qaoaz"><span class="std std-ref">QAOAz</span></a> we will consider the problem of portfolio re-balancing. For each
+asset in a portfolio of size <span class="math notranslate nohighlight">\(M\)</span>, an investor must choose one of
+the following positions:</p>
+<ol class="arabic simple">
+<li><p>Short position: buying and selling an asset with the expectation that
+it will drop in value.</p></li>
+<li><p>Long position: buying and holding the asset with the expectation that
+it will rise in value.</p></li>
+<li><p>No position: taking neither the long or short position.</p></li>
+</ol>
+<p>A quantum encoding of the possible solutions uses two qubits per asset.</p>
+<ol class="arabic simple">
+<li><p><span class="math notranslate nohighlight">\({\lvert 01\rangle} \rightarrow \text{short position}\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\({\lvert 10\rangle} \rightarrow \text{long position}\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\({\lvert 00\rangle}\)</span> or
+<span class="math notranslate nohighlight">\({\lvert 11\rangle} \rightarrow \text{no position}\)</span></p></li>
+</ol>
+<p>The discrete mean-variance Markowitz model provides a means of
+evaluating the quality associated with a given combination of positions.
+It can be expressed through minimisation of the cost function,</p>
+<div class="math notranslate nohighlight">
+\[{C(s)} = \omega \sum_{i,j = 1}^{M} \sigma_{ij}Z_iZ_j - (1 - \omega) \sum_{i = 1}^{M} r_iZ_i,\]</div>
+<p>subject to the constraint,</p>
+<div class="math notranslate nohighlight">
+\[{\chi_{\text{asset}}(s)} = \sum_{i = 1}^{M} z_i.\]</div>
+<p>In this formulation, the Pauli-Z gates <span class="math notranslate nohighlight">\(Z_i\)</span> encode a particular
+portfolio where, for each asset, eigenvalue
+<span class="math notranslate nohighlight">\(z_i \in {\left\{1,-1,0\right\}}\)</span> represents a choice of long,
+short or no position. Associated with each asset is the expected return
+<span class="math notranslate nohighlight">\(r_i\)</span> and covariance <span class="math notranslate nohighlight">\(\sigma_{ij}\)</span> between assets <span class="math notranslate nohighlight">\(i\)</span>
+and <span class="math notranslate nohighlight">\(j\)</span>; which are calculated using historical data. The risk
+parameter, <span class="math notranslate nohighlight">\(\omega\)</span>, weights consideration of <span class="math notranslate nohighlight">\(r_i\)</span> and
+<span class="math notranslate nohighlight">\(\sigma_{ij}\)</span> such that as <span class="math notranslate nohighlight">\(\omega \rightarrow 0\)</span> the
+optimal portfolio is one providing maximum returns. In contrast, as
+<span class="math notranslate nohighlight">\(\omega \rightarrow 1\)</span>, the optimal portfolio is the one that
+minimises risk. The constraint <span class="math notranslate nohighlight">\({\chi_{\text{asset}}(s)}\)</span> works to
+maintain the relative net position with respect to a pre-existing
+portfolio <span id="id3">[<a class="reference internal" href="bibliography.html#id60" title="N. Slate, E. Matwiejew, S. Marsh, and J. B. Wang. Quantum walk-based portfolio optimisation. Quantum, 5:513, 2021.">SMMW21</a>]</span>.</p>
+<p>In the following examples, we demonstrate the application of the QWOA
+and QAOAz to a small ‘portfolio’ consisting of four assets taken from
+the ASX 100, under the constraint <span class="math notranslate nohighlight">\({\chi_{\text{asset}}(s)} = 2\)</span>.</p>
+<section id="qaoaz">
+<h3>QAOAz<a class="headerlink" href="#qaoaz" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><em>examples/portfolio_rebalancing/qaoaz_portfolio.py</em></p></li>
+<li><p><em>examples/portfolio_rebalancing/qaoaz_qualities.py</em></p></li>
+</ul>
+<p>A <a class="reference internal" href="theoretical_background.html#qaoaz"><span class="std std-ref">QAOAz</span></a> approach to the portfolio optimisation problem uses two parity
+mixers that act on the short and long qubits, respectively, such that
+the <span class="math notranslate nohighlight">\({\mathcal{S}}\)</span> is partitioned into subgraphs of the same
+<span class="math notranslate nohighlight">\({\chi_{\text{asset}}(s)}\)</span> value. For this example, we are
+considering four assets so the two parity mixers act on separate
+subspaces of <span class="math notranslate nohighlight">\(\mathcal{H}\)</span> as shown below:</p>
+<figure class="align-center" id="qaoaz-subspaces">
+<a class="reference internal image-reference" href="_static/portfolio_parity.png"><img alt="_static/portfolio_parity.png" src="_static/portfolio_parity.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">/home/runner/work/QuOp_MPI/QuOp_MPI/docs/source/examples.rst</span>, line 254)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/portfolio_parity.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+</figure>
+<p>Where <span class="math notranslate nohighlight">\({\lvert l\rangle}\)</span> denotes a ‘long’ qubit,
+<span class="math notranslate nohighlight">\({\lvert s\rangle}\)</span> denotes a ‘short’ qubit, and the numbering
+indicates the global index of each qubit.</p>
+<p>To constrain probability amplitude to <span class="math notranslate nohighlight">\({\mathcal{S}^\prime}\)</span>,
+<span class="math notranslate nohighlight">\({{\lvert\psi_0\rangle}_\text{QAOAz}}\)</span> is prepared as</p>
+<div class="math notranslate nohighlight" id="qaoaz-portfolio-state">
+<span id="equation-qaoaz-portfolio-state"></span><span class="eqno">(2)<a class="headerlink" href="#qaoaz-portfolio-state" title="Link to this equation"></a></span>\[{{\lvert\psi_0\rangle}_\text{QAOAz}} = {\lvert 01\rangle}^{\otimes A}\left( \frac{1}{\sqrt{2}}({\lvert 00\rangle} + {\lvert 11\rangle})^{2N-A} \right),\]</div>
+<p>where <span class="math notranslate nohighlight">\(A\)</span> is the desired value of
+<span class="math notranslate nohighlight">\({\chi_{\text{asset}}(s)}\)</span>. This creates a (non-equal)
+superposition of states across all qubit subgraphs with a net parity of
+<span class="math notranslate nohighlight">\(A\)</span>.</p>
+<p>Here we implement the QAOAz using the <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> base-class, the <a class="reference internal" href="quop_mpi.html#module-quop_mpi.propagator.diagonal" title="quop_mpi.propagator.diagonal"><code class="xref py py-mod docutils literal notranslate"><span class="pre">diagonal</span></code></a> <code class="docutils literal notranslate"><span class="pre">propagator</span></code> module, the <a class="reference internal" href="quop_mpi.html#module-quop_mpi.propagator.sparse" title="quop_mpi.propagator.sparse"><code class="xref py py-mod docutils literal notranslate"><span class="pre">sparse</span></code></a> <code class="docutils literal notranslate"><span class="pre">propagator</span></code> module and the <a class="reference internal" href="quop_mpi.html#module-quop_mpi.state" title="quop_mpi.state"><code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.state</span></code></a> module. The <a class="reference internal" href="quop_mpi.html#quop_mpi.toolkit.string" title="quop_mpi.toolkit.string"><code class="xref py py-meth docutils literal notranslate"><span class="pre">string()</span></code></a>, <a class="reference internal" href="quop_mpi.html#quop_mpi.toolkit.X" title="quop_mpi.toolkit.X"><code class="xref py py-meth docutils literal notranslate"><span class="pre">X()</span></code></a>, <a class="reference internal" href="quop_mpi.html#quop_mpi.toolkit.Y" title="quop_mpi.toolkit.Y"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Y</span></code></a>, <a class="reference internal" href="quop_mpi.html#quop_mpi.toolkit.kron" title="quop_mpi.toolkit.kron"><code class="xref py py-meth docutils literal notranslate"><span class="pre">kron()</span></code></a> and <a class="reference internal" href="quop_mpi.html#quop_mpi.toolkit.kron_power" title="quop_mpi.toolkit.kron_power"><code class="xref py py-meth docutils literal notranslate"><span class="pre">kron_power()</span></code></a> functions from <a class="reference internal" href="quop_mpi.html#module-quop_mpi.toolkit" title="quop_mpi.toolkit"><code class="xref py py-mod docutils literal notranslate"><span class="pre">toolkit</span></code></a> are imported to assist with the definition of functions for the QAOAz parity <a class="reference internal" href="glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a> and <a class="reference internal" href="glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> (see <a class="reference internal" href="#equation-qaoaz-portfolio-state">(2)</a>). The <code class="docutils literal notranslate"><span class="pre">qaoaz_portfolio</span></code> function imported from <code class="docutils literal notranslate"><span class="pre">qaoaz_qualities</span></code> (<em>examples/portfolio_rebalancing/qaoaz_qualities.py</em>) is an <a class="reference internal" href="quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> that computes the solution qualities based on adjusted close price historical data obtained from Yahoo Finance.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">sqrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ansatz</span><span class="p">,</span> <span class="n">state</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.propagator</span><span class="w"> </span><span class="kn">import</span> <span class="n">diagonal</span><span class="p">,</span> <span class="n">sparse</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.toolkit</span><span class="w"> </span><span class="kn">import</span> <span class="n">kron</span><span class="p">,</span> <span class="n">kron_power</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.toolkit</span><span class="w"> </span><span class="kn">import</span> <span class="n">string</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">Y</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qaoaz_qualities</span><span class="w"> </span><span class="kn">import</span> <span class="n">qaoaz_portfolio</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">parity_ring</span></code>, <code class="docutils literal notranslate"><span class="pre">parity_mixer</span></code> and <code class="docutils literal notranslate"><span class="pre">mixer</span></code> functions generate the <a class="reference internal" href="theoretical_background.html#qaoaz"><span class="std std-ref">QAOAz</span></a> <a class="reference internal" href="glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a> <a class="reference internal" href="glossary.html#term-operator"><span class="xref std std-term">operator</span></a> as a CSR sparse matrix.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">parity_ring</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">):</span>
+    <span class="n">parity</span> <span class="o">=</span> <span class="n">X</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span> <span class="o">@</span> <span class="n">X</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span> <span class="o">+</span> <span class="n">Y</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span> <span class="o">@</span> <span class="n">Y</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parity</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">parity_mixer</span><span class="p">(</span><span class="n">qubits</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">):</span>
+
+    <span class="n">odd</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">even</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">n_subset</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">qubits</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_subset</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">odd</span> <span class="o">+=</span> <span class="n">parity_ring</span><span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">qubits</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n_subset</span><span class="p">],</span> <span class="n">n_qubits</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">even</span> <span class="o">+=</span> <span class="n">parity_ring</span><span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">qubits</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n_subset</span><span class="p">],</span> <span class="n">n_qubits</span><span class="p">)</span>
+
+    <span class="n">mixer</span> <span class="o">=</span> <span class="p">[</span><span class="n">odd</span><span class="p">,</span> <span class="n">even</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">qubits</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">last</span> <span class="o">=</span> <span class="n">parity_ring</span><span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">qubits</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">n_qubits</span><span class="p">)</span>
+        <span class="n">mixer</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">last</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">mixer</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">mixer</span><span class="p">(</span><span class="n">n_qubits</span><span class="p">):</span>
+    <span class="n">short_qubits</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
+    <span class="n">long_qubits</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">,</span> <span class="mi">2</span><span class="p">)]</span>
+    <span class="n">short_mixer</span> <span class="o">=</span> <span class="n">parity_mixer</span><span class="p">(</span><span class="n">short_qubits</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span>
+    <span class="n">long_mixer</span> <span class="o">=</span> <span class="n">parity_mixer</span><span class="p">(</span><span class="n">long_qubits</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">short_mixer</span> <span class="o">+</span> <span class="n">long_mixer</span>
+</pre></div>
+</div>
+<p>Next, the <code class="docutils literal notranslate"><span class="pre">parity_state</span></code> function implements <a class="reference internal" href="#equation-qaoaz-portfolio-state">(2)</a>,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">parity_state</span><span class="p">(</span><span class="n">n_qubits</span><span class="p">,</span> <span class="n">D</span><span class="p">):</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">n_qubits</span> <span class="o">//</span> <span class="mi">2</span>
+    <span class="n">term_1</span> <span class="o">=</span> <span class="n">kron_power</span><span class="p">(</span><span class="n">string</span><span class="p">(</span><span class="s2">&quot;01&quot;</span><span class="p">),</span> <span class="n">D</span><span class="p">)</span>
+    <span class="n">term_2</span> <span class="o">=</span> <span class="n">kron_power</span><span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">string</span><span class="p">(</span><span class="s2">&quot;11&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">string</span><span class="p">(</span><span class="s2">&quot;00&quot;</span><span class="p">)),</span> <span class="n">M</span> <span class="o">-</span> <span class="n">D</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">kron</span><span class="p">([</span><span class="n">term_1</span><span class="p">,</span> <span class="n">term_2</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>and the <a class="reference internal" href="glossary.html#term-system-size"><span class="xref std std-term">system size</span></a> is calculated from the number of qubits required to represent 4 assets.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">n_qubits</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">system_size</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="n">n_qubits</span>
+</pre></div>
+</div>
+<p>The <a class="reference internal" href="glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift</span></a> and <a class="reference internal" href="glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing</span></a> unitaries are defined via instances of the <a class="reference internal" href="quop_mpi.html#module-quop_mpi.propagator.diagonal" title="quop_mpi.propagator.diagonal"><code class="xref py py-mod docutils literal notranslate"><span class="pre">diagonal</span></code></a> and <a class="reference internal" href="quop_mpi.html#module-quop_mpi.propagator.sparse" title="quop_mpi.propagator.sparse"><code class="xref py py-mod docutils literal notranslate"><span class="pre">sparse</span></code></a> <code class="docutils literal notranslate"><span class="pre">unitary</span></code> classes.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">UQ</span> <span class="o">=</span> <span class="n">diagonal</span><span class="o">.</span><span class="n">unitary</span><span class="p">(</span><span class="n">diagonal</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">observables</span><span class="p">)</span>
+
+<span class="n">UW</span> <span class="o">=</span> <span class="n">sparse</span><span class="o">.</span><span class="n">unitary</span><span class="p">(</span>
+    <span class="n">sparse</span><span class="o">.</span><span class="n">operator</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span>
+    <span class="n">operator_dict</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">mixer</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">]}</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The <a class="reference internal" href="glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a> is defined by passing <code class="docutils literal notranslate"><span class="pre">[UQ,</span> <span class="pre">UW]</span></code> to <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_unitaries()</span></code></a> and the <a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a> defined by passing the index of <code class="docutils literal notranslate"><span class="pre">UQ</span></code> to <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_observables()</span></code></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span> <span class="o">=</span> <span class="n">Ansatz</span><span class="p">(</span><span class="n">system_size</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_unitaries</span><span class="p">([</span><span class="n">UQ</span><span class="p">,</span> <span class="n">UW</span><span class="p">])</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_observables</span><span class="p">(</span><span class="n">qaoaz_portfolio</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_initial_state</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">parity_state</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">,</span> <span class="mi">2</span><span class="p">]})</span>
+</pre></div>
+</div>
+<p>To assist with the analysis of <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> performance, QuOp supports the recording of important simulation metrics in a log file. The <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.set_log" title="quop_mpi.Ansatz.set_log"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_log()</span></code></a> method specifies the recording of the <a class="reference internal" href="glossary.html#term-system-size"><span class="xref std std-term">system size</span></a>, <a class="reference internal" href="glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depth</span></a>, optimised <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value, norm of the <a class="reference internal" href="glossary.html#term-final-state"><span class="xref std std-term">final state</span></a>, in-program simulation time, MPI communicator size, number of <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> evaluates and the success status of the classical <a class="reference internal" href="glossary.html#term-optimiser"><span class="xref std std-term">optimiser</span></a> to <code class="docutils literal notranslate"><span class="pre">qaoaz_portfolio.csv</span></code> for each simulation instance.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span><span class="o">.</span><span class="n">set_log</span><span class="p">(</span><span class="s2">&quot;qaoaz_portfolio_log&quot;</span><span class="p">,</span> <span class="s2">&quot;qaoaz&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We are often interested in evaluating the performance of a <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> as a function of the <a class="reference internal" href="glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depth</span></a>. For this, we use <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.benchmark" title="quop_mpi.Ansatz.benchmark"><code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code></a>, which will carry out a sequence of calls to <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.execute" title="quop_mpi.Ansatz.execute"><code class="xref py py-meth docutils literal notranslate"><span class="pre">execute()</span></code></a> over the ansatz depth range of 1 to 5, with 3 repeats per ansatz depth.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span><span class="o">.</span><span class="n">benchmark</span><span class="p">(</span>
+    <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span> <span class="mi">5</span><span class="p">,</span> <span class="n">param_persist</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;qaoaz_portfolio&quot;</span><span class="p">,</span> <span class="n">save_action</span><span class="o">=</span><span class="s2">&quot;w&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="qwoa">
+<h3>QWOA<a class="headerlink" href="#qwoa" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><em>examples/portfolio_rebalancing/qwoa_portfolio.py</em></p></li>
+<li><p><em>examples/portfolio_rebalancing/qwoa_qualities.py</em></p></li>
+</ul>
+<p>Here we address the portfolio optimisation problem using the <a class="reference internal" href="theoretical_background.html#qwoa"><span class="std std-ref">QWOA</span></a>, which carries out a quantum search over the subspace of valid solutions. For this we will use the predefined <a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.combinatorial.qwoa" title="quop_mpi.algorithm.combinatorial.qwoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">qwoa</span></code></a> algorithm and the <a class="reference internal" href="quop_mpi.html#quop_mpi.propagator.diagonal.operator.csv" title="quop_mpi.propagator.diagonal.operator.csv"><code class="xref py py-meth docutils literal notranslate"><span class="pre">csv()</span></code></a> <a class="reference internal" href="quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quop_mpi.algorithm.combinatorial</span><span class="w"> </span><span class="kn">import</span> <span class="n">qwoa</span><span class="p">,</span> <span class="n">csv</span>
+</pre></div>
+</div>
+<p>The <a class="reference internal" href="glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> is set equal to the number of valid solutions (<code class="docutils literal notranslate"><span class="pre">31</span></code>),</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">system_size</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">alg</span> <span class="o">=</span> <span class="n">qwoa</span><span class="p">(</span><span class="n">system_size</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>and the <a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a> and <a class="reference internal" href="glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> matrix <a class="reference internal" href="glossary.html#term-operator"><span class="xref std std-term">operator</span></a> specified by <a class="reference internal" href="quop_mpi.html#quop_mpi.algorithm.combinatorial.qaoa.set_qualities" title="quop_mpi.algorithm.combinatorial.qaoa.set_qualities"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_qualities()</span></code></a>. The <code class="docutils literal notranslate"><span class="pre">'args'</span></code> and <code class="docutils literal notranslate"><span class="pre">'kwargs'</span></code> items in the corresponding <a class="reference internal" href="quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> are passed to the pandas <cite>read_csv</cite> function. The solution quality values are retrieved from <code class="docutils literal notranslate"><span class="pre">qwoa_qualities.csv</span></code>, which have been precomputed using <em>examples/portfolio_rebalancing/qwoa_qualities.py</em>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span><span class="o">.</span><span class="n">set_qualities</span><span class="p">(</span>
+    <span class="n">csv</span><span class="p">,</span> 
+    <span class="p">{</span>
+        <span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;qwoa_qualities.csv&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;usecols&#39;</span><span class="p">:[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;header&#39;</span><span class="p">:</span><span class="kc">None</span><span class="p">}</span>
+    <span class="p">}</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>Finally, the logging of simulation data is specified and the algorithm simulated from <a class="reference internal" href="glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depths</span></a> 1 to 6 with 3 repeats per ansatz depth using <a class="reference internal" href="quop_mpi.html#quop_mpi.Ansatz.benchmark" title="quop_mpi.Ansatz.benchmark"><code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span><span class="o">.</span><span class="n">set_log</span><span class="p">(</span><span class="s2">&quot;qwoa_portfolio_log&quot;</span><span class="p">,</span> <span class="s2">&quot;qwoa&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">benchmark</span><span class="p">(</span>
+    <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span>
+    <span class="mi">5</span><span class="p">,</span>
+    <span class="n">param_persist</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;qwoa_portfolio&quot;</span><span class="p">,</span>
+    <span class="n">save_action</span><span class="o">=</span><span class="s2">&quot;w&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<figure class="align-center" id="qaoaz-vs-qwoa">
+<a class="reference internal image-reference" href="_static/portfolio_rebalancing.png"><img alt="_static/portfolio_rebalancing.png" src="_static/portfolio_rebalancing.png" />
+<aside class="system-message">
+<p class="system-message-title">System Message: WARNING/2 (<span class="docutils literal">/home/runner/work/QuOp_MPI/QuOp_MPI/docs/source/examples.rst</span>, line 343)</p>
+<p>Cannot scale image!
+  Could not get size from &quot;_static/portfolio_rebalancing.png&quot;:
+  Requires Python Imaging Library.</p>
+</aside>
+</a>
+<figcaption>
+<p><span class="caption-text">Final objective function value achieved by the QAOAz and the QWOA for a portfolio optimisation problem with 4 assets from ansatz depths 1 to 5. each point depicts the average of three repeats.</span><a class="headerlink" href="#qaoaz-vs-qwoa" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="package_overview.html" class="btn btn-neutral float-left" title="Package Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="quop_mpi.html" class="btn btn-neutral float-right" title="quop_mpi" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
