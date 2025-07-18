@@ -154,7 +154,7 @@ if (CMAKE_BUILD_TYPE STREQUAL DEBUG)
 	set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ggdb -O0 -Wall -fbounds-check")
 elseif(CMAKE_BUILD_TYPE STREQUAL RELEASE)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-	set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native")
+	set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native -fopenmp")
 endif()
 
 add_subdirectory(src)
