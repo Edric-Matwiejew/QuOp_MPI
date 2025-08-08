@@ -227,6 +227,9 @@ class Ansatz:
         self.observable_function = None
         self.variational_parameters = None
         self.initial_state_dict = None
+        self.objective_dict = None
+
+        self.objective_function = None
 
         # can be set using methods in the system class
         # but default values are used if not set
@@ -445,6 +448,10 @@ class Ansatz:
         if self.setup_initial_state:
             self.__gen_initial_state()
             self.setup_initial_state = False
+
+        if self.setup_objective:
+            self.__gen_objective()
+            self.setup_objective = False
 
         if self.setup_optimiser:
             self.__gen_optimiser()
@@ -937,6 +944,22 @@ class Ansatz:
 
         if self.subcomms.get_subcomm_index() == 0:
             return self.__get_expectation_value()
+
+    def set_objective(self, function: Callable, objective_dict: dict = None):
+        self.__parse_function_dict__(objective_dict, "objective_dict")
+        self.objective_function = function
+        self.setup_objective = True
+
+    def __parse_objective(self):
+        self.objective_function = interface(
+            [self,self.unitaries],
+            self.objective_function,
+            "objective",
+            self.subcomms.SUBCOMM,
+        )
+
+    def __gen_objective(self):
+        self.__parse_objective()
 
     def objective(self, variational_parameters: Union[list[float], np.ndarray[float]]) -> float:
         """Compute the :term:`objective function` at :term:`variational parameters` 
@@ -2018,7 +2041,15 @@ class Ansatz:
 
             self.__evolve_state(self.variational_parameters)
 
-            self.expectation = self.get_expectation_value()
+            if self.objective_function != None:
+                self.__get_local_probabilities()
+                self.objective_function.update_parameters()
+                self.expectation = self.objective_function.call(
+                    *self.objective_dict['args'],
+                    **self.objective_dict['kwargs']
+                )
+            else:
+                self.expectation = self.get_expectation_value()
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
 
