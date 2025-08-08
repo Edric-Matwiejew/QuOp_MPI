@@ -19,6 +19,12 @@ import inspect
 from .__utils.comm_size import vector_partitioning, max_compatible_size
 from .__lib.context import context
 
+##########################################
+# Collect profiling data if QUOP_PROFILE=1
+##########################################
+
+from .__profile import profiler
+
 ####################################
 # imports and classes for type hints
 ####################################
@@ -28,31 +34,6 @@ from typing import Callable, Union, Iterable
 
 Intracomm = MPI.Intracomm
 iterable = Iterable
-
-########################################
-# Functions and decorating for debugging
-########################################
-
-
-def print_method(func):
-    def decorator(*args, **kwargs):
-        with open(f"trace_{MPI.COMM_WORLD.Get_rank()}.txt", "a") as f:
-            f.write(f"{MPI.COMM_WORLD.Get_rank()}, {func.__name__}\n")
-            f.flush()
-        return func(*args, **kwargs)
-
-    return decorator
-
-
-def MPI_trace(cls):
-    for name, method in inspect.getmembers(cls):
-        if (
-            not inspect.ismethod(method) and not inspect.isfunction(method)
-        ) or inspect.isbuiltin(method):
-            continue
-        setattr(cls, name, print_method(method))
-    return cls
-
 
 ################################################################
 # Numerical Approximations of the objective function derivatives

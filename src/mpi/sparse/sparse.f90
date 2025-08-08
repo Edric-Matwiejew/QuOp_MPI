@@ -1677,133 +1677,101 @@ module Sparse
     !> @warning *spmv_series* requires that the *col_index* and *value* arrays of the CSR
     !> data type are stored in accending column order for each row subsection.
 
-    subroutine SpMV_Series( A, &
-                            u_local, &
-                            partition_table, &
-                            start_it, &
-                            current_it, &
-                            max_it, &
-                            rank, &
-                            v_local, &
-                            mpi_communicator)
+    subroutine SpMV_Series(A, &
+                           u_local, &
+                           partition_table, &
+                           start_it, &
+                           current_it, &
+                           max_it, &
+                           rank, &
+                           v_local, &
+                           mpi_communicator) 
 
-        type(CSR), intent(in) :: A !< @param Local CSR array partition.
-        complex(dp), dimension(:), intent(inout) :: u_local !< @param Local input vector partition.
-        integer, dimension(:), intent(in) :: partition_table !< @param MPI communicator partition scheme.
-        integer, intent(in) :: start_it !< @param starting multiplication index.
-        integer, intent(in) :: current_it !< @param Current multiplication index
-        integer, intent(in) :: max_it !< @param Final multiplication index.
-        integer, intent(in) :: rank
-        integer, intent(in) :: mpi_communicator !< @param MPI communicator handel.
-        complex(dp), dimension(partition_table(rank + 1):partition_table(rank + 2) - 1), &
-            intent(inout) :: v_local !< @param Local output vector partition.
-
-        complex(dp), dimension(:), allocatable, save :: u_resize
-        complex(dp), dimension(:), allocatable, save :: send_values
-        complex(dp), dimension(:), allocatable, save :: rec_values
-
-        integer :: lb, ub, lb_resize, ub_resize
-        integer :: num_send, num_rec
-
-        integer :: i, j
-
-        ! MPI environment
-        integer :: ierr
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2) - 1
-
-        num_rec = sum(A%num_rec_inds)
-        num_send = sum(A%num_send_inds)
-
-        lb_resize = ub + 1
-        ub_resize = ub + num_rec
-
-        if ((start_it == current_it) .and. allocated(u_resize)) then
-            deallocate(u_resize)
-            deallocate(rec_values)
-            deallocate(send_values)
-        endif
-
-        if (.not. allocated(u_resize)) then
-            !comm = 0
-            !calc = 0
-            allocate(u_resize(lb:ub_resize))
-            allocate(rec_values(num_rec))
-            allocate(send_values(num_send))
-        endif
-
-        !Calling with start_it = 0 and max_it = 0 clears the saved arrays if need.
-        if ((start_it == 0) .and. (max_it == 0)) then
-            if (allocated(u_resize)) then
-                deallocate(u_resize)
-                deallocate(rec_values)
-                deallocate(send_values)
-            endif
-            return
-        endif
-
-        u_resize(lb:ub) = u_local
-
-        !$omp parallel do
+       type(CSR), intent(in) :: A
+       complex(dp), intent(inout) :: u_local(:)
+       integer,     intent(in)    :: partition_table(:)
+       integer,     intent(in)    :: start_it, current_it, max_it, rank
+       integer,     intent(in)    :: mpi_communicator
+       complex(dp), intent(inout) :: v_local( partition_table(rank+1): &
+                                              partition_table(rank+2)-1 )
+    
+       complex(dp), allocatable, save :: u_resize(:)
+       complex(dp), allocatable, save :: send_values(:), rec_values(:)
+       integer,            save :: req = MPI_REQUEST_NULL
+       logical,            save :: first_call = .true.
+    
+       integer :: lb, ub, lb_resize, ub_resize
+       integer :: num_send, num_rec
+       integer :: i, j, ierr
+    
+       if (start_it == 0 .and. max_it == 0) then
+          if (allocated(u_resize)) then
+             deallocate(u_resize, send_values, rec_values)
+             first_call = .true.
+          end if
+          return
+       end if
+    
+       lb = partition_table(rank+1)
+       ub = partition_table(rank+2)-1
+    
+       num_rec  = sum(A%num_rec_inds)
+       num_send = sum(A%num_send_inds)
+    
+       lb_resize = ub + 1
+       ub_resize = ub + num_rec
+    
+       if ( first_call .or. .not.allocated(u_resize) .or. size(u_resize) /= ub_resize-lb+1 ) then
+          if (allocated(u_resize)) deallocate(u_resize, send_values, rec_values)
+          allocate(u_resize(lb:ub_resize), send_values(num_send), rec_values(num_rec))
+          first_call = .false.
+       end if
+    
+       u_resize(lb:ub) = u_local
+    
+       !$omp parallel do default(shared) schedule(static)
         do i = 1, num_send
-            send_values(i) = u_resize(A%RHS_send_inds(i))
-        enddo
-        !$omp end parallel do
-
-        call MPI_alltoallv( send_values, &
-                            A%num_send_inds, &
-                            A%send_disps, &
-                            MPI_double_complex, &
-                            rec_values, &
-                            A%num_rec_inds, &
-                            A%rec_disps, &
-                            MPI_double_complex, &
-                            MPI_communicator, &
-                            ierr)
-
-        u_resize(lb_resize:ub_resize) = rec_values
-
-        v_local = 0
-
-
-        ! !$omp parallel do
-        ! do i = lb, ub
-        !     do j = A%row_starts(i), A%row_starts(i + 1) - 1
-
-        !         v_local(i) = A%values(j)*u_resize(A%local_col_inds(j)) &
-        !             + v_local(i)
-
-        !     enddo
-        ! enddo
-        ! !$omp end parallel do
-
-        call SpMV_kernel(A, lb, ub, u_resize, v_local)
-
-        if (current_it == max_it) then
-            deallocate(u_resize)
-            deallocate(rec_values)
-            deallocate(send_values)
-        endif
-
+             send_values(i) = u_resize( A%RHS_send_inds(i) )
+        end do
+       !$omp end parallel do
+    
+       call MPI_Ialltoallv( send_values, A%num_send_inds, A%send_disps, MPI_DOUBLE_COMPLEX, &
+                            rec_values,  A%num_rec_inds,  A%rec_disps,  MPI_DOUBLE_COMPLEX, &
+                            mpi_communicator, req, ierr )
+    
+       v_local = (0.0_dp, 0.0_dp)
+    
+       ! local contribution while waiting for remote
+       !$omp parallel do default(shared) private(j) schedule(static)
+          do i = lb, ub
+             do j = A%row_starts(i), A%row_starts(i+1)-1
+                if (A%local_col_inds(j) <= ub) then
+                   v_local(i) = v_local(i) + A%values(j) * u_resize( A%local_col_inds(j) )
+                end if
+             end do
+          end do
+       !$omp end parallel do
+    
+       call MPI_Wait( req, MPI_STATUS_IGNORE, ierr )
+    
+       if (num_rec > 0) u_resize(lb_resize:ub_resize) = rec_values
+    
+       ! remote contribution
+       !$omp parallel do default(shared) private(j) schedule(static)
+          do i = lb, ub
+             do j = A%row_starts(i), A%row_starts(i+1)-1
+                if (A%local_col_inds(j) > ub) then
+                   v_local(i) = v_local(i) + A%values(j) * u_resize( A%local_col_inds(j) )
+                end if
+             end do
+          end do
+       !$omp end parallel do
+    
+       if (current_it == max_it) then
+          deallocate(u_resize, send_values, rec_values)
+          first_call = .true.
+       end if
     end subroutine SpMV_Series
-
-    subroutine SpMV_kernel(A, lb, ub, u, v)
-        type(CSR), intent(in) :: A
-        integer, intent(in) :: lb, ub
-        complex(dp), dimension(lb:), intent(in) :: u
-        complex(dp), dimension(lb:), intent(inout) :: v
-
-        integer :: i, j
-
-        do i = lb, ub
-            do j = A%row_starts(i), A%row_starts(i + 1) - 1
-                v(i) = A%values(j)*u(A%local_col_inds(j)) + v(i)
-            enddo
-        enddo
-
-
-    end subroutine SpMV_kernel
 
     !> @brief Sort the rows of a distributed CSR matrix.
 
