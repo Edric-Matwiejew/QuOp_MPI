@@ -262,3 +262,23 @@ QuOp Functions
 
                 return variational_parameters
         
+    Objective Function
+        Called after state-evolution during parameter optimisation. Returns a
+        scalar value for minimisation.
+        Passed to `quop_mpi.Ansatz.set_objective`.
+
+        **Typical Structure**
+
+        .. code-block:: python
+
+            def objective_function(
+               local_probabilities: nd.array[np.float64],
+               observables: nd.array[np.float64],
+               MPI_COMM: MPI.Intracomm,
+               *args,
+               **kwargs
+            ) -> float:
+
+                ...
+
+                return objective_function_value

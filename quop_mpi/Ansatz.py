@@ -928,6 +928,20 @@ class Ansatz:
             return self.__get_expectation_value()
 
     def set_objective(self, function: Callable, objective_dict: dict = None):
+        """Set a custom objective function (i.e. an objective function other
+        than the expectation value of the prepared state).
+
+        The function is called after state evolution - returning a scalar
+        value that is passed to the minimizer. 
+
+        Parameters
+        ----------
+        function: callable
+            an :term:`Objective Function` 
+
+        objective_dict: FunctionDict, optional
+            :term:`FunctionDict` for the `Objective Function`
+        """
         self.__parse_function_dict__(objective_dict, "objective_dict")
         self.objective_function = function
         self.setup_objective = True
