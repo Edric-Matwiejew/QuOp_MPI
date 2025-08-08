@@ -265,6 +265,7 @@ class Ansatz:
         self.setup_initial_state = True
         self.setup_log = False
         self.setup_optimiser = True
+        self.setup_objective = False
 
         self.time_limit = None
         self.suspend_path = None
