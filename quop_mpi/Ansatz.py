@@ -1207,8 +1207,8 @@ class Ansatz:
                     ["fun", "nfev", "success"],
                 )
 
-            if self.jacobian_input is not None:
-
+            if self.jacobian_input is not None and self.subcomms.get_n_subcomms() > 1:
+                # Only use parallel jacobian if we actually have multiple subcomms
                 if self.jacobian_input[0] == "forward":
                     self.jacobian_input = [forward_differences]
                 elif self.jacobian_input[0] == "central":
@@ -1217,6 +1217,15 @@ class Ansatz:
                 self.__parse_jacobian()
 
                 self.optimiser_args["jac"] = self.__mpi_jacobian
+            elif self.jacobian_input is not None:
+                # User requested parallel jacobian but only 1 subcomm was created
+                import warnings
+                warnings.warn(
+                    f"Parallel jacobian requested but only 1 subcommunicator could be created "
+                    f"(requested maxcomm={self.maxcomm}). Falling back to scipy's default "
+                    f"finite difference jacobian.",
+                    RuntimeWarning
+                )
 
 
     def __assign_backend(self):
@@ -2169,6 +2178,10 @@ class Ansatz:
             returns the objective function gradient to rank 0 in
             :meth:`~quop_mpi.Ansatz.MPI.COMM_WORLD`, None otherwise
         """
+        # Guard: if JACCOMM is None, fall back to scipy's default jacobian
+        if self.subcomms.JACCOMM is None:
+            return None
+
         self.subcomms.JACCOMM.barrier()
         self.stop = self.subcomms.JACCOMM.bcast(self.stop, 0)
 

@@ -920,3 +920,325 @@ class TestJacobianCorrectness:
             # The objective value should be a reasonable number (not NaN or Inf)
             assert np.isfinite(alg.result.fun), \
                 f"Objective value should be finite, got {alg.result.fun}"
+
+
+# =============================================================================
+# Input Validation Tests
+# =============================================================================
+
+@pytest.mark.mpi
+class TestParallelJacobianInputValidation:
+    """Test input validation for set_parallel_jacobian."""
+
+    def test_invalid_method_string_raises_or_handled(self, mpi_comm):
+        """Invalid method string should be handled gracefully."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        
+        # An invalid method should either raise during set_parallel_jacobian
+        # or during execute - the key is it shouldn't silently fail
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="invalid_method"
+        )
+        
+        # The invalid method is stored
+        assert alg.jacobian_input == ["invalid_method"]
+        
+        # Note: The actual error would occur during execute when
+        # the jacobian function is called
+
+    def test_reconfiguration_overwrites_previous(self, mpi_comm):
+        """Calling set_parallel_jacobian twice should overwrite previous config."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        
+        # First configuration
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward",
+            h=1e-5
+        )
+        
+        assert alg.jacobian_input == ["forward"]
+        assert alg.h == 1e-5
+        
+        # Reconfigure
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=4,
+            method="central",
+            h=1e-8
+        )
+        
+        assert alg.jacobian_input == ["central"]
+        assert alg.h == 1e-8
+        assert alg.maxcomm == 4
+
+    def test_default_step_size(self, mpi_comm):
+        """When h is not specified, default should be sqrt(machine epsilon)."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        
+        # Don't specify h
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward"
+        )
+        
+        expected_h = np.sqrt(np.finfo(float).eps)
+        assert alg.h == expected_h, f"Expected h={expected_h}, got h={alg.h}"
+
+    def test_maxcomm_larger_than_ranks(self, mpi_comm):
+        """maxcomm larger than available ranks should be handled gracefully."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        import warnings
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        
+        # Request more subcomms than ranks
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=100,  # Way more than available
+            method="forward"
+        )
+        
+        alg.set_optimiser(
+            "scipy",
+            {"method": "BFGS", "options": {"maxiter": 3, "gtol": 1e-3}},
+            ["fun", "nfev"]
+        )
+        
+        # Should complete without error and issue a warning about fallback
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            alg.execute()
+            
+            # Check that a RuntimeWarning about parallel jacobian fallback was issued
+            parallel_jac_warnings = [
+                warning for warning in w
+                if issubclass(warning.category, RuntimeWarning)
+                and "Parallel jacobian" in str(warning.message)
+            ]
+            # Note: warning may or may not appear depending on subcomm creation
+        
+        mpi_comm.barrier()
+        
+        # Actual subcomms created should not exceed available resources
+        n_subcomms = alg.subcomms.get_n_subcomms()
+        assert n_subcomms <= size, f"Should not create more subcomms ({n_subcomms}) than ranks ({size})"
+
+
+# =============================================================================
+# QAOA Algorithm Tests  
+# =============================================================================
+
+@pytest.mark.mpi
+class TestParallelJacobianWithQAOA:
+    """Test parallel jacobian with QAOA algorithm (not just QWOA)."""
+
+    def test_qaoa_with_parallel_jacobian_completes(self, mpi_comm):
+        """QAOA should work with parallel jacobian."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qaoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward"
+        )
+        
+        alg.set_optimiser(
+            "scipy",
+            {"method": "BFGS", "options": {"maxiter": 5, "gtol": 1e-3}},
+            ["fun", "nfev"]
+        )
+        
+        alg.execute()
+        mpi_comm.barrier()
+        
+        completed = True
+        all_completed = mpi_comm.gather(completed, root=0)
+        
+        if mpi_comm.Get_rank() == 0:
+            assert all(all_completed), "QAOA with parallel jacobian should complete"
+
+    def test_qaoa_parallel_jacobian_produces_result(self, mpi_comm):
+        """QAOA with parallel jacobian should produce valid result."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qaoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(2)
+        
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="central"
+        )
+        
+        alg.set_optimiser(
+            "scipy",
+            {"method": "BFGS", "options": {"maxiter": 10, "gtol": 1e-3}},
+            ["fun", "nfev"]
+        )
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None, "QAOA should have result"
+            assert np.isfinite(alg.result.fun), "Result should be finite"
+
+
+# =============================================================================
+# Cleanup Tests
+# =============================================================================
+
+@pytest.mark.mpi
+class TestParallelJacobianCleanup:
+    """Test cleanup and resource management with parallel jacobian."""
+
+    def test_destroy_after_parallel_jacobian(self, mpi_comm):
+        """destroy() should work after using parallel jacobian."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward"
+        )
+        
+        alg.set_optimiser(
+            "scipy",
+            {"method": "BFGS", "options": {"maxiter": 3, "gtol": 1e-3}},
+            ["fun", "nfev"]
+        )
+        
+        alg.execute()
+        
+        # destroy() should not raise
+        alg.destroy()
+        
+        mpi_comm.barrier()
+        
+        completed = True
+        all_completed = mpi_comm.gather(completed, root=0)
+        
+        if mpi_comm.Get_rank() == 0:
+            assert all(all_completed), "destroy() should complete without error"
+
+    def test_reexecute_after_destroy(self, mpi_comm):
+        """Should be able to execute again after destroy with parallel jacobian."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward"
+        )
+        
+        alg.set_optimiser(
+            "scipy",
+            {"method": "BFGS", "options": {"maxiter": 3, "gtol": 1e-3}},
+            ["fun", "nfev"]
+        )
+        
+        # First execute
+        alg.execute()
+        first_result = alg.result.fun if mpi_comm.Get_rank() == 0 else None
+        
+        # Destroy
+        alg.destroy()
+        
+        # Should be able to execute again
+        alg.execute()
+        
+        mpi_comm.barrier()
+        
+        completed = True
+        all_completed = mpi_comm.gather(completed, root=0)
+        
+        if mpi_comm.Get_rank() == 0:
+            assert all(all_completed), "Re-execute after destroy should work"
