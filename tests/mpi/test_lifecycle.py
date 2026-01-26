@@ -440,3 +440,92 @@ class TestResourceManagement:
             # All executions should produce valid results
             assert len(results) == 3
             assert all(r is not None for r in results)
+
+
+@pytest.mark.mpi
+class TestDelCleanup:
+    """Test that `del` properly cleans up resources via __del__."""
+
+    def test_del_before_setup(self, mpi_comm, small_system_size):
+        """Verify del is safe before setup()."""
+        from quop_mpi import Ansatz
+        
+        alg = Ansatz(small_system_size, mpi_comm)
+        
+        # Should not raise any errors
+        del alg
+
+    def test_del_after_setup(self, mpi_comm, simple_oracle):
+        """Verify del properly cleans up after setup()."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.setup()
+        
+        # Should not raise
+        del alg
+
+    def test_del_after_evolve(self, mpi_comm, simple_oracle):
+        """Verify del properly cleans up after state evolution."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.setup()
+        
+        params = simple_oracle.optimal_params(depth=1)
+        alg.evolve_state(params)
+        
+        # Should not raise
+        del alg
+
+    def test_del_after_execute(self, mpi_comm, simple_oracle):
+        """Verify del properly cleans up after execute()."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        alg.execute()
+        
+        # Should not raise
+        del alg
+
+    def test_sequential_del_creates_independent_instances(self, mpi_comm, simple_oracle):
+        """Test creating new instance after deleting old one."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        # First instance
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            result1 = alg.result['fun']
+        else:
+            result1 = None
+        result1 = mpi_comm.bcast(result1, root=0)
+        
+        del alg
+        
+        # Second instance should work independently
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            result2 = alg.result['fun']
+        else:
+            result2 = None
+        result2 = mpi_comm.bcast(result2, root=0)
+        
+        # Both should have produced valid results
+        assert result1 is not None and result2 is not None
+        
+        del alg

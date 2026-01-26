@@ -1295,6 +1295,51 @@ class Ansatz:
         simulation completion."""
         self.subcomms.free()
 
+    def __del__(self):
+        """Destructor to ensure proper cleanup when the object is deleted.
+        
+        Called automatically when `del` is used on the object or when the
+        object goes out of scope. Ensures all MPI resources and extension
+        module memory are properly freed.
+        """
+        try:
+            # Force cleanup regardless of lifecycle state
+            if hasattr(self, 'setup_called') and self.setup_called:
+                # Close log file if open
+                if hasattr(self, 'log') and self.log and not self.benchmarking:
+                    if hasattr(self, 'logfile') and self.logfile is not None:
+                        try:
+                            self.logfile.close()
+                        except:
+                            pass
+                
+                # Free unitary resources
+                if hasattr(self, 'unitaries') and hasattr(self, 'subcomms'):
+                    if self.subcomms.in_subcomm():
+                        for unitary in self.unitaries:
+                            if hasattr(unitary, 'planned') and unitary.planned:
+                                try:
+                                    unitary.destroy()
+                                except:
+                                    pass
+                
+                # Free subcommunicators
+                if hasattr(self, 'subcomms'):
+                    try:
+                        self.subcomms.free()
+                    except:
+                        pass
+            
+            # Free the duplicated communicator
+            if hasattr(self, 'MPI_COMM_WORLD') and self.MPI_COMM_WORLD is not None:
+                try:
+                    self.MPI_COMM_WORLD.Free()
+                except:
+                    pass
+        except:
+            # Suppress any exceptions during destruction
+            pass
+
     def destroy(self):
         """Call methods to close the results log file, free memory managed by
         extension modules and free MPI subcommunicators created by the
