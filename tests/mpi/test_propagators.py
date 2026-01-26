@@ -504,3 +504,255 @@ class TestStateEvolutionCorrectness:
             assert diff > 1e-6, "Different parameters should produce different states"
         
         del alg
+
+
+# =============================================================================
+# Tests for Momentum Propagator (used by QOWE)
+# =============================================================================
+
+@pytest.mark.mpi
+class TestMomentumPropagator:
+    """Tests for the momentum (FFT-based kinetic) propagator used by QOWE."""
+
+    def test_momentum_propagator_plan_returns_valid_partition(self, mpi_comm):
+        """Test that momentum propagator plan() returns valid partitioning."""
+        from quop_mpi.propagator.momentum import unitary
+        from quop_mpi.propagator.momentum import operator
+        from quop_mpi.algorithm.multivariable import setup_cartesian
+        
+        Ns = [4, 4]  # 16 total grid points
+        bounds = [[-1.0, 1.0], [-1.0, 1.0]]
+        deltas, mins = setup_cartesian([2, 2], bounds)  # 2^2 = 4 in each dim
+        
+        # Compute momentum-space parameters
+        deltask = np.array([2*np.pi/(n*d) for n, d in zip(Ns, deltas)])
+        minsk = np.array([-(n/2)*dk for n, dk in zip(Ns, deltask)])
+        
+        u = unitary(
+            Ns, mins, minsk, deltas, deltask,
+            operator.magnitude_squared
+        )
+        
+        system_size = Ns[0] * Ns[1]
+        local_i, alloc_local = u.plan(system_size, mpi_comm)
+        
+        all_local_i = mpi_comm.allgather(local_i)
+        total = sum(all_local_i)
+        
+        assert total == system_size, f"Sum of local_i ({total}) != system_size ({system_size})"
+        assert local_i >= 0
+        assert alloc_local >= local_i
+
+    def test_momentum_propagator_via_qowe(self, mpi_comm):
+        """Test momentum propagator through QOWE algorithm."""
+        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        
+        def sphere(x):
+            """Sphere function: x is 2D array, return sum of squares per row."""
+            return np.sum(x**2, axis=1)
+        
+        Ns = [2, 2]  # 4x4 = 16 grid points
+        bounds = [[-1.0, 1.0], [-1.0, 1.0]]
+        deltas, mins = setup_cartesian(Ns, bounds)
+        
+        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg.set_qualities(cartesian, {"args": [sphere]})
+        alg.set_depth(1)
+        
+        # Zero params = no evolution, uniform state
+        n_params = alg.total_params * alg.ansatz_depth
+        params = np.zeros(n_params)
+        alg.evolve_state(params)
+        
+        probs = alg.get_probabilities()
+        if mpi_comm.Get_rank() == 0:
+            total_prob = np.sum(probs)
+            assert abs(total_prob - 1.0) < 1e-10
+        
+        del alg
+
+    def test_momentum_propagator_preserves_normalization(self, mpi_comm):
+        """Test that momentum propagation preserves state normalization."""
+        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        
+        def sphere(x):
+            """Sphere function: x is 2D array, return sum of squares per row."""
+            return np.sum(x**2, axis=1)
+        
+        Ns = [2, 2]
+        bounds = [[-2.0, 2.0], [-2.0, 2.0]]
+        deltas, mins = setup_cartesian(Ns, bounds)
+        
+        np.random.seed(42)  # Seed for reproducible position_grid initial state
+        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg.set_qualities(cartesian, {"args": [sphere]})
+        alg.set_depth(2)
+        
+        # Non-zero params for actual evolution
+        rng = np.random.default_rng(123)
+        n_params = alg.total_params * alg.ansatz_depth
+        params = rng.random(n_params) * 0.5
+        alg.evolve_state(params)
+        
+        probs = alg.get_probabilities()
+        if mpi_comm.Get_rank() == 0:
+            total_prob = np.sum(probs)
+            assert abs(total_prob - 1.0) < 1e-10, f"Normalization violated: {total_prob}"
+        
+        del alg
+
+    def test_momentum_propagator_different_times_different_states(self, mpi_comm):
+        """Test that different evolution times produce different states."""
+        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        
+        def quadratic(x):
+            """Quadratic function: x is 2D array with columns [x0, x1]."""
+            return x[:, 0]**2 + 2*x[:, 1]**2
+        
+        Ns = [2, 2]
+        bounds = [[-1.0, 1.0], [-1.0, 1.0]]
+        deltas, mins = setup_cartesian(Ns, bounds)
+        
+        # First evolution with small times
+        np.random.seed(42)
+        alg1 = qowe(Ns, deltas, mins, mpi_comm)
+        alg1.set_qualities(cartesian, {"args": [quadratic]})
+        alg1.set_depth(1)
+        params1 = np.array([0.1, 0.1, 0.1])
+        alg1.evolve_state(params1)
+        state1 = alg1.get_final_state()
+        del alg1
+        
+        # Second evolution with larger times
+        np.random.seed(42)  # Same initial state
+        alg2 = qowe(Ns, deltas, mins, mpi_comm)
+        alg2.set_qualities(cartesian, {"args": [quadratic]})
+        alg2.set_depth(1)
+        params2 = np.array([0.5, 0.5, 0.5])
+        alg2.evolve_state(params2)
+        state2 = alg2.get_final_state()
+        del alg2
+        
+        if mpi_comm.Get_rank() == 0:
+            diff = np.linalg.norm(state1 - state2)
+            assert diff > 1e-6, "Different evolution times should produce different states"
+
+    def test_momentum_propagator_deterministic(self, mpi_comm):
+        """Test that momentum propagation is deterministic."""
+        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        
+        def sphere(x):
+            """Sphere function: x is 2D array, return sum of squares per row."""
+            return np.sum(x**2, axis=1)
+        
+        Ns = [2, 2]
+        bounds = [[-1.0, 1.0], [-1.0, 1.0]]
+        deltas, mins = setup_cartesian(Ns, bounds)
+        
+        params = np.array([0.3, 0.2, 0.1])
+        
+        # First run
+        np.random.seed(42)
+        alg1 = qowe(Ns, deltas, mins, mpi_comm)
+        alg1.set_qualities(cartesian, {"args": [sphere]})
+        alg1.set_depth(1)
+        alg1.evolve_state(params)
+        state1 = alg1.get_final_state()
+        del alg1
+        
+        # Second run with same seed
+        np.random.seed(42)
+        alg2 = qowe(Ns, deltas, mins, mpi_comm)
+        alg2.set_qualities(cartesian, {"args": [sphere]})
+        alg2.set_depth(1)
+        alg2.evolve_state(params)
+        state2 = alg2.get_final_state()
+        del alg2
+        
+        if mpi_comm.Get_rank() == 0:
+            np.testing.assert_allclose(state1, state2, rtol=1e-12)
+
+    def test_momentum_propagator_multi_depth(self, mpi_comm):
+        """Test momentum propagation with multiple ansatz depths."""
+        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        
+        def rosenbrock(x):
+            """Rosenbrock function: x is 2D array with columns [x0, x1]."""
+            return (1 - x[:, 0])**2 + 100*(x[:, 1] - x[:, 0]**2)**2
+        
+        Ns = [2, 2]
+        bounds = [[-2.0, 2.0], [-2.0, 2.0]]
+        deltas, mins = setup_cartesian(Ns, bounds)
+        
+        np.random.seed(42)
+        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg.set_qualities(cartesian, {"args": [rosenbrock]})
+        alg.set_depth(3)  # Three iterations
+        
+        # 3 params per layer * 3 layers = 9 params
+        rng = np.random.default_rng(99)
+        n_params = alg.total_params * alg.ansatz_depth
+        params = rng.random(n_params) * 0.3
+        
+        alg.evolve_state(params)
+        
+        probs = alg.get_probabilities()
+        if mpi_comm.Get_rank() == 0:
+            total_prob = np.sum(probs)
+            assert abs(total_prob - 1.0) < 1e-10
+        
+        del alg
+
+    def test_momentum_propagator_3d_grid(self, mpi_comm):
+        """Test momentum propagator with 3D grid."""
+        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        
+        def sphere_3d(x):
+            """3D sphere function: x is 2D array with columns [x0, x1, x2]."""
+            return np.sum(x**2, axis=1)
+        
+        Ns = [2, 2, 2]  # 4x4x4 = 64 grid points
+        bounds = [[-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0]]
+        deltas, mins = setup_cartesian(Ns, bounds)
+        
+        np.random.seed(42)
+        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg.set_qualities(cartesian, {"args": [sphere_3d]})
+        alg.set_depth(1)
+        
+        # 3D QOWE: 1 gamma + 3 t's = 4 params
+        assert alg.total_params == 4
+        
+        n_params = alg.total_params * alg.ansatz_depth
+        params = np.zeros(n_params)
+        alg.evolve_state(params)
+        
+        probs = alg.get_probabilities()
+        if mpi_comm.Get_rank() == 0:
+            total_prob = np.sum(probs)
+            assert abs(total_prob - 1.0) < 1e-10
+        
+        del alg
+
+    def test_momentum_space_parameters_correct(self, mpi_comm):
+        """Test that momentum-space grid parameters are correctly computed."""
+        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian
+        
+        Ns = [2, 2]  # 4x4 grid
+        bounds = [[-1.0, 1.0], [-1.0, 1.0]]
+        deltas, mins = setup_cartesian(Ns, bounds)
+        
+        alg = qowe(Ns, deltas, mins, mpi_comm)
+        
+        # Check deltask = 2*pi / (N * delta)
+        for i, (n, delta) in enumerate(zip(alg.Ns, deltas)):
+            expected_deltask = 2 * np.pi / (n * delta)
+            assert abs(alg.deltask[i] - expected_deltask) < 1e-12
+        
+        # Check minsk = -(N/2) * deltask
+        for i, (n, dk) in enumerate(zip(alg.Ns, alg.deltask)):
+            expected_minsk = -(n / 2) * dk
+            assert abs(alg.minsk[i] - expected_minsk) < 1e-12
+        
+        del alg
+
