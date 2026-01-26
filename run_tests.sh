@@ -65,6 +65,12 @@ case $TEST_TYPE in
         run_mpi_tests $NPROCS
         # Then run tests requiring 12 processes with oversubscribe
         run_parallel_jacobian_tests
+        # Run integration tests with 4 MPI processes
+        echo ""
+        echo "========================================"
+        echo "Running integration tests (4 MPI processes)..."
+        echo "========================================"
+        python tests/integration/run_integration_tests.py 4
         ;;
     *)
         echo "Unknown test type: $TEST_TYPE"
@@ -75,5 +81,5 @@ esac
 
 echo ""
 echo "========================================"
-echo "Tests completed!"
+echo "All tests completed!"
 echo "========================================"

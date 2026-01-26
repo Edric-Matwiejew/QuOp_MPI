@@ -27,10 +27,10 @@ def load_expected_results():
         return json.load(f)
 
 
-def run_example(script_path, cwd, timeout=300):
+def run_example(script_path, cwd, nprocs=4, timeout=300):
     """Run an example script and return parsed results."""
     result = subprocess.run(
-        ["mpiexec", "-n", "1", "python", script_path],
+        ["mpiexec", "-n", str(nprocs), "python", script_path],
         cwd=str(cwd),
         capture_output=True,
         text=True,
@@ -79,9 +79,12 @@ def validate_result(result, config):
 
 
 def main():
+    # Get number of MPI processes from command line (default: 4)
+    nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+    
     expected = load_expected_results()
     
-    print(f"Running {len(expected)} integration tests...")
+    print(f"Running {len(expected)} integration tests with {nprocs} MPI processes...")
     print("=" * 60)
     
     passed = 0
@@ -94,7 +97,7 @@ def main():
         print(f"\n[{test_name}] {config['description']}...")
         
         try:
-            result = run_example(script, example_dir)
+            result = run_example(script, example_dir, nprocs=nprocs)
             errors = validate_result(result, config)
             
             if result["success"] and not errors:
