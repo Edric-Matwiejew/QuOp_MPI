@@ -125,4 +125,31 @@ contains
         state_norm = active_context%get_state_norm()
     end subroutine get_state_norm
 
+    subroutine get_local_i(context_ptr, local_i)
+        !f2py integer(dp), intent(in) :: context_ptr
+        type(c_ptr), intent(in) :: context_ptr
+        integer(dp), intent(out) :: local_i
+        type(context_type), pointer :: active_context
+        call c_f_pointer(context_ptr, active_context)
+        local_i = active_context%get_local_i()
+    end subroutine get_local_i
+
+    subroutine get_local_i_offset(context_ptr, local_i_offset)
+        !f2py integer(dp), intent(in) :: context_ptr
+        type(c_ptr), intent(in) :: context_ptr
+        integer(dp), intent(out) :: local_i_offset
+        type(context_type), pointer :: active_context
+        call c_f_pointer(context_ptr, active_context)
+        local_i_offset = active_context%get_local_i_offset()
+    end subroutine get_local_i_offset
+
+    subroutine get_alloc_local(context_ptr, alloc_local)
+        !f2py integer(dp), intent(in) :: context_ptr
+        type(c_ptr), intent(in) :: context_ptr
+        integer(dp), intent(out) :: alloc_local
+        type(context_type), pointer :: active_context
+        call c_f_pointer(context_ptr, active_context)
+        alloc_local = active_context%get_alloc_local()
+    end subroutine get_alloc_local
+
 end module context_wrapper

@@ -90,3 +90,21 @@ class context:
             norm = self.context_wrapper.get_state_norm(self.ptr)
             return norm if self.SUBCOMM.rank == 0 else None
         return None
+
+    def sync_partition(self):
+        """Sync Python-side partition values with the Fortran context.
+        
+        This should be called after any operation that may resize the context
+        (e.g., circulant propagator planning with non-power-of-2 sizes).
+        
+        Returns
+        -------
+        tuple
+            (local_i, local_i_offset, alloc_local) - the updated values
+        """
+        if self.initialised:
+            self.host_local_i = self.context_wrapper.get_local_i(self.ptr)
+            self.host_local_i_offset = self.context_wrapper.get_local_i_offset(self.ptr)
+            self.host_alloc_local = self.context_wrapper.get_alloc_local(self.ptr)
+            return self.host_local_i, self.host_local_i_offset, self.host_alloc_local
+        return None
