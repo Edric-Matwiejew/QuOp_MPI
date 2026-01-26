@@ -315,6 +315,7 @@ class Ansatz:
 
     def set_parameter_map(
         self,
+        n_free_params: int,
         mapping_fn: Callable[[np.ndarray], np.ndarray],
         mapping_dict: dict | None = None,
     ):
@@ -323,6 +324,9 @@ class Ansatz:
 
         Parameters
         ----------
+        n_free_params : int
+            The number of free parameters in the reduced parameter vector.
+            This is the dimensionality of the optimization problem.
         mapping_fn : callable
             ``mapping_fn(free_vec, *args, **kwargs) -> full_vec``.
             *free_vec* is the vector presented to the optimiser;
@@ -339,6 +343,7 @@ class Ansatz:
 
         self._has_param_map = True
         self._param_map_raw = mapping_fn
+        self._n_free_params = n_free_params
         self.__parse_function_dict__(mapping_dict, "param_map_dict")
         self._need_bind_param_map = True
 
@@ -1638,9 +1643,9 @@ class Ansatz:
         """
 
         if self._has_param_map and initial_parameters is None:
-            raise ValueError(
-                "Parameter map is set: you must supply initial_parameters (the free-vector) to benchmark()"
-            )
+            # Auto-generate random initial parameters for the free vector
+            rng = np.random.default_rng(self.seed)
+            initial_parameters = rng.uniform(0, 2 * np.pi, self._n_free_params)
 
         best_obj = np.inf
         previous_params = None
@@ -1685,13 +1690,13 @@ class Ansatz:
             if self.subcomms.get_subcomm_index() == 0:
                 # Choose starting vector
                 if self._has_param_map:
-                    if repeat == 1:
-                        # initial_parameters already set above
-                        pass
-                    elif param_persist and previous_params is not None:
+                    # With a parameter map, the free vector size is constant across all depths.
+                    # The mapping function handles expansion via bound ansatz_depth/total_params.
+                    # param_persist just means "use the best free vector found so far".
+                    if param_persist and previous_params is not None:
                         self.variational_parameters = previous_params.copy()
                     else:
-                        # always restart from the original supplied free-vector
+                        # Start fresh from the original supplied free-vector
                         self.variational_parameters = np.asarray(
                             initial_parameters, dtype=np.float64
                         )
@@ -1745,11 +1750,14 @@ class Ansatz:
 
                 # If mapped, capture and persist the improved initial parameters on improvement
                 if self._has_param_map:
-                    current_free = self.result["x"]
-                    current_obj = self.quop_result["fun"]
-                    if current_obj < best_obj:
-                        best_obj = current_obj
-                        previous_params = current_free.copy()
+                    if self.subcomms.SUBCOMM.Get_rank() == 0:
+                        current_free = self.result["x"]
+                        current_obj = self.quop_result["fun"]
+                        if current_obj < best_obj:
+                            best_obj = current_obj
+                            previous_params = current_free.copy()
+                    # Broadcast updated previous_params to all ranks for next iteration
+                    previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root=0)
 
                 if verbose:
                     self.print_result()
