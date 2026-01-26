@@ -245,6 +245,7 @@ class Ansatz:
         self.verbose_objective = False
         self.objective_cnt = 0
         self.record_objective = False
+        self.objective_history = []
 
         self.n_evolutions = 0
         self.total_n_evolutions = []
@@ -394,8 +395,6 @@ class Ansatz:
         attribute_name : str
             :class:`~quop_mpi.Ansatz` attribute to be set to a :literal:`ParsedFunctionDict` instance
         """
-
-        parsed_dict = getattr(self, attribute_name)
 
         function_dict = {} if function_dict is None else function_dict
         parsed_dict = {"args": [], "kwargs": {}}
@@ -709,6 +708,7 @@ class Ansatz:
         self.setup_sampling = False
         self.sampling = False
         self.pre_execution_methods.remove(self.__pre_sampling)
+        self.post_execution_methods.remove(self.__post_sampling)
 
     def __pre_sampling(self):
         """Preparation for simulated sampling."""
@@ -1102,9 +1102,6 @@ class Ansatz:
         if self.subcomms.get_n_subcomms() > 1 and self.subcomms.in_subcomm():
 
             self.subcomms.create_jaccomm()
-
-            if self.subcomms.in_jaccomm():
-                self.subcomms.JACCOMM = self.subcomms.JACCOMM
 
     def __gen_unitaries(self):
         """Calls methods associated with :literal:`Unitary` instances to determine the
@@ -2102,7 +2099,7 @@ class Ansatz:
 
             self.__evolve_state(self.variational_parameters)
 
-            if self.objective_function != None:
+            if self.objective_function is not None:
                 self.__get_local_probabilities()
                 self.objective_function.update_parameters()
                 self.expectation = self.objective_function.call(
