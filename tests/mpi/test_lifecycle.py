@@ -231,6 +231,165 @@ class TestLifecycleSequences:
 
 
 @pytest.mark.mpi
+class TestDestroyFunctionality:
+    """Tests for destroy() method bug #5 from known_bugs.md.
+    
+    Bug #5: setup_parallel was never set to False, so __post_parallel() was never called.
+    
+    The destroy() condition `if not self.reset or not self.setup_called: return` is 
+    intentional - it skips cleanup when resources are still valid (reset=False means 
+    no configuration change since last setup). Cleanup only happens when configuration 
+    changes (reset=True) AND setup was called.
+    """
+
+    def test_setup_parallel_flag_after_setup(self, mpi_comm, simple_oracle):
+        """Verify setup_parallel is set to False after setup().
+        
+        Bug #5: setup_parallel was never set to False, so the cleanup code path
+        was never reachable even when destroy() was called with reset=True.
+        """
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        # Before setup, setup_parallel should be True (no parallel resources yet)
+        assert alg.setup_parallel == True
+        
+        alg.setup()
+        
+        # After setup, setup_parallel should be False (parallel resources allocated)
+        assert alg.setup_parallel == False, \
+            "Bug #5: setup_parallel should be False after setup() to indicate cleanup needed"
+
+    def test_destroy_calls_post_parallel_on_config_change(self, mpi_comm, simple_oracle):
+        """Verify destroy() calls __post_parallel() when configuration changes.
+        
+        The destroy() condition correctly skips cleanup when reset=False (no config 
+        change). Cleanup only occurs when reset=True AND setup_called=True.
+        """
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.execute()
+        
+        # Track if __post_parallel was called
+        original_post_parallel = alg._Ansatz__post_parallel
+        post_parallel_called = [False]
+        
+        def mock_post_parallel():
+            post_parallel_called[0] = True
+            original_post_parallel()
+        
+        alg._Ansatz__post_parallel = mock_post_parallel
+        
+        # Trigger configuration change - this sets reset=True
+        alg.set_unitaries(alg.unitaries)
+        assert alg.reset == True, "set_unitaries should set reset=True"
+        
+        alg.destroy()
+        
+        # Verify __post_parallel was called (Bug #5 fix makes this work)
+        assert post_parallel_called[0], \
+            "Bug #5: __post_parallel() should be called during destroy() when reset=True"
+        assert alg.setup_parallel == True, \
+            "setup_parallel should be True after cleanup completed"
+
+    def test_destroy_calls_post_unitaries_on_config_change(self, mpi_comm, simple_oracle):
+        """Verify destroy() calls __post_unitaries() when configuration changes."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.execute()
+        
+        # After execute, setup_unitaries should be False (unitaries generated)
+        assert alg.setup_unitaries == False, \
+            "setup_unitaries should be False after execute()"
+        
+        # Track if __post_unitaries was called
+        original_post_unitaries = alg._Ansatz__post_unitaries
+        post_unitaries_called = [False]
+        
+        def mock_post_unitaries():
+            post_unitaries_called[0] = True
+            original_post_unitaries()
+        
+        alg._Ansatz__post_unitaries = mock_post_unitaries
+        
+        # Trigger configuration change
+        alg.set_unitaries(alg.unitaries)
+        
+        alg.destroy()
+        
+        # Verify __post_unitaries was called
+        assert post_unitaries_called[0], \
+            "__post_unitaries() should be called during destroy() when reset=True"
+
+    def test_destroy_skips_cleanup_when_no_config_change(self, mpi_comm, simple_oracle):
+        """Verify destroy() skips cleanup when there's no configuration change.
+        
+        This is intentional behavior - resources are still valid if configuration
+        hasn't changed since last setup.
+        """
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.setup()
+        
+        # No configuration change, so reset=False
+        assert alg.reset == False
+        
+        # Track if cleanup methods were called
+        post_parallel_called = [False]
+        original_post_parallel = alg._Ansatz__post_parallel
+        def mock_post_parallel():
+            post_parallel_called[0] = True
+            original_post_parallel()
+        alg._Ansatz__post_parallel = mock_post_parallel
+        
+        alg.destroy()
+        
+        # Cleanup should NOT have been called (reset=False means resources still valid)
+        assert not post_parallel_called[0], \
+            "destroy() should skip cleanup when reset=False (no config change)"
+
+    def test_subcomms_freed_on_config_change(self, mpi_comm, simple_oracle):
+        """Verify MPI subcommunicators are properly freed when config changes."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.execute()
+        
+        # Track if subcomms.free() was called
+        original_free = alg.subcomms.free
+        free_called = [False]
+        
+        def mock_free():
+            free_called[0] = True
+            original_free()
+        
+        alg.subcomms.free = mock_free
+        
+        # Trigger configuration change
+        alg.set_unitaries(alg.unitaries)
+        
+        alg.destroy()
+        
+        # Verify free() was called (Bug #5 fix makes this work)
+        assert free_called[0], \
+            "Bug #5: subcomms.free() should be called during destroy() when reset=True"
+
+
+@pytest.mark.mpi
 class TestResourceManagement:
     """Test that resources are properly managed."""
 

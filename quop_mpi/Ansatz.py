@@ -1263,6 +1263,7 @@ class Ansatz:
             self.__assign_backend()
 
             self.__gen_parallel()
+            self.setup_parallel = False  # Indicate parallel resources need cleanup
 
             self.__check_comm_size()
 
@@ -1300,6 +1301,9 @@ class Ansatz:
         :class:`~quop_mpi.Ansatz` instance.
         """
 
+        # Skip cleanup if:
+        # - reset=False (no config change) - resources are still valid
+        # - setup_called=False (never set up) - nothing to clean up
         if not self.reset or not self.setup_called:
             return
 
