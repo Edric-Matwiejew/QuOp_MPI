@@ -275,18 +275,25 @@ def position_grid(
     if function is None:
         function = squeezed
 
-    fCQAOA = import_module("quop_mpi.__lib.fCQAOA")
+    from quop_mpi.__lib import cartesian as cart
 
     strides = np.empty(len(Ns), dtype=int)
     strides[-1] = 1
     for i in range(len(Ns) - 2, -1, -1):
         strides[i] = strides[i + 1] * Ns[i]
 
+    # Generate the local grid points
+    system_size = np.prod(Ns)
+    local_grid = cart.cartesian.gen_local_grid(
+        system_size, Ns, strides, deltas, mins, local_i_offset, local_i
+    )
+
     state = np.empty(shape=[alloc_local], dtype=np.complex128)
 
-    fCQAOA.continuous.dist_vector(
-        function, Ns, strides, deltas, mins, local_i_offset, state
-    )
+    # Apply the function to each grid point
+    for i in range(local_i):
+        grid_point = local_grid[i, :]
+        state[i] = function(grid_point)
 
     norm = np.sum(np.abs(state[:local_i]) ** 2)
     norm = MPI_COMM.allreduce(norm, op=MPI.SUM)

@@ -27,3 +27,32 @@ add_f2py_library(
 	SRC ${PROPAGATOR_WRAPPER}
 	INSTALL_SUBDIR mpi
 	)
+
+# MPI Momentum propagator for QOWE algorithm
+add_library(mpi_momentum OBJECT mpi_momentum.f90)
+
+target_link_libraries(
+    mpi_momentum
+    "${FFTW_DOUBLE_LIB}"
+    "${FFTW_DOUBLE_MPI_LIB}"
+)
+
+target_include_directories(
+    mpi_momentum
+    PUBLIC
+    ${FFTW_INCLUDE_DIRS}
+    ${CMAKE_Fortran_MODULE_DIRECTORY}/cartesian
+)
+
+add_dependencies(mpi_momentum cartesian_obj)
+
+set(momentum_depends mpi_context mpi_momentum cartesian_obj)
+set(momentum_definitions context=mpi_backend context_type=mpi_context propagator=mpi_momentum propagator_type=momentum_propagator propagator_wrapper=momentum_propagator_wrapper)
+
+add_f2py_library(
+    MODULE_NAME mpi_momentum_propagator
+    DEPENDS "${momentum_depends}"
+    DEFINITIONS "${momentum_definitions}"
+    SRC ${PROPAGATOR_WRAPPER}
+    INSTALL_SUBDIR mpi
+)

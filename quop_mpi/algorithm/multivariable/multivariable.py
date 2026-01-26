@@ -50,9 +50,13 @@ class multivariable(Ansatz):
         """
         if independent:
             self.UW_n_params = len(self.Ns)
+            self.UW.unitary_n_params = len(self.Ns)
         else:
             self.UW_n_params = 1
             self.UW.unitary_n_params = 1
+        
+        # Recalculate n_params (operator_n_params + unitary_n_params)
+        self.UW.n_params = self.UW.operator_n_params + self.UW.unitary_n_params
 
         self.set_unitaries([self.UQ, self.UW])
 
@@ -199,7 +203,7 @@ class qowe(multivariable):
                 ], dtype = np.float64)
   
         self.UQ = diagonal.unitary(
-            None,
+            diagonal.operator.observables,
             parameter_function=uniform,
         )
 
@@ -223,6 +227,6 @@ class qowe(multivariable):
         self.set_initial_state(
                 position_grid,
                 {     
-                "args": [self.Ns, self.deltas, self.mins]
+                "args": [None]  # function=None uses default Gaussian
                     }
                 )
