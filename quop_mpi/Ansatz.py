@@ -1420,18 +1420,7 @@ class Ansatz:
                     else:
                         evolution_parameter = param_slice
 
-                    #unitary.initial_state[: self.local_i] = self.final_state[
-                    #    : self.local_i
-                    #]
-
-                    #print(unitary.context.initial_state)
                     unitary.propagate(evolution_parameter)
-                    #self.context.state = self.context.state
-
-                    # propgators handle this now using pointer swapping if needed.
-                    #self.final_state[: self.local_i] = unitary.final_state[
-                    #    : self.local_i
-                    #]
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
                 self.n_evolutions += 1
