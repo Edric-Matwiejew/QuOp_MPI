@@ -875,14 +875,13 @@ class TestBenchmarkWithParameterMap:
 class TestBenchmarkWithParallelJacobian:
     """Tests for benchmark with parallel jacobian evaluation.
     
-    Note: Parallel jacobian requires multiple MPI subcommunicators,
-    which may not work well with just 2 MPI ranks. These tests verify
-    the configuration doesn't crash, but true parallel jacobian testing
-    requires more ranks.
+    Note: Parallel jacobian requires multiple MPI subcommunicators.
+    With processes_per_node=12 and maxcomm=3, we get 3 subcomms when run
+    with 12 MPI ranks. Run tests with: mpiexec -N 12 pytest ...
     """
 
-    def test_parallel_jacobian_config_conflict_with_param_map(self, mpi_comm, simple_oracle):
-        """Verify parallel jacobian and parameter map are mutually exclusive."""
+    def test_parallel_jacobian_with_param_map(self, mpi_comm, simple_oracle):
+        """Verify parallel jacobian and parameter map can be configured together."""
         from quop_mpi.algorithm.combinatorial import qaoa
         
         alg = qaoa(simple_oracle.system_size, mpi_comm)
@@ -891,40 +890,297 @@ class TestBenchmarkWithParallelJacobian:
         # Set up parallel jacobian first
         alg.set_parallel_jacobian(
             nodes_per_subcomm=1,
-            processes_per_node=1,
-            maxcomm=1,
+            processes_per_node=12,
+            maxcomm=3,
             method='forward',
         )
         
-        # Now try to set parameter map - should fail
-        def dummy_map(free_vec, depth):
-            return np.tile(free_vec, depth)
+        # Now set parameter map - should work now
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
         
-        with pytest.raises(ValueError):
-            alg.set_parameter_map(2, dummy_map)
+        # This should not raise
+        alg.set_parameter_map(2, parameter_map)
+        
+        # Verify both are configured
+        assert alg._has_param_map
+        assert alg.jacobian_input is not None
         
         del alg
 
-    def test_param_map_config_conflict_with_parallel_jacobian(self, mpi_comm, simple_oracle):
-        """Verify parameter map and parallel jacobian are mutually exclusive."""
+    def test_param_map_then_parallel_jacobian(self, mpi_comm, simple_oracle):
+        """Verify parameter map and parallel jacobian can be set in either order."""
         from quop_mpi.algorithm.combinatorial import qaoa
         
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         
         # Set up parameter map first
-        def dummy_map(free_vec, depth):
-            return np.tile(free_vec, depth)
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
         
-        alg.set_parameter_map(2, dummy_map)
+        alg.set_parameter_map(2, parameter_map)
         
-        # Now try to set parallel jacobian - should fail
-        with pytest.raises(ValueError):
-            alg.set_parallel_jacobian(
-                nodes_per_subcomm=1,
-                processes_per_node=1,
-                maxcomm=1,
-                method='forward',
-            )
+        # Now set parallel jacobian - should work now
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=12,
+            maxcomm=3,
+            method='forward',
+        )
+        
+        # Verify both are configured
+        assert alg._has_param_map
+        assert alg.jacobian_input is not None
+        
+        del alg
+
+    def test_benchmark_with_param_map_and_parallel_jacobian(self, mpi_comm, simple_oracle):
+        """Verify benchmark runs with both parameter map and parallel jacobian.
+        
+        This test requires sufficient MPI ranks to create multiple subcommunicators.
+        With processes_per_node=12 and maxcomm=3, we get 3 subcomms when run with 12 ranks.
+        """
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+        
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=12,
+            maxcomm=3,
+            method='forward',
+        )
+        
+        initial_params = np.array([np.pi, 0.5])
+        
+        # Run benchmark - parallel jacobian will work if enough ranks are available
+        alg.benchmark(
+            ansatz_depths=[1],
+            repeats=1,
+            initial_parameters=initial_params,
+            verbose=False,
+        )
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+    def test_parallel_jacobian_with_param_map_convergence(self, mpi_comm, simple_oracle):
+        """Verify benchmark with parallel jacobian + param map converges to low-cost state.
+        
+        This test uses the Grover search oracle and verifies that:
+        1. The optimizer reduces the objective function (expectation value)
+        2. Final expectation value is lower than uniform superposition
+        3. The algorithm is actually doing optimization, not just running
+        
+        Run with: mpiexec -N 12 pytest ... --with-mpi
+        """
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        oracle = simple_oracle
+        
+        alg = qwoa(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+        
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+        
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=12,
+            maxcomm=3,
+            method='forward',
+        )
+        
+        # Start away from optimal to verify optimizer moves toward it
+        # Optimal is approximately (gamma=pi, t=pi/N), start at (1.0, 0.1)
+        initial_params = np.array([1.0, 0.1])
+        
+        # Uniform superposition expectation: (N-M)/N where M=1 marked state
+        # For N=8, M=1: uniform_E = 7/8 = 0.875
+        uniform_expectation = oracle.uniform_expectation()
+        
+        alg.benchmark(
+            ansatz_depths=[1],
+            repeats=1,
+            initial_parameters=initial_params,
+            verbose=False,
+        )
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+            final_objective = alg.result['fun']
+            
+            # Key algorithmic test: final objective should be LESS than uniform
+            # This proves the optimizer is actually finding better parameters
+            assert final_objective < uniform_expectation, \
+                f"Optimizer should reduce expectation value below uniform. " \
+                f"Got {final_objective:.4f}, uniform = {uniform_expectation:.4f}"
+            
+            # The objective should have decreased from initial evaluation
+            # (can't easily get initial objective, but we know uniform is the baseline)
+            
+            # For a well-optimized Grover search, we should get close to
+            # theoretical success probability. With 1 iteration on N=8, M=1:
+            # P_success ≈ 0.78, so expectation ≈ 0.22 (since E = 1 - P_marked)
+            theoretical_success = oracle.theoretical_success_probability(1)
+            theoretical_expectation = 1 - theoretical_success
+            
+            # Allow significant tolerance since we only run 1 repeat
+            assert final_objective < 0.6, \
+                f"Expected significant probability on marked state. " \
+                f"Got objective {final_objective:.4f}, theoretical ≈ {theoretical_expectation:.4f}"
+        
+        del alg
+
+@pytest.mark.mpi
+class TestBenchmarkWithSamplingAndParameterMap:
+    """Tests for benchmark combining sampling with parameter map.
+    
+    This tests the combination of simulated sampling (set_sampling) with
+    a parameter map for Grover-like search optimization.
+    """
+
+    def test_benchmark_sampling_with_parameter_map(self, mpi_comm):
+        """Verify benchmark works with both sampling and parameter map enabled."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        system_size = 8
+        marked_state = 3
+        
+        def make_grover_oracle(marked):
+            def grover_oracle(local_i, local_i_offset):
+                qualities = np.ones(local_i, dtype=np.float64)
+                for i in range(local_i):
+                    global_i = local_i_offset + i
+                    if global_i == marked:
+                        qualities[i] = 0.0
+                return qualities
+            return grover_oracle
+        
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            """Map 2 parameters [gamma, t] to all ansatz layers."""
+            gamma, t = free_vec
+            full_params = np.zeros(ansatz_depth * total_params, dtype=np.float64)
+            for layer in range(ansatz_depth):
+                full_params[layer * total_params] = gamma
+                full_params[layer * total_params + 1] = t
+            return full_params
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(make_grover_oracle(marked_state))
+        
+        # Enable sampling with 100 shots per block
+        alg.set_sampling(sample_block_size=100)
+        
+        # Set parameter map
+        alg.set_parameter_map(2, parameter_map)
+        
+        initial_params = np.array([np.pi, 0.5])
+        
+        alg.benchmark(
+            ansatz_depths=[1],
+            repeats=1,
+            initial_parameters=initial_params,
+            verbose=False,
+        )
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+            assert 'x' in alg.result
+            assert len(alg.result['x']) == 2
+        
+        del alg
+
+    def test_benchmark_sampling_param_map_multiple_depths(self, mpi_comm):
+        """Verify sampling + parameter map works across multiple depths."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        system_size = 8
+        
+        def qualities(local_i, local_i_offset):
+            return np.random.rand(local_i)
+        
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            full_params = np.zeros(ansatz_depth * total_params, dtype=np.float64)
+            for layer in range(ansatz_depth):
+                full_params[layer * total_params] = gamma
+                full_params[layer * total_params + 1] = t
+            return full_params
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_sampling(sample_block_size=50)
+        alg.set_parameter_map(2, parameter_map)
+        
+        alg.benchmark(
+            ansatz_depths=[1, 2],
+            repeats=2,
+            param_persist=True,
+            verbose=False,
+        )
+        
+        results = alg.tracker.get_results()
+        if mpi_comm.Get_rank() == 0:
+            assert len(results[1]) == 2
+            assert len(results[2]) == 2
+        
+        del alg
+
+    def test_benchmark_sampling_param_map_custom_sampling_fn(self, mpi_comm):
+        """Verify sampling + parameter map works with custom sampling function."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        system_size = 8
+        
+        def qualities(local_i, local_i_offset):
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
+        
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+        
+        sample_count = [0]  # Mutable to track calls
+        
+        def custom_sampling(samples):
+            """Custom sampling that accepts after 2 blocks."""
+            sample_count[0] += 1
+            mean_val = np.mean([np.mean(block) for block in samples])
+            accept = len(samples) >= 2
+            return mean_val, accept
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_sampling(
+            sample_block_size=20,
+            function=custom_sampling,
+            max_sample_iterations=5,
+        )
+        alg.set_parameter_map(2, parameter_map)
+        
+        initial_params = np.array([1.0, 0.5])
+        
+        alg.benchmark(
+            ansatz_depths=[1],
+            repeats=1,
+            initial_parameters=initial_params,
+            verbose=False,
+        )
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
         
         del alg

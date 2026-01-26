@@ -336,11 +336,6 @@ class Ansatz:
             to the mapping function.
         """
 
-        if self.jacobian_input is not None:
-            raise ValueError(
-                "Cannot set a parameter‐mapping function when a parallel Jacobian is configured."
-            )
-
         self._has_param_map = True
         self._param_map_raw = mapping_fn
         self._n_free_params = n_free_params
@@ -1011,11 +1006,6 @@ class Ansatz:
             step-size used by the forward or central difference methods, by
             default :literal:`np.sqrt(np.finfo(float).eps)`
         """
-
-        if self._has_param_map:
-            raise ValueError(
-                "Cannot configure parallel Jacobian when a parameter‐mapping function is set."
-            )
 
         self.nodes_per_subcomm = nodes_per_subcomm
         self.processes_per_node = processes_per_node
@@ -2253,12 +2243,11 @@ class Ansatz:
         x = self.subcomms.JACCOMM.bcast(x, 0)
 
         if self.subcomms.JACCOMM.Get_rank() != 0:
-            # When no parameter map exists, x is the full variational parameters
-            # When a parameter map exists, x is the free params that get mapped to full
-            if self._has_param_map:
-                self.variational_parameters = self.__to_full(x)
-            else:
-                self.variational_parameters = x
+            # When a parameter map is set, x contains the free parameters.
+            # We keep variational_parameters as the free params so that
+            # the jacobian functions perturb the correct indices.
+            # The mapping to full params happens inside evaluate() -> __to_full().
+            self.variational_parameters = x
 
         partials = []
         if self.subcomms.JACCOMM.Get_rank() != 0:
