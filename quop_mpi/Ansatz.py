@@ -226,7 +226,8 @@ class Ansatz:
 
         self.setup_log = False  # whether results will be recorded in a *.log file.
 
-        # variables managed by the 'system' class self.stop = False  # synchronise ranks during optimisation
+        # variables managed by the 'system' class
+        self.stop = False  # synchronise ranks during optimisation
 
         self.expectation = None  # expectation value of the system
         self.initial_state_input = None

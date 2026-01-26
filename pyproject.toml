@@ -50,6 +50,10 @@ docs = [
     "sphinxcontrib-bibtex==2.5.0",
     "sphinx-rtd-theme==1.2.0"
 ]
+test = [
+    "pytest>=7.0",
+    "pytest-mpi>=0.6",
+]
 all = [
     "yfinance==0.2.54",
     "matplotlib>=3.6.0",
@@ -58,5 +62,14 @@ all = [
     "jupyter-core>=4.6.3",
     "numpydoc==1.5.0",
     "sphinxcontrib-bibtex==2.5.0",
-    "sphinx-rtd-theme==1.2.0"
+    "sphinx-rtd-theme==1.2.0",
+    "pytest>=7.0",
+    "pytest-mpi>=0.6",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -69,7 +69,7 @@ class qaoa(Ansatz):
 
             if self.observable_function is None:
                 raise RuntimeError(
-                    "Rank {}: Solution qualities not defined.".format(self.rank)
+                    "Rank {}: Solution qualities not defined.".format(self.MPI_COMM_WORLD.Get_rank())
                 )
 
             if self.param_function is None:
