@@ -276,7 +276,6 @@ class Ansatz:
 
         self.sampling_dict = {}
         self.sample_indexes = []
-        self.samples = []
         self.sample_minimum_indexes = []
         self.variational_parameter_history = []
 
@@ -1033,7 +1032,6 @@ class Ansatz:
         if newsize > 0:
 
             self.subcomms.shrink_subcomms(self.subcomms.SUBCOMM.Get_size() - newsize)
-            self.subcomms.SUBCOMM = self.subcomms.SUBCOMM
 
         while not busy_comm:
 
@@ -1047,14 +1045,12 @@ class Ansatz:
 
             if dropcount > 0:
                 self.subcomms.shrink_subcomms(dropcount)
-                self.subcomms.SUBCOMM = self.subcomms.SUBCOMM
             else:
-
                 busy_comm = True
             
 
         if self.subcomms.in_subcomm():
-            # create the default vector partitioning, may be altered durring the unitary planning phase.
+            # create the default vector partitioning, may be altered during the unitary planning phase.
             self.local_i, self.local_i_offset, self.alloc_local, self.partition_table = vector_partitioning(self.system_size, self.subcomms.SUBCOMM)
             
     @property
@@ -2250,11 +2246,8 @@ class Ansatz:
                 # Pass the parameter index - jacobian.call computes partial derivative
                 partials.append(self.jacobian.call(var))
 
-        opt_root = self.subcomms.get_subcomm_roots()[self.subcomms.colour]
-
         if self.subcomms.JACCOMM.Get_rank() == 0:
             jacobian = np.zeros(self.n_free_params, dtype=np.float64)
-            reqs = []
             for root, mapping in zip(self.subcomms.get_subcomm_roots(), self.var_map):
                 if root > 0:
                     for var in mapping:
@@ -2263,7 +2256,6 @@ class Ansatz:
                         )
 
         elif self.subcomms.SUBCOMM.Get_rank() == 0:
-            reqs = []
             jacobian = None
             for part, mapping in zip(partials, self.var_map[self.subcomms.get_subcomm_index()]):
                 self.MPI_COMM_WORLD.Send(
