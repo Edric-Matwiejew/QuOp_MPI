@@ -1,7 +1,7 @@
 Package Overview
 ================
 
-QuOp_MPI provides an objected-oriented framework for the design and simulation of :term:`QVAs <QVA>`. It enables researchers with any level of parallel programming experience to design simulation workflows that are efficiently scalable on massively parallel systems.
+QuOp_MPI provides an object-oriented framework for the design and simulation of :term:`QVAs <QVA>`. It enables researchers with any level of parallel programming experience to design simulation workflows that are efficiently scalable on massively parallel systems.
 
 QVA Simulation
 --------------

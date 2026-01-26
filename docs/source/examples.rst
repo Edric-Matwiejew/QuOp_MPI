@@ -3,7 +3,7 @@ Examples
 
 The following examples detail the simulation of :term:`QVAs <QVA>` for unconstrained and constrained combinatorial optimisation problems.
 
-The examples are size so they may be easily ran on most personal computers. The examples must be ran using the ``mpiexec`` or ``mpirun`` launchers. For example, to run the QAOA maxcut example located in *examples/maxcut* on a system with 4 CPU cores:
+The examples are sized so they may be easily run on most personal computers. The examples must be run using the ``mpiexec`` or ``mpirun`` launchers. For example, to run the QAOA maxcut example located in *examples/maxcut* on a system with 4 CPU cores:
 
 .. code-block:: bash
 
@@ -69,7 +69,7 @@ implement :math:numref:`maxcut-cost`.
 
 A :class:`~quop_mpi.algorithm.combinatorial.qaoa` instance is instantiated.
 and the :math:`\text{diag}(\hat{Q})` (the solution qualities) is defined via the
-:meth:`~quop_mpi.Ansatz.set_qualities` method. For this, we pass the :meth:`~quop_mpi.observable.serial`
+:meth:`~quop_mpi.algorithm.combinatorial.qaoa.set_qualities` method. For this, we pass the :meth:`~quop_mpi.observable.serial`
 :term:`Observables Function` along with a dictionary containing ``maxcut qualities`` and its
 arguments. The ``serial`` function assists with memory-efficient
 simulation, by calling the ``maxcut_qualities`` at the root MPI process and distributing its output over
@@ -330,7 +330,7 @@ The :term:`system state` is set equal to the number of valid solutions (``31``),
 .. literalinclude:: ../../examples/portfolio_rebalancing/qwoa_portfolio.py
     :lines: 3-4
 
-and the :term:`observables` and :term:`phase-shift unitary` matrix :term:`operator` specified by :meth:`~quop_mpi.algorithm.combinatorial.qaoa.set_qualities`. The ``'args'`` and ``'kwargs'`` items in the corresponding :term:`FunctionDict` are passed to the pandas `read_csv` function. The solution quality values are retrieved from ``qwoa_qualities.csv``, which have been precomputed using *examples/portfolio_rebalancing/qwoa_qualities.py*.
+and the :term:`observables` and :term:`phase-shift unitary` matrix :term:`operator` specified by :meth:`~quop_mpi.algorithm.combinatorial.qwoa.set_qualities`. The ``'args'`` and ``'kwargs'`` items in the corresponding :term:`FunctionDict` are passed to the pandas `read_csv` function. The solution quality values are retrieved from ``qwoa_qualities.csv``, which have been precomputed using *examples/portfolio_rebalancing/qwoa_qualities.py*.
 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qwoa_portfolio.py
     :lines: 6-12

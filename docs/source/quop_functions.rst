@@ -136,7 +136,7 @@ QuOp Functions
         Returns an :term:`objective function` value computed from batches of
         :term:`observables` values that are sampled based on the probability
         distribution of the wavefunction state vector during simulation together
-        with a boolean that specifies wether the :term:`objective function`
+        with a boolean that specifies whether the :term:`objective function`
         value should be passed to the :term:`optimiser` or more sample batches
         taken. Passed to :meth:`quop_mpi.Ansatz.set_sampling`.
 
