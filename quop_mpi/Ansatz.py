@@ -1718,7 +1718,7 @@ class Ansatz:
                                         for result in self.tracker.results_dict[depth - 1]
                                     ]
                                     xs = [
-                                        result["variational parameters"]
+                                        result["varitional_parameters"]
                                         for result in self.tracker.results_dict[depth - 1]
                                     ]
                                     previous_params = xs[np.argmin(funs)]
