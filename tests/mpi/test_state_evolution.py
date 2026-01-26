@@ -36,11 +36,10 @@ class TestEvolveStateBasic:
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        alg.setup()
         
         params = simple_oracle.optimal_params(depth=1)
         
-        # Should complete without error
+        # Should complete without error (evolve_state handles setup internally)
         alg.evolve_state(params)
         
         # State should be populated (use get_probabilities to verify)
@@ -55,7 +54,6 @@ class TestEvolveStateBasic:
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        alg.setup()
         
         params = simple_oracle.optimal_params(depth=1)
         alg.evolve_state(params)
@@ -74,7 +72,6 @@ class TestEvolveStateBasic:
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        alg.setup()
         
         params = simple_oracle.optimal_params(depth=1)
         
@@ -105,7 +102,6 @@ class TestEvolveStateParameterSensitivity:
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        alg.setup()
         
         # Optimal parameters
         params1 = simple_oracle.optimal_params(depth=1)
@@ -130,7 +126,6 @@ class TestEvolveStateParameterSensitivity:
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        alg.setup()
         
         # Zero parameters: no phase shift, no mixing
         params = np.zeros(2, dtype=np.float64)
@@ -196,7 +191,6 @@ class TestEvolveStateCorrectness:
         alg = qwoa(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
-        alg.setup()
         
         params = oracle.optimal_params(depth=1)
         alg.evolve_state(params)
@@ -259,9 +253,6 @@ class TestEvolveStateCorrectness:
             theoretical = oracle.theoretical_success_probability(1)
             assert abs(qaoa_marked - theoretical) < 0.01, \
                 f"Both should match theory ({theoretical:.4f})"
-        
-        alg_qaoa.destroy()
-        alg_qwoa.destroy()
 
     def test_optimal_params_concentrate_probability(self, mpi_comm, single_solution_oracle):
         """
@@ -295,8 +286,6 @@ class TestEvolveStateCorrectness:
             # Should match theoretical Grover probability
             assert abs(marked_prob - theoretical) < 0.02, \
                 f"Optimal params should match theory: got {marked_prob:.4f}, expected {theoretical:.4f}"
-        
-        alg.destroy()
 
     def test_multiple_solutions_share_probability(self, mpi_comm, simple_oracle):
         """
@@ -332,8 +321,6 @@ class TestEvolveStateCorrectness:
             
             assert max_deviation < 0.1 * mean_marked, \
                 f"Marked states should have similar probabilities (max dev: {max_deviation:.4f})"
-        
-        alg.destroy()
 
     def test_increasing_depth_improves_concentration(self, mpi_comm):
         """
@@ -365,8 +352,6 @@ class TestEvolveStateCorrectness:
             if mpi_comm.Get_rank() == 0:
                 marked_prob = oracle.compute_marked_probability(full_probs)
                 concentrations.append(marked_prob)
-            
-            alg.destroy()
         
         if mpi_comm.Get_rank() == 0:
             # Each depth should match theoretical Grover probability

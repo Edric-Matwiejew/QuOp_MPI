@@ -68,8 +68,6 @@ class TestExecuteBasic:
                 expected_n_params = 2 * depth
                 assert len(alg.result['x']) == expected_n_params, \
                     f"Depth {depth} should have {expected_n_params} params"
-            
-            alg.destroy()
 
 
 @pytest.mark.mpi
@@ -133,8 +131,6 @@ class TestOptimizationQuality:
             
             if mpi_comm.Get_rank() == 0:
                 results[depth] = alg.result['fun']
-            
-            alg.destroy()
         
         if mpi_comm.Get_rank() == 0:
             # Deeper circuit should achieve at least as good (usually better) result
@@ -176,8 +172,6 @@ class TestOptimizationConvergence:
             # Starting near optimum should achieve much better than uniform
             assert final_expectation < uniform * 0.8, \
                 f"Near-optimal start should beat uniform ({uniform:.4f}) significantly (got {final_expectation:.4f})"
-        
-        alg.destroy()
 
     def test_multiple_executions_give_consistent_results(self, mpi_comm):
         """Verify repeated optimization gives similar results."""
@@ -196,8 +190,6 @@ class TestOptimizationConvergence:
             
             if mpi_comm.Get_rank() == 0:
                 expectations.append(alg.result['fun'])
-            
-            alg.destroy()
         
         if mpi_comm.Get_rank() == 0:
             # Results should be reasonably consistent

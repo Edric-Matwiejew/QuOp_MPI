@@ -4,10 +4,15 @@ Shared pytest fixtures for QuOp_MPI tests.
 MPI tests should be run with:
     mpiexec -n <nprocs> python -m pytest tests/mpi/
 """
+import os
 import pytest
 import numpy as np
 import math
 from mpi4py import MPI
+
+# Set OMP_NUM_THREADS=1 to prevent OpenMP thread contention with MPI
+# This must be set before any OpenMP-enabled libraries are loaded
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 # Import the Grover parameter calculator for test oracle construction
 import sys
