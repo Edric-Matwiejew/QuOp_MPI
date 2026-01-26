@@ -220,9 +220,6 @@ class Ansatz:
         self.optimiser = (
             None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
         )
-        self.optimiser = (
-            None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
-        )
 
         self.setup_log = False  # whether results will be recorded in a *.log file.
 
@@ -468,7 +465,7 @@ class Ansatz:
         self.quop_result["qubits"] = copy(np.log2(self.system_size))
         self.quop_result["system size"] = copy(self.system_size)
         self.quop_result["ansatz_depth"] = copy(self.ansatz_depth)
-        self.quop_result["varitional_parameters"] = deepcopy(
+        self.quop_result["variational_parameters"] = deepcopy(
             self.result["x"]
         )
         self.quop_result["mapped_parameters"] = deepcopy(
@@ -1182,7 +1179,7 @@ class Ansatz:
             if unitary.unitary_type == "diagonal":
                 self.observables = unitary.operator
             else:
-                RuntimeError(
+                raise RuntimeError(
                     f"Rank {self.subcomms.SUBCOMM.Get_rank()}: Cannot identify observables, no diagonal unitary defined"
                 )
 
@@ -1713,7 +1710,7 @@ class Ansatz:
                                         for result in self.tracker.results_dict[depth - 1]
                                     ]
                                     xs = [
-                                        result["varitional_parameters"]
+                                        result["variational_parameters"]
                                         for result in self.tracker.results_dict[depth - 1]
                                     ]
                                     previous_params = xs[np.argmin(funs)]
