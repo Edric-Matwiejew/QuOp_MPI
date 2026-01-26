@@ -340,7 +340,7 @@ class TestParameterMapValidation:
             # result['x'] should have n_free params
             assert len(alg.result['x']) == n_free
             # quop_result should have both
-            assert len(alg.quop_result['varitional_parameters']) == n_free
+            assert len(alg.quop_result['variational_parameters']) == n_free
             assert len(alg.quop_result['mapped_parameters']) == 6
         
         del alg

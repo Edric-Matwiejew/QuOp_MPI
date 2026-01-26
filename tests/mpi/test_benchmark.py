@@ -872,12 +872,15 @@ class TestBenchmarkWithParameterMap:
 
 
 @pytest.mark.mpi
+@pytest.mark.requires_nprocs(12)
 class TestBenchmarkWithParallelJacobian:
     """Tests for benchmark with parallel jacobian evaluation.
     
     Note: Parallel jacobian requires multiple MPI subcommunicators.
     With processes_per_node=12 and maxcomm=3, we get 3 subcomms when run
-    with 12 MPI ranks. Run tests with: mpiexec -N 12 pytest ...
+    with 12 MPI ranks. Run tests with: mpiexec -n 12 pytest ...
+    
+    These tests are skipped when run with fewer than 12 MPI processes.
     """
 
     def test_parallel_jacobian_with_param_map(self, mpi_comm, simple_oracle):
