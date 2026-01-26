@@ -126,9 +126,10 @@ contains
         allocate(self%eigenvalues(int(self%local_o)))
 
         if (array_sizes(1) == 1) then
-            self%eigenvalues(2:) = -1
+            ! Complete graph: eigenvalue is N-1 for k=0, and -1 for k!=0
+            self%eigenvalues = -1  ! Set all to -1 first
             if (self%local_o_offset == 0) then
-                self%eigenvalues(1) = self%context%system_size - 1
+                self%eigenvalues(1) = self%context%system_size - 1  ! k=0 case
             endif
         else
 
@@ -156,18 +157,15 @@ contains
         class(circulant_propagator), intent(inout) :: self
         real(dp), dimension(:), intent(in) :: ts
 
-        self%context%initial_state = self%context%initial_state
-
         call fftw_mpi_execute_dft(self%fftw_plan_forward, self%context%initial_state, self%context%initial_state)
-        self%context%initial_state(1:self%local_o) = exp(cmplx(0, -ts(1)*self%eigenvalues))* &
+
+        self%context%initial_state(1:self%local_o) = exp(cmplx(0.0_dp, -ts(1)*self%eigenvalues, kind=dp))* &
                                                          self%context%initial_state(1:self%local_o)
 
         self%context%initial_state(1:self%local_o) = self%context%initial_state(1:self%local_o) &
                                                          /real(self%context%system_size, dp)
 
         call fftw_mpi_execute_dft(self%fftw_plan_backward, self%context%initial_state, self%context%initial_state)
-
-        !self%context%initial_state = self%context%initial_state
 
     end subroutine mpi_circulant_propagate
 
