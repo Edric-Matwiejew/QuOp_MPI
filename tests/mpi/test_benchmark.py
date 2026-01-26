@@ -1034,14 +1034,14 @@ class TestBenchmarkWithParallelJacobian:
             
             # For a well-optimized Grover search, we should get close to
             # theoretical success probability. With 1 iteration on N=8, M=1:
-            # P_success ≈ 0.78, so expectation ≈ 0.22 (since E = 1 - P_marked)
+            # P_success ~= 0.78, so expectation ~= 0.22 (since E = 1 - P_marked)
             theoretical_success = oracle.theoretical_success_probability(1)
             theoretical_expectation = 1 - theoretical_success
             
             # Allow significant tolerance since we only run 1 repeat
             assert final_objective < 0.6, \
                 f"Expected significant probability on marked state. " \
-                f"Got objective {final_objective:.4f}, theoretical ≈ {theoretical_expectation:.4f}"
+                f"Got objective {final_objective:.4f}, theoretical ~= {theoretical_expectation:.4f}"
         
         del alg
 

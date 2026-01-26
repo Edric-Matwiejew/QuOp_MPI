@@ -118,7 +118,7 @@ class Ansatz:
 
     * :term:`Initial State Function` (:meth:`~quop_mpi.Ansatz.set_initial_state`)
     * :term:`Observables Function` (:meth:`~quop_mpi.Ansatz.set_observables`)
-    * :term:`Free Parameters Function` (:meth:`~quop_mpi.Ansatz.set_free_params`)
+    * :term:`Parameter Map Function` (:meth:`~quop_mpi.Ansatz.set_parameter_map`)
     * :term:`Jacobian Function` (:meth:`~quop_mpi.Ansatz.set_parallel_jacobian`)
     * :term:`Sampling Function` (:meth:`~quop_mpi.Ansatz.set_sampling`)
 
@@ -130,7 +130,8 @@ class Ansatz:
 
     .. code-block :: python
 
-        alg = Ansatz(system_size) alg.set_unitaries([UQ, UW])
+        alg = Ansatz(system_size)
+        alg.set_unitaries([UQ, UW])
         alg.set_observables(observable_function)
 
     Attributes
@@ -340,7 +341,7 @@ class Ansatz:
         self._need_bind_param_map = True
 
     def __to_full(self, vec: np.ndarray) -> np.ndarray:
-        """Ensure vec is the full‑length parameter vector.
+        """Ensure vec is the full-length parameter vector.
         Applies the user mapping if necessary.
         """
         full_len = self.ansatz_depth * self.total_params
@@ -455,9 +456,9 @@ class Ansatz:
             method()
 
     def __populate_quop_result(self):
-        """Populate fields of the :meth:`~quop_mpi.Ansatz.quop_result` dictionary.
+        """Populate fields of the :attr:`~quop_mpi.Ansatz.quop_result` dictionary.
 
-        Called by rank 0 in :meth:`~quop_mpi.Ansatz.MPI_COMM_WORLD` only.
+        Called by rank 0 in :attr:`~quop_mpi.Ansatz.MPI_COMM_WORLD` only.
         """
         self.quop_result["fun"] = copy(self.result["fun"])
         self.quop_result["qubits"] = copy(np.log2(self.system_size))
@@ -527,11 +528,11 @@ class Ansatz:
         ----------
         function : callable or int
             an :term:`Observables Function` or an integer specifying the index
-            of a phase-shift unitary in the list passed to the
-            :meth:`~quop_mpi.Ansatz.set_observables` whose exponent contains the
+            of a phase-shift unitary in the list passed to
+            :meth:`~quop_mpi.Ansatz.set_unitaries` whose exponent contains the
             observable vector.
 
-        observables_dict: FunctionDict, optional
+        observable_dict : FunctionDict, optional
             :term:`FunctionDict` for the Observables Function
         """
 
@@ -664,7 +665,7 @@ class Ansatz:
 
         Samples are taken in blocks of `sample_block_size`. These are passed as
         a list of lists to :literal:`function` (a :term:`Sampling Function`), which returns a value for expectation
-        value/objective function and a boolean that indicates wether the sampled
+        value/objective function and a boolean that indicates whether the sampled
         result should be passed to the classical optimiser.
 
         If :literal:`function` is :literal:`None`, the :term:`objective function` is
@@ -912,7 +913,7 @@ class Ansatz:
 
     def get_expectation_value(self) -> float:
         """Compute the :term:`objective function` at the current
-        value of :meth:`~quop_mpi.Ansatz.variational_parameters`.
+        value of :attr:`~quop_mpi.Ansatz.variational_parameters`.
 
         Returns
         -------
@@ -995,7 +996,7 @@ class Ansatz:
             instance duplicates) if `nodes_per_subcomm > 1`, or the maximum
             number of MPI subcommunicators per node if `nodes_per_subcomm = 1`
         method :{'forward', 'central'} or callable, optional
-            'forward' or 'central' to used the forward difference or central
+            'forward' or 'central' to use the forward difference or central
             difference method for numerical approximation of the partial
             derivatives, or a QuOp Jacobian Function, by default 'forward'
         h : float, optional
@@ -1521,8 +1522,8 @@ class Ansatz:
                 self.__post()
 
     def __execute_subcomm_group_zero(self):
-        """Tasks carried out at :meth:`~quop_mpi.Ansatz.subcomms` group zero during simulation
-        of a QVA via a called to :meth:`~quop_mpi.Ansatz.execute`"""
+        """Tasks carried out at :attr:`~quop_mpi.Ansatz.subcomms` group zero during simulation
+        of a QVA via a call to :meth:`~quop_mpi.Ansatz.execute`."""
         if self.record_objective:
             self.total_n_evolutions = []
 
@@ -1549,8 +1550,8 @@ class Ansatz:
         if self.MPI_COMM_WORLD.Get_rank() != 0:
             return
 
-        print("\nQuOp_MPI Simulatuion Summary", flush=True)
-        print("============================\n", flush=True)
+        print("\nQuOp_MPI Simulation Summary", flush=True)
+        print("===========================\n", flush=True)
         for i, key in enumerate(self.quop_result.keys()):
             printkey = f"{key}:"
             if i == 8:
@@ -1769,7 +1770,7 @@ class Ansatz:
 
     def get_final_state(self) -> Union[np.ndarray[np.complex128], None]:
         """Gather the :term:`final state` to rank 0 of the :literal:`Ansatz` MPI subcommunicator.
-         
+
         Requires a previous call to :meth:`~quop_mpi.Ansatz.execute`, :meth:`~quop_mpi.Ansatz.evolve_state`
         or :meth:`~quop_mpi.Ansatz.benchmark`. If called after :meth:`~quop_mpi.Ansatz.benchmark` the
         gathered state will correspond to the last performed simulation.
@@ -1790,7 +1791,7 @@ class Ansatz:
     def get_probabilities(self) -> Union[np.ndarray[np.float64], None]:
         """Gather probabilities computed from the :term:`final state` at rank 0
         of the :literal:`Ansatz` MPI subcommunicator.
-         
+
         Requires a previous call to :meth:`~quop_mpi.Ansatz.execute`,
         :meth:`~quop_mpi.Ansatz.evolve_state` or :meth:`~quop_mpi.Ansatz.benchmark`. If called after
         :meth:`~quop_mpi.Ansatz.benchmark` the gathered state will correspond to the last
@@ -1829,9 +1830,9 @@ class Ansatz:
 
         ::
 
-            ├── config_name
-                ├── final_state 
-                ├── observables
+            config_name/
+                final_state
+                observables
 
         The minimization result is saved in the 'minimize_result' attribute of
         'config_name' as a formatted string.
@@ -2081,9 +2082,9 @@ class Ansatz:
 
         Returns
         -------
-        float or None]
+        float or None
             returns the objective function value at rank 0 in
-            :meth:`~quop_mpi.Ansatz.MPI_COMM_WORLD`, None otherwise
+            :attr:`~quop_mpi.Ansatz.MPI_COMM_WORLD`, None otherwise
         """
         self.stop = self.subcomms.SUBCOMM.bcast(self.stop, root=0)
 
@@ -2141,7 +2142,7 @@ class Ansatz:
         self.log = True
 
     def __create_new_logfile(self):
-        """Create a new log file, called by rank 0 at :meth:`~quop_mpi.Ansatz.MPI_COMM_WORLD`
+        """Create a new log file, called by rank 0 at :attr:`~quop_mpi.Ansatz.MPI_COMM_WORLD`
         only."""
 
         headings = [
@@ -2213,7 +2214,7 @@ class Ansatz:
         -------
         float or None
             returns the objective function gradient to rank 0 in
-            :meth:`~quop_mpi.Ansatz.MPI.COMM_WORLD`, None otherwise
+            :attr:`~quop_mpi.Ansatz.MPI_COMM_WORLD`, None otherwise
         """
         # Guard: if JACCOMM is None, fall back to scipy's default jacobian
         if self.subcomms.JACCOMM is None:

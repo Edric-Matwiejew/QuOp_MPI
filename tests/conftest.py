@@ -77,7 +77,7 @@ class _GroverOracle:
     
     Uses Grover's search structure: observables are 0 for marked states,
     1 for unmarked. This provides:
-    - Known optimal parameters (gamma=π, t=π/N for complete graph mixing)
+    - Known optimal parameters (gamma=pi, t=pi/N for complete graph mixing)
     - Predictable probability concentration on marked states
     - Analytically computable success probabilities
     
@@ -139,7 +139,7 @@ class _GroverOracle:
         """
         Return optimal variational parameters for given depth.
         
-        For Grover: (gamma=π, t=walk_time) repeated for each layer.
+        For Grover: (gamma=pi, t=walk_time) repeated for each layer.
         """
         return np.array([np.pi, self.optimal_walk_time] * depth, dtype=np.float64)
     
@@ -147,7 +147,7 @@ class _GroverOracle:
         """
         Theoretical probability on marked states after n iterations.
         
-        P = sin²((2k+1)θ) where θ = arcsin(√(M/N))
+        P = sin^2((2k+1)*theta) where theta = arcsin(sqrt(M/N))
         """
         theta = math.asin(math.sqrt(self.n_marked / self.system_size))
         return math.sin((2 * n_iterations + 1) * theta) ** 2
@@ -173,7 +173,7 @@ class _GroverOracle:
         enabling the same Grover-like behavior for testing both algorithms.
         
         The complete graph adjacency matrix A has:
-        - A[i,j] = 1 for all i ≠ j
+        - A[i,j] = 1 for all i != j
         - A[i,i] = 0
         
         This is used with sparse.operator.serial to configure QAOA's mixer.
