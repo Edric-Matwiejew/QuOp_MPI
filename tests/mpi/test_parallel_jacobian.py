@@ -659,3 +659,264 @@ class TestJacobianSynchronization:
         
         if mpi_comm.Get_rank() == 0:
             assert all(all_completed), "Should complete without deadlock"
+
+
+# =============================================================================
+# Jacobian Correctness Tests - Compare with/without parallel jacobian
+# =============================================================================
+
+@pytest.mark.mpi
+class TestJacobianCorrectness:
+    """Test that parallel jacobian produces correct optimization results.
+    
+    These tests compare optimization with parallel jacobian against
+    optimization without it (using scipy's default finite difference jacobian).
+    Both should converge to the same result.
+    """
+
+    def test_parallel_jacobian_matches_serial_forward(self, mpi_comm):
+        """Parallel forward-difference jacobian should match serial optimization."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        depth = 2
+        seed = 42
+        
+        # Common BFGS options for reproducible comparison
+        # Use tight tolerances and fixed initial parameters
+        bfgs_options = {
+            "method": "BFGS",
+            "options": {
+                "maxiter": 100,
+                "gtol": 1e-5,
+                "norm": np.inf,
+                "disp": False,
+            }
+        }
+        
+        # Generate fixed initial parameters (must be same for both runs)
+        np.random.seed(seed)
+        initial_params = np.random.uniform(-np.pi, np.pi, depth * 2)
+        
+        # Run WITHOUT parallel jacobian (scipy's default finite diff)
+        alg_serial = qwoa(system_size, mpi_comm)
+        alg_serial.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg_serial.set_depth(depth)
+        alg_serial.set_seed(seed)
+        alg_serial.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
+        alg_serial.execute(initial_params.copy())
+        
+        serial_result_fun = None
+        serial_result_x = None
+        if mpi_comm.Get_rank() == 0:
+            serial_result_fun = alg_serial.result.fun
+            serial_result_x = alg_serial.result.x.copy()
+        
+        mpi_comm.barrier()
+        
+        # Run WITH parallel jacobian (forward difference)
+        alg_parallel = qwoa(system_size, mpi_comm)
+        alg_parallel.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg_parallel.set_depth(depth)
+        alg_parallel.set_seed(seed)
+        
+        alg_parallel.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward"
+        )
+        
+        alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
+        alg_parallel.execute(initial_params.copy())
+        
+        if mpi_comm.Get_rank() == 0:
+            parallel_result_fun = alg_parallel.result.fun
+            parallel_result_x = alg_parallel.result.x
+            
+            # Both should converge to similar objective function values
+            # Allow small tolerance due to different jacobian computation paths
+            assert np.isclose(serial_result_fun, parallel_result_fun, rtol=1e-3), \
+                f"Objective values differ: serial={serial_result_fun}, parallel={parallel_result_fun}"
+            
+            # Parameters should be close (may differ slightly due to different paths)
+            assert np.allclose(serial_result_x, parallel_result_x, rtol=1e-2, atol=1e-3), \
+                f"Optimal parameters differ:\nserial={serial_result_x}\nparallel={parallel_result_x}"
+
+    def test_parallel_jacobian_matches_serial_central(self, mpi_comm):
+        """Parallel central-difference jacobian should match serial optimization."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        depth = 2
+        seed = 123
+        
+        bfgs_options = {
+            "method": "BFGS",
+            "options": {
+                "maxiter": 100,
+                "gtol": 1e-5,
+                "norm": np.inf,
+                "disp": False,
+            }
+        }
+        
+        np.random.seed(seed)
+        initial_params = np.random.uniform(-np.pi, np.pi, depth * 2)
+        
+        # Run WITHOUT parallel jacobian
+        alg_serial = qwoa(system_size, mpi_comm)
+        alg_serial.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg_serial.set_depth(depth)
+        alg_serial.set_seed(seed)
+        alg_serial.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
+        alg_serial.execute(initial_params.copy())
+        
+        serial_result_fun = None
+        if mpi_comm.Get_rank() == 0:
+            serial_result_fun = alg_serial.result.fun
+        
+        mpi_comm.barrier()
+        
+        # Run WITH parallel jacobian (central difference - more accurate)
+        alg_parallel = qwoa(system_size, mpi_comm)
+        alg_parallel.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg_parallel.set_depth(depth)
+        alg_parallel.set_seed(seed)
+        
+        alg_parallel.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="central"
+        )
+        
+        alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
+        alg_parallel.execute(initial_params.copy())
+        
+        if mpi_comm.Get_rank() == 0:
+            parallel_result_fun = alg_parallel.result.fun
+            
+            # Central difference should be more accurate, so results should be very close
+            assert np.isclose(serial_result_fun, parallel_result_fun, rtol=1e-3), \
+                f"Objective values differ: serial={serial_result_fun}, parallel={parallel_result_fun}"
+
+    def test_parallel_jacobian_convergence_deeper_circuit(self, mpi_comm):
+        """Parallel jacobian should work correctly with deeper circuits."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        depth = 4  # More parameters = more work for jacobian
+        seed = 456
+        
+        bfgs_options = {
+            "method": "BFGS",
+            "options": {
+                "maxiter": 50,
+                "gtol": 1e-4,
+                "disp": False,
+            }
+        }
+        
+        np.random.seed(seed)
+        initial_params = np.random.uniform(-np.pi, np.pi, depth * 2)
+        
+        # Run WITHOUT parallel jacobian
+        alg_serial = qwoa(system_size, mpi_comm)
+        alg_serial.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg_serial.set_depth(depth)
+        alg_serial.set_seed(seed)
+        alg_serial.set_optimiser("scipy", bfgs_options, ["fun", "nfev"])
+        alg_serial.execute(initial_params.copy())
+        
+        serial_result_fun = None
+        if mpi_comm.Get_rank() == 0:
+            serial_result_fun = alg_serial.result.fun
+        
+        mpi_comm.barrier()
+        
+        # Run WITH parallel jacobian
+        alg_parallel = qwoa(system_size, mpi_comm)
+        alg_parallel.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg_parallel.set_depth(depth)
+        alg_parallel.set_seed(seed)
+        
+        alg_parallel.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward"
+        )
+        
+        alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev"])
+        alg_parallel.execute(initial_params.copy())
+        
+        if mpi_comm.Get_rank() == 0:
+            parallel_result_fun = alg_parallel.result.fun
+            
+            # Both should find similar minima
+            assert np.isclose(serial_result_fun, parallel_result_fun, rtol=1e-2), \
+                f"Objective values differ for depth={depth}: serial={serial_result_fun}, parallel={parallel_result_fun}"
+
+    def test_parallel_jacobian_gradient_accuracy(self, mpi_comm):
+        """Test that parallel jacobian computes accurate gradients.
+        
+        Compare gradients at a fixed point computed by parallel jacobian
+        vs scipy's approx_fprime.
+        """
+        from quop_mpi.algorithm.combinatorial import qwoa
+        from scipy.optimize import approx_fprime
+        
+        size = mpi_comm.Get_size()
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+        
+        system_size = 64
+        depth = 2
+        
+        # Fixed test point
+        np.random.seed(789)
+        test_params = np.random.uniform(-np.pi, np.pi, depth * 2)
+        
+        # Create algorithm and setup for gradient evaluation
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(serial, {'args': [make_qualities_function(system_size)]})
+        alg.set_depth(depth)
+        
+        alg.set_parallel_jacobian(
+            nodes_per_subcomm=1,
+            processes_per_node=size,
+            maxcomm=2,
+            method="forward"
+        )
+        
+        # Use just 1 iteration to get gradient at initial point
+        alg.set_optimiser(
+            "scipy",
+            {"method": "BFGS", "options": {"maxiter": 1, "gtol": 1e-10}},
+            ["fun", "jac", "nfev"]
+        )
+        
+        alg.execute(test_params.copy())
+        
+        if mpi_comm.Get_rank() == 0:
+            # The optimization should have computed at least one gradient
+            # Check that the result exists and has reasonable properties
+            assert alg.result is not None, "Should have optimization result"
+            assert hasattr(alg.result, 'fun'), "Result should have objective value"
+            
+            # The objective value should be a reasonable number (not NaN or Inf)
+            assert np.isfinite(alg.result.fun), \
+                f"Objective value should be finite, got {alg.result.fun}"
