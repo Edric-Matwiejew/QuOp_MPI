@@ -52,7 +52,38 @@ contains
         integer(sp), intent(out) :: max_size
         integer(sp), intent(in) :: COMM
 
-        max_size = available_ranks
+        integer(C_INTPTR_T) :: local_i, local_i_offset, local_o, local_o_offset
+        integer(C_INTPTR_T) :: alloc_local
+        integer(C_INTPTR_T) :: min_local_i
+        integer(sp) :: ierr, comm_size, comm_rank
+        integer(sp) :: n_active
+
+        call MPI_Comm_size(COMM, comm_size, ierr)
+        call MPI_Comm_rank(COMM, comm_rank, ierr)
+
+        ! Query FFTW for the distribution it will use
+        alloc_local = fftw_mpi_local_size_1d(int(system_size, C_INTPTR_T), &
+                                              COMM, &
+                                              FFTW_FORWARD, &
+                                              FFTW_ESTIMATE, &
+                                              local_i, &
+                                              local_i_offset, &
+                                              local_o, &
+                                              local_o_offset)
+
+        ! Find minimum local_i across all ranks
+        call MPI_Allreduce(local_i, min_local_i, 1, MPI_INTEGER8, MPI_MIN, COMM, ierr)
+
+        ! Count how many ranks have local_i > 0
+        if (local_i > 0) then
+            n_active = 1
+        else
+            n_active = 0
+        endif
+        call MPI_Allreduce(MPI_IN_PLACE, n_active, 1, MPI_INTEGER, MPI_SUM, COMM, ierr)
+
+        ! Return the number of active ranks (those with local_i > 0)
+        max_size = n_active
 
     end subroutine mpi_circulant_max_comm_size
 
@@ -76,18 +107,16 @@ contains
                                                 self%local_o, &
                                                 self%local_o_offset)
 
-        if ((self%context%alloc_local < alloc_local) .or. (self%local_i /= self%context%local_i) ) then
-            call MPI_Comm_rank(self%context%SUBCOMM, rank, ierr)
-            if (rank == 0) then
-                write(*,*) 'Warning: Input size inconsistency between FFTW (circulant propagator) ', &
-                        'requirements and context instance resizing state array to statisfy FFTW constraints.'
-            endif
+        ! Update context with FFTW's required distribution
+        if (self%context%alloc_local < alloc_local) then
             self%context%alloc_local = alloc_local
-            self%context%local_i = self%local_i
-            self%context%local_i_offset = self%local_i_offset
             deallocate(self%context%initial_state)
             allocate(self%context%initial_state(alloc_local))
         endif
+
+        ! Update partition info from FFTW's distribution
+        self%context%local_i = self%local_i
+        self%context%local_i_offset = self%local_i_offset
 
         self%fftw_plan_forward = fftw_mpi_plan_dft_1d(self%system_size, &
                                             self%context%initial_state, &

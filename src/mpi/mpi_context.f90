@@ -34,9 +34,6 @@ module mpi_backend
         !procedure :: get_final_state => context_get_final_state
         procedure :: set_observables => context_set_observables
         procedure :: get_observables => context_get_observables
-        procedure :: get_local_i => context_get_local_i
-        procedure :: get_local_i_offset => context_get_local_i_offset
-        procedure :: get_alloc_local => context_get_alloc_local
 
     end type mpi_context
 
@@ -124,7 +121,7 @@ contains
     subroutine context_set_state(self, state)
         class(mpi_context), intent(inout) :: self
         complex(dp), intent(in) :: state(:)
-        self%initial_state = state
+        self%initial_state(:size(state)) = state
     end subroutine context_set_state
 
     subroutine context_get_state(self, state)
@@ -132,32 +129,5 @@ contains
         complex(dp), intent(inout) :: state(:)
         state = self%initial_state
     end subroutine context_get_state
-
-    !subroutine context_set_final_state(self, state)
-    !    class(mpi_context), intent(inout) :: self
-    !    complex(dp), intent(in) :: state(:)
-    !    self%final_state = state
-    !end subroutine context_set_final_state
-
-    !subroutine context_get_final_state(self, state)
-    !    class(mpi_context), intent(inout) :: self
-    !    complex(dp), intent(inout) :: state(:)
-    !    state = self%final_state
-    !end subroutine context_get_final_state
-
-    integer(dp) function context_get_local_i(self)
-        class(mpi_context), intent(in) :: self
-        context_get_local_i = self%local_i
-    end function context_get_local_i
-
-    integer(dp) function context_get_local_i_offset(self)
-        class(mpi_context), intent(in) :: self
-        context_get_local_i_offset = self%local_i_offset
-    end function context_get_local_i_offset
-
-    integer(dp) function context_get_alloc_local(self)
-        class(mpi_context), intent(in) :: self
-        context_get_alloc_local = self%alloc_local
-    end function context_get_alloc_local
 
 end module mpi_backend

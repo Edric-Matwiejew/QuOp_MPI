@@ -1053,6 +1053,8 @@ class Ansatz:
         if self.subcomms.in_subcomm():
             # create the default vector partitioning, may be altered during the unitary planning phase.
             self.local_i, self.local_i_offset, self.alloc_local, self.partition_table = vector_partitioning(self.system_size, self.subcomms.SUBCOMM)
+            # Update MPI_COMM to the (possibly shrunken) subcomm
+            self.MPI_COMM = self.subcomms.SUBCOMM
             
     @property
     def n_free_params(self):
@@ -1119,20 +1121,6 @@ class Ansatz:
                     unitary.gen_operator()
 
                 unitary.seed = self.seed + i
-
-            # Sync partition info from the context in case propagator planning resized it
-            # (e.g., circulant propagator with non-power-of-2 system sizes)
-            if self.context is not None:
-                new_local_i, new_local_i_offset, new_alloc_local = self.context.sync_partition()
-                if new_local_i != self.local_i or new_alloc_local != self.alloc_local:
-                    self.local_i = new_local_i
-                    self.local_i_offset = new_local_i_offset
-                    self.alloc_local = new_alloc_local
-                    # Regenerate partition table
-                    gathered = self.subcomms.SUBCOMM.allgather(self.local_i)
-                    self.partition_table = np.array([0] + list(np.cumsum(gathered)), dtype=np.int64)
-                    # Regenerate observables with new partition size
-                    self.__gen_observables()
 
     def __gen_depth(self):
         """Computes the total number of variational parameters at the current
