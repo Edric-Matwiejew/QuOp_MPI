@@ -309,8 +309,7 @@ class Ansatz:
         self._param_map_parsed     = None                 # interface-wrapped fn
         self.param_map_dict        = {"args": [], "kwargs": {}}
         self._need_bind_param_map  = False                # postpone binding until SUBCOMM exists
-
-
+        self._n_free_params        = None                 # set when param map is configured
 
         atexit.register(self.__exit)
 
@@ -1066,6 +1065,17 @@ class Ansatz:
             # create the default vector partitioning, may be altered durring the unitary planning phase.
             self.local_i, self.local_i_offset, self.alloc_local, self.partition_table = vector_partitioning(self.system_size, self.subcomms.SUBCOMM)
             
+    @property
+    def n_free_params(self):
+        """Number of free parameters presented to the optimizer.
+        
+        Without a parameter map, this equals n_variational_parameters.
+        With a parameter map, this is the size of the reduced parameter vector.
+        """
+        if self._has_param_map and self._n_free_params is not None:
+            return self._n_free_params
+        return self.n_variational_parameters
+
     def __update_var_map(self):
         """Queries :literal:`Unitary` instances passed to the :class:`~quop_mpi.Ansatz` instance via the
         :meth:`~quop_mpi.Ansatz.set_unitaries` methods to determine the number and ordering of
@@ -1074,7 +1084,8 @@ class Ansatz:
         if self.subcomms.get_n_subcomms() > 1:
             self.var_map = [[] for _ in range(self.subcomms.get_n_subcomms())]
             if self.subcomms.in_subcomm():
-                for var in range(self.n_free_params):
+                n_params = self.n_free_params
+                for var in range(n_params):
                     self.var_map[1:][var % (self.subcomms.get_n_subcomms() - 1)].append(
                         var
                     )
@@ -2172,15 +2183,19 @@ class Ansatz:
         x = self.subcomms.JACCOMM.bcast(x, 0)
 
         if self.subcomms.JACCOMM.Get_rank() != 0:
-            self.variational_parameters = self.__place_free_params(
-                self.variational_parameters, x
-            )
+            # When no parameter map exists, x is the full variational parameters
+            # When a parameter map exists, x is the free params that get mapped to full
+            if self._has_param_map:
+                self.variational_parameters = self.__to_full(x)
+            else:
+                self.variational_parameters = x
 
         partials = []
         if self.subcomms.JACCOMM.Get_rank() != 0:
             for var in self.var_map[self.subcomms.get_subcomm_index()]:
                 self.jacobian.update_parameters()
-                partials.append(self.jacobian.call(self.free_params[var]))
+                # Pass the parameter index - jacobian.call computes partial derivative
+                partials.append(self.jacobian.call(var))
 
         opt_root = self.subcomms.get_subcomm_roots()[self.subcomms.colour]
 
