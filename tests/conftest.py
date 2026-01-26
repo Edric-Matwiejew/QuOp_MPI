@@ -8,16 +8,46 @@ import os
 import pytest
 import numpy as np
 import math
+from dataclasses import dataclass
 from mpi4py import MPI
 
 # Set OMP_NUM_THREADS=1 to prevent OpenMP thread contention with MPI
 # This must be set before any OpenMP-enabled libraries are loaded
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-# Import the Grover parameter calculator for test oracle construction
-import sys
-sys.path.insert(0, '/home/edric/Pawsey/repos/QuOp_MPI')
-from grovers_params import grover_params
+
+# =============================================================================
+# Grover's Algorithm Parameter Calculator
+# =============================================================================
+
+@dataclass
+class GroverResult:
+    """Result of Grover parameter calculation."""
+    k_opt: int          # Optimal number of iterations
+    theta: float        # Rotation angle per iteration
+    success_prob: float # Probability of measuring a marked state
+
+
+def grover_params(n_marked: int, system_size: int) -> GroverResult:
+    """
+    Calculate optimal Grover algorithm parameters.
+    
+    For M marked states out of N total states:
+    - theta = arcsin(sqrt(M/N))
+    - k_opt = floor(pi / (4 * theta))
+    - success_prob = sin^2((2*k_opt + 1) * theta)
+    """
+    if n_marked <= 0 or system_size <= 0:
+        return GroverResult(k_opt=0, theta=0.0, success_prob=0.0)
+    
+    if n_marked >= system_size:
+        return GroverResult(k_opt=0, theta=np.pi/2, success_prob=1.0)
+    
+    theta = np.arcsin(np.sqrt(n_marked / system_size))
+    k_opt = max(int(np.floor(np.pi / (4 * theta))), 1)
+    success_prob = np.sin((2 * k_opt + 1) * theta) ** 2
+    
+    return GroverResult(k_opt=k_opt, theta=theta, success_prob=success_prob)
 
 
 # =============================================================================

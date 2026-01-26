@@ -47,6 +47,7 @@ function(add_f2py_library)
     OUTPUT  "${module_pyf}"
     COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py
             -h "${module_pyf}"
+            -m "${F2PY_LIBRARY_MODULE_NAME}"
             "${PREPROCESSED_SRC}"
             --overwrite-signature
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
@@ -59,7 +60,6 @@ function(add_f2py_library)
     OUTPUT  "${module_f2py_wrapper}" "${module_f2py_c}"
     COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py
             --f2cmap "${f2py_cmap}"
-            -m "${F2PY_LIBRARY_MODULE_NAME}"
             "${module_pyf}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     DEPENDS "${module_pyf}"

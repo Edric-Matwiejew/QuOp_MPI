@@ -17,7 +17,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics"
 ]
 dependencies = [
-    "numpy<1.26",
+    "numpy>=1.26",
     "mpi4py>=3.1.2",
     "scipy>=1.9.1",
     "h5py>=3.0.0",
@@ -30,10 +30,10 @@ requires = [
     "build",
     "wheel",
     "ninja",
-    "scikit-build==0.13.0",
-    "cmake>=3.5,<4",
-    "numpy<1.26",
-    "setuptools>=42,<=68.0.0"
+    "scikit-build>=0.17",
+    "cmake>=3.18,<4",
+    "numpy>=2.0",
+    "setuptools>=42"
 ]
 build-backend = "setuptools.build_meta"
 
