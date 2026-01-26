@@ -430,3 +430,360 @@ class TestSaveDataIntegrity:
                 assert np.all(np.isfinite(saved_obs)), "Observables contain non-finite values"
         
         del alg
+
+
+# =============================================================================
+# Tests for Parallel I/O Data Integrity
+# =============================================================================
+
+@pytest.mark.mpi
+class TestParallelIODataIntegrity:
+    """Tests verifying data integrity when saved in parallel across MPI ranks."""
+
+    def test_distributed_state_assembled_correctly(self, mpi_comm, temp_h5_file):
+        """Verify that distributed state pieces are correctly assembled in HDF5."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.__utils.__mpi import gather_array
+        import h5py
+        
+        system_size = 16
+        
+        def qualities(local_i, local_i_offset):
+            # Each rank has unique observable values for identification
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64) * 2.0
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        # Use non-trivial parameters for non-uniform state
+        params = np.array([0.3, 0.5])
+        alg.evolve_state(params)
+        
+        # Get the full state via proper API
+        full_state_gathered = alg.get_final_state()
+        
+        # Save
+        config_name = "dist_state_test"
+        alg.save(temp_h5_file, config_name)
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
+                
+                # Verify saved state matches gathered state
+                np.testing.assert_allclose(
+                    saved_state, full_state_gathered, rtol=1e-14,
+                    err_msg="Saved state does not match gathered distributed state"
+                )
+        
+        del alg
+
+    def test_distributed_observables_assembled_correctly(self, mpi_comm, temp_h5_file):
+        """Verify that distributed observables are correctly assembled in HDF5."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.__utils.__mpi import gather_array
+        import h5py
+        
+        system_size = 32
+        
+        def qualities(local_i, local_i_offset):
+            # Unique pattern: offset squared to identify rank contributions
+            return np.array([
+                (local_i_offset + i)**2 * 0.1 
+                for i in range(local_i)
+            ], dtype=np.float64)
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        params = np.array([0.0, 0.0])
+        alg.execute(params)
+        
+        # Gather observables after setup (observables are set after execute)
+        local_obs = alg.observables[:alg.local_i]
+        partition_table = alg.partition_table
+        
+        full_obs_gathered = gather_array(local_obs, partition_table, mpi_comm)
+        
+        config_name = "dist_obs_test"
+        alg.save(temp_h5_file, config_name)
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
+                
+                # Verify saved observables match gathered values
+                np.testing.assert_allclose(
+                    saved_obs, full_obs_gathered, rtol=1e-14,
+                    err_msg="Saved observables do not match gathered distributed observables"
+                )
+        
+        del alg
+
+    def test_partition_contributions_are_contiguous(self, mpi_comm, temp_h5_file):
+        """Verify each rank's partition appears at correct offset in saved file."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        import h5py
+        
+        system_size = 24
+        
+        # Use rank-identifiable values
+        def qualities(local_i, local_i_offset):
+            rank = mpi_comm.Get_rank()
+            # Mark with rank * 1000 + position for easy identification
+            return np.array([
+                rank * 1000 + local_i_offset + i 
+                for i in range(local_i)
+            ], dtype=np.float64)
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        # Store local info for verification
+        local_i = alg.local_i
+        local_i_offset = alg.local_i_offset
+        rank = mpi_comm.Get_rank()
+        
+        params = np.array([0.0, 0.0])
+        alg.execute(params)
+        
+        config_name = "partition_test"
+        alg.save(temp_h5_file, config_name)
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
+                
+                # Verify the structure matches expected rank contributions
+                # Each element should encode: rank * 1000 + global_index
+                for i in range(system_size):
+                    val = saved_obs[i]
+                    encoded_rank = int(val) // 1000
+                    encoded_index = int(val) % 1000
+                    
+                    assert encoded_index == i, \
+                        f"Index mismatch at position {i}: expected {i}, got {encoded_index}"
+        
+        del alg
+
+    def test_complex_data_real_imag_preserved(self, mpi_comm, temp_h5_file):
+        """Verify complex state data preserves both real and imaginary parts."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        import h5py
+        
+        system_size = 16
+        
+        def qualities(local_i, local_i_offset):
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        # Use parameters that produce complex amplitudes
+        params = np.array([np.pi/4, np.pi/3])
+        alg.evolve_state(params)
+        
+        # Store expected state using proper API
+        full_expected = alg.get_final_state()
+        
+        config_name = "complex_test"
+        alg.save(temp_h5_file, config_name)
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
+                
+                # Verify real parts match
+                np.testing.assert_allclose(
+                    saved_state.real, full_expected.real, rtol=1e-14,
+                    err_msg="Real parts of state do not match"
+                )
+                
+                # Verify imaginary parts match
+                np.testing.assert_allclose(
+                    saved_state.imag, full_expected.imag, rtol=1e-14,
+                    err_msg="Imaginary parts of state do not match"
+                )
+        
+        del alg
+
+    def test_uneven_partition_sizes(self, mpi_comm, temp_h5_file):
+        """Verify correct saving with uneven partition sizes across ranks."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        import h5py
+        
+        # Use a system size that doesn't divide evenly by common rank counts
+        # 17 is prime, guarantees uneven partitioning
+        system_size = 17
+        
+        def qualities(local_i, local_i_offset):
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        # Verify uneven partitioning exists
+        all_local_i = mpi_comm.allgather(alg.local_i)
+        
+        params = np.array([0.2, 0.3])
+        alg.execute(params)
+        
+        config_name = "uneven_test"
+        alg.save(temp_h5_file, config_name)
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
+                
+                # Verify correct sizes
+                assert saved_obs.shape[0] == system_size, \
+                    f"Observables size {saved_obs.shape[0]} != system_size {system_size}"
+                assert saved_state.shape[0] == system_size, \
+                    f"State size {saved_state.shape[0]} != system_size {system_size}"
+                
+                # Verify observables are sequential
+                expected_obs = np.arange(system_size, dtype=np.float64)
+                np.testing.assert_allclose(saved_obs, expected_obs, rtol=1e-14)
+        
+        del alg
+
+    def test_large_system_parallel_save(self, mpi_comm, temp_h5_file):
+        """Test parallel save with larger system size for stress testing."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        import h5py
+        
+        system_size = 256  # Larger system
+        
+        def qualities(local_i, local_i_offset):
+            return np.sin(np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64))
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        params = np.array([0.1, 0.2])
+        alg.execute(params)
+        
+        config_name = "large_test"
+        alg.save(temp_h5_file, config_name)
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
+                saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
+                
+                # Verify sizes
+                assert saved_state.shape[0] == system_size
+                assert saved_obs.shape[0] == system_size
+                
+                # Verify normalization
+                probs = np.abs(saved_state)**2
+                assert np.isclose(np.sum(probs), 1.0, rtol=1e-10), \
+                    f"State not normalized: sum(|psi|^2) = {np.sum(probs)}"
+                
+                # Verify observables match expected
+                expected_obs = np.sin(np.arange(system_size, dtype=np.float64))
+                np.testing.assert_allclose(saved_obs, expected_obs, rtol=1e-10)
+        
+        del alg
+
+    def test_initial_state_parallel_save(self, mpi_comm, temp_h5_file):
+        """Verify initial_state is correctly saved in parallel."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        import h5py
+        
+        system_size = 32
+        
+        def qualities(local_i, local_i_offset):
+            return np.ones(local_i, dtype=np.float64)
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        params = np.array([0.0, 0.0])
+        alg.execute(params)
+        
+        config_name = "init_state_test"
+        alg.save(temp_h5_file, config_name)
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                saved_init = np.array(f[config_name]["initial_state"]).view(np.complex128)
+                
+                # Initial state should be uniform superposition
+                expected_amplitude = 1.0 / np.sqrt(system_size)
+                expected_init = np.full(system_size, expected_amplitude, dtype=np.complex128)
+                
+                np.testing.assert_allclose(saved_init, expected_init, rtol=1e-10)
+        
+        del alg
+
+    def test_multiple_configs_independent(self, mpi_comm, temp_h5_file):
+        """Verify multiple saved configs don't interfere with each other."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        import h5py
+        
+        system_size = 16
+        
+        def qualities(local_i, local_i_offset):
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
+        
+        alg = qwoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(1)
+        
+        # Save with different parameters
+        params1 = np.array([0.1, 0.1])
+        alg.evolve_state(params1)
+        alg.save(temp_h5_file, "config_1", action="a")
+        
+        params2 = np.array([0.5, 0.5])
+        alg.evolve_state(params2)
+        alg.save(temp_h5_file, "config_2", action="a")
+        
+        params3 = np.array([1.0, 1.0])
+        alg.evolve_state(params3)
+        alg.save(temp_h5_file, "config_3", action="a")
+        
+        mpi_comm.barrier()
+        
+        if mpi_comm.Get_rank() == 0:
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                state1 = np.array(f["config_1"]["final_state"]).view(np.complex128)
+                state2 = np.array(f["config_2"]["final_state"]).view(np.complex128)
+                state3 = np.array(f["config_3"]["final_state"]).view(np.complex128)
+                
+                # States should be different
+                assert not np.allclose(state1, state2), "config_1 and config_2 should differ"
+                assert not np.allclose(state2, state3), "config_2 and config_3 should differ"
+                assert not np.allclose(state1, state3), "config_1 and config_3 should differ"
+                
+                # Each should be normalized
+                for state, name in [(state1, "config_1"), (state2, "config_2"), (state3, "config_3")]:
+                    probs = np.abs(state)**2
+                    assert np.isclose(np.sum(probs), 1.0, rtol=1e-10), \
+                        f"{name} not normalized"
+        
+        del alg
+
