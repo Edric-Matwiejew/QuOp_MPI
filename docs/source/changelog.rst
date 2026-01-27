@@ -4,11 +4,6 @@
 Changelog
 =========
 
-All notable changes to QuOp_MPI are documented here.
-
-The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
-and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
-
 Unreleased
 ==========
 
@@ -23,14 +18,6 @@ Added
 - Comprehensive QuOp Functions documentation with implementation patterns (plain function, factory/closure, callable class)
 - Bindable attributes tables in documentation for both Ansatz and Unitary
 - Naming convention recommendation (underscore prefix) for custom QuOp Function parameters
-
-Changed
--------
-
-- Ansatz now inherits from ``Bindable`` base class
-- Unitary now inherits from ``Bindable`` base class
-- ``_interface.py`` now properly skips ``*args`` and ``**kwargs`` when parsing function signatures
-
 - Comprehensive MPI-enabled test suite with pytest-mpi (380+ tests)
 - Unit tests for toolkit module (kronecker, pauli, string functions)
 - Unit tests for NLopt wrapper module
@@ -43,6 +30,9 @@ Changed
 Changed
 -------
 
+- Ansatz now inherits from ``Bindable`` base class
+- Unitary now inherits from ``Bindable`` base class
+- ``_interface.py`` now properly skips ``*args`` and ``**kwargs`` when parsing function signatures
 - **Major refactor of Ansatz.py**: Extracted cohesive subsystems into mixins for improved maintainability
 
   - ``_sampling.py``: Simulated quantum measurement functionality
@@ -58,10 +48,14 @@ Changed
   - Renamed internal modules from ``__*.py`` to ``_*.py`` (single underscore for private modules)
   - Moved ``_utils/_nlopt_wrap.py`` → ``_optimization/nlopt_wrap.py``
 
-- Removed orphaned ``algorithm/multivariable.py`` (duplicate of ``algorithm/multivariable/``)
 - Refactored optional dependencies in pyproject.toml (``[dev]`` replaces ``[all]``)
 - Updated documentation sidebar with grouped navigation
 - NumPy 2.x compatibility
+
+Removed
+-------
+
+- Orphaned ``algorithm/multivariable.py`` (duplicate of ``algorithm/multivariable/``)
 
 Fixed
 -----
