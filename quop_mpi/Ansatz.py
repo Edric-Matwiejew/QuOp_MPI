@@ -10,20 +10,26 @@ from time import time
 import numpy as np
 from mpi4py import MPI
 from . import config
-from .__utils.__interface import interface
-from .__utils.__mpi import gather_array, subcomms
-from .__utils.__filenames import ensure_path_and_extension
-from .__utils.__tracker import job_tracker
+from ._utils._interface import interface
+from ._utils._mpi import gather_array
+from ._utils._filenames import ensure_path_and_extension
+from ._utils._tracker import job_tracker
 import inspect
 
-from .__utils.comm_size import vector_partitioning, max_compatible_size
-from .__lib.context import context
+from ._utils._comm_size import vector_partitioning, max_compatible_size
+from ._lib.context import context
+from ._sampling import Sampling
+from ._logging import Logging
+from ._communicator import Communicator
+from ._optimization import Jacobian, forward_differences, central
+from ._benchmark import Benchmark
+from ._utils._bindable import Bindable
 
 ##########################################
 # Collect profiling data if QUOP_PROFILE=1
 ##########################################
 
-from .__profile import profiler
+from ._profile import profiler
 
 ####################################
 # imports and classes for type hints
@@ -35,90 +41,20 @@ from typing import Callable, Union, Iterable
 Intracomm = MPI.Intracomm
 iterable = Iterable
 
-################################################################
-# Numerical Approximations of the objective function derivatives
-################################################################
-
-
-def forward_differences(
-    variational_parameters: np.ndarray[float], evaluate: Callable, h: float, var: int
-) -> float:
-    """Computes an approximation of the partial derivative of a QVA at point
-    :literal:`variational_parameters` with respect to the parameter of index :literal:`var` using
-    the forward differences method.
-
-    Parameters
-    ----------
-    variational_parameters : ndarray[float]
-        1-D real array of ansatz variational parameters
-    evaluate : callable
-        method or function for computation of the objective function value (see
-        :meth:`~quop_mpi.Ansatz.evaluate`)
-    h : float
-        step-size used in forward difference approximation
-    var : int
-        index of the variational parameter for which the partial derivative is
-        to be approximated.
-
-    Returns
-    -------
-    float
-        approximate partial derivative
-    """
-    expectation = evaluate(variational_parameters)
-    x = variational_parameters.copy()
-    x[var] += h
-    expectation_forward = evaluate(x)
-    return (expectation_forward - expectation) / h
-
-
-def central(
-    variational_parameters: np.ndarray[float], evaluate: Callable, h: float, var: int
-) -> float:
-    """Computes an approximation of the partial derivative of a QVA at point
-    :literal:`variational_parameters` with respect to the parameter of index :literal:`var` using
-    the central differences method.
-
-    Parameters
-    ----------
-    variational_parameters : ndarray[float]
-        1-D real array of ansatz variational parameters
-    evaluate : callable
-        method or function for computation of the objective function value (see
-        :meth:`~quop_mpi.Ansatz.evaluate`)
-    h : float
-        Step-size used in central difference approximation.
-    var : int
-        index of the variational parameter for which the partial derivative is
-        to be approximated.
-
-    Returns
-    -------
-    float
-        approximate partial derivative.
-    """
-    x_back = copy(variational_parameters)
-    x_forward = copy(variational_parameters)
-    x_back[var] -= h
-    x_forward[var] += h
-    expectation_back = evaluate(x_back)
-    expectation_forward = evaluate(x_forward)
-    return (expectation_forward - expectation_back) / (2 * h)
-
 
 ###################
 # QuOp Ansatz Class
 ###################
 
 #@MPI_trace
-class Ansatz:
+class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     """Define and simulate a :term:`QVA`.
 
     Associated QuOp Functions:
 
     * :term:`Initial State Function` (:meth:`~quop_mpi.Ansatz.set_initial_state`)
     * :term:`Observables Function` (:meth:`~quop_mpi.Ansatz.set_observables`)
-    * :term:`Free Parameters Function` (:meth:`~quop_mpi.Ansatz.set_free_params`)
+    * :term:`Parameter Map Function` (:meth:`~quop_mpi.Ansatz.set_parameter_map`)
     * :term:`Jacobian Function` (:meth:`~quop_mpi.Ansatz.set_parallel_jacobian`)
     * :term:`Sampling Function` (:meth:`~quop_mpi.Ansatz.set_sampling`)
 
@@ -130,7 +66,8 @@ class Ansatz:
 
     .. code-block :: python
 
-        alg = Ansatz(system_size) alg.set_unitaries([UQ, UW])
+        alg = Ansatz(system_size)
+        alg.set_unitaries([UQ, UW])
         alg.set_observables(observable_function)
 
     Attributes
@@ -220,21 +157,14 @@ class Ansatz:
         self.optimiser = (
             None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
         )
-        self.optimiser = (
-            None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
-        )
 
-        self.setup_log = False  # whether results will be recorded in a *.log file.
-
-        # variables managed by the 'system' class self.stop = False  # synchronise ranks during optimisation
+        # variables managed by the 'system' class
+        self.stop = False  # synchronise ranks during optimisation
 
         self.expectation = None  # expectation value of the system
         self.initial_state_input = None
         self.ansatz_initial_state = None  # initial state before algorithm evolution
         self.final_state = None  # quantum state during and after simulation
-        self.jacobian_input = None  # for parallel jacobian evaluation
-        self.var = None  # for parallel jacobian evaluation
-        self.benchmarking = False  # indicates whether the benchmark method is running
         self.last_evaluated = np.empty(
             0
         )  # last set of variational parameters passed to 'evolve_state'.
@@ -242,28 +172,18 @@ class Ansatz:
         self.setup_called = False
         self.destroy_called = False
 
-        self.jac_ranks = None
-
         self.verbose_objective = False
         self.objective_cnt = 0
         self.record_objective = False
+        self.objective_history = []
 
         self.n_evolutions = 0
         self.total_n_evolutions = []
 
-        self.log = False
-
-        # arguments for subcomms class initialisation
-        self.nodes_per_subcomm = None
-        self.processes_per_node = None
-        self.maxcomm = None
-
         self.setup_depth = True
-        self.setup_parallel = True
         self.setup_unitaries = True
         self.setup_observables = True
         self.setup_initial_state = True
-        self.setup_log = False
         self.setup_optimiser = True
         self.setup_objective = False
 
@@ -275,32 +195,21 @@ class Ansatz:
 
         self.seed = 0
 
-        self.sampling_dict = {}
-        self.sample_indexes = []
-        self.samples = []
-        self.sample_minimum_indexes = []
-        self.variational_parameter_history = []
-
-        # sampling variables
-        self.samples = None
-        self.sample_block_size = None
-        self.max_sample_iterations = None
-        self.sampling_function = None
-        self.sampling_function_input = None
-        self.sampling = False
-        self.global_minimum = None
-        self.minimum_sampled = np.inf
-        self.shots_to_global_minimum = "not found"
-        self.global_minimum_found = False
-        self.total_shots = 0
-        self.setup_sampling = False
-        self.filename = None
+        # Initialize sampling subsystem
+        self._init_sampling()
+        # Initialize logging subsystem
+        self._init_logging()
+        # Initialize communicator subsystem (MPI subcommunicators)
+        self._init_communicator()
+        # Initialize jacobian subsystem (optional parallel gradient)
+        self._init_jacobian()
+        # Initialize benchmark subsystem
+        self._init_benchmark()
         self.pre_execution_methods = []
         self.post_execution_methods = []
         self.quop_result = {}
         self.setup_var_map = True
         self.setup_called = False
-        self.var_map = None
         self.reset = False
 
         self._has_param_map        = False                # flag
@@ -308,13 +217,13 @@ class Ansatz:
         self._param_map_parsed     = None                 # interface-wrapped fn
         self.param_map_dict        = {"args": [], "kwargs": {}}
         self._need_bind_param_map  = False                # postpone binding until SUBCOMM exists
-
-
+        self._n_free_params        = None                 # set when param map is configured
 
         atexit.register(self.__exit)
 
     def set_parameter_map(
         self,
+        n_free_params: int,
         mapping_fn: Callable[[np.ndarray], np.ndarray],
         mapping_dict: dict | None = None,
     ):
@@ -323,6 +232,9 @@ class Ansatz:
 
         Parameters
         ----------
+        n_free_params : int
+            The number of free parameters in the reduced parameter vector.
+            This is the dimensionality of the optimization problem.
         mapping_fn : callable
             ``mapping_fn(free_vec, *args, **kwargs) -> full_vec``.
             *free_vec* is the vector presented to the optimiser;
@@ -332,18 +244,14 @@ class Ansatz:
             to the mapping function.
         """
 
-        if self.jacobian_input is not None:
-            raise ValueError(
-                "Cannot set a parameter‐mapping function when a parallel Jacobian is configured."
-            )
-
         self._has_param_map = True
         self._param_map_raw = mapping_fn
+        self._n_free_params = n_free_params
         self.__parse_function_dict__(mapping_dict, "param_map_dict")
         self._need_bind_param_map = True
 
     def __to_full(self, vec: np.ndarray) -> np.ndarray:
-        """Ensure vec is the full‑length parameter vector.
+        """Ensure vec is the full-length parameter vector.
         Applies the user mapping if necessary.
         """
         full_len = self.ansatz_depth * self.total_params
@@ -398,8 +306,6 @@ class Ansatz:
             :class:`~quop_mpi.Ansatz` attribute to be set to a :literal:`ParsedFunctionDict` instance
         """
 
-        parsed_dict = getattr(self, attribute_name)
-
         function_dict = {} if function_dict is None else function_dict
         parsed_dict = {"args": [], "kwargs": {}}
 
@@ -417,7 +323,7 @@ class Ansatz:
             self.__gen_depth()
             self.setup_depth = False
 
-        self.__update_var_map()
+        self._update_var_map()
 
         if self.setup_observables:
             self.__gen_observables()
@@ -440,11 +346,11 @@ class Ansatz:
             self.setup_optimiser = False
 
         if self.setup_sampling:
-            self.__gen_sampling()
+            self._gen_sampling()
             self.setup_sampling = False
 
         if self.setup_log:
-            self.__gen_log()
+            self._gen_log()
             self.setup_log = False
 
         if self._need_bind_param_map:
@@ -460,15 +366,15 @@ class Ansatz:
             method()
 
     def __populate_quop_result(self):
-        """Populate fields of the :meth:`~quop_mpi.Ansatz.quop_result` dictionary.
+        """Populate fields of the :attr:`~quop_mpi.Ansatz.quop_result` dictionary.
 
-        Called by rank 0 in :meth:`~quop_mpi.Ansatz.MPI_COMM_WORLD` only.
+        Called by rank 0 in :attr:`~quop_mpi.Ansatz.MPI_COMM_WORLD` only.
         """
         self.quop_result["fun"] = copy(self.result["fun"])
         self.quop_result["qubits"] = copy(np.log2(self.system_size))
         self.quop_result["system size"] = copy(self.system_size)
         self.quop_result["ansatz_depth"] = copy(self.ansatz_depth)
-        self.quop_result["varitional_parameters"] = deepcopy(
+        self.quop_result["variational_parameters"] = deepcopy(
             self.result["x"]
         )
         self.quop_result["mapped_parameters"] = deepcopy(
@@ -490,7 +396,9 @@ class Ansatz:
         if (self.MPI_COMM_WORLD.Get_rank() == 0) and (self.result is not None):
             self.__populate_quop_result()
 
-        self.subcomms.SUBCOMM.barrier()
+        # Only ranks in the subcomm have a valid SUBCOMM to call barrier on
+        if self.subcomms.in_subcomm():
+            self.subcomms.SUBCOMM.barrier()
         self.variational_parameters = None
 
         for method in self.post_execution_methods:
@@ -532,11 +440,11 @@ class Ansatz:
         ----------
         function : callable or int
             an :term:`Observables Function` or an integer specifying the index
-            of a phase-shift unitary in the list passed to the
-            :meth:`~quop_mpi.Ansatz.set_observables` whose exponent contains the
+            of a phase-shift unitary in the list passed to
+            :meth:`~quop_mpi.Ansatz.set_unitaries` whose exponent contains the
             observable vector.
 
-        observables_dict: FunctionDict, optional
+        observable_dict : FunctionDict, optional
             :term:`FunctionDict` for the Observables Function
         """
 
@@ -597,7 +505,7 @@ class Ansatz:
 
             self.optimiser = sp_minimize
         elif optimiser == "nlopt":
-            from quop_mpi.__utils.__nlopt_wrap import minimize as nlopt_minimize
+            from quop_mpi._optimization.nlopt_wrap import minimize as nlopt_minimize
 
             self.optimiser = nlopt_minimize
         elif callable(optimiser):
@@ -608,13 +516,7 @@ class Ansatz:
 
         self.setup_optimiser = True
 
-    def __parse_jacobian(self):
-        """Bind a QuOp Jacobian Function to the attributes of an instantiated
-        :class:`~quop_mpi.Ansatz` instance.
-        """
-        self.jacobian = interface(
-            [self], self.jacobian_input[0], "jacobian", self.subcomms.SUBCOMM
-        )
+    # __parse_jacobian is inherited from Jacobian mixin
 
     def set_depth(self, depth: int):
         """Set the simulated :term:`ansatz depth`.
@@ -658,251 +560,57 @@ class Ansatz:
             self.subcomms.SUBCOMM,
         )
 
-    def set_sampling(
-        self,
-        sample_block_size: int,
-        function: Callable = None,
-        max_sample_iterations: int = 100,
-        sampling_dict: dict = None,
-    ):
-        """Compute the :term:`objective function` using simulated sampling.
+    # Sampling methods (set_sampling, unset_sampling, etc.) are inherited from Sampling mixin
+    # Logging methods (set_log, save, etc.) are inherited from Logging mixin
 
-        Samples are taken in blocks of `sample_block_size`. These are passed as
-        a list of lists to :literal:`function` (a :term:`Sampling Function`), which returns a value for expectation
-        value/objective function and a boolean that indicates wether the sampled
-        result should be passed to the classical optimiser.
+    # Bindable attributes for QuOp Functions - used for documentation and validation.
+    # Subclasses can extend this by defining their own BINDABLE_ATTRIBUTES dict.
+    BINDABLE_ATTRIBUTES = {
+        # Core partitioning
+        "system_size": "Total number of quantum basis states",
+        "local_i": "Number of elements in this rank's partition",
+        "local_i_offset": "Global index offset for this rank's partition",
+        "partition_table": "Array describing global partitioning scheme",
+        # Observables and state
+        "observables": "Local partition of observable values (after setup)",
+        "ansatz_initial_state": "Local partition of initial state vector",
+        "final_state": "Local partition of current/final state vector",
+        # Variational parameters
+        "variational_parameters": "Current variational parameter values",
+        "ansatz_depth": "Number of ansatz iterations (layers)",
+        "total_params": "Number of variational parameters per iteration",
+        # MPI
+        "MPI_COMM": "MPI subcommunicator for this Ansatz instance",
+        # Execution state
+        "expectation": "Last computed objective function value",
+        "seed": "Random seed for parameter generation",
+    }
 
-        If :literal:`function` is :literal:`None`, the :term:`objective function` is
-        computed as the mean of :literal:`sample_block_size` shots.
-
-        Parameters
-        ----------
-        sample_block_size : int
-            number of shots taken between successive computation of the
-            expectation value/objective function
-        function : callable, optional
-            :term:`Sampling Function`
-        max_sample_iterations : int, optional
-            maximum number of sample blocks per computation of the expectation
-            value/objective function,  overrides the boolean returned by
-            :literal:`function`, by default 100
-        sampling_dict : FunctionDict, optional
-            :term:`FunctionDict` for the Sampling Function
+    def print_all_bindable_attributes(self):
+        """Print bindable attributes for this Ansatz AND all its Unitaries.
+        
+        This shows the complete picture of what parameters can be bound in
+        QuOp Functions:
+        
+        - Ansatz-level functions (Observables, Initial State, Parameter Map,
+          Sampling, Objective) bind to Ansatz attributes
+        - Unitary-level functions (Operator, Parameter) bind to Unitary attributes
+        
+        Call this after :meth:`set_unitaries` to see Unitary attributes.
+        
+        See Also
+        --------
+        print_bindable_attributes : Ansatz attributes only
         """
-
-        self.__parse_function_dict__(sampling_dict, "sampling_dict")
-
-        if function is None:
-            function = lambda samples: (np.mean(samples), True)
-
-        self.sample_block_size = sample_block_size
-        self.max_sample_iterations = max_sample_iterations
-        self.sampling_function_input = function
-
-        if not self.setup_sampling:
-            self.pre_execution_methods.append(self.__pre_sampling)
-            self.post_execution_methods.append(self.__post_sampling)
-
-        self.setup_sampling = True
-
-    def unset_sampling(self):
-        """Revert to simulation using exact computation of the
-        :term:`objective function`.
-        """
-        self.setup_sampling = False
-        self.sampling = False
-        self.pre_execution_methods.remove(self.__pre_sampling)
-
-    def __pre_sampling(self):
-        """Preparation for simulated sampling."""
-
-        self.minimum_sampled = np.inf
-        self.total_shots = 0
-        self.global_minimum_found = False
-        self.shots_to_global_minimum = "not found"
-
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
-            print("Executing with simulated sampling.")
-
-    def __post_sampling(self):
-        """Post simulation steps for simulated sampling."""
-
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
-
-            self.quop_result["sampling total shots"] = self.total_shots
-            self.quop_result["sampling minimum measured"] = self.minimum_sampled
-            self.quop_result[
-                "sampling shots to minimum measured"
-            ] = self.shots_to_global_minimum
-            self.quop_result["observables global minimum"] = self.global_minimum
-
-    def __gen_sampling(self):
-        """Setup for simulated sampling."""
-
-        if self.subcomms.in_subcomm():
-
-            self.sampling = True
-
-            self.__parse_sampling_function()
-
-            self.global_minimum = self.subcomms.SUBCOMM.reduce(
-                np.min(np.real(self.observables)), op=MPI.MIN
-            )
-
-    def __parse_sampling_function(self):
-        """Bind the arguments of a QuOp Sampling Function to the attributes of
-        and :class:`~quop_mpi.Ansatz` instance.
-        """
-
-        self.sampling_function = interface(
-            [self, self.unitaries],
-            self.sampling_function_input,
-            "sampling test function",
-            self.subcomms.SUBCOMM,
-        )
-
-    def __sample_expectation_value(self) -> float:
-        """Returns the expectation value of QVA with solution quality values
-        sampled according to the probability distribution of the system
-        state vector.
-
-        Returns
-        -------
-        float
-            expectation value of the sampled solution qualities
-        """
-        if not self.subcomms.in_subcomm():
-            return
-
-        if self.subcomms.SUBCOMM.Get_rank() == 0:
-            self.samples = []
-            self.sample_indexes = []
+        # Print Ansatz attributes
+        self.print_bindable_attributes()
+        
+        # Print Unitary attributes if unitaries have been set
+        if hasattr(self, 'unitaries') and self.unitaries:
+            for i, unitary in enumerate(self.unitaries):
+                unitary.print_bindable_attributes()
         else:
-            self.samples = [None]
-            self.sample_indexes = [None]
-
-        for _ in range(self.max_sample_iterations):
-
-            # Get the probability from each node in MPI_COMM
-            self.__get_local_probabilities()
-            total_local_probability = np.array(
-                [self.local_probabilities.sum()], dtype=np.float32
-            )
-
-            comm_opt_size = self.subcomms.SUBCOMM.Get_size()
-
-            if self.subcomms.SUBCOMM.Get_rank() == 0:
-                process_probabilities = np.empty(comm_opt_size, dtype=np.float32)
-            else:
-                process_probabilities = None
-
-            self.subcomms.SUBCOMM.Gather(
-                total_local_probability, process_probabilities, root=0
-            )
-
-            if self.subcomms.SUBCOMM.Get_rank() == 0:
-
-                rank_samples = np.random.choice(
-                    list(range(comm_opt_size)),
-                    size=self.sample_block_size,
-                    replace=True,
-                    p=process_probabilities,
-                )
-
-                ranks, counts = np.unique(rank_samples, return_counts=True)
-
-                samples_per_rank = np.zeros(comm_opt_size, dtype=int)
-
-                for rank, count in zip(ranks, counts):
-                    samples_per_rank[rank] = count
-
-            else:
-                samples_per_rank = np.empty(comm_opt_size, dtype=int)
-
-            self.subcomms.SUBCOMM.Bcast(samples_per_rank, root=0)
-
-            local_normed_probabilities = (
-                self.local_probabilities / self.local_probabilities.sum()
-            )
-
-            local_samples_inds = np.random.choice(
-                list(range(self.local_i)),
-                size=samples_per_rank[self.subcomms.SUBCOMM.Get_rank()],
-                replace=True,
-                p=local_normed_probabilities,
-            ).astype(np.int32)
-
-            local_samples = np.real(self.observables[local_samples_inds]).astype(
-                np.float64
-            )
-
-            if self.subcomms.SUBCOMM.Get_rank() == 0:
-                self.samples.append(np.empty(self.sample_block_size, dtype=np.float64))
-                self.sample_indexes.append(
-                    np.empty(self.sample_block_size, dtype=np.int32)
-                )
-
-            self.subcomms.SUBCOMM.Gatherv(
-                local_samples, [self.samples[-1], samples_per_rank], 0
-            )
-
-            self.subcomms.SUBCOMM.Gatherv(
-                local_samples_inds + self.local_i_offset,
-                [self.sample_indexes[-1], samples_per_rank],
-                0,
-            )
-
-            if self.subcomms.SUBCOMM.Get_rank() == 0:
-
-                self.sampling_function.update_parameters()
-
-                sampling_function_result = self.sampling_function.call(
-                    *self.sampling_dict["args"], **self.sampling_dict["kwargs"]
-                )
-
-                self.total_shots += len(self.samples[-1])
-
-            else:
-                sampling_function_result = None
-
-            expectation, sample_test = self.subcomms.SUBCOMM.bcast(
-                sampling_function_result, root=0
-            )
-
-            if self.subcomms.SUBCOMM.Get_rank() == 0:
-                argmin = np.argmin(self.samples[-1])
-                self.sample_minimum_indexes.append(self.sample_indexes[-1][argmin])
-                self.variational_parameter_history.append(self.variational_parameters)
-                sample_min = self.samples[-1][argmin]
-                if self.minimum_sampled > sample_min:
-                    self.minimum_sampled = sample_min
-                    self.shots_to_global_minimum = copy(self.total_shots)
-            if sample_test:
-                break
-
-        return expectation
-
-    def set_log(self, filename: str, label: str, action: str = "a"):
-        """Creates a CSV in which to save simulation results after a call to
-        :meth:`~quop_mpi.Ansatz.execute`.
-
-        Parameters
-        ----------
-        filename : str
-            path to the log file
-        label : str
-           simulation identifier
-        action : {'a', 'w'}, optional
-            'a' to append or 'w' overwrite, by default 'a'
-        """
-
-        self.filename = ensure_path_and_extension(filename, "csv")
-        self.label = label
-        self.log_action = action
-
-        self.repeat = 1  # needed if logging results from the execute method
-
-        self.setup_log = True
+            print("(No unitaries set yet - call set_unitaries() first to see Unitary attributes)\n")
 
     def set_seed(self, seed: int):
         """Integer for seeding of random number generation.
@@ -916,7 +624,7 @@ class Ansatz:
 
     def get_expectation_value(self) -> float:
         """Compute the :term:`objective function` at the current
-        value of :meth:`~quop_mpi.Ansatz.variational_parameters`.
+        value of :attr:`~quop_mpi.Ansatz.variational_parameters`.
 
         Returns
         -------
@@ -973,51 +681,7 @@ class Ansatz:
         if self.subcomms.get_subcomm_index() == 0:
             return self.__objective(variational_parameters)
 
-    def set_parallel_jacobian(
-        self,
-        nodes_per_subcomm: int,
-        processes_per_node: int,
-        maxcomm: int,
-        method: Union[str, Callable] = "forward",
-        h: float = None,
-    ):
-        """Specify :term:`optimisation<optimiser>` of the :term:`variational
-        parameters` using parallel computation of the jacobian.
-
-        This creates MPI subcommunicators containing duplicates of the
-        :class:`~quop_mpi.Ansatz` instance which return partial derivative information to
-        the root MPI process during optimisation.
-
-        Parameters
-        ----------
-        nodes_per_subcomm : int
-            MPI nodes per subcommunicator
-        processes_per_node : int
-            MPI processors associated with each node
-        maxcomm : int
-            maximum number of created MPI subcommunicators (and :class:`~quop_mpi.Ansatz`
-            instance duplicates) if `nodes_per_subcomm > 1`, or the maximum
-            number of MPI subcommunicators per node if `nodes_per_subcomm = 1`
-        method :{'forward', 'central'} or callable, optional
-            'forward' or 'central' to used the forward difference or central
-            difference method for numerical approximation of the partial
-            derivatives, or a QuOp Jacobian Function, by default 'forward'
-        h : float, optional
-            step-size used by the forward or central difference methods, by
-            default :literal:`np.sqrt(np.finfo(float).eps)`
-        """
-
-        if self._has_param_map:
-            raise ValueError(
-                "Cannot configure parallel Jacobian when a parameter‐mapping function is set."
-            )
-
-        self.nodes_per_subcomm = nodes_per_subcomm
-        self.processes_per_node = processes_per_node
-        self.maxcomm = maxcomm
-        self.jacobian_input = [method]
-        self.h = h if h is not None else np.sqrt(np.finfo(float).eps)
-        self.reset = True
+    # set_parallel_jacobian is inherited from Jacobian mixin
 
     def __check_comm_size(self):
         """Ensure that all MPI ranks have been assigned at least :literal:`local_i = 1`
@@ -1041,7 +705,6 @@ class Ansatz:
         if newsize > 0:
 
             self.subcomms.shrink_subcomms(self.subcomms.SUBCOMM.Get_size() - newsize)
-            self.subcomms.SUBCOMM = self.subcomms.SUBCOMM
 
         while not busy_comm:
 
@@ -1055,52 +718,30 @@ class Ansatz:
 
             if dropcount > 0:
                 self.subcomms.shrink_subcomms(dropcount)
-                self.subcomms.SUBCOMM = self.subcomms.SUBCOMM
             else:
-
                 busy_comm = True
             
 
         if self.subcomms.in_subcomm():
-            # create the default vector partitioning, may be altered durring the unitary planning phase.
+            # create the default vector partitioning, may be altered during the unitary planning phase.
             self.local_i, self.local_i_offset, self.alloc_local, self.partition_table = vector_partitioning(self.system_size, self.subcomms.SUBCOMM)
-            
-    def __update_var_map(self):
-        """Queries :literal:`Unitary` instances passed to the :class:`~quop_mpi.Ansatz` instance via the
-        :meth:`~quop_mpi.Ansatz.set_unitaries` methods to determine the number and ordering of
-        QVA variational parameters.
-        """
-        if self.subcomms.get_n_subcomms() > 1:
-            self.var_map = [[] for _ in range(self.subcomms.get_n_subcomms())]
-            if self.subcomms.in_subcomm():
-                for var in range(self.n_free_params):
-                    self.var_map[1:][var % (self.subcomms.get_n_subcomms() - 1)].append(
-                        var
-                    )
-        else:
-            self.var_map = None
-
-    def __gen_parallel(self):
-        """Creates MPI subcommunicators for QVA simulation with or without
-        parallel computation of the objective function Jacobian.
-        """
-
-        self.subcomms = subcomms(
-            self.nodes_per_subcomm,
-            self.processes_per_node,
-            self.maxcomm,
-            self.MPI_COMM_WORLD,
-        )
-
-        if self.subcomms.in_subcomm():
+            # Update MPI_COMM to the (possibly shrunken) subcomm
             self.MPI_COMM = self.subcomms.SUBCOMM
+            
+    @property
+    def n_free_params(self):
+        """Number of free parameters presented to the optimizer.
+        
+        Without a parameter map, this equals n_variational_parameters.
+        With a parameter map, this is the size of the reduced parameter vector.
+        """
+        if self._has_param_map and self._n_free_params is not None:
+            return self._n_free_params
+        return self.n_variational_parameters
 
-        if self.subcomms.get_n_subcomms() > 1 and self.subcomms.in_subcomm():
+    # __update_var_map is inherited from Jacobian mixin
 
-            self.subcomms.create_jaccomm()
-
-            if self.subcomms.in_jaccomm():
-                self.subcomms.JACCOMM = self.subcomms.JACCOMM
+    # __gen_parallel is inherited from Jacobian mixin
 
     def __gen_unitaries(self):
         """Calls methods associated with :literal:`Unitary` instances to determine the
@@ -1108,10 +749,6 @@ class Ansatz:
         Generates operators associated with the :literal:`Unitary` instances.
         """
         if self.subcomms.in_subcomm():
-            #for unitary in self.unitaries:
-            #    if unitary is not self.planner:
-            #        unitary._Unitary__copy_plan(self.planner)
-
             for i, unitary in enumerate(self.unitaries):
                 unitary._Unitary__plan(self.system_size, self.subcomms.SUBCOMM)
                 unitary.parse_plan([self.local_i, self.alloc_local])
@@ -1145,9 +782,6 @@ class Ansatz:
                 *self.initial_state_dict["args"], **self.initial_state_dict["kwargs"]
             )
 
-            # do in evolve state
-            #self.context.state = self.ansatz_initial_state
-
     def __gen_observables(self):
         """Generates the observables for computation of the QVA objective
         function."""
@@ -1175,7 +809,7 @@ class Ansatz:
             if unitary.unitary_type == "diagonal":
                 self.observables = unitary.operator
             else:
-                RuntimeError(
+                raise RuntimeError(
                     f"Rank {self.subcomms.SUBCOMM.Get_rank()}: Cannot identify observables, no diagonal unitary defined"
                 )
 
@@ -1195,21 +829,13 @@ class Ansatz:
                     ["fun", "nfev", "success"],
                 )
 
-            if self.jacobian_input is not None:
-
-                if self.jacobian_input[0] == "forward":
-                    self.jacobian_input = [forward_differences]
-                elif self.jacobian_input[0] == "central":
-                    self.jacobian_input = [central]
-
-                self.__parse_jacobian()
-
-                self.optimiser_args["jac"] = self.__mpi_jacobian
+            # Configure parallel jacobian if requested (from Jacobian mixin)
+            self._configure_parallel_jacobian()
 
 
     def __assign_backend(self):
 
-        self.backend = import_module(f"quop_mpi.__lib.{config.backend}")
+        self.backend = import_module(f"quop_mpi._lib.{config.backend}")
 
         for unitary in self.unitaries:
             unitary.assign_backend(self.backend)
@@ -1241,7 +867,8 @@ class Ansatz:
             #TODO trigger setup on changes to config.backend
             self.__assign_backend()
 
-            self.__gen_parallel()
+            self._gen_parallel()
+            self.setup_parallel = False  # Indicate parallel resources need cleanup
 
             self.__check_comm_size()
 
@@ -1255,11 +882,39 @@ class Ansatz:
             self.reset = False
             self.setup_called = True
 
-    def __post_log(self):
-        """Close the results log file on simulation completion."""
-
-        if self.MPI_COMM_WORLD.Get_rank() == 0 and self.log:
-            self.logfile.close()
+    def prepare(self):
+        """Fully initialize the Ansatz for inspection without running optimization.
+        
+        This method runs both :meth:`setup` and internal preparation steps,
+        bringing the Ansatz to its runtime state. After calling this method:
+        
+        - All Unitary instances have their attributes populated
+        - Observables, initial state, and operators are generated
+        - :meth:`print_all_bindable_attributes` shows actual runtime values
+        - :meth:`get_expectation_value` can be called
+        
+        This is useful for:
+        
+        - Debugging QuOp Functions before optimization
+        - Inspecting the parallel partitioning scheme
+        - Querying bindable attributes with their runtime values
+        - Testing observables and initial state functions
+        
+        Examples
+        --------
+        >>> alg = qwoa(1024)
+        >>> alg.set_qualities(my_observables)
+        >>> alg.prepare()  # Fully initialize
+        >>> alg.print_all_bindable_attributes()  # Now shows actual values
+        >>> print(f"Observables range: {alg.observables.min():.2f} to {alg.observables.max():.2f}")
+        
+        See Also
+        --------
+        setup : Lower-level setup (parallel resources only)
+        execute : Run optimization
+        """
+        self.setup()
+        self._Ansatz__pre()
 
     def __post_unitaries(self):
         """Free memory managed by extension modules on simulation completion."""
@@ -1268,10 +923,52 @@ class Ansatz:
                 if unitary.planned:
                     unitary.destroy()
 
-    def __post_parallel(self):
-        """Free subcommunicators associated with the :class:`~quop_mpi.Ansatz` instance on
-        simulation completion."""
-        self.subcomms.free()
+    # __post_parallel is inherited from Jacobian mixin
+
+    def __del__(self):
+        """Destructor to ensure proper cleanup when the object is deleted.
+        
+        Called automatically when `del` is used on the object or when the
+        object goes out of scope. Ensures all MPI resources and extension
+        module memory are properly freed.
+        """
+        try:
+            # Force cleanup regardless of lifecycle state
+            if hasattr(self, 'setup_called') and self.setup_called:
+                # Close log file if open
+                if hasattr(self, 'log') and self.log and not self.benchmarking:
+                    if hasattr(self, 'logfile') and self.logfile is not None:
+                        try:
+                            self.logfile.close()
+                        except:
+                            pass
+                
+                # Free unitary resources
+                if hasattr(self, 'unitaries') and hasattr(self, 'subcomms'):
+                    if self.subcomms.in_subcomm():
+                        for unitary in self.unitaries:
+                            if hasattr(unitary, 'planned') and unitary.planned:
+                                try:
+                                    unitary.destroy()
+                                except:
+                                    pass
+                
+                # Free subcommunicators
+                if hasattr(self, 'subcomms'):
+                    try:
+                        self.subcomms.free()
+                    except:
+                        pass
+            
+            # Free the duplicated communicator
+            if hasattr(self, 'MPI_COMM_WORLD') and self.MPI_COMM_WORLD is not None:
+                try:
+                    self.MPI_COMM_WORLD.Free()
+                except:
+                    pass
+        except:
+            # Suppress any exceptions during destruction
+            pass
 
     def destroy(self):
         """Call methods to close the results log file, free memory managed by
@@ -1279,18 +976,21 @@ class Ansatz:
         :class:`~quop_mpi.Ansatz` instance.
         """
 
+        # Skip cleanup if:
+        # - reset=False (no config change) - resources are still valid
+        # - setup_called=False (never set up) - nothing to clean up
         if not self.reset or not self.setup_called:
             return
 
         if not self.benchmarking and self.log:
-            self.__post_log()
+            self._post_log()
 
         if not self.setup_unitaries:
             self.__post_unitaries()
             self.setup_unitaries = True
 
         if not self.setup_parallel:
-            self.__post_parallel()
+            self._post_parallel()
             self.setup_parallel = True
 
     def evolve_state(
@@ -1364,18 +1064,7 @@ class Ansatz:
                     else:
                         evolution_parameter = param_slice
 
-                    #unitary.initial_state[: self.local_i] = self.final_state[
-                    #    : self.local_i
-                    #]
-
-                    #print(unitary.context.initial_state)
                     unitary.propagate(evolution_parameter)
-                    #self.context.state = self.context.state
-
-                    # propgators handle this now using pointer swapping if needed.
-                    #self.final_state[: self.local_i] = unitary.final_state[
-                    #    : self.local_i
-                    #]
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
                 self.n_evolutions += 1
@@ -1457,17 +1146,17 @@ class Ansatz:
                 self.__post()
 
                 if self.log:
-                    self.__log_update()
+                    self._log_update()
 
             else:
                 while not self.stop:
-                    self.__mpi_jacobian(None)
+                    self._mpi_jacobian(None)
 
                 self.__post()
 
     def __execute_subcomm_group_zero(self):
-        """Tasks carried out at :meth:`~quop_mpi.Ansatz.subcomms` group zero during simulation
-        of a QVA via a called to :meth:`~quop_mpi.Ansatz.execute`"""
+        """Tasks carried out at :attr:`~quop_mpi.Ansatz.subcomms` group zero during simulation
+        of a QVA via a call to :meth:`~quop_mpi.Ansatz.execute`."""
         if self.record_objective:
             self.total_n_evolutions = []
 
@@ -1484,7 +1173,7 @@ class Ansatz:
         self.__objective(None)
 
         if self.subcomms.get_n_subcomms() > 1:
-            self.__mpi_jacobian(None)
+            self._mpi_jacobian(None)
 
         self.time = time() - self.time
 
@@ -1494,8 +1183,8 @@ class Ansatz:
         if self.MPI_COMM_WORLD.Get_rank() != 0:
             return
 
-        print("\nQuOp_MPI Simulatuion Summary", flush=True)
-        print("============================\n", flush=True)
+        print("\nQuOp_MPI Simulation Summary", flush=True)
+        print("===========================\n", flush=True)
         for i, key in enumerate(self.quop_result.keys()):
             printkey = f"{key}:"
             if i == 8:
@@ -1518,200 +1207,11 @@ class Ansatz:
             print("===================\n", flush=True)
             print(self.result, flush=True)
 
-    def benchmark(
-        self,
-        ansatz_depths: iterable[int],
-        repeats: int,
-        initial_parameters: Union[list[float], np.ndarray[float]] = None,
-        param_persist: bool = False,
-        verbose: bool = True,
-        filename: str = None,
-        label: str = "test",
-        save_action: str = "a",
-        time_limit: int = None,
-        suspend_path: str = None,
-    ):
-        """A method by which to study how a QVA performs as the number
-        of ansatz iterations<ansatz depth> increases.
-
-        Parameters
-        ----------
-        ansatz_depths : iterable[int]
-            integers specifying a sequence of ansatz depths<ansatz depth>
-        repeats : int
-            number of repeats at each ansatz depth
-        initial_parameters: list[float] or ndarray[float], optional
-            ** Must be defined if a parameter mapping function is set. **
-            initial variational parameter values, if not present these are generated
-            using the default parameter generation methods of the ansatz unitaries.
-        param_persist : bool, optional
-            if True the optimised variational parameter values which achieved
-            the lowest objective function value for all repeats at ansatz_depth
-            will be used as starting parameters for the first
-            ansatz_depth * total_params at ansatz_depth += 1. if a parameter
-            map is set, the initial parameters will update whenever the 
-            objective function reaches a new minimum.
-        verbose : bool, optional
-            if True, print current the ansatz depth, repeat number and
-            optimisation results (default True)
-        filename : str or None, optional
-            name of *.h5 file in which to save the optimised system state and observables
-        label : str, optional
-            if filename is not None, *.h5 data will be saved as
-            "filename/label_depth_repeat" (default "test")
-        save_action : {'a', 'w'}, optional
-            action taken during first file write: 'a' to append, 'w' to overwrite (default 'a')
-        time_limit : int or None, optional
-            total allocated in-program time in seconds; if exceeded, the benchmark is suspended
-        suspend_path : str or None, optional
-            path to the suspend file if time_limit is not None
-        """
-
-        if self._has_param_map and initial_parameters is None:
-            raise ValueError(
-                "Parameter map is set: you must supply initial_parameters (the free-vector) to benchmark()"
-            )
-
-        best_obj = np.inf
-        previous_params = None
-
-        if initial_parameters is not None:
-            self.variational_parameters = np.asarray(initial_parameters, dtype=np.float64)
-
-        self.destroy()
-        self.setup()
-        ansatz_depth_temp = deepcopy(self.ansatz_depth)
-        self.benchmarking = True
-        suspend_path = "suspend" if suspend_path is None else suspend_path
-        self.tracker = job_tracker(
-            repeats,
-            list(ansatz_depths)[-1],
-            time_limit,
-            self.MPI_COMM_WORLD,
-            seed=self.seed,
-            suspend_path=suspend_path,
-        )
-        first = not self.tracker.got_match
-
-        while not self.tracker.complete:
-            repeat, depth = self.tracker.get_job()
-            self.set_seed(self.tracker.get_seed())
-            self.ansatz_depth = depth
-            self.set_depth(depth)
-
-            if repeat == 1 or first:
-                self.set_depth(depth)
-                first = False
-                if (
-                    self.subcomms.get_subcomm_index() == 0
-                    and verbose
-                    and self.subcomms.SUBCOMM.Get_rank() == 0
-                ):
-                    print(f"Starting depth = {depth}:", flush=True)
-
-            self.__pre()
-            self.repeat = repeat
-
-            if self.subcomms.get_subcomm_index() == 0:
-                # Choose starting vector
-                if self._has_param_map:
-                    if repeat == 1:
-                        # initial_parameters already set above
-                        pass
-                    elif param_persist and previous_params is not None:
-                        self.variational_parameters = previous_params.copy()
-                    else:
-                        # always restart from the original supplied free-vector
-                        self.variational_parameters = np.asarray(
-                            initial_parameters, dtype=np.float64
-                        )
-                else:
-                    # Unmapped case
-                    if (not param_persist) or (depth == 1):
-                        self.variational_parameters = self.__gen_initial_params(depth)
-                    else:
-                        # Persist full-vector between repeats/depths
-                        if self.subcomms.SUBCOMM.Get_rank() == 0:
-                            n_previous = len(self.tracker.results_dict[depth - 1])
-                        else:
-                            n_previous = None
-                        n_previous = self.subcomms.SUBCOMM.bcast(n_previous, root=0)
-
-                        if n_previous > 0:
-                            if self.subcomms.SUBCOMM.Get_rank() == 0:
-                                if (
-                                    self.tracker.job_list[self.tracker.job_index][1]
-                                    != self.tracker.job_list[self.tracker.job_index - 1][1]
-                                ) or (previous_params is None):
-                                    funs = [
-                                        result["fun"]
-                                        for result in self.tracker.results_dict[depth - 1]
-                                    ]
-                                    xs = [
-                                        result["variational parameters"]
-                                        for result in self.tracker.results_dict[depth - 1]
-                                    ]
-                                    previous_params = xs[np.argmin(funs)]
-                            else:
-                                previous_params = None
-
-                            previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root=0)
-
-                            self.variational_parameters = np.empty(
-                                depth * self.total_params, dtype=np.float64
-                            )
-                            # fill with best from last depth
-                            self.variational_parameters[: len(previous_params)] = previous_params
-                            # new parameters for the final layer
-                            new_params = self.__gen_initial_params(1)
-                            self.variational_parameters[-self.total_params :] = new_params
-                        else:
-                            self.variational_parameters = self.__gen_initial_params()
-
-                if verbose and self.subcomms.SUBCOMM.Get_rank() == 0:
-                    print(f"{repeat} of {repeats} at depth {depth}...", flush=True)
-
-                self.execute()
-
-                # If mapped, capture and persist the improved initial parameters on improvement
-                if self._has_param_map:
-                    current_free = self.result["x"]
-                    current_obj = self.quop_result["fun"]
-                    if current_obj < best_obj:
-                        best_obj = current_obj
-                        previous_params = current_free.copy()
-
-                if verbose:
-                    self.print_result()
-
-                if filename is not None:
-                    if first:
-                        self.save(
-                            ensure_path_and_extension(filename, "h5"),
-                            f"{label}_{depth}_{repeat}",
-                            action=save_action,
-                        )
-                    else:
-                        self.save(
-                            ensure_path_and_extension(filename, "h5"),
-                            f"{label}_{depth}_{repeat}",
-                            action="a",
-                        )
-
-                self.tracker.update(self.quop_result)
-                first = False
-
-            else:
-                self.execute()
-                self.tracker.update(None)
-
-        self.benchmarking = False
-        self.ansatz_depth = ansatz_depth_temp
-
+    # benchmark method is inherited from Benchmark mixin
 
     def get_final_state(self) -> Union[np.ndarray[np.complex128], None]:
         """Gather the :term:`final state` to rank 0 of the :literal:`Ansatz` MPI subcommunicator.
-         
+
         Requires a previous call to :meth:`~quop_mpi.Ansatz.execute`, :meth:`~quop_mpi.Ansatz.evolve_state`
         or :meth:`~quop_mpi.Ansatz.benchmark`. If called after :meth:`~quop_mpi.Ansatz.benchmark` the
         gathered state will correspond to the last performed simulation.
@@ -1732,7 +1232,7 @@ class Ansatz:
     def get_probabilities(self) -> Union[np.ndarray[np.float64], None]:
         """Gather probabilities computed from the :term:`final state` at rank 0
         of the :literal:`Ansatz` MPI subcommunicator.
-         
+
         Requires a previous call to :meth:`~quop_mpi.Ansatz.execute`,
         :meth:`~quop_mpi.Ansatz.evolve_state` or :meth:`~quop_mpi.Ansatz.benchmark`. If called after
         :meth:`~quop_mpi.Ansatz.benchmark` the gathered state will correspond to the last
@@ -1746,145 +1246,11 @@ class Ansatz:
         """
 
         if self.subcomms.in_subcomm() and self.subcomms.get_subcomm_index() == 0:
-            #prob = np.abs(self.final_state) ** 2
             return gather_array(
                 np.abs(self.context.state)**2, self.unitaries[0].partition_table, self.subcomms.SUBCOMM
             )
 
-    def save(self, file_name: str, config_name: str, action: str = "a"):
-        """Write the :term:`final state`, :term:`observables` and results
-        summary to a HDf5 file.
-
-        Parameters
-        ----------
-        file_name : str
-            file path to saved data
-        config_name : str
-            simulation identifier
-        action : {'a', 'w'}, optional
-            'a' to append or 'w' to overwrite, by default 'a'
-
-        Notes
-        -----
-
-        Data is saved into a :literal:`*.h5` file with the following structure.
-
-        ::
-
-            ├── config_name
-                ├── final_state 
-                ├── observables
-
-        The minimization result is saved in the 'minimize_result' attribute of
-        'config_name' as a formatted string.
-
-        Multiple configurations with a unique config_name can be stored in the
-        same .h5 file. HDF5 files are supported in python by the `h5py
-        <https://www.h5py.org/>`_ package. With it, a saved configuration can be
-        accessed as follows:
-
-        .. code-block:: python
-
-            import h5py
-
-            config_name = "my_simulation"
-
-            f = h5py.File(file_name + ".h5", "r") final_state =
-            np.array(f[config_name]['final_state']).view(np.complex128)
-            eigenvalues =
-            np.array(f[config_name]['eigenvalues']).view(np.complex128)
-            observables =
-            np.array(f[config_name]['observables']).view(np.float64)
-
-            print(f["my_simulation"].attrs["minimize_result"])
-
-        .. warning::
-
-            The :literal:`"final_state"` and :literal:`"observables"` datasets are saved using Fortran
-            subroutines which make use of parallel HDF5.
-
-            The complex values of the final_state array are saved as a compound
-            datatype consisting of contiguous double precision reals. This is
-            equivalent to the np.complex128 NumPy datatype. To access this data
-            without a loss of precision in python, the user must set the
-            **view** of the NumPy array to np.complex128, rather than casting it
-            to np.complex128 using the dtype keyword.
-
-            Similarly, the observables array, which is saved as an array of
-            double-precision reals, should have its view set to np.float64.
-        """
-
-        if self.subcomms.get_subcomm_index() != 0:
-            return
-
-        from quop_mpi.__lib import parallel_io
-
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
-
-            import h5py
-
-            self.config_name = config_name
-
-            file_name = ensure_path_and_extension(file_name, "h5")
-            File = h5py.File(file_name, action)
-
-            # If the config_name already exists in the target file, add an underscore.
-            duplicate = True
-            while duplicate:
-                if self.config_name in File:
-                    self.config_name += "_"
-                else:
-                    duplicate = False
-
-            config = File.create_group(self.config_name)
-
-            if self.result is not None:
-                config.attrs["minimize_result"] = str(self.result)
-
-            File.create_dataset(
-                f"{self.config_name}/initial_phases",
-                data=self.variational_parameters,
-                dtype=np.float64,
-            )
-            File.close()
-        else:
-            self.config_name = None
-
-        file_name = self.subcomms.SUBCOMM.bcast(file_name, root=0)
-        self.config_name = self.subcomms.SUBCOMM.bcast(self.config_name, root=0)
-
-        parallel_io.io.save_dist_complex(
-            file_name,
-            f"{self.config_name}/",
-            "final_state",
-            "a",
-            self.system_size,
-            self.local_i_offset,
-            self.context.state[: self.local_i],
-            self.subcomms.SUBCOMM.py2f(),
-        )
-
-        parallel_io.io.save_dist_complex(
-            file_name,
-            f"{self.config_name}/",
-            "initial_state",
-            "a",
-            self.system_size,
-            self.local_i_offset,
-            self.ansatz_initial_state[: self.local_i],
-            self.subcomms.SUBCOMM.py2f(),
-        )
-
-        parallel_io.io.save_dist_real(
-            file_name,
-            f"{self.config_name}/",
-            "observables",
-            "a",
-            self.system_size,
-            self.local_i_offset,
-            self.observables[: self.local_i],
-            self.subcomms.SUBCOMM.py2f(),
-        )
+    # save method is inherited from Logging mixin
 
     def gen_initial_params(
         self, ansatz_depth:int = None
@@ -1963,7 +1329,7 @@ class Ansatz:
 
         return params
 
-    def __get_local_probabilities(self) -> np.ndarray[np.float64]:
+    def _get_local_probabilities(self) -> np.ndarray[np.float64]:
         """Compute the probabilities of states local to each MPI process.
 
         Returns
@@ -1988,10 +1354,6 @@ class Ansatz:
         if self.subcomms.get_subcomm_index() == 0:
             self.state_norm = self.context.get_state_norm()
             return self.state_norm
-            #self.state_norm = self.subcomms.SUBCOMM.allreduce(
-            #    np.sum(self.__get_local_probabilities()), op=MPI.SUM
-            #)
-            #return self.state_norm
 
     def __get_expectation_value(self) -> float:
         """Compute the expectation value at :meth:`~quop_mpi.Ansatz.variational_parameters`.
@@ -2003,9 +1365,9 @@ class Ansatz:
         """
 
         if self.sampling:
-            return self.__sample_expectation_value()
+            return self._sample_expectation_value()
 
-        self.__get_local_probabilities()
+        self._get_local_probabilities()
 
         local_expectation = np.dot(self.local_probabilities, self.observables)
 
@@ -2023,9 +1385,9 @@ class Ansatz:
 
         Returns
         -------
-        float or None]
+        float or None
             returns the objective function value at rank 0 in
-            :meth:`~quop_mpi.Ansatz.MPI_COMM_WORLD`, None otherwise
+            :attr:`~quop_mpi.Ansatz.MPI_COMM_WORLD`, None otherwise
         """
         self.stop = self.subcomms.SUBCOMM.bcast(self.stop, root=0)
 
@@ -2037,8 +1399,8 @@ class Ansatz:
 
             self.__evolve_state(self.variational_parameters)
 
-            if self.objective_function != None:
-                self.__get_local_probabilities()
+            if self.objective_function is not None:
+                self._get_local_probabilities()
                 self.objective_function.update_parameters()
                 self.expectation = self.objective_function.call(
                     *self.objective_dict['args'],
@@ -2065,159 +1427,3 @@ class Ansatz:
                 if self.record_objective:
                     self.total_n_evolutions.append(self.n_evolutions)
                 return self.expectation
-
-    def __gen_log(self):
-        """Create or open a log file."""
-
-        self.n_log_fields = 6
-
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
-
-            if os.path.exists(self.filename) and self.log_action == "a":
-                self.logfile = open(self.filename, "a", newline="")
-                self.logfile_csv = csv.writer(self.logfile)
-            else:
-
-                self.__create_new_logfile()
-
-        self.log = True
-
-    def __create_new_logfile(self):
-        """Create a new log file, called by rank 0 at :meth:`~quop_mpi.Ansatz.MPI_COMM_WORLD`
-        only."""
-
-        headings = [
-            "label",
-            "system_size",
-            "ansatz_depth",
-            "repeat",
-            "state_norm",
-            "simulation_time",
-            "MPI_nodes",
-            "MPI_jacobian_evaluations",
-        ]
-
-        if self.sampling:
-            headings.extend(
-                ("total_shots", "minimum_sampled", "shots_to_global_minimum")
-            )
-
-        if self.optimiser_log is not None:
-            headings.extend(iter(self.optimiser_log))
-
-        self.logfile = open(self.filename, "w")
-        self.logfile_csv = csv.writer(self.logfile)
-        self.logfile_csv.writerow(headings)
-
-    def __log_update(self):
-        """Write simulation information to an active log file."""
-
-        if self.MPI_COMM_WORLD.Get_rank() != 0:
-            return
-
-        log_output = [
-            self.label,
-            self.system_size,
-            self.ansatz_depth,
-            self.repeat,
-            self.state_norm,
-            self.time,
-            self.subcomms.SUBCOMM.size,
-            self.neval_mpi_jac,
-        ]
-
-        if self.sampling:
-            log_output.extend(
-                (
-                    self.total_shots,
-                    self.minimum_sampled,
-                    self.shots_to_global_minimum,
-                )
-            )
-        if self.optimiser_log is not None:
-            log_output.extend(
-                self.result[optimiser_log] for optimiser_log in self.optimiser_log
-            )
-        self.logfile_csv.writerow(log_output)
-
-        self.logfile.flush()
-
-    def __mpi_jacobian(self, x: np.ndarray[float]) -> Union[float, None]:
-        """Compute the objective function gradient with parallel
-        instances of the :class:`~quop_mpi.Ansatz` class.
-
-        Parameters
-        ----------
-        x : ndarray[float]
-            1-D real array of free variational parameters
-
-        Returns
-        -------
-        float or None
-            returns the objective function gradient to rank 0 in
-            :meth:`~quop_mpi.Ansatz.MPI.COMM_WORLD`, None otherwise
-        """
-        self.subcomms.JACCOMM.barrier()
-        self.stop = self.subcomms.JACCOMM.bcast(self.stop, 0)
-
-        if self.stop:
-            self.subcomms.JACCOMM.barrier()
-            return
-
-        self.variational_parameters = self.subcomms.JACCOMM.bcast(
-            self.variational_parameters, 0
-        )
-
-        x = self.subcomms.JACCOMM.bcast(x, 0)
-
-        if self.subcomms.JACCOMM.Get_rank() != 0:
-            self.variational_parameters = self.__place_free_params(
-                self.variational_parameters, x
-            )
-
-        partials = []
-        if self.subcomms.JACCOMM.Get_rank() != 0:
-            for var in self.var_map[self.subcomms.get_subcomm_index()]:
-                self.jacobian.update_parameters()
-                partials.append(self.jacobian.call(self.free_params[var]))
-
-        opt_root = self.subcomms.get_subcomm_roots()[self.subcomms.colour]
-
-        if self.subcomms.JACCOMM.Get_rank() == 0:
-            jacobian = np.zeros(self.n_free_params, dtype=np.float64)
-            reqs = []
-            for root, mapping in zip(self.subcomms.get_subcomm_roots(), self.var_map):
-                if root > 0:
-                    for var in mapping:
-                        self.MPI_COMM_WORLD.Recv(
-                            [jacobian[var : var + 1], MPI.DOUBLE], source=root, tag=var
-                        )
-
-        elif self.subcomms.SUBCOMM.Get_rank() == 0:
-            reqs = []
-            jacobian = None
-            for part, mapping in zip(partials, self.var_map[self.subcomms.get_subcomm_index()]):
-                self.MPI_COMM_WORLD.Send(
-                    [np.array([part]), MPI.DOUBLE], dest=0, tag=mapping
-                )
-        else:
-            jacobian = None
-
-        self.subcomms.JACCOMM.barrier()
-
-        if self.record_objective:
-            if self.subcomms.JACCOMM.Get_rank() == 0:
-                self.n_evolutions = self.subcomms.JACCOMM.reduce(
-                    self.n_evolutions, op=MPI.SUM, root=0
-                )
-            else:
-                self.subcomms.JACCOMM.reduce(self.n_evolutions, op=MPI.SUM, root=0)
-                self.n_evolutions = 0
-
-        if self.subcomms.JACCOMM.Get_rank() == 0:
-
-            self.neval_mpi_jac += 1
-            return jacobian
-
-        else:
-            return None

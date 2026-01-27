@@ -2,7 +2,7 @@ from importlib import import_module
 import numpy as np
 from quop_mpi import config
 from quop_mpi.Unitary import Unitary
-from quop_mpi.__lib.propagator import propagator
+from quop_mpi._lib.propagator import propagator
 
 class unitary(Unitary):
     """Compute the action of a :term:`mixing unitary` with a phase_shift

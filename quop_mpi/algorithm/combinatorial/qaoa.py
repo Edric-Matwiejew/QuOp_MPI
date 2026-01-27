@@ -33,8 +33,6 @@ class qaoa(Ansatz):
         self.operator_function = None
         self.param_function = None
 
-    #TODO Update docstring
-
     def set_qualities(self, function: Callable, observables_dict: dict = None):
         """Define the :term:`observables` and :term:`phase-shift unitary` :term:`operator`
 
@@ -69,7 +67,7 @@ class qaoa(Ansatz):
 
             if self.observable_function is None:
                 raise RuntimeError(
-                    "Rank {}: Solution qualities not defined.".format(self.rank)
+                    "Rank {}: Solution qualities not defined.".format(self.MPI_COMM_WORLD.Get_rank())
                 )
 
             if self.param_function is None:

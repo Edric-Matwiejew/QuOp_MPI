@@ -36,7 +36,7 @@ contains
         real(dp), intent(in) :: mins(n_dim) ! the minimum in each dimension, maxs = mins + Ns*deltas
         integer(dp), intent(in) :: local_i_offset ! Starting index alogn n0 dimension.
         integer(dp), intent(in) :: local_i ! Number of indices alogn the n0 dimension at this rank.
-        real(dp), intent(inout) :: vec(local_i)
+        complex(dp), intent(inout) :: vec(local_i)
 
         real(dp), dimension(n_dim) :: grid_point
         integer :: i, j

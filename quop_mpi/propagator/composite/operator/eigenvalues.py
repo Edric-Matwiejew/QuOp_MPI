@@ -4,7 +4,6 @@ from importlib import import_module
 import numpy as np
 
 def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:
-    #TODO: NOW RETURNS GRAPH ARRAYS
     """Generate the eigenvalues of a :ref:`QMOA` :term:`mixing unitary` 
     :term:`operator`.
 

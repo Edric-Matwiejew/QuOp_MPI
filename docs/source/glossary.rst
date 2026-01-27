@@ -47,7 +47,7 @@ Glossary
         See :meth:`quop_mpi.Ansatz.set_unitaries`.
 
     unitary 
-        A unitary operator parameterised by and arbitrary number of
+        A unitary operator parameterised by an arbitrary number of
         :term:`variational parameters`,
 
         .. math::
@@ -73,7 +73,7 @@ Glossary
 
     operator parameter
         :term:`Variational parameter <variational parameters>` that
-        parametertise the structure of an :term:`operator`.
+        parameterise the structure of an :term:`operator`.
 
         See :class:`quop_mpi.Unitary` and :mod:`quop_mpi.propagator`.
         
@@ -97,15 +97,17 @@ Glossary
         * :mod:`quop_mpi.propagator.momentum`
 
     ansatz depth
-        The number of repeats (or s) of the :term:`ansatz unitary`.
+        The number of repeats (or iterations) of the :term:`ansatz unitary`.
 
         See :meth:`quop_mpi.Ansatz.set_depth`.
 
     variational parameters 
         Classically tunable parameters of an :term:`ansatz unitary`. Each
         :term:`ansatz iteration <ansatz depth>` is associated with its own subset of parameters,
-        such that the total number of varitional parameters grows linearly with
+        such that the total number of variational parameters grows linearly with
         the :term:`ansatz depth`.
+
+        See :mod:`quop_mpi.param` for predefined parameter initialisation functions.
 
     observables
         A real vector of scalar quality values associated with each simulated basis
@@ -121,18 +123,19 @@ Glossary
             
             \langle \theta | \hat{O} | \theta \rangle
 
-        :meth:`quop_mpi.Ansatz.objective_function`.
+        See :meth:`quop_mpi.Ansatz.objective_function`.
 
     free parameters
         The subset of :term:`variational parameters` to be tuned via classical
-        optimisation of the :term:`objective function`. See
-        :meth:`quop_mpi.Ansatz.set_free_params`.
+        optimisation of the :term:`objective function`. When using a parameter
+        map, the free parameters are mapped to the full variational parameter
+        vector.
 
-        :meth:`quop_mpi.Ansatz.set_free_params`.
+        See :meth:`quop_mpi.Ansatz.set_parameter_map`.
 
     optimiser
         The classical optimiser responsible for minimisation of the
         :term:`objective function` via variation of the 
         :term:`free variational parameters <free parameters>`.
 
-        :meth:`quop_mpi.Ansatz.set_optimiser`.
+        See :meth:`quop_mpi.Ansatz.set_optimiser`.

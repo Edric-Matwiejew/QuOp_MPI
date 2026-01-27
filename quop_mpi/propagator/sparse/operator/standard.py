@@ -2,7 +2,7 @@
 :class:`quop_mpi.propagator.sparse.unitary`.
 """
 from __future__ import annotations
-from quop_mpi.__utils.__mpi import __scatter_sparse
+from quop_mpi._utils._mpi import __scatter_sparse
 import numpy as np
 
 ####################################
@@ -53,7 +53,7 @@ def hypercube(
     RuntimeError
         if :literal:`system_size % 2 != 0`
     """
-    from quop_mpi.__lib.csr_generators import csr_generators
+    from quop_mpi._lib.csr_generators import csr_generators
 
     if system_size % 2 != 0:
         raise RuntimeError(
@@ -155,7 +155,7 @@ def serial(
 
 def qmoa_mixer(local_i, local_i_offset, Ns, Gs): 
 
-    from quop_mpi.__lib.csr_generators import csr_generators
+    from quop_mpi._lib.csr_generators import csr_generators
 
     n_dim = len(Ns)
 

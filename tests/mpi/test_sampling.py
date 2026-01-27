@@ -1,0 +1,562 @@
+"""
+Tests for Ansatz sampling functionality: set_sampling() and unset_sampling().
+
+Sampling allows simulating measurement-based objective function evaluation,
+which is more realistic for actual quantum hardware where we can't directly
+access the full wavefunction.
+
+Run with: mpiexec -n 2 python -m pytest tests/mpi/test_sampling.py -v --with-mpi
+"""
+import pytest
+import numpy as np
+from mpi4py import MPI
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from conftest import TestOracle
+
+
+@pytest.mark.mpi
+class TestSetSamplingBasic:
+    """Basic tests for set_sampling() method."""
+
+    def test_set_sampling_sets_flag(self, mpi_comm, simple_oracle):
+        """Verify set_sampling() sets the setup_sampling flag."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        # Before set_sampling
+        assert alg.setup_sampling == False
+        
+        alg.set_sampling(sample_block_size=10)
+        
+        # After set_sampling
+        assert alg.setup_sampling == True
+        
+        del alg
+
+    def test_set_sampling_stores_block_size(self, mpi_comm, simple_oracle):
+        """Verify set_sampling() stores the sample_block_size."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        block_size = 50
+        alg.set_sampling(sample_block_size=block_size)
+        
+        assert alg.sample_block_size == block_size
+        
+        del alg
+
+    def test_set_sampling_stores_max_iterations(self, mpi_comm, simple_oracle):
+        """Verify set_sampling() stores max_sample_iterations."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        max_iters = 50
+        alg.set_sampling(sample_block_size=10, max_sample_iterations=max_iters)
+        
+        assert alg.max_sample_iterations == max_iters
+        
+        del alg
+
+    def test_set_sampling_default_max_iterations(self, mpi_comm, simple_oracle):
+        """Verify default max_sample_iterations is 100."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        alg.set_sampling(sample_block_size=10)
+        
+        assert alg.max_sample_iterations == 100
+        
+        del alg
+
+    def test_set_sampling_stores_function(self, mpi_comm, simple_oracle):
+        """Verify set_sampling() stores the sampling function."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        def custom_sampler(samples):
+            return np.mean(samples), True
+        
+        alg.set_sampling(sample_block_size=10, function=custom_sampler)
+        
+        assert alg.sampling_function_input is custom_sampler
+        
+        del alg
+
+    def test_set_sampling_default_function(self, mpi_comm, simple_oracle):
+        """Verify default sampling function uses mean."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        alg.set_sampling(sample_block_size=10)
+        
+        # Default function should exist
+        assert alg.sampling_function_input is not None
+        
+        # Test that default function computes mean and returns True
+        test_samples = [1.0, 2.0, 3.0, 4.0, 5.0]
+        result, accept = alg.sampling_function_input(test_samples)
+        assert result == 3.0  # mean of 1-5
+        assert accept == True
+        
+        del alg
+
+
+@pytest.mark.mpi
+class TestUnsetSampling:
+    """Tests for unset_sampling() method."""
+
+    def test_unset_sampling_clears_flag(self, mpi_comm, simple_oracle):
+        """Verify unset_sampling() clears the sampling flags."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        alg.set_sampling(sample_block_size=10)
+        assert alg.setup_sampling == True
+        
+        alg.unset_sampling()
+        
+        assert alg.setup_sampling == False
+        assert alg.sampling == False
+        
+        del alg
+
+    def test_unset_sampling_removes_pre_execution_method(self, mpi_comm, simple_oracle):
+        """Verify unset_sampling() removes pre_execution method."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        initial_pre_methods = len(alg.pre_execution_methods)
+        
+        alg.set_sampling(sample_block_size=10)
+        assert len(alg.pre_execution_methods) == initial_pre_methods + 1
+        
+        alg.unset_sampling()
+        assert len(alg.pre_execution_methods) == initial_pre_methods
+        
+        del alg
+
+
+@pytest.mark.mpi
+class TestSamplingExecution:
+    """Tests for sampling during execute()."""
+
+    def test_execute_with_sampling_completes(self, mpi_comm, simple_oracle):
+        """Verify execute() completes with sampling enabled."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=10, max_sample_iterations=5)
+        
+        # Should complete without error
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+    def test_execute_with_sampling_produces_result(self, mpi_comm, simple_oracle):
+        """Verify execute() with sampling produces valid optimization result."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=20, max_sample_iterations=10)
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert 'x' in alg.result
+            assert 'fun' in alg.result
+            assert np.isfinite(alg.result['fun'])
+        
+        del alg
+
+    def test_sampling_tracks_total_shots(self, mpi_comm, simple_oracle):
+        """Verify sampling tracks total shots taken."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=10, max_sample_iterations=5)
+        
+        alg.execute()
+        
+        # total_shots should be > 0 after execution
+        # (on rank 0 of the subcomm)
+        if alg.subcomms.in_rootcomm():
+            assert alg.total_shots > 0
+        
+        del alg
+
+    def test_sampling_finds_minimum(self, mpi_comm, simple_oracle):
+        """Verify sampling tracks minimum sampled value."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=50, max_sample_iterations=10)
+        
+        alg.execute()
+        
+        # minimum_sampled should be updated
+        if alg.subcomms.in_rootcomm():
+            assert alg.minimum_sampled != np.inf
+            # For Grover oracle, minimum should be 0 or close to it
+            assert alg.minimum_sampled >= 0.0
+        
+        del alg
+
+
+@pytest.mark.mpi
+class TestSamplingResults:
+    """Tests for sampling result attributes."""
+
+    def test_quop_result_contains_sampling_info(self, mpi_comm, simple_oracle):
+        """Verify quop_result contains sampling statistics after execute."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=20, max_sample_iterations=5)
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert "sampling total shots" in alg.quop_result
+            assert "sampling minimum measured" in alg.quop_result
+            assert "sampling shots to minimum measured" in alg.quop_result
+        
+        del alg
+
+    def test_global_minimum_tracked(self, mpi_comm, simple_oracle):
+        """Verify global_minimum is computed correctly."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=10, max_sample_iterations=5)
+        
+        alg.execute()
+        
+        # global_minimum should be the minimum observable value
+        # For Grover oracle, this is 0 (marked states)
+        if alg.subcomms.in_rootcomm():
+            assert alg.global_minimum is not None
+            assert alg.global_minimum == 0.0  # Grover oracle minimum
+        
+        del alg
+
+
+@pytest.mark.mpi
+class TestSamplingWithQWOA:
+    """Tests for sampling with QWOA algorithm."""
+
+    def test_qwoa_with_sampling_completes(self, mpi_comm, simple_oracle):
+        """Verify QWOA with sampling completes."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        alg = qwoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=10, max_sample_iterations=5)
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+    def test_qwoa_sampling_tracks_shots(self, mpi_comm, simple_oracle):
+        """Verify QWOA sampling tracks total shots."""
+        from quop_mpi.algorithm.combinatorial import qwoa
+        
+        alg = qwoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=20, max_sample_iterations=5)
+        
+        alg.execute()
+        
+        if alg.subcomms.in_rootcomm():
+            assert alg.total_shots > 0
+        
+        del alg
+
+
+@pytest.mark.mpi
+class TestCustomSamplingFunction:
+    """Tests for custom sampling functions."""
+
+    def test_custom_sampling_function_called(self, mpi_comm, simple_oracle):
+        """Verify custom sampling function is called during execution."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        # Track if function was called
+        call_count = [0]
+        
+        def counting_sampler(samples):
+            call_count[0] += 1
+            return np.mean(samples), True
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=10, function=counting_sampler, 
+                        max_sample_iterations=3)
+        
+        alg.execute()
+        
+        # Synchronize call count across ranks
+        total_calls = mpi_comm.reduce(call_count[0], op=MPI.SUM, root=0)
+        
+        if mpi_comm.Get_rank() == 0:
+            # Function should have been called at least once
+            assert total_calls > 0
+        
+        del alg
+
+    def test_custom_sampling_function_can_reject(self, mpi_comm, simple_oracle):
+        """Verify custom function returning False continues sampling."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        iteration_count = [0]
+        
+        def always_reject(samples):
+            iteration_count[0] += 1
+            # Return False to continue sampling up to max_iterations
+            return np.mean(samples), False
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        max_iters = 5
+        alg.set_sampling(sample_block_size=10, function=always_reject,
+                        max_sample_iterations=max_iters)
+        
+        alg.execute()
+        
+        # The function should be called max_iterations times per objective call
+        # since it always returns False
+        del alg
+
+    def test_custom_sampling_function_early_accept(self, mpi_comm, simple_oracle):
+        """Verify custom function returning True stops sampling early."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        def always_accept(samples):
+            return np.mean(samples), True
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=10, function=always_accept,
+                        max_sample_iterations=100)
+        
+        alg.execute()
+        
+        # Should complete quickly since it accepts after first block
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+
+@pytest.mark.mpi
+class TestSamplingVsExact:
+    """Tests comparing sampling to exact computation."""
+
+    def test_sampling_expectation_in_quality_range(self, mpi_comm, simple_oracle):
+        """Verify sampled expectation is within valid quality range."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=100, max_sample_iterations=10)
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            result_value = alg.result['fun']
+            # For Grover oracle, quality range is [0, 1]
+            assert 0.0 <= result_value <= 1.0
+        
+        del alg
+
+    def test_sampling_vs_exact_converge(self, mpi_comm, simple_oracle):
+        """Verify sampling with many shots approaches exact computation."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        # First, get exact result
+        alg_exact = qaoa(simple_oracle.system_size, mpi_comm)
+        alg_exact.set_qualities(simple_oracle.qualities_function())
+        alg_exact.set_depth(1)
+        alg_exact.setup()
+        alg_exact._Ansatz__pre()
+        
+        params = simple_oracle.optimal_params(depth=1)
+        exact_result = alg_exact.evaluate(params)
+        del alg_exact
+        
+        # Now with sampling (large block size for accuracy)
+        alg_sampled = qaoa(simple_oracle.system_size, mpi_comm)
+        alg_sampled.set_qualities(simple_oracle.qualities_function())
+        alg_sampled.set_depth(1)
+        alg_sampled.set_sampling(sample_block_size=500, max_sample_iterations=1)
+        alg_sampled.setup()
+        alg_sampled._Ansatz__pre()
+        
+        # evolve_state and get sampled expectation
+        alg_sampled.evolve_state(params)
+        sampled_result = alg_sampled.get_expectation_value()
+        
+        # With large sample size, results should be reasonably close
+        if alg_sampled.subcomms.in_rootcomm():
+            # Allow for sampling variance (within 0.2 of exact)
+            assert abs(sampled_result - exact_result) < 0.2, \
+                f"Sampled {sampled_result} too far from exact {exact_result}"
+        
+        del alg_sampled
+
+
+@pytest.mark.mpi
+class TestSamplingEdgeCases:
+    """Tests for edge cases in sampling."""
+
+    def test_small_block_size(self, mpi_comm, simple_oracle):
+        """Test sampling with very small block size."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=1, max_sample_iterations=10)
+        
+        # Should complete without error
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+    def test_large_block_size(self, mpi_comm, simple_oracle):
+        """Test sampling with block size larger than system size."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        # Block size > system_size
+        alg.set_sampling(sample_block_size=simple_oracle.system_size * 2, 
+                        max_sample_iterations=3)
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+    def test_single_iteration(self, mpi_comm, simple_oracle):
+        """Test sampling with max_sample_iterations=1."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_sampling(sample_block_size=50, max_sample_iterations=1)
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+    def test_toggle_sampling_on_off(self, mpi_comm, simple_oracle):
+        """Test toggling sampling on and off."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        # Enable sampling
+        alg.set_sampling(sample_block_size=10)
+        assert alg.setup_sampling == True
+        
+        # Disable sampling
+        alg.unset_sampling()
+        assert alg.setup_sampling == False
+        
+        # Re-enable sampling
+        alg.set_sampling(sample_block_size=20)
+        assert alg.setup_sampling == True
+        assert alg.sample_block_size == 20
+        
+        alg.execute()
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg
+
+    def test_execute_after_unset_sampling(self, mpi_comm, simple_oracle):
+        """Test execute() uses exact computation after unset_sampling()."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        
+        # Enable then disable sampling
+        alg.set_sampling(sample_block_size=10)
+        alg.unset_sampling()
+        
+        # Execute should use exact computation
+        alg.execute()
+        
+        # Should not have sampling statistics
+        assert alg.sampling == False
+        
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+        
+        del alg

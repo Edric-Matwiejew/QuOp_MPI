@@ -44,8 +44,6 @@ class qwoa(Ansatz):
         observable_dict : FunctionDict, optional
             :term:`FunctionDict` for ``function``
         """
-        #self.operator_function = function
-        #self.operator_dict = operator_dict
         self.set_observables(function, observable_dict)
 
     def set_params(self, param_function, param_dict=None):
@@ -68,7 +66,7 @@ class qwoa(Ansatz):
 
             if self.observable_function is None:
                 raise RuntimeError(
-                    "Rank {}: Solution qualities not defined.".format(self.rank)
+                    "Rank {}: Solution qualities not defined.".format(self.MPI_COMM_WORLD.Get_rank())
                 )
 
             if self.param_function is None:

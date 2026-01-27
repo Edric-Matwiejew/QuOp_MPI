@@ -18,13 +18,13 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'QuOp_MPI'
-copyright = '2021, Edric Matwiejew'
+copyright = '2021-2026, Edric Matwiejew'
 author = 'Edric Matwiejew'
 
-autodoc_mock_imports = ["mpi4py", "h5py","nlopt", "quop_mpi.__lib"]
+autodoc_mock_imports = ["mpi4py", "h5py","nlopt", "quop_mpi._lib"]
 
 # The full version, including alpha/beta/rc tags
-release = '1.3.0'
+release = '1.4.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -47,6 +47,9 @@ bibtex_bibfiles = ['bibliography.bib']
 autosummary_generate = False
 numpydoc_show_class_members = False
 
+# Enable numbered figures and equations for :numref: references
+numfig = True
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -63,6 +66,15 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 html_theme = 'sphinx_rtd_theme'
+
+# GitHub repository settings for RTD theme
+html_context = {
+    'display_github': True,
+    'github_user': 'Edric-Matwiejew',
+    'github_repo': 'QuOp_MPI',
+    'github_version': 'main',
+    'conf_py_path': '/docs/source/',
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

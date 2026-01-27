@@ -121,7 +121,7 @@ contains
     subroutine context_set_state(self, state)
         class(mpi_context), intent(inout) :: self
         complex(dp), intent(in) :: state(:)
-        self%initial_state = state
+        self%initial_state(:size(state)) = state
     end subroutine context_set_state
 
     subroutine context_get_state(self, state)
@@ -129,17 +129,5 @@ contains
         complex(dp), intent(inout) :: state(:)
         state = self%initial_state
     end subroutine context_get_state
-
-    !subroutine context_set_final_state(self, state)
-    !    class(mpi_context), intent(inout) :: self
-    !    complex(dp), intent(in) :: state(:)
-    !    self%final_state = state
-    !end subroutine context_set_final_state
-
-    !subroutine context_get_final_state(self, state)
-    !    class(mpi_context), intent(inout) :: self
-    !    complex(dp), intent(inout) :: state(:)
-    !    state = self%final_state
-    !end subroutine context_get_final_state
 
 end module mpi_backend

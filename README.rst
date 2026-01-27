@@ -6,9 +6,9 @@ A Parallel Framework for Quantum Variational Algorithms
 
 QuOp_MPI is a Python 3 module designed for parallel, distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators.
 
-**Current Version:** 1.3.0
+**Current Version:** 1.4.0
 
-For an in-depth discussion on design, usage, and performance, please refer to the `preprint on arXiv <https://arxiv.org/abs/2110.03963>`_.
+For an in-depth discussion on design, usage, and performance, see the `Journal of Computational Science paper <https://doi.org/10.1016/j.jocs.2022.101711>`_ (also available on `arXiv <https://arxiv.org/abs/2110.03963>`_).
 
 Related Publications
 --------------------
@@ -22,7 +22,31 @@ Related Publications
 
 1. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum Walk-Based Vehicle Routing Optimisation.* Frontiers in Physics 9, (2021).
 2. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum walk-based portfolio optimisation.* Quantum 5, 513 (2021).
-3. Matwiejew, E., Pye J. & Wang J. B. *Quantum Optimisation for Continuous Multivariable Functions by a Structured Search.* arXiv:2210.06227 (2022).
+3. Matwiejew, E., Pye, J. & Wang, J. B. *Quantum optimisation for continuous multivariable functions by a structured search.* Quantum Science and Technology 8, 045012 (2023).
+4. Qu, D., Matwiejew, E., Wang, K., Wang, J. & Xue, P. *Experimental implementation of quantum-walk-based portfolio optimization.* Quantum Science and Technology 9, 025014 (2024).
+5. Pye, J., Matwiejew, E., Smith, A., Maylanda Kovalam, M. & Finn, L. S. *Gravitational-wave matched filtering with variational quantum algorithms.* arXiv:2408.13177 (2024).
+6. Freeland, A. & Wang, J. B. *Quantum optimisation applied to the Quadratic Assignment Problem.* arXiv:2601.01104 (2026).
+
+Citing QuOp_MPI
+---------------
+
+If you use QuOp_MPI in your research, please cite:
+
+    Matwiejew, E. & Wang, J. B. QuOp_MPI: A framework for parallel simulation of quantum variational algorithms. *Journal of Computational Science* 62, 101711 (2022).
+
+BibTeX entry:
+
+.. code-block:: bibtex
+
+    @article{matwiejew2022quop,
+      title={QuOp\_MPI: A framework for parallel simulation of quantum variational algorithms},
+      author={Matwiejew, Edric and Wang, Jingbo B},
+      journal={Journal of Computational Science},
+      volume={62},
+      pages={101711},
+      year={2022},
+      publisher={Elsevier}
+    }
 
 Installation
 ============
@@ -81,21 +105,20 @@ For development or modifying QuOp_MPI, use the following steps:
 Optional Dependencies
 ---------------------
 
-QuOp_MPI provides optional dependencies for documentation and examples.  
+For a full development environment with all optional dependencies:
 
-- **Install all optional dependencies at once:**
+.. code-block:: bash
 
-  .. code-block:: bash
+   python -m pip install '.[dev]'
 
-     python -m pip install '.[all]'
+Alternatively, install only what you need:
 
-- **Manual installation:**  
-  If you prefer, install dependencies manually:
+.. code-block:: bash
 
-  .. code-block:: bash
-
-     python -m pip install numpydoc==1.5.0 sphinxcontrib-bibtex==2.5.0 sphinx-rtd-theme==1.2.0
-     python -m pip install pandas-datareader==0.10.0 yfinance==0.2.12 matplotlib>=3.6.0 seaborn>=0.11.2 jupyter-client>=6.1.2 jupyter-core>=4.6.3
+   python -m pip install '.[examples]'  # Run example notebooks and scripts
+   python -m pip install '.[docs]'      # Build documentation
+   python -m pip install '.[test]'      # Run the test suite
+   python -m pip install '.[nlopt]'     # Enable NLopt optimizer support
 
 Usage Examples
 --------------
@@ -110,7 +133,7 @@ After installation, you can test the package using one of the provided examples.
 Documentation
 =============
 
-The documentation is built using Sphinx. After installing the optional documentation dependencies, generate the docs with:
+After installing ``.[docs]``, build the documentation with:
 
 .. code-block:: bash
 
@@ -119,7 +142,7 @@ The documentation is built using Sphinx. After installing the optional documenta
 Building FFTW3 and HDF5 From Source
 ===================================
 
-If pre-built parallel versions of FFTW3 and HDF5 are not available on your system, compile them from source as follows:
+To compile FFTW3 and HDF5 from source:
 
 .. code-block:: bash
 
@@ -165,4 +188,4 @@ Contact Information
 For bug reports or inquiries, please submit an issue on GitHub or contact:
 
 Edric Matwiejew  
-Email: edric.matwiejew@research.uwa.edu.au
+Email: edric_matwiejew@CSIRO.au

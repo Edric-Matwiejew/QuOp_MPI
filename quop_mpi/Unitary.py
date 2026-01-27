@@ -2,7 +2,8 @@ from __future__ import annotations
 from importlib import import_module
 import numpy as np
 from mpi4py import MPI
-from .__utils.__interface import interface
+from ._utils._interface import interface
+from ._utils._bindable import Bindable
 
 ####################################
 # imports and classes for type hints
@@ -13,7 +14,7 @@ from typing import Callable, Union, Iterable, Any
 Intracomm = MPI.Intracomm
 iterable = Iterable
 
-class Unitary:
+class Unitary(Bindable):
     """Base class for a ``unitary``.
 
     A ``unitary`` is derived from the ``Unitary`` class and implements
@@ -164,8 +165,36 @@ class Unitary:
 
         self.n_params += operator_n_params + unitary_n_params
 
-        #TODO document
+        #: Constraints on valid MPI communicator sizes for this unitary.
+        #: A list of 1-D integer arrays specifying divisibility requirements.
+        #: Used by :meth:`quop_mpi.Ansatz` to determine compatible parallelization.
         self.comm_size_constraints = [np.array([1], dtype = int)]
+
+    # Bindable attributes for QuOp Functions bound to Unitary instances.
+    # Subclasses (propagators) can extend this by defining their own BINDABLE_ATTRIBUTES dict.
+    BINDABLE_ATTRIBUTES = {
+        # Core partitioning (shared with Ansatz)
+        "system_size": "Total number of quantum basis states",
+        "local_i": "Number of elements in this rank's partition",
+        "local_i_offset": "Global index offset for this rank's partition",
+        "partition_table": "Array describing global partitioning scheme",
+        # MPI (shared with Ansatz)
+        "MPI_COMM": "MPI subcommunicator",
+        "seed": "Random seed for parameter generation",
+        # Unitary-specific partitioning
+        "alloc_local": "Size of operator array (equals local_i for non-array operators)",
+        "lb": "Lower global index of the local partition",
+        "ub": "Upper global index of the local partition",
+        # Parameter counts
+        "n_params": "Total parameters for this Unitary (operator + unitary)",
+        "operator_n_params": "Number of operator variational parameters",
+        "unitary_n_params": "Number of unitary variational parameters",
+        # State and operator
+        "variational_parameters": "Operator variational parameters (for parameterised operators)",
+        "initial_state": "Local partition of input state to this unitary",
+        "final_state": "Local partition of output state from this unitary",
+        "operator": "The operator object (after gen_operator called)",
+    }
 
     def __parse_function_dict__(self, function_dict, attribute_name):
 

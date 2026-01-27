@@ -52,7 +52,38 @@ contains
         integer(sp), intent(out) :: max_size
         integer(sp), intent(in) :: COMM
 
-        max_size = available_ranks
+        integer(C_INTPTR_T) :: local_i, local_i_offset, local_o, local_o_offset
+        integer(C_INTPTR_T) :: alloc_local
+        integer(C_INTPTR_T) :: min_local_i
+        integer(sp) :: ierr, comm_size, comm_rank
+        integer(sp) :: n_active
+
+        call MPI_Comm_size(COMM, comm_size, ierr)
+        call MPI_Comm_rank(COMM, comm_rank, ierr)
+
+        ! Query FFTW for the distribution it will use
+        alloc_local = fftw_mpi_local_size_1d(int(system_size, C_INTPTR_T), &
+                                              COMM, &
+                                              FFTW_FORWARD, &
+                                              FFTW_ESTIMATE, &
+                                              local_i, &
+                                              local_i_offset, &
+                                              local_o, &
+                                              local_o_offset)
+
+        ! Find minimum local_i across all ranks
+        call MPI_Allreduce(local_i, min_local_i, 1, MPI_INTEGER8, MPI_MIN, COMM, ierr)
+
+        ! Count how many ranks have local_i > 0
+        if (local_i > 0) then
+            n_active = 1
+        else
+            n_active = 0
+        endif
+        call MPI_Allreduce(MPI_IN_PLACE, n_active, 1, MPI_INTEGER, MPI_SUM, COMM, ierr)
+
+        ! Return the number of active ranks (those with local_i > 0)
+        max_size = n_active
 
     end subroutine mpi_circulant_max_comm_size
 
@@ -67,6 +98,18 @@ contains
 
         self%system_size = self%context%system_size
 
+        ! Handle trivial case: system_size == 1
+        ! FFTW MPI cannot handle 1D DFTs of size 1 (crashes with invalid pointer)
+        ! For size 1, the DFT is the identity transformation, so we skip FFTW
+        if (self%system_size <= 1) then
+            self%local_i = self%context%local_i
+            self%local_i_offset = self%context%local_i_offset
+            self%local_o = self%context%local_i
+            self%local_o_offset = self%context%local_i_offset
+            ! Don't set planned=.true. since we didn't create FFTW plans
+            return
+        endif
+
         alloc_local = fftw_mpi_local_size_1d(   self%system_size, &
                                                 self%context%SUBCOMM, &
                                                 FFTW_FORWARD, &
@@ -76,18 +119,16 @@ contains
                                                 self%local_o, &
                                                 self%local_o_offset)
 
-        if ((self%context%alloc_local < alloc_local) .or. (self%local_i /= self%context%local_i) ) then
-            call MPI_Comm_rank(self%context%SUBCOMM, rank, ierr)
-            if (rank == 0) then
-                write(*,*) 'Warning: Input size inconsistency between FFTW (circulant propagator) ', &
-                        'requirements and context instance resizing state array to statisfy FFTW constraints.'
-            endif
+        ! Update context with FFTW's required distribution
+        if (self%context%alloc_local < alloc_local) then
             self%context%alloc_local = alloc_local
-            self%context%local_i = self%local_i
-            self%context%local_i_offset = self%local_i_offset
             deallocate(self%context%initial_state)
             allocate(self%context%initial_state(alloc_local))
         endif
+
+        ! Update partition info from FFTW's distribution
+        self%context%local_i = self%local_i
+        self%context%local_i_offset = self%local_i_offset
 
         self%fftw_plan_forward = fftw_mpi_plan_dft_1d(self%system_size, &
                                             self%context%initial_state, &
@@ -126,9 +167,10 @@ contains
         allocate(self%eigenvalues(int(self%local_o)))
 
         if (array_sizes(1) == 1) then
-            self%eigenvalues(2:) = -1
+            ! Complete graph: eigenvalue is N-1 for k=0, and -1 for k!=0
+            self%eigenvalues = -1  ! Set all to -1 first
             if (self%local_o_offset == 0) then
-                self%eigenvalues(1) = self%context%system_size - 1
+                self%eigenvalues(1) = self%context%system_size - 1  ! k=0 case
             endif
         else
 
@@ -156,18 +198,26 @@ contains
         class(circulant_propagator), intent(inout) :: self
         real(dp), dimension(:), intent(in) :: ts
 
-        self%context%initial_state = self%context%initial_state
+        ! Handle trivial case: system_size == 1
+        ! For size 1, the circulant propagator just applies a phase shift
+        ! The eigenvalue for a single-element circulant is just the single element itself
+        if (self%system_size <= 1) then
+            if (self%local_i > 0) then
+                self%context%initial_state(1:self%local_i) = exp(cmplx(0.0_dp, -ts(1)*self%eigenvalues(1), kind=dp)) * &
+                                                             self%context%initial_state(1:self%local_i)
+            endif
+            return
+        endif
 
         call fftw_mpi_execute_dft(self%fftw_plan_forward, self%context%initial_state, self%context%initial_state)
-        self%context%initial_state(1:self%local_o) = exp(cmplx(0, -ts(1)*self%eigenvalues))* &
+
+        self%context%initial_state(1:self%local_o) = exp(cmplx(0.0_dp, -ts(1)*self%eigenvalues, kind=dp))* &
                                                          self%context%initial_state(1:self%local_o)
 
         self%context%initial_state(1:self%local_o) = self%context%initial_state(1:self%local_o) &
                                                          /real(self%context%system_size, dp)
 
         call fftw_mpi_execute_dft(self%fftw_plan_backward, self%context%initial_state, self%context%initial_state)
-
-        !self%context%initial_state = self%context%initial_state
 
     end subroutine mpi_circulant_propagate
 

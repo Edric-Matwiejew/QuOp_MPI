@@ -1,17 +1,26 @@
+"""Implements the :ref:`QOWE <QOWE>` :term:`mixing unitary` using momentum-space
+propagation via FFT.
+"""
+from importlib import import_module
 import numpy as np
+from ... import config
 from ...Unitary import Unitary
-#from ...__lib import fCQAOA
+from ..._lib.propagator import propagator
+
 
 class unitary(Unitary):
     """Implements the :ref:`QOWE <QOWE>` :term:`mixing unitary`.
 
+    This propagator uses Fourier transforms to evolve the quantum state
+    in momentum space, applying kinetic energy evolution.
+
     .. warning::
 
         ``unitary`` instances of type ``'momentum`` require that the ``size`` of
-        the MPI communicator assocaited with :class:`quop_mpi.Ansatz` class be
+        the MPI communicator associated with :class:`quop_mpi.Ansatz` class be
         a factor of the first grid dimension (``Ns[0] % size == 0``). 
 
-    **Inhertance Diagram:**
+    **Inheritance Diagram:**
 
         .. graphviz::
 
@@ -38,7 +47,7 @@ class unitary(Unitary):
     Parameters
     ----------
     Ns : list[int]
-        the number of grid points in each dimension of the Cartesian grid in position and momentum space
+        the number of grid points in each dimension of the Cartesian grid
     minsq : list[float]
         the minimum of each Cartesian coordinate in position space
     minsk : list[float]
@@ -49,7 +58,8 @@ class unitary(Unitary):
         the step-size in each Cartesian coordinate in momentum space
     *args and **kwargs:
         passed to the initialisation method of :class:`quop_mpi.Unitary`
-        """
+    """
+
     def __init__(
         self,
         Ns: list[int],
@@ -60,155 +70,80 @@ class unitary(Unitary):
         *args,
         **kwargs
     ):
+        self.Ns = np.array(Ns, dtype=np.int32)
+        self.minsq = np.array(minsq, dtype=np.float64)
+        self.minsk = np.array(minsk, dtype=np.float64)
+        self.deltasq = np.array(deltasq, dtype=np.float64)
+        self.deltask = np.array(deltask, dtype=np.float64)
 
-        super().__init__(
-            *args,
-            **kwargs
-        )
+        super().__init__(*args, **kwargs)
 
-        # check Ns against N
-        self.evolve = fCQAOA.fcqaoa.evolve_ft
-        
-        # should be system_size
-        self.Ns = Ns
-        self.minsq = minsq
-        self.minsk = minsk
-        self.deltasq = deltasq
-        self.deltask = deltask
-        
-        self.unitary_type = "continuous"
+        self.unitary_type = "momentum"
+        self.context = None
+        self.comm_size_constraints = [np.array(Ns, dtype=np.int32)]
         self.planner = True
-        self.planned = False
-        self.N = 1
 
-        for dim in Ns:
-            self.N *= dim
-
-        self.dummy_mixer = np.empty((np.max(self.Ns), len(self.Ns)), dtype=np.float64)
-        self.local_n0 = None
-        self.local_n0_offset = None
-        self.strides = None
-        self.pk = None
-        self.pq = None
-
-    def __fftw_plan(self):
-
-        """Calls FFTW subroutines which set up the ancillary data structures
-        needed to efficiently perform 1D parallel Fourier and inverse Fourier
-        transforms."""
-       
-        self.evolve(
-                self.N,
-                self.Ns,
-                self.local_i_offset,
-                self.local_n0,
-                self.strides,
-                np.array([0 for i in range(len(self.Ns))]),
-                self.dummy_mixer,
-                self.pk,
-                self.pq,
-                self.initial_state,
-                self.MPI_COMM.py2f(), 
-                1)
-    
-        self.planned = True
+    def assign_backend(self, backend):
+        """Assign the Fortran backend for momentum propagation."""
+        self.propagator_module = backend.momentum_propagator
+        self.propagators = [propagator(self.propagator_module.momentum_propagator_wrapper)]
 
     def plan(self, system_size, MPI_COMM):
+        """Compute local partition size for this rank.
+        
+        Parameters
+        ----------
+        system_size : int
+            Total size of the system state
+        MPI_COMM : Intracomm
+            MPI communicator
+            
+        Returns
+        -------
+        tuple[int, int]
+            (local_i, alloc_local) - local partition size and allocation size
+        """
+        size = MPI_COMM.Get_size()
+        rank = MPI_COMM.Get_rank()
 
-        self.MPI_COMM = MPI_COMM
-        part = fCQAOA.fcqaoa.plan_partition(self.Ns, self.MPI_COMM.py2f())
-       
-        self.alloc_local = part[0]
-        self.local_i = part[1]
-        self.local_i_offset = part[2]
-        self.local_n0 = part[3] 
-        self.local_n0_offset = part[4]
-        self.strides = part[5]
+        local_i = int(system_size // size + np.ceil((system_size % size) // (rank + 1) / size))
 
-        return self.local_i, self.alloc_local
+        return local_i, local_i
 
     def copy_plan(self, ex_unitary):
-
-        # CHECK FOR CORRECTNESS
-        try:
-
-            self.local_n0 = ex_unitary.local_n0
-            self.local_n0_offset = ex_unitary.local_n0_offset
-            self.strides = ex_unitary.strides
-
-        except:
-
-            raise ValueError("Input unitary does not propagate using FFTW")
+        """Copy planning information from another unitary."""
+        pass
 
     def gen_operator(self, *args):
-
-        if not self.planned:
-            self.__fftw_plan()
-
-        def phase_k(x):
-            return np.exp(-1.0j*np.sum(x*self.minsq))
+        """Generate the momentum-space operator.
         
-        def phase_q(x):
-            return np.exp(1.0j*np.sum(x*self.minsk))
-
-        self.pk = np.empty(shape = [self.local_i], dtype = np.complex128)
-        self.pq = np.empty(shape = [self.local_i], dtype = np.complex128)
-        
-        fCQAOA.fcqaoa.dist_vector(
-                phase_k,
-                self.Ns,
-                self.strides,
-                self.deltask,
-                self.minsk,
-                self.local_i_offset,
-                self.pk)
-        
-        fCQAOA.fcqaoa.dist_vector(
-                phase_q,
-                self.Ns,
-                self.strides,
-                self.deltasq,
-                self.minsq,
-                self.local_i_offset,
-                self.pq)
-
+        Sets up the FFTW plans and computes the phase factors and
+        momentum-space eigenvalues needed for propagation.
+        """
+        self.propagators[0].plan(self.context)
         super().gen_operator(*args)
+        
+        # Pass grid parameters to the Fortran propagator
+        # The operator function returns eigenvalues, but the momentum propagator
+        # computes its own based on grid parameters
+        self.propagators[0].gen_operator([
+            self.Ns,
+            self.minsq,
+            self.minsk,
+            self.deltasq,
+            self.deltask
+        ])
 
-    def propagate(self, x):
-
-        self.evolve(
-                self.N,
-                self.Ns,
-                self.local_i_offset,
-                self.local_n0,
-                self.strides,
-                np.abs(x),
-                self.operator,
-                self.pk,
-                self.pq,
-                self.initial_state,
-                self.MPI_COMM.py2f(), 
-                0)
-
-        # check efficiency
-        self.final_state[:] = self.initial_state
+    def propagate(self, t):
+        """Apply momentum-space evolution.
+        
+        Parameters
+        ----------
+        t : ndarray
+            Evolution times for each dimension
+        """
+        self.propagators[0].propagate(t)
 
     def destroy(self):
-
-        if self.planned:
-
-            self.evolve(
-                    self.N,
-                    self.Ns,
-                    self.local_i_offset,
-                    self.local_n0,
-                    self.strides,
-                    np.array([0 for i in range(len(self.Ns))]),
-                    self.operator,
-                    self.pk,
-                    self.pq,
-                    self.initial_state,
-                    self.MPI_COMM.py2f(), 
-                    -1)
-    
-            self.planned = False
+        """Clean up FFTW plans and deallocate memory."""
+        self.propagators[0].destroy()

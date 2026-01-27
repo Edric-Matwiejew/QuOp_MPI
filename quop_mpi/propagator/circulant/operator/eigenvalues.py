@@ -1,11 +1,11 @@
 from __future__ import annotations
-#from importlib import import_module
 import numpy as np
 
-#TODO update docstring new complete 
 def complete(system_size: int) -> np.ndarray[np.float64]:
-    """Generate a parallel partition of the eigenvalues of a complete
-    circulant graph with edge weightings :literal:`1`.
+    """Return a placeholder array for a complete circulant graph.
+
+    For a complete graph, eigenvalue computation is handled internally by the
+    propagator, so this function returns an empty array as a signal.
 
     An :term:`Operator Function` associated with
     :class:`quop_mpi.propagator.circulant.unitary`.
@@ -14,25 +14,14 @@ def complete(system_size: int) -> np.ndarray[np.float64]:
     ----------
     system_size : int
         the size of the simulated :term:`QVA`
-    local_i : int
-        size of the local :term:`system state` partitions,
-        :class:`quop_mpi.Ansatz` attribute
-    local_i_offset : int
-        global index offset of the local system state partitions,
-        :class:`quop_mpi.Ansatz` attribute
 
     Returns
     -------
-    ndarray[complex128]
-        1-D complex array of :literal:`local_i` eigenvalues with
-        global index offset :literal:`local_i_offset`
+    ndarray[float64]
+        1-D array with a single element (placeholder for complete graph)
     """
     return np.empty(1, dtype = np.float64)
 
-    #return fqwoa_mpi.fqwoa_mpi.graph_eigenvalues(graph_array, local_i, local_i_offset)
-
-#TODO update docstring, document case for complete graph
-#TODO UPDATE DOCSTRING
 def graph(
         system_size: int,
         i: int = 1) -> np.ndarray[np.float64]:
@@ -46,22 +35,16 @@ def graph(
     ----------
     system_size : int
         the size of the simulated :term:`QVA`
-    local_i : int
-        size of the local :term:`system state` partitions,
-        :class:`quop_mpi.Ansatz` attribute
-    local_i_offset : int
-        global index offset of the local system state partitions,
-        :class:`quop_mpi.Ansatz` attribute
     i : int, optional
         index of the graph (ordered by vertex degree), :literal:`1` corresponds to a
-        cycle graph and :literal:`system_size // 2 + 1` to a complete graph, by default
-        :literal:`1`
+        cycle graph and :literal:`system_size // 2` or greater to a complete graph,
+        by default :literal:`1`
 
     Returns
     -------
-    ndarray[complex128]
-        1-D complex array of :literal:`local_i` eigenvalues with global index offset
-        :literal:`local_i_offset`
+    ndarray[float64]
+        1-D real array of :literal:`system_size` eigenvalues, or a single-element
+        placeholder array if :literal:`i >= system_size // 2` (complete graph)
     """
 
     if (i >= system_size//2):
