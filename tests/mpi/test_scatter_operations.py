@@ -19,8 +19,8 @@ from scipy import sparse as sp
 import quop_mpi._utils._mpi as mpi_utils
 
 # Create aliases for the dunder-prefixed functions
-scatter_1D_array = mpi_utils._scatter_1D_array
-scatter_sparse = mpi_utils._scatter_sparse
+scatter_1D_array = mpi_utils.__scatter_1D_array
+scatter_sparse = mpi_utils.__scatter_sparse
 gather_array = mpi_utils.gather_array
 
 
