@@ -53,13 +53,11 @@ QuOp Functions
         the :meth:`quop_mpi.Ansatz.set_initial_state` method and bound to the
         attributes of the :class:`quop_mpi.Ansatz` class.
 
-        **Typical structure:**
-
         Predefined Initial State Functions are included in the
         :mod:`quop_mpi.state` module. See :class:`quop_mpi.Ansatz` for a
         selected list of available attributes.
 
-        See :class:`quop_mpi.Ansatz` for a selected list of available attributes.
+        **Typical structure:**
 
         .. code-block:: python
 

@@ -47,7 +47,7 @@ Glossary
         See :meth:`quop_mpi.Ansatz.set_unitaries`.
 
     unitary 
-        A unitary operator parameterised by and arbitrary number of
+        A unitary operator parameterised by an arbitrary number of
         :term:`variational parameters`,
 
         .. math::
@@ -107,6 +107,8 @@ Glossary
         such that the total number of variational parameters grows linearly with
         the :term:`ansatz depth`.
 
+        See :mod:`quop_mpi.param` for predefined parameter initialisation functions.
+
     observables
         A real vector of scalar quality values associated with each simulated basis
         state (lower is better). Defines the diagonal observables operator :math:`\hat{O}`. 
@@ -121,7 +123,7 @@ Glossary
             
             \langle \theta | \hat{O} | \theta \rangle
 
-        :meth:`quop_mpi.Ansatz.objective_function`.
+        See :meth:`quop_mpi.Ansatz.objective_function`.
 
     free parameters
         The subset of :term:`variational parameters` to be tuned via classical
@@ -136,4 +138,4 @@ Glossary
         :term:`objective function` via variation of the 
         :term:`free variational parameters <free parameters>`.
 
-        :meth:`quop_mpi.Ansatz.set_optimiser`.
+        See :meth:`quop_mpi.Ansatz.set_optimiser`.
