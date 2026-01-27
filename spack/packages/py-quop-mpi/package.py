@@ -33,12 +33,12 @@ class PyQuopMpi(PythonPackage):
     depends_on("cmake@3.18:", type="build")
 
     # Runtime dependencies
-    depends_on("py-numpy@:1.25", type=("build", "run"))
-    depends_on("py-mpi4py@3.1.2:", type=("build", "run"))
-    depends_on("py-scipy@1.9.1:", type=("build", "run"))
+    depends_on("py-numpy@1.20:", type=("build", "run"))
+    depends_on("py-mpi4py@3.1:", type=("build", "run"))
+    depends_on("py-scipy@1.9:", type=("build", "run"))
     depends_on("py-h5py@3:", type=("build", "run"))
-    depends_on("py-pandas@1.3.4:", type=("build", "run"))
-    depends_on("py-networkx@2.8.6:", type=("build", "run"))
+    depends_on("py-pandas@1.3:", type=("build", "run"))
+    depends_on("py-networkx@2.6:", type=("build", "run"))
 
     # External library dependencies
     depends_on("mpi", type=("build", "link", "run"))
