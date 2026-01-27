@@ -4,4 +4,4 @@ The original version of the module, 'nlopt_wrap.py' is available as part of 'rev
 
 https://travis-ci.org/github/NICTA/revrand
 
-The version of 'nlopt_wrap.py' included with QuOp_MPI has been modified by Edric Matwiejew, queries regrading its usage in QuOp_MPI should be directed towards edric.matwiejew@research.uwa.edu.au.
+The version of 'nlopt_wrap.py' included with QuOp_MPI has been modified by Edric Matwiejew, queries regarding its usage in QuOp_MPI should be directed towards edric_matwiejew@CSIRO.au.

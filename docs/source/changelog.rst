@@ -92,7 +92,7 @@ Changed
 Version 1.0.0 (2021-09-30)
 ==========================
 
-This is the first major release, coinciding with the `Computer Physics Communications publication <https://doi.org/10.1016/j.cpc.2023.108724>`_.
+This is the first major release, coinciding with the `Journal of Computational Science publication <https://doi.org/10.1016/j.jocs.2022.101711>`_.
 
 Added
 -----
