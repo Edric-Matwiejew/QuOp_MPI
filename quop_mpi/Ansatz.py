@@ -23,6 +23,7 @@ from ._logging import Logging
 from ._communicator import Communicator
 from ._optimization import Jacobian, forward_differences, central
 from ._benchmark import Benchmark
+from ._utils._bindable import Bindable
 
 ##########################################
 # Collect profiling data if QUOP_PROFILE=1
@@ -46,7 +47,7 @@ iterable = Iterable
 ###################
 
 #@MPI_trace
-class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
+class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     """Define and simulate a :term:`QVA`.
 
     Associated QuOp Functions:
@@ -562,7 +563,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
     # Sampling methods (set_sampling, unset_sampling, etc.) are inherited from Sampling mixin
     # Logging methods (set_log, save, etc.) are inherited from Logging mixin
 
-    # Bindable attributes for QuOp Functions - used for documentation and validation
+    # Bindable attributes for QuOp Functions - used for documentation and validation.
+    # Subclasses can extend this by defining their own BINDABLE_ATTRIBUTES dict.
     BINDABLE_ATTRIBUTES = {
         # Core partitioning
         "system_size": "Total number of quantum basis states",
@@ -584,53 +586,31 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
         "seed": "Random seed for parameter generation",
     }
 
-    def get_bindable_attributes(self) -> dict:
-        """Return a dictionary of attributes that can be bound to QuOp Function parameters.
-
-        QuOp Functions (observables, initial state, parameter map, etc.) can have
-        their positional parameters automatically bound to Ansatz attributes by
-        matching parameter names. This method shows which attributes are available
-        for binding and their current values.
-
-        Returns
-        -------
-        dict
-            Dictionary mapping attribute names to (value, description) tuples.
-            Value is None if the attribute hasn't been set yet.
-
-        Examples
-        --------
-        >>> alg = Ansatz(1024)
-        >>> alg.get_bindable_attributes()
-        {'system_size': (1024, 'Total number of quantum basis states'),
-         'local_i': (None, 'Number of elements in this rank\\'s partition'),
-         ...}
-
+    def print_all_bindable_attributes(self):
+        """Print bindable attributes for this Ansatz AND all its Unitaries.
+        
+        This shows the complete picture of what parameters can be bound in
+        QuOp Functions:
+        
+        - Ansatz-level functions (Observables, Initial State, Parameter Map,
+          Sampling, Objective) bind to Ansatz attributes
+        - Unitary-level functions (Operator, Parameter) bind to Unitary attributes
+        
+        Call this after :meth:`set_unitaries` to see Unitary attributes.
+        
         See Also
         --------
-        :term:`QuOp Function` : How parameter binding works
+        print_bindable_attributes : Ansatz attributes only
         """
-        result = {}
-        for attr, description in self.BINDABLE_ATTRIBUTES.items():
-            value = getattr(self, attr, None)
-            result[attr] = (value, description)
-        return result
-
-    def print_bindable_attributes(self):
-        """Print a formatted table of attributes available for binding to QuOp Functions.
-
-        This is a convenience method for interactive use to discover which
-        parameter names can be used in custom QuOp Functions.
-        """
-        print("\nBindable Attributes for QuOp Functions")
-        print("=" * 60)
-        print(f"{'Attribute':<25} {'Set?':<6} Description")
-        print("-" * 60)
-        for attr, description in self.BINDABLE_ATTRIBUTES.items():
-            value = getattr(self, attr, None)
-            is_set = "Yes" if value is not None else "No"
-            print(f"{attr:<25} {is_set:<6} {description}")
-        print()
+        # Print Ansatz attributes
+        self.print_bindable_attributes()
+        
+        # Print Unitary attributes if unitaries have been set
+        if hasattr(self, 'unitaries') and self.unitaries:
+            for i, unitary in enumerate(self.unitaries):
+                unitary.print_bindable_attributes()
+        else:
+            print("(No unitaries set yet - call set_unitaries() first to see Unitary attributes)\n")
 
     def set_seed(self, seed: int):
         """Integer for seeding of random number generation.

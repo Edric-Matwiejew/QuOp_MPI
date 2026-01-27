@@ -80,19 +80,16 @@ class interface:
             if not bound:
                 self.unbound_params.append(param_name)
         
-        # Warn on rank 0 if there are unbound parameters that aren't clearly
-        # meant to come from FunctionDict args/kwargs
+        # Warn on rank 0 if there are unbound parameters that look like they
+        # should bind (i.e., don't start with underscore). Underscore-prefixed
+        # params are conventionally custom and expected to come from FunctionDict.
         if self.rank == 0 and self.unbound_params:
-            # Only warn if the first few expected params weren't bound
-            # (later params are likely from FunctionDict)
-            n_bound = len(self.args)
-            n_total = len(self.positional_params)
-            if n_bound < n_total:
+            unexpected_unbound = [p for p in self.unbound_params if not p.startswith('_')]
+            if unexpected_unbound:
                 warnings.warn(
-                    f"{self.function_name} function: {len(self.unbound_params)} "
-                    f"positional parameter(s) not bound to Ansatz attributes: "
-                    f"{self.unbound_params}. These must be provided via FunctionDict['args']. "
-                    f"Use Ansatz.get_bindable_attributes() to see available bindings.",
+                    f"{self.function_name} function: positional parameter(s) not bound: "
+                    f"{unexpected_unbound}. These must be provided via FunctionDict['args']. "
+                    f"Use print_all_bindable_attributes() to see available bindings.",
                     stacklevel=4
                 )
         

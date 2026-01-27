@@ -90,13 +90,28 @@ Bindable Attributes
 -------------------
 
 When defining a QuOp Function, positional parameters are automatically bound
-to :class:`quop_mpi.Ansatz` attributes **by matching the parameter name to the
-attribute name**. This is the key mechanism: if your function has a parameter
-named ``local_i``, it will automatically receive the value of ``ansatz.local_i``.
+to class attributes **by matching the parameter name to the attribute name**.
+This is the key mechanism: if your function has a parameter named ``local_i``,
+it will automatically receive the value of that attribute.
 
-The following attributes can be bound:
+**Binding sources differ by function type**:
 
-.. list-table:: Bindable Ansatz Attributes
+* **Ansatz-level functions** (Observables, Initial State, Parameter Map,
+  Sampling, Objective): bind to :class:`quop_mpi.Ansatz` attributes
+* **Unitary-level functions** (Operator, Parameter): bind to
+  :class:`quop_mpi.Unitary` attributes
+
+Many attributes (like ``local_i``, ``system_size``, ``MPI_COMM``) are shared
+between Ansatz and Unitary, so they work in both contexts. However, some
+attributes are specific to each class.
+
+Ansatz Bindable Attributes
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These attributes are available for Observables, Initial State, Parameter Map,
+Sampling, and Objective Functions:
+
+.. list-table::
    :header-rows: 1
    :widths: 25 15 60
 
@@ -166,9 +181,83 @@ recommend prefixing your custom parameter names with an underscore:
 This prevents accidental collisions with current or future Ansatz attributes
 (e.g., ``seed``, ``expectation``).
 
-**Runtime discovery**: Call ``ansatz.get_bindable_attributes()`` or
-``ansatz.print_bindable_attributes()`` to see available attributes and their
-current values.
+**Runtime discovery**: Use these methods to discover available bindings:
+
+* ``ansatz.print_bindable_attributes()`` — show Ansatz attributes only
+* ``ansatz.print_all_bindable_attributes()`` — show Ansatz AND all Unitary attributes
+* ``unitary.print_bindable_attributes()`` — show attributes for a specific Unitary
+
+For programmatic access, use ``get_bindable_attributes()`` which returns a dictionary.
+
+**Extensibility**: Subclasses (algorithms, propagators) can extend the available
+bindable attributes by defining their own ``BINDABLE_ATTRIBUTES`` class variable.
+The discovery methods automatically collect attributes from the entire class
+hierarchy.
+
+Unitary Bindable Attributes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These attributes are available for Operator and Parameter Functions. They are
+bound from the :class:`quop_mpi.Unitary` instance:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Parameter Name
+     - Type
+     - Description
+   * - ``system_size``
+     - int
+     - Total number of quantum basis states (shared with Ansatz)
+   * - ``local_i``
+     - int
+     - Number of elements in this MPI rank's partition (shared)
+   * - ``local_i_offset``
+     - int
+     - Global index offset for this rank's partition (shared)
+   * - ``partition_table``
+     - ndarray[int]
+     - Array describing global partitioning (shared)
+   * - ``MPI_COMM``
+     - MPI.Intracomm
+     - MPI subcommunicator (shared)
+   * - ``seed``
+     - int
+     - Random seed for parameter generation (shared)
+   * - ``alloc_local``
+     - int
+     - Size of the operator array (equals ``local_i`` for non-array operators)
+   * - ``lb``
+     - int
+     - Lower global index of the local partition
+   * - ``ub``
+     - int
+     - Upper global index of the local partition
+   * - ``n_params``
+     - int
+     - Total parameters for this Unitary (operator + unitary params)
+   * - ``operator_n_params``
+     - int
+     - Number of operator variational parameters
+   * - ``unitary_n_params``
+     - int
+     - Number of unitary variational parameters
+   * - ``variational_parameters``
+     - ndarray[float64]
+     - Operator variational parameters (only for parameterised operators)
+   * - ``initial_state``
+     - ndarray[complex128]
+     - Local partition of input state to this unitary
+   * - ``final_state``
+     - ndarray[complex128]
+     - Local partition of output state from this unitary
+
+.. note::
+
+   Attributes marked "(shared)" have the same values in both Ansatz and
+   Unitary contexts. Unitary-specific attributes like ``variational_parameters``
+   are only meaningful for Operator Functions that define parameterised operators.
 
 .. glossary::
 
@@ -388,17 +477,19 @@ current values.
         Returns an :term:`operator` object that is compatible with the propagation method of
         a specific :class:`unitary` class. See :class:`quop_mpi.Unitary`.
 
+        .. note::
+
+           Operator Functions bind to **Unitary** attributes, not Ansatz
+           attributes. See the "Unitary Bindable Attributes" table above.
+
         Predefined Operator Functions are included with each ``unitary`` class
         in the :mod:`quop_mpi.propagator` module under
         ``quop_mpi.propagator.<unitary>.operator``.
 
-        **Required parameters** (commonly used):
+        **Commonly used parameters** (bound from Unitary):
 
         * ``local_i`` — partition size for this rank
         * ``local_i_offset`` — global index offset
-
-        **Optional parameters**:
-
         * ``system_size`` — total number of basis states
         * ``variational_parameters`` — only if the operator is parameterised
 
@@ -425,12 +516,17 @@ current values.
         Returns initial values for the :term:`variational parameters` associated
         with an instance of the :class:`quop_mpi.Unitary` class.
 
+        .. note::
+
+           Parameter Functions bind to **Unitary** attributes, not Ansatz
+           attributes. See the "Unitary Bindable Attributes" table above.
+
         Predefined Parameter Functions are included in the :mod:`quop_mpi.param`
         module.
 
-        **Commonly used parameters**:
+        **Commonly used parameters** (bound from Unitary):
 
-        * ``n_params`` — number of parameters to generate (bound from Unitary)
+        * ``n_params`` — number of parameters to generate
 
         **Typical Structure**
 
