@@ -22,7 +22,10 @@ Related Publications
 
 1. Bennett, T., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum Walk-Based Vehicle Routing Optimisation.* Frontiers in Physics 9, (2021).
 2. Slate, N., Matwiejew, E., Marsh, S. & Wang, J. B. *Quantum walk-based portfolio optimisation.* Quantum 5, 513 (2021).
-3. Matwiejew, E., Pye J. & Wang J. B. *Quantum Optimisation for Continuous Multivariable Functions by a Structured Search.* arXiv:2210.06227 (2022).
+3. Matwiejew, E., Pye, J. & Wang, J. B. *Quantum optimisation for continuous multivariable functions by a structured search.* Quantum Science and Technology 8, 045012 (2023).
+4. Qu, D., Matwiejew, E., Wang, K., Wang, J. & Xue, P. *Experimental implementation of quantum-walk-based portfolio optimization.* Quantum Science and Technology 9, 025014 (2024).
+5. Pye, J., Matwiejew, E., Smith, A., Maylanda Kovalam, M. & Finn, L. S. *Gravitational-wave matched filtering with variational quantum algorithms.* arXiv:2408.13177 (2024).
+6. Freeland, A. & Wang, J. B. *Quantum optimisation applied to the Quadratic Assignment Problem.* arXiv:2601.01104 (2026).
 
 Citing QuOp_MPI
 ---------------
