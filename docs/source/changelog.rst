@@ -14,7 +14,7 @@ Added
 - ``Ansatz.prepare()`` method to fully initialize the Ansatz for inspection without running optimization
 - ``Ansatz.print_all_bindable_attributes()`` method to display bindable attributes for Ansatz and all Unitaries
 - ``get_bindable_attributes()`` and ``print_bindable_attributes()`` methods on both Ansatz and Unitary classes
-- Extensible ``BINDABLE_ATTRIBUTES`` class variable pattern — subclasses (algorithms, propagators) can define their own bindable attributes
+- Extensible ``BINDABLE_ATTRIBUTES`` class variable pattern -- subclasses (algorithms, propagators) can define their own bindable attributes
 - Comprehensive QuOp Functions documentation with implementation patterns (plain function, factory/closure, callable class)
 - Bindable attributes tables in documentation for both Ansatz and Unitary
 - Naming convention recommendation (underscore prefix) for custom QuOp Function parameters
@@ -44,9 +44,9 @@ Changed
 
 - Reorganized internal module structure with consistent naming conventions
 
-  - Renamed ``__lib/`` → ``_lib/``, ``__utils/`` → ``_utils/``, ``__profile/`` → ``_profile/``
+  - Renamed ``__lib/`` -> ``_lib/``, ``__utils/`` -> ``_utils/``, ``__profile/`` -> ``_profile/``
   - Renamed internal modules from ``__*.py`` to ``_*.py`` (single underscore for private modules)
-  - Moved ``_utils/_nlopt_wrap.py`` → ``_optimization/nlopt_wrap.py``
+  - Moved ``_utils/_nlopt_wrap.py`` -> ``_optimization/nlopt_wrap.py``
 
 - Refactored optional dependencies in pyproject.toml (``[dev]`` replaces ``[all]``)
 - Updated documentation sidebar with grouped navigation

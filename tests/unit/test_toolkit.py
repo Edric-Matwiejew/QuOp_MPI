@@ -48,7 +48,7 @@ class TestKronecker:
         Z = sparse.csr_matrix([[1, 0], [0, -1]])
         result = kron([Z, Z])
         
-        # Z ⊗ Z = diag(1, -1, -1, 1)
+        # Z (x) Z = diag(1, -1, -1, 1)
         expected = np.diag([1, -1, -1, 1])
         np.testing.assert_array_almost_equal(result.toarray(), expected)
 
@@ -165,12 +165,12 @@ class TestPauli:
         np.testing.assert_array_almost_equal(result.toarray(), np.eye(8))
 
     def test_pauli_X_on_first_qubit_two_qubit_system(self):
-        """X on qubit 0 in 2-qubit system: X ⊗ I."""
+        """X on qubit 0 in 2-qubit system: X (x) I."""
         from quop_mpi.toolkit.pauli import X
         
         result = X(0, 2)
         
-        # X ⊗ I
+        # X (x) I
         X_mat = np.array([[0, 1], [1, 0]])
         I_mat = np.eye(2)
         expected = np.kron(X_mat, I_mat)
@@ -179,12 +179,12 @@ class TestPauli:
         np.testing.assert_array_almost_equal(result.toarray(), expected)
 
     def test_pauli_X_on_second_qubit_two_qubit_system(self):
-        """X on qubit 1 in 2-qubit system: I ⊗ X."""
+        """X on qubit 1 in 2-qubit system: I (x) X."""
         from quop_mpi.toolkit.pauli import X
         
         result = X(1, 2)
         
-        # I ⊗ X
+        # I (x) X
         X_mat = np.array([[0, 1], [1, 0]])
         I_mat = np.eye(2)
         expected = np.kron(I_mat, X_mat)
@@ -193,7 +193,7 @@ class TestPauli:
         np.testing.assert_array_almost_equal(result.toarray(), expected)
 
     def test_pauli_Z_on_middle_qubit_three_qubit_system(self):
-        """Z on qubit 1 in 3-qubit system: I ⊗ Z ⊗ I."""
+        """Z on qubit 1 in 3-qubit system: I (x) Z (x) I."""
         from quop_mpi.toolkit.pauli import Z
         
         result = Z(1, 3)
@@ -211,14 +211,14 @@ class TestPauli:
         
         result = Y(0, 1)
         
-        # Y† = Y
+        # Y^dag = Y
         np.testing.assert_array_almost_equal(
             result.toarray(),
             result.toarray().conj().T
         )
 
     def test_pauli_matrices_square_to_identity(self):
-        """X², Y², Z² = I."""
+        """X^2, Y^2, Z^2 = I."""
         from quop_mpi.toolkit.pauli import X, Y, Z, I
         
         n_qubits = 2
@@ -276,7 +276,7 @@ class TestString:
     """Tests for quop_mpi.toolkit.string module."""
 
     def test_string_zero(self):
-        """String '0' gives |0⟩ state."""
+        """String '0' gives |0> state."""
         from quop_mpi.toolkit.string import string
         
         result = string('0')
@@ -285,7 +285,7 @@ class TestString:
         np.testing.assert_array_equal(result, expected)
 
     def test_string_one(self):
-        """String '1' gives |1⟩ state."""
+        """String '1' gives |1> state."""
         from quop_mpi.toolkit.string import string
         
         result = string('1')
@@ -294,7 +294,7 @@ class TestString:
         np.testing.assert_array_equal(result, expected)
 
     def test_string_two_qubits_00(self):
-        """String '00' gives |00⟩ = [1,0,0,0]."""
+        """String '00' gives |00> = [1,0,0,0]."""
         from quop_mpi.toolkit.string import string
         
         result = string('00')
@@ -303,7 +303,7 @@ class TestString:
         np.testing.assert_array_equal(result, expected)
 
     def test_string_two_qubits_01(self):
-        """String '01' gives |01⟩ = [0,1,0,0]."""
+        """String '01' gives |01> = [0,1,0,0]."""
         from quop_mpi.toolkit.string import string
         
         result = string('01')
@@ -312,7 +312,7 @@ class TestString:
         np.testing.assert_array_equal(result, expected)
 
     def test_string_two_qubits_10(self):
-        """String '10' gives |10⟩ = [0,0,1,0]."""
+        """String '10' gives |10> = [0,0,1,0]."""
         from quop_mpi.toolkit.string import string
         
         result = string('10')
@@ -321,7 +321,7 @@ class TestString:
         np.testing.assert_array_equal(result, expected)
 
     def test_string_two_qubits_11(self):
-        """String '11' gives |11⟩ = [0,0,0,1]."""
+        """String '11' gives |11> = [0,0,0,1]."""
         from quop_mpi.toolkit.string import string
         
         result = string('11')
@@ -330,12 +330,12 @@ class TestString:
         np.testing.assert_array_equal(result, expected)
 
     def test_string_three_qubits_101(self):
-        """String '101' gives |101⟩ = basis state 5."""
+        """String '101' gives |101> = basis state 5."""
         from quop_mpi.toolkit.string import string
         
         result = string('101')
         
-        # |101⟩ is index 5 in an 8-dim space (binary 101 = 5)
+        # |101> is index 5 in an 8-dim space (binary 101 = 5)
         expected = np.zeros(8, dtype=np.complex128)
         expected[5] = 1
         
@@ -386,7 +386,7 @@ class TestToolkitIntegration:
     """Integration tests combining toolkit components."""
 
     def test_pauli_z_eigenvalues_match_string_states(self):
-        """Pauli Z has eigenvalue +1 for |0⟩ and -1 for |1⟩."""
+        """Pauli Z has eigenvalue +1 for |0> and -1 for |1>."""
         from quop_mpi.toolkit.pauli import Z
         from quop_mpi.toolkit.string import string
         
@@ -395,16 +395,16 @@ class TestToolkitIntegration:
         state_0 = string('0')
         state_1 = string('1')
         
-        # Z|0⟩ = +|0⟩
+        # Z|0> = +|0>
         result_0 = Z_op @ state_0
         np.testing.assert_array_almost_equal(result_0, state_0)
         
-        # Z|1⟩ = -|1⟩
+        # Z|1> = -|1>
         result_1 = Z_op @ state_1
         np.testing.assert_array_almost_equal(result_1, -state_1)
 
     def test_pauli_x_flips_states(self):
-        """Pauli X flips |0⟩ ↔ |1⟩."""
+        """Pauli X flips |0> <-> |1>."""
         from quop_mpi.toolkit.pauli import X
         from quop_mpi.toolkit.string import string
         
@@ -413,22 +413,22 @@ class TestToolkitIntegration:
         state_0 = string('0')
         state_1 = string('1')
         
-        # X|0⟩ = |1⟩
+        # X|0> = |1>
         np.testing.assert_array_almost_equal(X_op @ state_0, state_1)
         
-        # X|1⟩ = |0⟩
+        # X|1> = |0>
         np.testing.assert_array_almost_equal(X_op @ state_1, state_0)
 
     def test_kron_power_matches_multi_qubit_pauli(self):
-        """kron_power of Pauli Z matches multi-qubit Z⊗Z⊗Z."""
+        """kron_power of Pauli Z matches multi-qubit Z(x)Z(x)Z."""
         from quop_mpi.toolkit.kronecker import kron_power
         from quop_mpi.toolkit.pauli import z
         
         n_qubits = 3
         result = kron_power(z, n_qubits)
         
-        # Z⊗Z⊗Z has diagonal elements based on parity
-        # For state |abc⟩, eigenvalue is (-1)^(a+b+c)
+        # Z(x)Z(x)Z has diagonal elements based on parity
+        # For state |abc>, eigenvalue is (-1)^(a+b+c)
         expected_diag = []
         for i in range(2**n_qubits):
             parity = bin(i).count('1')
