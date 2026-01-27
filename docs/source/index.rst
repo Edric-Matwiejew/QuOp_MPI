@@ -8,6 +8,10 @@ Welcome to QuOp_MPI's documentation!
    :target: https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/LICENSE
    :alt: License
 
+.. image:: https://img.shields.io/badge/GitHub-Repository-blue?logo=github
+   :target: https://github.com/Edric-Matwiejew/QuOp_MPI
+   :alt: GitHub Repository
+
 .. image:: https://zenodo.org/badge/233372703.svg
    :target: https://zenodo.org/badge/latestdoi/233372703
    :alt: DOI
