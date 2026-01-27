@@ -52,7 +52,7 @@ Here the QAOA is applied to the max-cut problem
 for the graph shown below. The predefined
 ``Ansatz`` subclass :class:`~quop_mpi.algorithm.combinatorial.qaoa` forms the basis of the simulation.
 
-.. figure:: _static/maxcut_graph.png
+.. figure:: _static/maxcut_solution.png
    :name: maxcut-graph
    :scale: 25%
    :align: center
