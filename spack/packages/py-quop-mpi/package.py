@@ -42,19 +42,16 @@ class PyQuopMpi(PythonPackage):
     depends_on("fftw@3:+mpi+fortran", type=("build", "link", "run"))
     depends_on("hdf5@1.10:+fortran+shared+mpi", type=("build", "link", "run"))
 
-    # Optional dependencies for examples
-    # py-yfinance and py-seaborn are provided by this repo (not in Spack builtin)
-    variant("examples", default=False, description="Install dependencies for examples")
-    depends_on("py-yfinance@0.2:", when="+examples", type="run")
-    depends_on("py-matplotlib@3.6:", when="+examples", type="run")
-    depends_on("py-seaborn@0.11.2:", when="+examples", type="run")
-    depends_on("py-jupyterlab", when="+examples", type="run")
-
-    # Optional dependencies for documentation (these are in Spack builtin)
+    # Optional dependencies for documentation (available in Spack builtin)
     variant("docs", default=False, description="Install dependencies for documentation")
     depends_on("py-numpydoc@1.5:", when="+docs", type="run")
     depends_on("py-sphinxcontrib-bibtex@2.5:", when="+docs", type="run")
     depends_on("py-sphinx-rtd-theme@1.2:", when="+docs", type="run")
+
+    # Note: Example dependencies (yfinance, seaborn, etc.) have complex dependency
+    # chains not available in Spack. Install them with pip after loading:
+    #   spack load py-quop-mpi
+    #   pip install --user yfinance matplotlib seaborn jupyterlab
 
     def setup_build_environment(self, env):
         """Set up environment variables for the build."""
