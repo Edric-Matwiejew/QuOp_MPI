@@ -211,7 +211,7 @@ QuOp Functions
 
     Operator Function
         Returns an :term:`operator` object that is compatible with the propagation method of
-        specific :class:`unitary` class. See :meth:`quop_mpi.Unitary`.
+        specific :class:`unitary` class. See :class:`quop_mpi.Unitary`.
 
         Predefined Operator Functions are included with each ``unitary`` class
         in the :mod:`quop_mpi.propagator` module under
@@ -242,7 +242,7 @@ QuOp Functions
 
     Parameter Function
         Returns initial values for the :term:`variational parameters` associated
-        with an instance of the :meth:`quop_mpi.Unitary` class.
+        with an instance of the :class:`quop_mpi.Unitary` class.
 
         Predefined Parameter Functions are included in the :mod:`quop_mpi.param`
         module. See :class:`quop_mpi.Unitary` for a list of available
@@ -265,7 +265,7 @@ QuOp Functions
     Objective Function
         Called after state-evolution during parameter optimisation. Returns a
         scalar value for minimisation.
-        Passed to `quop_mpi.Ansatz.set_objective`.
+        Passed to :meth:`quop_mpi.Ansatz.set_objective`.
 
         **Typical Structure**
 

@@ -196,13 +196,13 @@ class swarm:
         Parameters
         ----------
         args: list[Any] or list[list[Any]] 
-            positional arguments for :meth:`quop_mpi.ansatz.set_log`, or a list
+            positional arguments for :meth:`quop_mpi.Ansatz.set_log`, or a list
             of positional arguments specifying unique input for
-            :meth:`quop_mpi.ansatz.set_log` for each :literal:`Ansatz` instance.
+            :meth:`quop_mpi.Ansatz.set_log` for each :literal:`Ansatz` instance.
         kwargs: dict
-            keyword arguments for :meth:`quop_mpi.ansatz.set_log`, or keywords
+            keyword arguments for :meth:`quop_mpi.Ansatz.set_log`, or keywords
             pointing to a list of positional arguments specifying unique input
-            for :meth:`quop_mpi.ansatz.set_log` for each :literal:`Ansatz`
+            for :meth:`quop_mpi.Ansatz.set_log` for each :literal:`Ansatz`
             instance.
         """
         if self.subcomms.in_subcomm():
@@ -230,13 +230,13 @@ class swarm:
         Parameters
         ----------
         args: 
-            positional arguments for :meth:`quop_mpi.ansatz.save`, or a list of
+            positional arguments for :meth:`quop_mpi.Ansatz.save`, or a list of
             positional arguments specifying unique input for
-            :meth:`quop_mpi.ansatz.save` for each :literal:`Ansatz` instance.
+            :meth:`quop_mpi.Ansatz.save` for each :literal:`Ansatz` instance.
         kwargs:
-            keyword arguments for :meth:`quop_mpi.ansatz.save`, or keywords
+            keyword arguments for :meth:`quop_mpi.Ansatz.save`, or keywords
             pointing to a list of positional arguments specifying unique input
-            for :meth:`quop_mpi.ansatz.save` for each :literal:`Ansatz`
+            for :meth:`quop_mpi.Ansatz.save` for each :literal:`Ansatz`
             instance.
         """
         if self.subcomms.in_subcomm():
@@ -264,14 +264,14 @@ class swarm:
         Parameters
         ----------
         args: list[Ans] or list[list[Any]]
-            positional arguments for :meth:`quop_mpi.ansatz.benchmark`, or a
+            positional arguments for :meth:`quop_mpi.Ansatz.benchmark`, or a
             list of positional arguments specifying unique input for
-            :meth:`quop_mpi.ansatz.benchmark` for each :literal:`Ansatz`
+            :meth:`quop_mpi.Ansatz.benchmark` for each :literal:`Ansatz`
             instance.
         kwargs: dict
-            keyword arguments for :meth:`quop_mpi.ansatz.benchmark`, or keywords
+            keyword arguments for :meth:`quop_mpi.Ansatz.benchmark`, or keywords
             pointing to a list of positional arguments specifying unique input
-            for :meth:`quop_mpi.ansatz.benchmark` for each :literal:`Ansatz`
+            for :meth:`quop_mpi.Ansatz.benchmark` for each :literal:`Ansatz`
             instance.
         """
         if self.subcomms.in_subcomm():

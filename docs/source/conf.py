@@ -47,6 +47,9 @@ bibtex_bibfiles = ['bibliography.bib']
 autosummary_generate = False
 numpydoc_show_class_members = False
 
+# Enable numbered figures and equations for :numref: references
+numfig = True
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
