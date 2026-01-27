@@ -276,15 +276,15 @@ class TestDestroyFunctionality:
         alg.set_depth(1)
         alg.execute()
         
-        # Track if __post_parallel was called
-        original_post_parallel = alg._Ansatz__post_parallel
+        # Track if _post_parallel was called
+        original_post_parallel = alg._post_parallel
         post_parallel_called = [False]
         
         def mock_post_parallel():
             post_parallel_called[0] = True
             original_post_parallel()
         
-        alg._Ansatz__post_parallel = mock_post_parallel
+        alg._post_parallel = mock_post_parallel
         
         # Trigger configuration change - this sets reset=True
         alg.set_unitaries(alg.unitaries)
@@ -292,9 +292,9 @@ class TestDestroyFunctionality:
         
         alg.destroy()
         
-        # Verify __post_parallel was called (Bug #5 fix makes this work)
+        # Verify _post_parallel was called (Bug #5 fix makes this work)
         assert post_parallel_called[0], \
-            "Bug #5: __post_parallel() should be called during destroy() when reset=True"
+            "Bug #5: _post_parallel() should be called during destroy() when reset=True"
         assert alg.setup_parallel == True, \
             "setup_parallel should be True after cleanup completed"
 
@@ -348,11 +348,11 @@ class TestDestroyFunctionality:
         
         # Track if cleanup methods were called
         post_parallel_called = [False]
-        original_post_parallel = alg._Ansatz__post_parallel
+        original_post_parallel = alg._post_parallel
         def mock_post_parallel():
             post_parallel_called[0] = True
             original_post_parallel()
-        alg._Ansatz__post_parallel = mock_post_parallel
+        alg._post_parallel = mock_post_parallel
         
         alg.destroy()
         

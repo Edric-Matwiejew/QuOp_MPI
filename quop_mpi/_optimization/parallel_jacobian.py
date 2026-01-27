@@ -95,6 +95,12 @@ class Jacobian:
         # Jacobian-specific attributes
         self.jacobian_input = [method]
         self.h = h if h is not None else np.sqrt(np.finfo(float).eps)
+        
+        # Communicator attributes (from Communicator mixin)
+        self.nodes_per_subcomm = nodes_per_subcomm
+        self.processes_per_node = processes_per_node
+        self.maxcomm = maxcomm
+        
         self.reset = True
 
     def _update_var_map(self):
