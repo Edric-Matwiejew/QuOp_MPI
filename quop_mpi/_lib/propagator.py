@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def array_list_to_pointers(arrays):
     """
     Convert a list of NumPy arrays into two Numpy arrays:
@@ -15,13 +16,13 @@ def array_list_to_pointers(arrays):
     array_sizes = np.array(array_sizes, dtype=np.int64)
     return ptrs, array_sizes
 
+
 class propagator:
 
     def __init__(self, propagator):
         self.propagator = propagator
         self.ptr = self.propagator.setup()
         self.initialised = True
-
 
     def destroy(self):
         if self.initialised:
@@ -30,8 +31,9 @@ class propagator:
 
     def max_comm_size(self, system_size, available_ranks, constraints, COMM):
         ptrs, array_sizes = array_list_to_pointers(constraints)
-        return self.propagator.max_comm_size(self.ptr, system_size, available_ranks,
-                                          ptrs, array_sizes, COMM)
+        return self.propagator.max_comm_size(
+            self.ptr, system_size, available_ranks, ptrs, array_sizes, COMM
+        )
 
     def plan(self, context):
         self.propagator.plan(self.ptr, context.ptr)

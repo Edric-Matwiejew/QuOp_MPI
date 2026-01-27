@@ -9,47 +9,47 @@ from __future__ import annotations
 
 class Bindable:
     """Base class providing bindable attribute discovery for QuOp Functions.
-    
+
     QuOp Functions can have their positional parameters automatically bound
     to class attributes by matching parameter names. This class provides
     methods to discover and display which attributes are available for binding.
-    
+
     Subclasses should define a ``BINDABLE_ATTRIBUTES`` class variable as a
     dictionary mapping attribute names to description strings. The discovery
     methods automatically collect attributes from the entire class hierarchy,
     so subclasses can extend (not replace) the available bindings.
-    
+
     Example
     -------
     .. code-block:: python
-    
+
         class MyClass(Bindable):
             BINDABLE_ATTRIBUTES = {
                 "my_attr": "Description of my_attr",
             }
-            
+
             def __init__(self):
                 self.my_attr = 42
-        
+
         obj = MyClass()
         obj.print_bindable_attributes()
-    
+
     See Also
     --------
     :term:`QuOp Function` : How parameter binding works
     """
-    
+
     # Subclasses override this to define their bindable attributes
     BINDABLE_ATTRIBUTES: dict[str, str] = {}
 
     @classmethod
     def _collect_bindable_attributes(cls) -> dict[str, str]:
         """Collect BINDABLE_ATTRIBUTES from the entire class hierarchy.
-        
+
         This allows subclasses to extend the bindable attributes by defining
         their own BINDABLE_ATTRIBUTES dict. Subclass definitions override
         parent definitions for the same key.
-        
+
         Returns
         -------
         dict
@@ -58,7 +58,7 @@ class Bindable:
         result = {}
         # Traverse MRO in reverse so subclass definitions override parents
         for klass in reversed(cls.__mro__):
-            attrs = getattr(klass, 'BINDABLE_ATTRIBUTES', None)
+            attrs = getattr(klass, "BINDABLE_ATTRIBUTES", None)
             if attrs is not None:
                 result.update(attrs)
         return result
@@ -69,7 +69,7 @@ class Bindable:
         QuOp Functions can have their positional parameters automatically bound
         to class attributes by matching parameter names. This method shows which
         attributes are available for binding and their current values.
-        
+
         This method collects bindable attributes from the entire class hierarchy,
         so subclasses can extend the available attributes.
 
@@ -105,14 +105,14 @@ class Bindable:
         """
         all_attrs = self._collect_bindable_attributes()
         class_name = self.__class__.__name__
-        
+
         # Include unitary_type if available (for Unitary subclasses)
-        unitary_type = getattr(self, 'unitary_type', None)
+        unitary_type = getattr(self, "unitary_type", None)
         if unitary_type:
             header = f"\nBindable Attributes for {class_name} ({unitary_type})"
         else:
             header = f"\nBindable Attributes for {class_name}"
-        
+
         print(header)
         print("=" * 70)
         print(f"{'Attribute':<25} {'Set?':<6} Description")

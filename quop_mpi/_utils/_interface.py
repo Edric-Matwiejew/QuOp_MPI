@@ -66,7 +66,7 @@ class interface:
     def update_parameters(self):
 
         self.args = []
-        
+
         for positional_param in self.positional_params:
             param_name = positional_param.split(":")[0]
             for obj in self.objs:
@@ -74,5 +74,5 @@ class interface:
                 if param_value is not None:
                     self.args.append(param_value)
                     break
-        
+
         self.call = partial(self.function, *self.args)

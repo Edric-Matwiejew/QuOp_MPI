@@ -129,14 +129,18 @@ class swarm_tracker:
         self.sent_status = False
 
         self.status_send_tags = [
-            len(self.tasks) + self.subcomms.get_n_subcomms()*self.subcomms.get_subcomm_index() + i
+            len(self.tasks)
+            + self.subcomms.get_n_subcomms() * self.subcomms.get_subcomm_index()
+            + i
             for i in range(self.subcomms.get_n_subcomms())
         ]
 
         self.status_recv_tags = [
-           len(self.tasks) + self.subcomms.get_n_subcomms()*i + self.subcomms.get_subcomm_index()
-           for i in range(self.subcomms.get_n_subcomms())
-                ]
+            len(self.tasks)
+            + self.subcomms.get_n_subcomms() * i
+            + self.subcomms.get_subcomm_index()
+            for i in range(self.subcomms.get_n_subcomms())
+        ]
 
         if self.suspend_path is not None:
             self.__get_match()
@@ -201,7 +205,9 @@ class swarm_tracker:
 
         self.results_dict = {str(task): None for task in self.tasks}
         self.seeds = [i + self.seed for i in range(len(self.tasks))]
-        self.seeds_dict = {str(task): seed for task, seed in zip(self.seeds, self.tasks)}
+        self.seeds_dict = {
+            str(task): seed for task, seed in zip(self.seeds, self.tasks)
+        }
         self.seed_int = max(self.seeds) + 1
 
     def __distribute_tasks(self):
@@ -269,13 +275,22 @@ class swarm_tracker:
 
             # looping through all subcomm roots other than the subcomm
             # that contains the rank with global index 0.
-            for i, (subcomm_root, tasks, tags) in enumerate(zip(
-                self.subcomms.get_subcomm_roots()[1:],
-                self.task_sublists[1:],
-                self.seed_sublists[1:],
-            )
+            for i, (subcomm_root, tasks, tags) in enumerate(
+                zip(
+                    self.subcomms.get_subcomm_roots()[1:],
+                    self.task_sublists[1:],
+                    self.seed_sublists[1:],
+                )
             ):
-                for j, (task, tag), in enumerate(zip(tasks, tags,)):
+                for (
+                    j,
+                    (task, tag),
+                ) in enumerate(
+                    zip(
+                        tasks,
+                        tags,
+                    )
+                ):
                     if not self.status_sublists[i + 1][j]:
                         if self.subcomms.MPI_COMM.iprobe(source=subcomm_root, tag=tag):
                             self.results_dict[str(task)] = self.subcomms.MPI_COMM.recv(
@@ -283,7 +298,9 @@ class swarm_tracker:
                             )
                             self.status_sublists[i + 1][j] = True
 
-            self.status = [status for sublist in self.status_sublists for status in sublist]
+            self.status = [
+                status for sublist in self.status_sublists for status in sublist
+            ]
 
         elif self.subcomms.in_rootcomm() and (not result is None):
             self.subcomms.MPI_COMM.isend(
@@ -300,7 +317,9 @@ class swarm_tracker:
 
         if not self.time_limit is None:
             self.time_limit -= time() - self.marked_time
-            self.time_limit = self.subcomms.SUBCOMM.allreduce(self.time_limit, op=MPI.MIN)
+            self.time_limit = self.subcomms.SUBCOMM.allreduce(
+                self.time_limit, op=MPI.MIN
+            )
 
     def __send_status(self, status):
         if self.subcomms.in_rootcomm() and not self.sent_status:
@@ -332,7 +351,7 @@ class swarm_tracker:
         return out_of_time, completed_all_tasks
 
     def __synchronise_tracker(self):
-        #exit()
+        # exit()
         if self.subcomms.in_rootcomm():
             synchronised = False
             while not synchronised:
@@ -355,7 +374,9 @@ class swarm_tracker:
         if self.subcomms.in_subcomm():
 
             if not len(self.local_tasks) == self.task_index:
-                self.local_results_dict[str(self.local_tasks[self.task_index])] = copy(result)
+                self.local_results_dict[str(self.local_tasks[self.task_index])] = copy(
+                    result
+                )
 
                 self.__collect_results(
                     self.local_results_dict[str(self.local_tasks[self.task_index])]
@@ -365,16 +386,15 @@ class swarm_tracker:
                 self.subcomms.SUBCOMM.barrier()
                 self.__update_time()
 
-                self.subcomm_status[self.subcomms.get_subcomm_index()][
-                    1
-                ] = self.task_index == len(self.local_tasks)
+                self.subcomm_status[self.subcomms.get_subcomm_index()][1] = (
+                    self.task_index == len(self.local_tasks)
+                )
 
                 self.subcomm_status[self.subcomms.get_subcomm_index()][
                     0
                 ] = self.__enough_time()
 
             status = self.subcomm_status[self.subcomms.get_subcomm_index()]
-
 
             if self.subcomms.in_rootcomm():
 
@@ -388,10 +408,12 @@ class swarm_tracker:
 
             self.subcomms.SUBCOMM.barrier()
 
-            self.subcomm_status = self.subcomms.SUBCOMM.bcast(self.subcomm_status, root=0)
+            self.subcomm_status = self.subcomms.SUBCOMM.bcast(
+                self.subcomm_status, root=0
+            )
 
             if self.__end_tracker():
-            
+
                 if self.subcomms.MPI_COMM.Get_rank() == 0:
                     self.__collect_results(None)
                 out_of_time, completed_all_tasks = self.__end_state()
@@ -551,10 +573,9 @@ class job_tracker:
         suspend_path=None,
         seed=0,
     ):
-
         """
         Track progression of a benchmark-like job.
-        Records the results, allows for a benchmark to be resumed and for additional siulations 
+        Records the results, allows for a benchmark to be resumed and for additional siulations
         to be done at a higher depth or more repeats.
 
         If QUOP_FORCE_RESUME=1 then load from the specified resume file no matter what.
@@ -574,7 +595,7 @@ class job_tracker:
         file name is modified with the date and time.
 
         The class incrementments 'seed' with each call to 'update' and recalls the last
-        'seed' value when the job is restored. This way 'seed' can  be used to ensure 
+        'seed' value when the job is restored. This way 'seed' can  be used to ensure
         that additional repeats are unique.
 
         """
@@ -698,7 +719,6 @@ class job_tracker:
                 )
 
             setattr(self, attribute, env)
-
 
     def __mark_time(self):
 

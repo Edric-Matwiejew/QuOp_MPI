@@ -4,7 +4,7 @@ import networkx as nx
 
 Graph = nx.circular_ladder_graph(4)
 nodes = len(Graph.nodes)
-system_size = 2 ** nodes
+system_size = 2**nodes
 G = nx.to_scipy_sparse_array(Graph)
 
 
@@ -25,7 +25,7 @@ def parallel_maxcut_qualities(local_i, local_i_offset, G):
 
 
 alg = qaoa(system_size)
-alg.set_qualities(parallel_maxcut_qualities, {'args':[G]})
+alg.set_qualities(parallel_maxcut_qualities, {"args": [G]})
 alg.set_depth(2)
 alg.execute()
 alg.print_result()

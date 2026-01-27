@@ -1,11 +1,10 @@
 from __future__ import annotations
 import numpy as np
 
+
 def uniform(
-        n_params: int,
-        seed: int,
-        low: float = 0,
-        high: float = 2*np.pi) -> np.ndarray[np.float64]:
+    n_params: int, seed: int, low: float = 0, high: float = 2 * np.pi
+) -> np.ndarray[np.float64]:
     """Generate initial :term:`variational parameters` from a uniform
     distribution.
 
@@ -37,4 +36,4 @@ def uniform(
 
     np.random.seed(seed)
 
-    return np.random.uniform(low = low, high = high, size = n_params)
+    return np.random.uniform(low=low, high=high, size=n_params)

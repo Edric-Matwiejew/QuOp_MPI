@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from portfolio import get_stock_data
 
+
 def qwoa_portfolio(
     n_stocks=4,
     stocks=None,
@@ -19,13 +20,13 @@ def qwoa_portfolio(
 
     stock_ret = data.pct_change()
     mean_returns = stock_ret.mean()  # Average returns
-    cov_matrix = stock_ret.cov()       # Covariance calculations
+    cov_matrix = stock_ret.cov()  # Covariance calculations
 
     costfunc = []
     portfolio_return = []
     portfolio_std_dev = []
 
-    for k in range(2 ** n_qubits):
+    for k in range(2**n_qubits):
         binary = np.zeros(n_qubits // 2)
         temp = list(bin(k))
         temp.pop(0)  # remove '0'
@@ -60,9 +61,10 @@ def qwoa_portfolio(
     costfunc_df = pd.DataFrame(data=costfunc)
     costfunc_df.to_csv("qwoa_qualities.csv", header=False)
 
+
 def main():
     qwoa_portfolio(n_stocks=5, choose=2)
 
+
 if __name__ == "__main__":
     main()
-

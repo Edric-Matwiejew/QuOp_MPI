@@ -8,7 +8,7 @@ import numpy as np
 Graph = nx.circular_ladder_graph(4)
 
 vertices = len(Graph.nodes)
-system_size = 2 ** vertices
+system_size = 2**vertices
 
 G = nx.to_scipy_sparse_array(Graph)
 
@@ -28,9 +28,9 @@ s.set_seed([[i] for i in range(s.subcomms.get_n_subcomms())])
 np.random.seed(0)
 tasks = []
 for i in range(16):
-    tasks.append(np.random.uniform(size = 2))
+    tasks.append(np.random.uniform(size=2))
 
-results = s.execute_swarm(tasks, basename = 'execute_swarm/maxcut')
+results = s.execute_swarm(tasks, basename="execute_swarm/maxcut")
 
 result = s.get_optimal_result()
 if MPI.COMM_WORLD.Get_rank() == 0:

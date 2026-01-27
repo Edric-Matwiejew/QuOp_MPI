@@ -15,6 +15,7 @@ Intracomm = MPI.Intracomm
 
 ####################################
 
+
 def equal(system_size: int, local_i: int) -> np.ndarray[np.complex128]:
     """Generate an equal superposition over all :term:`system states<system state>`.
 
@@ -26,7 +27,7 @@ def equal(system_size: int, local_i: int) -> np.ndarray[np.complex128]:
     system_size : int
         size of the simulated :term:`QVA`, :class:`quop_mpi.Ansatz` attribute
     local_i : int
-        size of the local :term:`system state` partitions, 
+        size of the local :term:`system state` partitions,
         :class:`quop_mpi.Ansatz` attribute
 
     Returns
@@ -85,6 +86,7 @@ def basis(
 
     return initial_state
 
+
 def array(
     local_i: int,
     local_i_offset: int,
@@ -95,7 +97,7 @@ def array(
     """Define the :term:`initial state` using a Numpy array.
 
     An :term:`Initial State Function`. The :literal:`normalize` argument can be
-    specified by passing a :term:`FunctionDict` to 
+    specified by passing a :term:`FunctionDict` to
     :meth:`~quop_mpi.Ansatz.set_initial_state` .
 
     Parameters
@@ -110,7 +112,7 @@ def array(
         MPI communicator of the :term:`QVA` simulation,
         :class:`quop_mpi.Ansatz` attribute
     state : ndarray[complex128]
-        A 1-D array of :term:`system size` initial state values 
+        A 1-D array of :term:`system size` initial state values
     normalize : bool, optional
         wether to normalize :literal:`state`, by default True
 
@@ -133,6 +135,7 @@ def array(
         initial_state = initial_state / np.sqrt(normalization)
 
     return initial_state
+
 
 def serial(
     partition_table: list[int], MPI_COMM: Intracomm, function: Callable, *args, **kwargs
@@ -209,7 +212,7 @@ def position_grid(
         size of the array containing the local partition of the system,
         :class:`quop_mpi.Ansatz` attribute
     local_i : int
-        number of initial state values in local partition of the 
+        number of initial state values in local partition of the
         :term:`system state`, :class:`quop_mpi.Ansatz` attribute
     local_i_offset : int
         global index offset of the local system state partition,

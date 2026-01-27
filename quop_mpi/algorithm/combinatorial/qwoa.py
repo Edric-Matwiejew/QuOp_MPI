@@ -24,7 +24,7 @@ class qwoa(Ansatz):
     system_size : int
         :term:`system size` of the simulated :term:`QVA`
     MPI_COMM : Intracomm, optional
-        MPI communicator, default ``mpi4py.MPI.COMM_WORLD`` 
+        MPI communicator, default ``mpi4py.MPI.COMM_WORLD``
     """
 
     def __init__(self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD):
@@ -34,7 +34,7 @@ class qwoa(Ansatz):
         self.operator_function = None
         self.param_function = None
 
-    def set_qualities(self, function, observable_dict = None):
+    def set_qualities(self, function, observable_dict=None):
         """Define the :term:`observables` and :term:`phase-shift unitary` :term:`operator`
 
         Parameters
@@ -66,7 +66,9 @@ class qwoa(Ansatz):
 
             if self.observable_function is None:
                 raise RuntimeError(
-                    "Rank {}: Solution qualities not defined.".format(self.MPI_COMM_WORLD.Get_rank())
+                    "Rank {}: Solution qualities not defined.".format(
+                        self.MPI_COMM_WORLD.Get_rank()
+                    )
                 )
 
             if self.param_function is None:

@@ -22,7 +22,7 @@ class Jacobian:
     This class is not intended to be instantiated directly. It provides methods
     for parallel computation of the objective function gradient using MPI
     subcommunicators.
-    
+
     Requires the :class:`Communicator` mixin to be present in the class hierarchy
     to provide subcommunicator management (nodes_per_subcomm, processes_per_node,
     maxcomm, subcomms attributes).
@@ -95,12 +95,12 @@ class Jacobian:
         # Jacobian-specific attributes
         self.jacobian_input = [method]
         self.h = h if h is not None else np.sqrt(np.finfo(float).eps)
-        
+
         # Communicator attributes (from Communicator mixin)
         self.nodes_per_subcomm = nodes_per_subcomm
         self.processes_per_node = processes_per_node
         self.maxcomm = maxcomm
-        
+
         self.reset = True
 
     def _update_var_map(self):
@@ -129,7 +129,7 @@ class Jacobian:
 
     def _configure_parallel_jacobian(self):
         """Configure parallel jacobian in __gen_optimiser if requested.
-        
+
         Called from __gen_optimiser in Ansatz.
         """
         if self.jacobian_input is not None and self.subcomms.get_n_subcomms() > 1:
@@ -146,11 +146,12 @@ class Jacobian:
         elif self.jacobian_input is not None:
             # User requested parallel jacobian but only 1 subcomm was created
             import warnings
+
             warnings.warn(
                 f"Parallel jacobian requested but only 1 subcommunicator could be created "
                 f"(requested maxcomm={self.maxcomm}). Falling back to scipy's default "
                 f"finite difference jacobian.",
-                RuntimeWarning
+                RuntimeWarning,
             )
             return False
         return False
@@ -212,7 +213,9 @@ class Jacobian:
 
         elif self.subcomms.SUBCOMM.Get_rank() == 0:
             jacobian = None
-            for part, mapping in zip(partials, self.var_map[self.subcomms.get_subcomm_index()]):
+            for part, mapping in zip(
+                partials, self.var_map[self.subcomms.get_subcomm_index()]
+            ):
                 self.MPI_COMM_WORLD.Send(
                     [np.array([part]), MPI.DOUBLE], dest=0, tag=mapping
                 )

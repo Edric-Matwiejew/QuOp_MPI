@@ -6,12 +6,14 @@ Default is an equal superposition over all basis states.
 
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_initial_state.py -v --with-mpi
 """
+
 import pytest
 import numpy as np
 from mpi4py import MPI
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from conftest import TestOracle
 
@@ -20,50 +22,53 @@ from conftest import TestOracle
 class TestDefaultInitialState:
     """Tests for default initial state behavior (equal superposition)."""
 
-    def test_default_initial_state_is_equal_superposition(self, mpi_comm, simple_oracle):
+    def test_default_initial_state_is_equal_superposition(
+        self, mpi_comm, simple_oracle
+    ):
         """Verify default initial state is uniform superposition."""
         from quop_mpi.algorithm.combinatorial import qaoa
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
         alg._Ansatz__pre()  # __pre() generates initial state
-        
+
         # After __pre, ansatz_initial_state should be set
         if alg.subcomms.in_subcomm():
             assert alg.ansatz_initial_state is not None
-            
+
             # Each element should have amplitude 1/sqrt(N)
             expected_amplitude = 1.0 / np.sqrt(simple_oracle.system_size)
-            
+
             # Check local portion
             for val in alg.ansatz_initial_state:
                 assert np.isclose(np.abs(val), expected_amplitude, atol=1e-10)
-        
+
         alg._Ansatz__post()  # Finalize execution phase
         del alg
 
     def test_default_initial_state_is_normalized(self, mpi_comm, simple_oracle):
         """Verify default initial state has unit norm."""
         from quop_mpi.algorithm.combinatorial import qaoa
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
         alg._Ansatz__pre()  # __pre() generates initial state
-        
+
         if alg.subcomms.in_subcomm():
             # Compute local norm squared
             local_norm_sq = np.sum(np.abs(alg.ansatz_initial_state) ** 2)
-            
+
             # Reduce across all ranks in subcomm
             total_norm_sq = alg.subcomms.SUBCOMM.allreduce(local_norm_sq, op=MPI.SUM)
-            
-            assert np.isclose(total_norm_sq, 1.0, atol=1e-10), \
-                f"Initial state norm should be 1.0, got {np.sqrt(total_norm_sq)}"
-        
+
+            assert np.isclose(
+                total_norm_sq, 1.0, atol=1e-10
+            ), f"Initial state norm should be 1.0, got {np.sqrt(total_norm_sq)}"
+
         alg._Ansatz__post()  # Finalize execution phase
         del alg
 
@@ -71,20 +76,20 @@ class TestDefaultInitialState:
         """Verify default initial state uses quop_mpi.state.equal function."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
         alg._Ansatz__pre()  # __pre() generates initial state
-        
+
         if alg.subcomms.in_subcomm():
             # After __pre, the initial_state_function should be set
             # Compare with manually calling equal()
             expected = equal(simple_oracle.system_size, alg.local_i)
-            
+
             assert np.allclose(alg.ansatz_initial_state, expected)
-        
+
         alg._Ansatz__post()  # Finalize execution phase
         del alg
 
@@ -97,32 +102,32 @@ class TestSetInitialStateBasic:
         """Verify set_initial_state() sets the setup flag."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        
+
         # Explicitly set initial state
         alg.set_initial_state(equal)
-        
+
         assert alg.setup_initial_state == True
-        
+
         del alg
 
     def test_set_initial_state_stores_function(self, mpi_comm, simple_oracle):
         """Verify set_initial_state() stores the function."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        
+
         alg.set_initial_state(equal)
-        
+
         # The function should be stored (before parsing)
         assert alg.initial_state_function is equal
-        
+
         del alg
 
 
@@ -134,34 +139,34 @@ class TestEqualInitialState:
         """Verify equal initial state works with QAOA."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(equal)
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-        
+
         del alg
 
     def test_equal_state_with_qwoa(self, mpi_comm, simple_oracle):
         """Verify equal initial state works with QWOA."""
         from quop_mpi.algorithm.combinatorial import qwoa
         from quop_mpi.state import equal
-        
+
         alg = qwoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(equal)
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-        
+
         del alg
 
 
@@ -173,27 +178,26 @@ class TestBasisInitialState:
         """Verify basis state with single basis state generates valid state."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import basis
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        
+
         # Start in basis state |0>
         alg.set_initial_state(
-            basis, 
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': [0]}}
+            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
         )
-        
+
         alg.setup()
         alg._Ansatz__pre()  # __pre() generates initial state
-        
+
         if alg.subcomms.in_subcomm():
             # Initial state should be set
             assert alg.ansatz_initial_state is not None
-            
+
             # Verify state has correct size
             assert len(alg.ansatz_initial_state) == alg.local_i
-        
+
         alg._Ansatz__post()  # Finalize execution phase
         del alg
 
@@ -201,26 +205,26 @@ class TestBasisInitialState:
         """Verify basis state with multiple basis states is set correctly."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import basis
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        
+
         # Start in equal superposition of |0> and |1>
         basis_states = [0, 1]
         alg.set_initial_state(
             basis,
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': basis_states}}
+            initial_state_dict={"args": [], "kwargs": {"basis_states": basis_states}},
         )
-        
+
         alg.setup()
         alg._Ansatz__pre()  # __pre() generates initial state
-        
+
         if alg.subcomms.in_subcomm():
             # Verify state was generated
             assert alg.ansatz_initial_state is not None
             assert len(alg.ansatz_initial_state) == alg.local_i
-        
+
         alg._Ansatz__post()  # Finalize execution phase
         del alg
 
@@ -228,20 +232,19 @@ class TestBasisInitialState:
         """Verify basis initial state allows successful execution."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import basis
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(
-            basis,
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': [0]}}
+            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
         )
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-        
+
         del alg
 
 
@@ -252,80 +255,80 @@ class TestCustomInitialState:
     def test_custom_function_called(self, mpi_comm, simple_oracle):
         """Verify custom initial state function is called."""
         from quop_mpi.algorithm.combinatorial import qaoa
-        
+
         call_count = [0]
-        
+
         def custom_initial_state(system_size, local_i):
             call_count[0] += 1
             # Return uniform superposition
-            return np.full(local_i, 1.0/np.sqrt(system_size), dtype=np.complex128)
-        
+            return np.full(local_i, 1.0 / np.sqrt(system_size), dtype=np.complex128)
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(custom_initial_state)
-        
+
         alg.setup()
         alg._Ansatz__pre()  # __pre() generates initial state
-        
+
         # Custom function should have been called (on ranks in subcomm)
         total_calls = mpi_comm.reduce(call_count[0], op=MPI.SUM, root=0)
-        
+
         if mpi_comm.Get_rank() == 0:
             assert total_calls > 0
-        
+
         alg._Ansatz__post()  # Finalize execution phase
         del alg
 
     def test_custom_localized_state(self, mpi_comm, simple_oracle):
         """Test custom function that creates a localized initial state."""
         from quop_mpi.algorithm.combinatorial import qaoa
-        
+
         def localized_state(system_size, local_i, local_i_offset):
             """Create state localized at index 0."""
             state = np.zeros(local_i, dtype=np.complex128)
             if local_i_offset == 0 and local_i > 0:
                 state[0] = 1.0
             return state
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(localized_state)
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-        
+
         del alg
 
     def test_custom_state_with_parameters(self, mpi_comm, simple_oracle):
         """Test custom function with additional parameters via FunctionDict."""
         from quop_mpi.algorithm.combinatorial import qaoa
-        
+
         def parameterized_state(system_size, local_i, amplitude_scale=1.0):
             """Create state with scaled amplitude."""
             amp = amplitude_scale / np.sqrt(system_size)
             return np.full(local_i, amp, dtype=np.complex128)
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        
+
         # Pass amplitude_scale via initial_state_dict
         alg.set_initial_state(
             parameterized_state,
-            initial_state_dict={'args': [], 'kwargs': {'amplitude_scale': 1.0}}
+            initial_state_dict={"args": [], "kwargs": {"amplitude_scale": 1.0}},
         )
-        
+
         alg.setup()
         alg._Ansatz__pre()  # __pre() generates initial state
-        
+
         if alg.subcomms.in_subcomm():
             expected_amp = 1.0 / np.sqrt(simple_oracle.system_size)
             assert np.allclose(np.abs(alg.ansatz_initial_state), expected_amp)
-        
+
         alg._Ansatz__post()  # Finalize execution phase
         del alg
 
@@ -338,62 +341,61 @@ class TestInitialStateEvolution:
         """Verify zero parameters keep state close to equal superposition."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(equal)
-        
+
         # Evolve with zero parameters
         zero_params = np.zeros(2)  # gamma=0, beta=0
         alg.evolve_state(zero_params)
-        
+
         if alg.subcomms.in_subcomm():
             # With zero params, state should be unchanged (still uniform)
             expected_amplitude = 1.0 / np.sqrt(simple_oracle.system_size)
-            
+
             # Check that amplitudes are still uniform
-            for val in alg.context.state[:alg.local_i]:
+            for val in alg.context.state[: alg.local_i]:
                 assert np.isclose(np.abs(val), expected_amplitude, atol=1e-5)
-        
+
         del alg
 
     def test_initial_state_affects_expectation(self, mpi_comm, simple_oracle):
         """Verify different initial states give different expectation values."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal, basis
-        
+
         # Test with equal superposition
         alg_equal = qaoa(simple_oracle.system_size, mpi_comm)
         alg_equal.set_qualities(simple_oracle.qualities_function())
         alg_equal.set_depth(1)
         alg_equal.set_initial_state(equal)
-        
+
         params = np.array([0.5, 0.5])
         alg_equal.evolve_state(params)
         exp_equal = alg_equal.get_expectation_value()
-        
+
         del alg_equal
-        
+
         # Test with single basis state
         alg_basis = qaoa(simple_oracle.system_size, mpi_comm)
         alg_basis.set_qualities(simple_oracle.qualities_function())
         alg_basis.set_depth(1)
         alg_basis.set_initial_state(
-            basis,
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': [0]}}
+            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
         )
-        
+
         alg_basis.evolve_state(params)
         exp_basis = alg_basis.get_expectation_value()
-        
+
         # Expectation values should generally be different
         # (depending on the oracle, index 0 might or might not be marked)
         # We just verify both are valid numbers
         if alg_basis.subcomms.in_rootcomm():
             assert np.isfinite(exp_equal)
             assert np.isfinite(exp_basis)
-        
+
         del alg_basis
 
 
@@ -404,41 +406,41 @@ class TestInitialStateWithDifferentAlgorithms:
     def test_qaoa_with_custom_initial_state(self, mpi_comm, simple_oracle):
         """Verify QAOA works with custom initial state."""
         from quop_mpi.algorithm.combinatorial import qaoa
-        
+
         def half_amplitude_state(system_size, local_i):
             """Half of normal amplitude (not normalized)."""
-            return np.full(local_i, 0.5/np.sqrt(system_size), dtype=np.complex128)
-        
+            return np.full(local_i, 0.5 / np.sqrt(system_size), dtype=np.complex128)
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(half_amplitude_state)
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-        
+
         del alg
 
     def test_qwoa_with_basis_initial_state(self, mpi_comm, simple_oracle):
         """Verify QWOA works with basis initial state."""
         from quop_mpi.algorithm.combinatorial import qwoa
         from quop_mpi.state import basis
-        
+
         alg = qwoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(
             basis,
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': [0, 1, 2]}}
+            initial_state_dict={"args": [], "kwargs": {"basis_states": [0, 1, 2]}},
         )
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-        
+
         del alg
 
 
@@ -450,76 +452,73 @@ class TestInitialStateEdgeCases:
         """Test setting initial state multiple times."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal, basis
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
-        
+
         # First set to basis
         alg.set_initial_state(
-            basis,
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': [0]}}
+            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
         )
-        
+
         # Then change to equal
         alg.set_initial_state(equal)
-        
+
         # Should use equal (the last one set)
         assert alg.initial_state_function is equal
-        
+
         del alg
 
     def test_initial_state_after_execute(self, mpi_comm, simple_oracle):
         """Test that initial state can be changed and re-executed."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import equal, basis
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(equal)
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
-            result1 = alg.result['fun']
+            result1 = alg.result["fun"]
         else:
             result1 = None
         result1 = mpi_comm.bcast(result1, root=0)
-        
+
         # Change initial state
         alg.set_initial_state(
-            basis,
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': [0]}}
+            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
         )
-        
+
         # Re-execute
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
-            result2 = alg.result['fun']
+            result2 = alg.result["fun"]
             assert result2 is not None
-        
+
         del alg
 
     def test_initial_state_with_deeper_circuit(self, mpi_comm, simple_oracle):
         """Test custom initial state with deeper circuit."""
         from quop_mpi.algorithm.combinatorial import qaoa
         from quop_mpi.state import basis
-        
+
         alg = qaoa(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(3)  # Deeper circuit
         alg.set_initial_state(
-            basis,
-            initial_state_dict={'args': [], 'kwargs': {'basis_states': [0]}}
+            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
         )
-        
+
         alg.execute()
-        
+
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
             # Should have 6 parameters for depth=3 (2 per layer)
-            assert len(alg.result['x']) == 6
-        
+            assert len(alg.result["x"]) == 6
+
         del alg

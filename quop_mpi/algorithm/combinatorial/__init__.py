@@ -9,6 +9,7 @@
         * :meth:`~quop_mpi.propagator.diagonal.operator.array`
         * :meth:`~quop_mpi.propagator.diagonal.operator.uniform`
 """
+
 from .qwoa import qwoa
 from .qaoa import qaoa
 from ...observable import serial as serial

@@ -5,7 +5,9 @@ from .. import config
 
 
 class context:
-    def __init__(self, backend, system_size, alloc_local, local_i, local_i_offset, SUBCOMM):
+    def __init__(
+        self, backend, system_size, alloc_local, local_i, local_i_offset, SUBCOMM
+    ):
 
         self.system_size = system_size
         self.host_alloc_local = alloc_local
@@ -55,14 +57,14 @@ class context:
     def state(self, state):
         self.context_wrapper.set_state(self.ptr, state)
 
-    #@property
-    #def final_state(self):
+    # @property
+    # def final_state(self):
     #    if self.initialised:
     #        return self.context_wrapper.get_final_state(self.ptr, self.host_alloc_local)
     #    return None
 
-    #@final_state.setter
-    #def final_state(self, state):
+    # @final_state.setter
+    # def final_state(self, state):
     #    self.context_wrapper.set_final_state(self.ptr, state)
 
     def get_expectation_value(self):

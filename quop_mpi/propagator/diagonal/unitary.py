@@ -4,6 +4,7 @@ from quop_mpi import config
 from quop_mpi.Unitary import Unitary
 from quop_mpi._lib.propagator import propagator
 
+
 class unitary(Unitary):
     """Compute the action of a :term:`mixing unitary` with a phase_shift
     :term:`operator` or a sequence of mixing-unitaries with phase_shift
@@ -18,7 +19,7 @@ class unitary(Unitary):
                 node [fontsize="10"];
                 Unitary[label="quop_mpi.Unitary", shape="rectangle"];
                 unitary[label="quop_mpi.propagator.phase_shift.unitary", shape="rectangle"];
-    
+
                 Unitary -> unitary;
             }
 
@@ -51,17 +52,20 @@ class unitary(Unitary):
 
         self.propagators = []
         for i in range(self.unitary_n_params):
-            self.propagators.append(propagator(self.propagator_module.diagonal_propagator_wrapper))
+            self.propagators.append(
+                propagator(self.propagator_module.diagonal_propagator_wrapper)
+            )
 
     def plan(self, system_size, MPI_COMM):
 
         size = MPI_COMM.Get_size()
         rank = MPI_COMM.Get_rank()
 
-        local_i = int(system_size // size + np.ceil((system_size % size) // (rank + 1) / size))
+        local_i = int(
+            system_size // size + np.ceil((system_size % size) // (rank + 1) / size)
+        )
 
         return local_i, local_i
-
 
     def copy_plan(self, ex_unitary):
         pass
@@ -79,7 +83,7 @@ class unitary(Unitary):
             if self.unitary_n_params > 1:
                 operator_args = [diagonals[i]]
             else:
-                operator_args = [diagonals] 
+                operator_args = [diagonals]
 
             propagator.gen_operator(operator_args)
 

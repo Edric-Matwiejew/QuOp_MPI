@@ -16,13 +16,14 @@ Intracomm = MPI.Intracomm
 
 ####################################
 
+
 class multivariable(Ansatz):
     """Base class for simulation of the :ref:`QMOA <QMOA>` and :ref:`QOWE`
     algorithm."""
 
     def set_params(self, param_function: Callable, param_dict: dict = None):
-        """Define the :term:`Parameter Function` for the 
-        :term:`phase-shift <phase-shift unitary>` and 
+        """Define the :term:`Parameter Function` for the
+        :term:`phase-shift <phase-shift unitary>` and
         :term:`mixing <mixing unitary>` unitaries.
 
         Parameters
@@ -54,13 +55,13 @@ class multivariable(Ansatz):
         else:
             self.UW_n_params = 1
             self.UW.unitary_n_params = 1
-        
+
         # Recalculate n_params (operator_n_params + unitary_n_params)
         self.UW.n_params = self.UW.operator_n_params + self.UW.unitary_n_params
 
         self.set_unitaries([self.UQ, self.UW])
 
-    def set_qualities(self, function: Callable, operator_dict : dict = None):
+    def set_qualities(self, function: Callable, operator_dict: dict = None):
         """Define the :term:`observables` and :term:`phase-shift unitary` :term:`operator`
 
         Parameters
@@ -88,13 +89,14 @@ class multivariable(Ansatz):
         """
 
         if self.COMM_OPT.Get_rank() == 0:
-        
+
             inds = self.unitaries[1].fCQAOA.continuous.get_index(
                 index + 1, self.Ns, self.UW.strides
             )
             grid_points = (inds - 1) * self.deltas
             grid_points += self.mins
             return grid_points
+
 
 class qmoa(multivariable):
     """Simulate the :ref:`QMOA <QMOA>`.
@@ -109,17 +111,18 @@ class qmoa(multivariable):
     MPI_communicator : Intracomm, optional
         MPI Intracomm, by default MPI.COMM_WORLD
     """
+
     def __init__(self, Ns: list[int], MPI_COMM: Intracomm = MPI.COMM_WORLD):
         self.Ns = [2**N for N in Ns]
 
-        system_size = 1 
+        system_size = 1
         for N in self.Ns:
             system_size *= N
 
         super().__init__(system_size, MPI_COMM)
 
-        self.continuous_function = None # must be defined using set_qualities
-        self.graphs = Ns # complete graphs by default
+        self.continuous_function = None  # must be defined using set_qualities
+        self.graphs = Ns  # complete graphs by default
         self.UW_n_params = len(Ns)
 
         self.UQ = diagonal.unitary(
@@ -128,17 +131,16 @@ class qmoa(multivariable):
         )
 
         self.UQ.Ns = self.Ns
-        
+
         self.UW = composite.unitary(
             self.Ns,
             composite.operator.ith,
             operator_dict={
-                "args":[],
-                "kwargs":{
-                "Cs": self.Ns},
+                "args": [],
+                "kwargs": {"Cs": self.Ns},
             },
             parameter_function=uniform,
-            unitary_n_params = self.UW_n_params,
+            unitary_n_params=self.UW_n_params,
         )
 
         self.set_unitaries([self.UQ, self.UW])
@@ -158,11 +160,18 @@ class qmoa(multivariable):
             ``1``,  ``Cs[j] == 1`` cycle graph,  ``Cs[j] > system_size // 2``
             complete graph
         """
-        self.UW.operator_dict = {"args": [], "kwargs": {"Cs":Cs}}
+        self.UW.operator_dict = {"args": [], "kwargs": {"Cs": Cs}}
+
 
 class qowe(multivariable):
 
-    def __init__(self, Ns: list[int], deltas: list[float], mins: list[float], MPI_COMM: Intracomm = MPI.COMM_WORLD):
+    def __init__(
+        self,
+        Ns: list[int],
+        deltas: list[float],
+        mins: list[float],
+        MPI_COMM: Intracomm = MPI.COMM_WORLD,
+    ):
         """Simulate the :ref:`QMOA <QMOA>`.
 
         A :term:`QVA` for the optimisation of continuous multivariable
@@ -183,24 +192,26 @@ class qowe(multivariable):
         self.deltas = deltas
         self.mins = mins
 
-        system_size = 1 
+        system_size = 1
         for N in self.Ns:
             system_size *= N
 
         super().__init__(system_size, MPI_COMM)
 
-        self.continuous_function = None # must be defined using set_qualities
-        self.graphs = Ns # complete graphs by default
+        self.continuous_function = None  # must be defined using set_qualities
+        self.graphs = Ns  # complete graphs by default
         self.UW_n_params = len(Ns)
-        
-        self.deltask = np.array([
-                2*np.pi/(n*delta) for (delta, n) in zip(self.deltas, self.Ns)
-                ], dtype = np.float64)
-        
-        self.minsk = np.array([
-                -(n/2)*delta for (delta, n) in zip(self.deltask, self.Ns)
-                ], dtype = np.float64)
-  
+
+        self.deltask = np.array(
+            [2 * np.pi / (n * delta) for (delta, n) in zip(self.deltas, self.Ns)],
+            dtype=np.float64,
+        )
+
+        self.minsk = np.array(
+            [-(n / 2) * delta for (delta, n) in zip(self.deltask, self.Ns)],
+            dtype=np.float64,
+        )
+
         self.UQ = diagonal.unitary(
             diagonal.operator.observables,
             parameter_function=uniform,
@@ -209,7 +220,7 @@ class qowe(multivariable):
         self.UQ.Ns = self.Ns
         self.UQ.mins = mins
         self.UQ.deltas = self.deltas
-            
+
         self.UW = momentum.unitary(
             self.Ns,
             self.mins,
@@ -218,14 +229,11 @@ class qowe(multivariable):
             self.deltask,
             momentum.operator.magnitude_squared,
             parameter_function=uniform,
-            unitary_n_params = len(self.Ns),
+            unitary_n_params=len(self.Ns),
         )
-        
+
         self.set_unitaries([self.UQ, self.UW])
 
         self.set_initial_state(
-                position_grid,
-                {     
-                "args": [None]  # function=None uses default Gaussian
-                    }
-                )
+            position_grid, {"args": [None]}  # function=None uses default Gaussian
+        )

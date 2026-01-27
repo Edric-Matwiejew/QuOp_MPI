@@ -3,7 +3,8 @@ from copy import copy
 import numpy as np
 from scipy import sparse as __sparse
 
-def kron(terms: list['sparse']) -> 'csr_matrix':
+
+def kron(terms: list["sparse"]) -> "csr_matrix":
     """Compute the tensor (Kronecker) product of a sequence of sparse matrices.
 
     Parameters
@@ -34,12 +35,13 @@ def kron(terms: list['sparse']) -> 'csr_matrix':
     else:
 
         for term in terms[1:]:
-            out = __sparse.kron(out, term, format = 'coo')
+            out = __sparse.kron(out, term, format="coo")
 
         return out.tocsr()
 
-#"""Compute the tensor (Kronecker) product of ``n`` instances of a sparse matrix.
-def kron_power(term: 'sparse', n: int) -> 'csr_matrix':
+
+# """Compute the tensor (Kronecker) product of ``n`` instances of a sparse matrix.
+def kron_power(term: "sparse", n: int) -> "csr_matrix":
     """Compute the tensor (Kronecker) product of ``n`` instances of a sparse matrix.
 
     Parameters
@@ -52,7 +54,6 @@ def kron_power(term: 'sparse', n: int) -> 'csr_matrix':
     Returns
     -------
     csr_matrix
-       tensor product of ``n`` occurences of ``term`` 
+       tensor product of ``n`` occurences of ``term``
     """
     return kron([term for _ in range(n)])
-

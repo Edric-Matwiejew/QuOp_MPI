@@ -10,6 +10,7 @@ functions.
     * :meth:`~quop_mpi.diagonal.operator.cartesian`
     * :meth:`~quop_mpi.diagonal.operator.cartesian_scaled`
 """
+
 from .multivariable import qmoa, qowe
 from ...propagator.diagonal.operator import setup_cartesian as setup_cartesian
 from ...propagator.diagonal.operator import cartesian as cartesian

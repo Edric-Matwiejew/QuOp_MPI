@@ -46,7 +46,8 @@ iterable = Iterable
 # QuOp Ansatz Class
 ###################
 
-#@MPI_trace
+
+# @MPI_trace
 class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     """Define and simulate a :term:`QVA`.
 
@@ -130,6 +131,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     MPI_communicator : Intracomm, optional
         MPI Intracomm, by default MPI.COMM_WORLD
     """
+
     def __init__(self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD):
 
         self.system_size = system_size
@@ -212,12 +214,12 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.setup_called = False
         self.reset = False
 
-        self._has_param_map        = False                # flag
-        self._param_map_raw        = lambda x, *a, **k: x # identity fallback
-        self._param_map_parsed     = None                 # interface-wrapped fn
-        self.param_map_dict        = {"args": [], "kwargs": {}}
-        self._need_bind_param_map  = False                # postpone binding until SUBCOMM exists
-        self._n_free_params        = None                 # set when param map is configured
+        self._has_param_map = False  # flag
+        self._param_map_raw = lambda x, *a, **k: x  # identity fallback
+        self._param_map_parsed = None  # interface-wrapped fn
+        self.param_map_dict = {"args": [], "kwargs": {}}
+        self._need_bind_param_map = False  # postpone binding until SUBCOMM exists
+        self._n_free_params = None  # set when param map is configured
 
         atexit.register(self.__exit)
 
@@ -287,9 +289,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self.destroy()
         self.MPI_COMM_WORLD.barrier()
 
-    def __parse_function_dict__(
-        self, function_dict: dict, attribute_name: str
-    ):
+    def __parse_function_dict__(self, function_dict: dict, attribute_name: str):
         """Takes a user specified :literal:`FunctionDict` and sets :literal:`attribute_name`
         to a :literal:`ParsedFunctionDict` containing the values associated with the
         "args" and "kwargs" keys of the input :literal:`FunctionDict`. If either of these
@@ -374,9 +374,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.quop_result["qubits"] = copy(np.log2(self.system_size))
         self.quop_result["system size"] = copy(self.system_size)
         self.quop_result["ansatz_depth"] = copy(self.ansatz_depth)
-        self.quop_result["variational_parameters"] = deepcopy(
-            self.result["x"]
-        )
+        self.quop_result["variational_parameters"] = deepcopy(self.result["x"])
         self.quop_result["mapped_parameters"] = deepcopy(
             self.__to_full(self.result["x"])
         )
@@ -530,9 +528,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self.ansatz_depth = depth
             self.setup_depth = True
 
-    def set_initial_state(
-        self, function: Callable, initial_state_dict: dict = None
-    ):
+    def set_initial_state(self, function: Callable, initial_state_dict: dict = None):
         """Define the :term:`initial state`.
 
         Parameters
@@ -588,29 +584,31 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     def print_all_bindable_attributes(self):
         """Print bindable attributes for this Ansatz AND all its Unitaries.
-        
+
         This shows the complete picture of what parameters can be bound in
         QuOp Functions:
-        
+
         - Ansatz-level functions (Observables, Initial State, Parameter Map,
           Sampling, Objective) bind to Ansatz attributes
         - Unitary-level functions (Operator, Parameter) bind to Unitary attributes
-        
+
         Call this after :meth:`set_unitaries` to see Unitary attributes.
-        
+
         See Also
         --------
         print_bindable_attributes : Ansatz attributes only
         """
         # Print Ansatz attributes
         self.print_bindable_attributes()
-        
+
         # Print Unitary attributes if unitaries have been set
-        if hasattr(self, 'unitaries') and self.unitaries:
+        if hasattr(self, "unitaries") and self.unitaries:
             for i, unitary in enumerate(self.unitaries):
                 unitary.print_bindable_attributes()
         else:
-            print("(No unitaries set yet - call set_unitaries() first to see Unitary attributes)\n")
+            print(
+                "(No unitaries set yet - call set_unitaries() first to see Unitary attributes)\n"
+            )
 
     def set_seed(self, seed: int):
         """Integer for seeding of random number generation.
@@ -640,12 +638,12 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         than the expectation value of the prepared state).
 
         The function is called after state evolution - returning a scalar
-        value that is passed to the minimizer. 
+        value that is passed to the minimizer.
 
         Parameters
         ----------
         function: callable
-            an :term:`Objective Function` 
+            an :term:`Objective Function`
 
         objective_dict: FunctionDict, optional
             :term:`FunctionDict` for the `Objective Function`
@@ -656,7 +654,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     def __parse_objective(self):
         self.objective_function = interface(
-            [self,self.unitaries],
+            [self, self.unitaries],
             self.objective_function,
             "objective",
             self.subcomms.SUBCOMM,
@@ -665,8 +663,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def __gen_objective(self):
         self.__parse_objective()
 
-    def objective(self, variational_parameters: Union[list[float], np.ndarray[float]]) -> float:
-        """Compute the :term:`objective function` at :term:`variational parameters` 
+    def objective(
+        self, variational_parameters: Union[list[float], np.ndarray[float]]
+    ) -> float:
+        """Compute the :term:`objective function` at :term:`variational parameters`
         :literal:`variational_parameters`.
 
         Parameters
@@ -710,8 +710,13 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
             if self.subcomms.in_subcomm():
 
-                max_comm_size = max_compatible_size(self.unitaries, self.system_size, self.subcomms.SUBCOMM.size, self.subcomms.SUBCOMM.py2f())
-                dropcount = self.subcomms.SUBCOMM.size  - max_comm_size 
+                max_comm_size = max_compatible_size(
+                    self.unitaries,
+                    self.system_size,
+                    self.subcomms.SUBCOMM.size,
+                    self.subcomms.SUBCOMM.py2f(),
+                )
+                dropcount = self.subcomms.SUBCOMM.size - max_comm_size
 
             else:
                 break
@@ -720,18 +725,22 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 self.subcomms.shrink_subcomms(dropcount)
             else:
                 busy_comm = True
-            
 
         if self.subcomms.in_subcomm():
             # create the default vector partitioning, may be altered during the unitary planning phase.
-            self.local_i, self.local_i_offset, self.alloc_local, self.partition_table = vector_partitioning(self.system_size, self.subcomms.SUBCOMM)
+            (
+                self.local_i,
+                self.local_i_offset,
+                self.alloc_local,
+                self.partition_table,
+            ) = vector_partitioning(self.system_size, self.subcomms.SUBCOMM)
             # Update MPI_COMM to the (possibly shrunken) subcomm
             self.MPI_COMM = self.subcomms.SUBCOMM
-            
+
     @property
     def n_free_params(self):
         """Number of free parameters presented to the optimizer.
-        
+
         Without a parameter map, this equals n_variational_parameters.
         With a parameter map, this is the size of the reduced parameter vector.
         """
@@ -753,7 +762,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 unitary._Unitary__plan(self.system_size, self.subcomms.SUBCOMM)
                 unitary.parse_plan([self.local_i, self.alloc_local])
 
-
                 if unitary.operator_n_params == 0:
                     unitary.gen_operator()
 
@@ -774,6 +782,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
             if self.initial_state_dict is None:
                 from .state import equal
+
                 self.set_initial_state(equal)
 
             self.__parse_initial_state_function()
@@ -832,7 +841,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             # Configure parallel jacobian if requested (from Jacobian mixin)
             self._configure_parallel_jacobian()
 
-
     def __assign_backend(self):
 
         self.backend = import_module(f"quop_mpi._lib.{config.backend}")
@@ -845,12 +853,13 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self.subcomms.in_subcomm():
 
             self.context = context(
-                    self.backend,
-                    self.system_size,
-                    self.alloc_local,
-                    self.local_i,
-                    self.local_i_offset,
-                    self.subcomms.SUBCOMM)
+                self.backend,
+                self.system_size,
+                self.alloc_local,
+                self.local_i,
+                self.local_i_offset,
+                self.subcomms.SUBCOMM,
+            )
 
             self.subcomms.SUBCOMM.barrier()
 
@@ -864,7 +873,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self.reset and not self.setup_called:
             self.seed += 1
 
-            #TODO trigger setup on changes to config.backend
+            # TODO trigger setup on changes to config.backend
             self.__assign_backend()
 
             self._gen_parallel()
@@ -884,22 +893,22 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     def prepare(self):
         """Fully initialize the Ansatz for inspection without running optimization.
-        
+
         This method runs both :meth:`setup` and internal preparation steps,
         bringing the Ansatz to its runtime state. After calling this method:
-        
+
         - All Unitary instances have their attributes populated
         - Observables, initial state, and operators are generated
         - :meth:`print_all_bindable_attributes` shows actual runtime values
         - :meth:`get_expectation_value` can be called
-        
+
         This is useful for:
-        
+
         - Debugging QuOp Functions before optimization
         - Inspecting the parallel partitioning scheme
         - Querying bindable attributes with their runtime values
         - Testing observables and initial state functions
-        
+
         Examples
         --------
         >>> alg = qwoa(1024)
@@ -907,7 +916,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         >>> alg.prepare()  # Fully initialize
         >>> alg.print_all_bindable_attributes()  # Now shows actual values
         >>> print(f"Observables range: {alg.observables.min():.2f} to {alg.observables.max():.2f}")
-        
+
         See Also
         --------
         setup : Lower-level setup (parallel resources only)
@@ -927,41 +936,41 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     def __del__(self):
         """Destructor to ensure proper cleanup when the object is deleted.
-        
+
         Called automatically when `del` is used on the object or when the
         object goes out of scope. Ensures all MPI resources and extension
         module memory are properly freed.
         """
         try:
             # Force cleanup regardless of lifecycle state
-            if hasattr(self, 'setup_called') and self.setup_called:
+            if hasattr(self, "setup_called") and self.setup_called:
                 # Close log file if open
-                if hasattr(self, 'log') and self.log and not self.benchmarking:
-                    if hasattr(self, 'logfile') and self.logfile is not None:
+                if hasattr(self, "log") and self.log and not self.benchmarking:
+                    if hasattr(self, "logfile") and self.logfile is not None:
                         try:
                             self.logfile.close()
                         except:
                             pass
-                
+
                 # Free unitary resources
-                if hasattr(self, 'unitaries') and hasattr(self, 'subcomms'):
+                if hasattr(self, "unitaries") and hasattr(self, "subcomms"):
                     if self.subcomms.in_subcomm():
                         for unitary in self.unitaries:
-                            if hasattr(unitary, 'planned') and unitary.planned:
+                            if hasattr(unitary, "planned") and unitary.planned:
                                 try:
                                     unitary.destroy()
                                 except:
                                     pass
-                
+
                 # Free subcommunicators
-                if hasattr(self, 'subcomms'):
+                if hasattr(self, "subcomms"):
                     try:
                         self.subcomms.free()
                     except:
                         pass
-            
+
             # Free the duplicated communicator
-            if hasattr(self, 'MPI_COMM_WORLD') and self.MPI_COMM_WORLD is not None:
+            if hasattr(self, "MPI_COMM_WORLD") and self.MPI_COMM_WORLD is not None:
                 try:
                     self.MPI_COMM_WORLD.Free()
                 except:
@@ -997,7 +1006,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self, variational_parameters: Union[list[float], np.ndarray[float]]
     ):
         """Compute the :term:`system state` under the action of the
-        :term:`ansatz unitary`. 
+        :term:`ansatz unitary`.
 
         See Also
         --------
@@ -1033,7 +1042,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.in_subcomm():
 
-            x = self.__to_full(x) # apply parameter mapping if present
+            x = self.__to_full(x)  # apply parameter mapping if present
 
             self.context.state = self.ansatz_initial_state.astype(np.complex128)
             params_split = np.split(x, self.ansatz_depth)
@@ -1060,7 +1069,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                         ):
                             self.observables = unitary.operator
 
-
                     else:
                         evolution_parameter = param_slice
 
@@ -1070,7 +1078,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 self.n_evolutions += 1
             self.last_evaluated = copy(x)
 
-    def evaluate(self, variational_parameters: Union[list[float], np.ndarray[float]]) -> float:
+    def evaluate(
+        self, variational_parameters: Union[list[float], np.ndarray[float]]
+    ) -> float:
         """Lazily computes the :term:`objective function` value.
 
         The :class:`~quop_mpi.Ansatz` instance stores the last :term:`variational
@@ -1118,13 +1128,19 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
             self.__pre()
 
-            self.variational_parameters = self.MPI_COMM_WORLD.bcast(variational_parameters, root = 0)
+            self.variational_parameters = self.MPI_COMM_WORLD.bcast(
+                variational_parameters, root=0
+            )
 
             if self.variational_parameters is None:
                 if self._has_param_map:
-                    raise ValueError ("Parameter map function is set, initial parameters must be supplied to execute.")
+                    raise ValueError(
+                        "Parameter map function is set, initial parameters must be supplied to execute."
+                    )
                 else:
-                    self.variational_parameters = self.gen_initial_params(self.ansatz_depth)
+                    self.variational_parameters = self.gen_initial_params(
+                        self.ansatz_depth
+                    )
 
         if self.subcomms.in_subcomm():
 
@@ -1132,7 +1148,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self.n_evolutions = 0
 
             if self.subcomms.get_subcomm_index() == 0:
-                
+
                 self.objective_cnt = 0
 
                 if self.subcomms.SUBCOMM.Get_rank() == 0:
@@ -1247,14 +1263,14 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.in_subcomm() and self.subcomms.get_subcomm_index() == 0:
             return gather_array(
-                np.abs(self.context.state)**2, self.unitaries[0].partition_table, self.subcomms.SUBCOMM
+                np.abs(self.context.state) ** 2,
+                self.unitaries[0].partition_table,
+                self.subcomms.SUBCOMM,
             )
 
     # save method is inherited from Logging mixin
 
-    def gen_initial_params(
-        self, ansatz_depth:int = None
-    ) -> np.ndarray[np.float64]:
+    def gen_initial_params(self, ansatz_depth: int = None) -> np.ndarray[np.float64]:
         """Generate initial :term:`variational parameters`.
 
         Values are generated using the :term:`Parameter Function` associated
@@ -1262,7 +1278,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         method.
 
         .. note::
-            If :literal:`ansatz_depth` is :literal:`None` the :term:`ansatz depth` defaults 
+            If :literal:`ansatz_depth` is :literal:`None` the :term:`ansatz depth` defaults
             to `1` or the depth specified by the :meth:`~quop_mpi.Ansatz.set_depth` method.
 
         Parameters
@@ -1292,9 +1308,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         return params
 
-    def __gen_initial_params(
-        self, ansatz_depth: int =  None
-    ) -> np.ndarray[np.float64]:
+    def __gen_initial_params(self, ansatz_depth: int = None) -> np.ndarray[np.float64]:
         """Generates and returns initial ansatz variational parameters.
 
         Parameters
@@ -1321,9 +1335,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         for param_iters in param_iterations:
             for i, unitary in enumerate(self.unitaries):
                 unitary.seed += i + 1
-                param_iters[
-                    self.param_map[i] : self.param_map[i + 1]
-                ] = unitary.gen_initial_params()
+                param_iters[self.param_map[i] : self.param_map[i + 1]] = (
+                    unitary.gen_initial_params()
+                )
 
         self.subcomms.SUBCOMM.Bcast([params, MPI.DOUBLE], 0)
 
@@ -1339,8 +1353,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             global index offset :meth:`~quop_mpi.Ansatz.local_i_offset`
         """
         self.local_probabilities = (
-            (np.abs(self.context.state[: self.local_i]) ** 2).astype(np.float64)
-        )
+            np.abs(self.context.state[: self.local_i]) ** 2
+        ).astype(np.float64)
         return self.local_probabilities
 
     def __get_state_norm(self) -> float:
@@ -1403,8 +1417,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 self._get_local_probabilities()
                 self.objective_function.update_parameters()
                 self.expectation = self.objective_function.call(
-                    *self.objective_dict['args'],
-                    **self.objective_dict['kwargs']
+                    *self.objective_dict["args"], **self.objective_dict["kwargs"]
                 )
             else:
                 self.expectation = self.get_expectation_value()

@@ -135,9 +135,9 @@ class Sampling:
 
             self.quop_result["sampling total shots"] = self.total_shots
             self.quop_result["sampling minimum measured"] = self.minimum_sampled
-            self.quop_result[
-                "sampling shots to minimum measured"
-            ] = self.shots_to_global_minimum
+            self.quop_result["sampling shots to minimum measured"] = (
+                self.shots_to_global_minimum
+            )
             self.quop_result["observables global minimum"] = self.global_minimum
 
     def _gen_sampling(self):

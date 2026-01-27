@@ -15,8 +15,10 @@ from .._utils._tracker import swarm_tracker
 from ..Unitary import Unitary
 from ..Ansatz import Ansatz as _Ansatz
 from typing import Callable, Union, Iterable
+
 Ansatz = type(_Ansatz)
 ######################################
+
 
 def is_list_of_lists(args):
     if len(args) > 0:
@@ -100,7 +102,7 @@ class swarm:
     instance as,
 
     .. code-block:: python
-        
+
         Ansatz(*args, MPI_COMM, **kwargs)
 
 
@@ -122,13 +124,14 @@ class swarm:
         (see :mod:`quop_mpi.algorithm`)
 
     """
+
     def __init__(
         self,
         nodes_per_subcomm: int,
         processes_per_node: int,
         maxcomm: int,
         MPI_COMM: MPI_COMM_type,
-        alg: 'Ansatz',
+        alg: "Ansatz",
         *args,
         **kwargs,
     ):
@@ -177,7 +180,9 @@ class swarm:
             if not is_list_of_lists(unitaries):
                 self.ansatz.set_unitaries(unitaries)
             elif is_len_swarm(self, unitaries):
-                self.ansatz.set_unitaries(unitaries[0][self.subcomms.get_subcomm_index()])
+                self.ansatz.set_unitaries(
+                    unitaries[0][self.subcomms.get_subcomm_index()]
+                )
             else:
                 raise RuntimeError(
                     (
@@ -195,7 +200,7 @@ class swarm:
 
         Parameters
         ----------
-        args: list[Any] or list[list[Any]] 
+        args: list[Any] or list[list[Any]]
             positional arguments for :meth:`quop_mpi.Ansatz.set_log`, or a list
             of positional arguments specifying unique input for
             :meth:`quop_mpi.Ansatz.set_log` for each :literal:`Ansatz` instance.
@@ -229,7 +234,7 @@ class swarm:
 
         Parameters
         ----------
-        args: 
+        args:
             positional arguments for :meth:`quop_mpi.Ansatz.save`, or a list of
             positional arguments specifying unique input for
             :meth:`quop_mpi.Ansatz.save` for each :literal:`Ansatz` instance.
@@ -286,9 +291,9 @@ class swarm:
                         k["filename"], "h5", modifier=self.subcomms.get_subcomm_index()
                     )
                 if "suspend_path" in k.keys():
-                    k[
-                        "suspend_path"
-                    ] = f"{k['suspend_path']}_{self.subcomms.get_subcomm_index()}"
+                    k["suspend_path"] = (
+                        f"{k['suspend_path']}_{self.subcomms.get_subcomm_index()}"
+                    )
                 if "label" in k.keys():
                     k["label"] = f"{k['label']}_{self.subcomms.get_subcomm_index()}"
                 else:
@@ -329,9 +334,9 @@ class swarm:
         log_path: str = None,
         h5_path: str = None,
         labels: Union[str, list[str]] = None,
-        save_action: str ="a",
+        save_action: str = "a",
         time_limit: float = None,
-        verbose: bool =True,
+        verbose: bool = True,
         suspend_path: str = None,
     ):
         """Parallel simulation of :term:`QVAs <QVA>` over a set of initial
@@ -378,7 +383,9 @@ class swarm:
 
         suspend_path = basename if suspend_path is None else suspend_path
 
-        tracker = swarm_tracker(tasks, time_limit, self.subcomms, suspend_path=suspend_path)
+        tracker = swarm_tracker(
+            tasks, time_limit, self.subcomms, suspend_path=suspend_path
+        )
 
         if basename is not None and h5_path is None:
             h5path = ensure_path_and_extension(
@@ -386,8 +393,7 @@ class swarm:
                 "h5",
             )
         elif h5_path is not None:
-            h5path = ensure_path_and_extension(h5_path, 'h5')
-
+            h5path = ensure_path_and_extension(h5_path, "h5")
 
         if basename is not None and log_path is None:
             logpath = ensure_path_and_extension(
@@ -395,7 +401,7 @@ class swarm:
                 "csv",
             )
         elif log_path is not None:
-            logpath = ensure_path_and_extension(log_path, 'csv')
+            logpath = ensure_path_and_extension(log_path, "csv")
 
         first = True
 
@@ -484,7 +490,7 @@ class swarm:
 
         Returns
         -------
-        list[dict] 
+        list[dict]
             optimisation results ordered by ansatz depth
         """
         self.set_seed(self.subcomms.get_subcomm_index())
@@ -503,7 +509,6 @@ class swarm:
             else:
                 depth_suspend_path = f"{basename}/depth_{depth}"
 
-
             self.ansatz.set_depth(depth)
             self.ansatz.destroy()
             self.ansatz.setup()
@@ -513,13 +518,13 @@ class swarm:
             if self.subcomms.get_subcomm_index() == 0:
 
                 if (first or depth == 1) or (not param_persist):
-                    params_list = [self.ansatz.gen_initial_params(depth) for _ in range(repeats)]
+                    params_list = [
+                        self.ansatz.gen_initial_params(depth) for _ in range(repeats)
+                    ]
                     first = False
                 else:
                     params_list = [
-                        np.concatenate(
-                            [optimal_x, self.ansatz.gen_initial_params(1)]
-                        )
+                        np.concatenate([optimal_x, self.ansatz.gen_initial_params(1)])
                         for _ in range(repeats)
                     ]
 
@@ -541,10 +546,10 @@ class swarm:
                     labels=labels,
                     save_action=save_action,
                     time_limit=time_limit,
-                    log_path = f'{basename}',
-                    h5_path = f'{basename}',
+                    log_path=f"{basename}",
+                    h5_path=f"{basename}",
                     verbose=verbose,
-                    suspend_path = depth_suspend_path,
+                    suspend_path=depth_suspend_path,
                 )
             )
 

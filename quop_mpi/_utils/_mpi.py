@@ -45,7 +45,7 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
         n_local_rows = partition_table[rank + 1] - partition_table[rank]
 
-        W_row_starts.append(np.empty(n_local_rows + 1, dtype = np.int64))
+        W_row_starts.append(np.empty(n_local_rows + 1, dtype=np.int64))
 
         counts = partition_table[1:] - partition_table[0:-1] + 1
         disps = partition_table[:-1] - 1
@@ -59,7 +59,7 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
         n_local_nnz = W_row_starts[-1][-1] - W_row_starts[-1][0]
 
-        W_col_indexes.append(np.empty(n_local_nnz, dtype = np.int64))
+        W_col_indexes.append(np.empty(n_local_nnz, dtype=np.int64))
         W_values.append(np.empty(n_local_nnz, np.complex128))
 
         counts = np.zeros(size, int)
@@ -154,9 +154,8 @@ class subcomms:
         maxcomm,
         MPI_COMM,
     ):
-
         """
-        nodes_per_subcomm: The number of nodes in each subcommunicator. 
+        nodes_per_subcomm: The number of nodes in each subcommunicator.
         processes_per_node: The number of processes at each node.
         macomm: Try to create this many subcommunicators.
 
@@ -194,7 +193,6 @@ class subcomms:
 
         else:
 
-
             node_ID = [MPI.Get_processor_name(), self.MPI_COMM.Get_rank()]
 
             IDs = self.MPI_COMM.allgather(node_ID)
@@ -229,7 +227,6 @@ class subcomms:
 
                 if nodes_per_subcomm == 1:
 
-                    
                     if n_processes % maxcomm != 0:
                         n_subcomms = max([1, n_processes // maxcomm])
                         warn(
@@ -317,7 +314,7 @@ class subcomms:
     def create_jaccomm(self):
 
         if self.get_n_subcomms() == 1:
-            warn('One subcommunicator present, skipping creation of JACOMM.')
+            warn("One subcommunicator present, skipping creation of JACOMM.")
 
         else:
 
@@ -369,7 +366,6 @@ class subcomms:
             n_empty_in_subcomm = self.SUBCOMM.allreduce(empty, op=MPI.SUM)
 
         return n_empty_in_subcomm
-
 
     def shrink_subcomms(self, n_empty_in_subcomm):
 

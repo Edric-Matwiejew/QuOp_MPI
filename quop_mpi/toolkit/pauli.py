@@ -3,8 +3,9 @@ import numpy as np
 from scipy import sparse as __sparse
 
 y = __sparse.coo_matrix(np.array([[0, -1j], [1j, 0]]))
-x = __sparse.coo_matrix(np.array([[0,1],[1,0]]))
+x = __sparse.coo_matrix(np.array([[0, 1], [1, 0]]))
 z = __sparse.coo_matrix(np.array([[1, 0], [0, -1]]))
+
 
 def __pauli_term(matrix, index, n_qubits):
 
@@ -13,14 +14,15 @@ def __pauli_term(matrix, index, n_qubits):
         kron_terms.append(__sparse.identity(2**index))
     kron_terms.append(matrix)
     if index != (n_qubits - 1):
-        kron_terms.append(__sparse.identity(2**(n_qubits - index - 1)))
-    
+        kron_terms.append(__sparse.identity(2 ** (n_qubits - index - 1)))
+
     for i in range(1, len(kron_terms)):
         kron_terms[0] = __sparse.kron(kron_terms[0], kron_terms[i])
 
     return kron_terms[0].tocsr()
 
-def I(n_qubits: int) -> 'csr_matrix':
+
+def I(n_qubits: int) -> "csr_matrix":
     """Generate a sparse identity matrix of size ``2 ** n_qubits``.
 
     Parameters
@@ -30,12 +32,13 @@ def I(n_qubits: int) -> 'csr_matrix':
 
     Returns
     -------
-    csr_matrix 
+    csr_matrix
         the identity operator for ``n_qubits``
     """
-    return __sparse.identity(2**n_qubits, format = 'csr')
+    return __sparse.identity(2**n_qubits, format="csr")
 
-def X(index: int, n_qubits: int) -> 'csr_matrix':
+
+def X(index: int, n_qubits: int) -> "csr_matrix":
     """Generate the Pauli X operator acting on qubit ``index`` in a system of
     ``n_qubits``.
 
@@ -53,7 +56,8 @@ def X(index: int, n_qubits: int) -> 'csr_matrix':
     """
     return __pauli_term(x, index, n_qubits)
 
-def Y(index: int, n_qubits: int) -> 'csr_matrix':
+
+def Y(index: int, n_qubits: int) -> "csr_matrix":
     """Generate the Pauli Y operator acting on qubit ``index`` in a system of
     ``n_qubits``.
 
@@ -70,6 +74,7 @@ def Y(index: int, n_qubits: int) -> 'csr_matrix':
         the Pauli Y operator acting on qubit ``index`` in a system of ``n_qubits``
     """
     return __pauli_term(y, index, n_qubits)
+
 
 def Z(index: int, n_qubits: int):
     """Generate the Pauli Z operator acting on qubit ``index`` in a system of

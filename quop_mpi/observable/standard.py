@@ -15,11 +15,7 @@ Intracomm = MPI.Intracomm
 
 
 def serial(
-    partition_table: list[int],
-    MPI_COMM: Intracomm,
-    function: Callable,
-    *args,
-    **kwargs
+    partition_table: list[int], MPI_COMM: Intracomm, function: Callable, *args, **kwargs
 ) -> np.ndarray[np.float64]:
     """Generate :term:`observables` using a serial python function.
 
@@ -31,12 +27,12 @@ def serial(
     Parameters
     ----------
     partition_table : list[int]
-        1-D array describing the global partitioning scheme, 
+        1-D array describing the global partitioning scheme,
          :class:`quop_mpi.Ansatz` attribute
     MPI_COMM : Intracomm
         MPI communicator, :class:`quop_mpi.Ansatz` attribute
     function : Callable
-        Python function returning a 1-D real array of :term:`system size` 
+        Python function returning a 1-D real array of :term:`system size`
          observable values
 
     Returns
@@ -79,7 +75,8 @@ def serial(
 
 
 def csv(
-    partition_table: list[int], MPI_COMM: Intracomm, *args, **kwargs) -> np.ndarray[np.float64]:
+    partition_table: list[int], MPI_COMM: Intracomm, *args, **kwargs
+) -> np.ndarray[np.float64]:
     """Load :term:`observables` from a :literal:`*.csv` using `pandas
     <https://pandas.pydata.org/>`_.
 
@@ -123,7 +120,7 @@ def hdf5(
     MPI_COMM: Intracomm,
     filename: str,
     dataset_name: str,
-    **kwargs
+    **kwargs,
 ) -> np.ndarray[np.float64]:
     """Load :term:`observables` from a :literal:`*.h5` file using `HDF5 for Python <https://docs.h5py.org/en/latest/index.html>`_.
 
@@ -175,7 +172,7 @@ def array(
     """Define :term:`observables` with a NumPy ndarray.
 
     An :term:`Observables Function`. The :literal:`array` argument must be passed to
-    :meth:`quop_mpi.Ansatz.set_observables` in a :term:`FunctionDict` . 
+    :meth:`quop_mpi.Ansatz.set_observables` in a :term:`FunctionDict` .
 
     Parameters
     ----------

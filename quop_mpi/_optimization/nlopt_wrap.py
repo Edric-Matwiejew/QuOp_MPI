@@ -4,39 +4,39 @@ from functools import partial
 from warnings import warn
 from re import search
 
-NLOPT_ALGORITHMS_KEYS = list(filter(partial(search, r'^[GL][ND]_'),
-                                    dir(nlopt)))
+NLOPT_ALGORITHMS_KEYS = list(filter(partial(search, r"^[GL][ND]_"), dir(nlopt)))
 NLOPT_ALGORITHMS = {k: getattr(nlopt, k) for k in NLOPT_ALGORITHMS_KEYS}
 NLOPT_MESSAGES = {
-    nlopt.SUCCESS: 'Success',
-    nlopt.STOPVAL_REACHED: 'Optimization stopped because stopval (above) '
-                           'was reached.',
-    nlopt.FTOL_REACHED: 'Optimization stopped because ftol_rel or ftol_abs '
-                        '(above) was reached.',
-    nlopt.XTOL_REACHED: 'Optimization stopped because xtol_rel or xtol_abs '
-                        '(above) was reached.',
-    nlopt.MAXEVAL_REACHED: 'Optimization stopped because maxeval (above) '
-                           'was reached.',
-    nlopt.MAXTIME_REACHED: 'Optimization stopped because maxtime (above) '
-                           'was reached.',
-    nlopt.FAILURE: 'Failure',
-    nlopt.INVALID_ARGS: 'Invalid arguments (e.g. lower bounds are bigger '
-                        'than upper bounds, an unknown algorithm was '
-                        'specified, etcetera).',
-    nlopt.OUT_OF_MEMORY: 'Ran out of memory.',
-    nlopt.ROUNDOFF_LIMITED: 'Halted because roundoff errors limited progress. '
-                            '(In this case, the optimization still typically '
-                            'returns a useful result.)',
+    nlopt.SUCCESS: "Success",
+    nlopt.STOPVAL_REACHED: "Optimization stopped because stopval (above) "
+    "was reached.",
+    nlopt.FTOL_REACHED: "Optimization stopped because ftol_rel or ftol_abs "
+    "(above) was reached.",
+    nlopt.XTOL_REACHED: "Optimization stopped because xtol_rel or xtol_abs "
+    "(above) was reached.",
+    nlopt.MAXEVAL_REACHED: "Optimization stopped because maxeval (above) "
+    "was reached.",
+    nlopt.MAXTIME_REACHED: "Optimization stopped because maxtime (above) "
+    "was reached.",
+    nlopt.FAILURE: "Failure",
+    nlopt.INVALID_ARGS: "Invalid arguments (e.g. lower bounds are bigger "
+    "than upper bounds, an unknown algorithm was "
+    "specified, etcetera).",
+    nlopt.OUT_OF_MEMORY: "Ran out of memory.",
+    nlopt.ROUNDOFF_LIMITED: "Halted because roundoff errors limited progress. "
+    "(In this case, the optimization still typically "
+    "returns a useful result.)",
     nlopt.FORCED_STOP: "Halted because of a forced termination: the user "
-                       "called nlopt_force_stop(opt) on the optimization's "
-                       "nlopt_opt object opt from the user's objective "
-                       "function or constraints."
+    "called nlopt_force_stop(opt) on the optimization's "
+    "nlopt_opt object opt from the user's objective "
+    "function or constraints.",
 }
 
 
 # TODO: argument to specify whether to be stateful
-def minimize(fun, x0, args=(), method=None, jac=None, bounds=None,
-             constraints=[], **options):
+def minimize(
+    fun, x0, args=(), method=None, jac=None, bounds=None, constraints=[], **options
+):
     """
     Parameters
     ----------
@@ -127,36 +127,38 @@ def minimize(fun, x0, args=(), method=None, jac=None, bounds=None,
 
         # Could unpack kwargs here `make_nlopt_fun(**constr)`
         # but we want to support default values
-        fun = make_nlopt_fun(fun=constr['fun'],
-                             jac=constr.get('jac', False),
-                             args=constr.get('args', ()))
+        fun = make_nlopt_fun(
+            fun=constr["fun"], jac=constr.get("jac", False), args=constr.get("args", ())
+        )
 
-        if constr['type'] == 'eq':
+        if constr["type"] == "eq":
             opt.add_equality_constraint(fun)
-        elif constr['type'] == 'ineq':
+        elif constr["type"] == "ineq":
             opt.add_inequality_constraint(fun)
-        elif constr['type'] in ('eq_m', 'ineq_m'):
+        elif constr["type"] in ("eq_m", "ineq_m"):
             # TODO: Define '_m' as suffix for now.
             # TODO: Add support for vector/matrix-valued constraints
-            raise NotImplementedError('Vector-valued constraints currently '
-                                      'not supported.')
+            raise NotImplementedError(
+                "Vector-valued constraints currently " "not supported."
+            )
         else:
-            raise ValueError('Constraint type not recognized')
+            raise ValueError("Constraint type not recognized")
 
     # Set other options, e.g. termination criteria
     for option, val in options.items():
         try:
-            set_option = getattr(opt, 'set_{option}'.format(option=option))
+            set_option = getattr(opt, "set_{option}".format(option=option))
         except AttributeError:
-            raise ValueError('Parameter {option} could not be '
-                             'recognized.'.format(option=option))
+            raise ValueError(
+                "Parameter {option} could not be " "recognized.".format(option=option)
+            )
         else:
             set_option(val)
 
     # Perform the optimization
     try:
         x = opt.optimize(x0)
-    except:# nlopt.RoundoffLimited:
+    except:  # nlopt.RoundoffLimited:
         # If we encounter a RoundoffLimited exception, simply return last point
         x = path[-1]
 
@@ -164,7 +166,8 @@ def minimize(fun, x0, args=(), method=None, jac=None, bounds=None,
         x=x,
         fun=opt.last_optimum_value(),
         message=get_nlopt_message(opt.last_optimize_result()),
-        success=(opt.last_optimize_result() > 0),nfev=opt.get_numevals()
+        success=(opt.last_optimize_result() > 0),
+        nfev=opt.get_numevals(),
     )
 
 
@@ -188,6 +191,7 @@ def make_nlopt_fun(fun, jac=True, args=(), path=None):
     .. _`NLOpt Python interface`:
        http://ab-initio.mit.edu/wiki/index.php/NLopt_Python_Reference#Objective_function
     """
+
     def nlopt_fun(x, grad):
 
         if path is not None:
@@ -207,16 +211,22 @@ def make_nlopt_fun(fun, jac=True, args=(), path=None):
             else:
                 if bool(jac):
                     if grad_temp is None:
-                        warn('Using gradient-based optimization with '
-                             'jac=True, but no gradient information is '
-                             'available.', RuntimeWarning)
+                        warn(
+                            "Using gradient-based optimization with "
+                            "jac=True, but no gradient information is "
+                            "available.",
+                            RuntimeWarning,
+                        )
                     else:
                         grad[:] = grad_temp
                 else:
                     if grad_temp is not None:
-                        warn('Using gradient-based optimization with '
-                             'jac=False, the provided gradient information '
-                             'is ignored.', RuntimeWarning)
+                        warn(
+                            "Using gradient-based optimization with "
+                            "jac=False, the provided gradient information "
+                            "is ignored.",
+                            RuntimeWarning,
+                        )
 
         return val
 
@@ -282,14 +292,16 @@ def get_nlopt_enum(method_name=None, default=nlopt.LN_BOBYQA):
     True
     """
     if method_name is None:
-        method_name = 'LN_BOBYQA'
+        method_name = "LN_BOBYQA"
 
     try:
         return NLOPT_ALGORITHMS[method_name.upper()]
     except KeyError:
-        warn('Method {name} could not be found. Defaulting to '
-             '{default}'.format(name=method_name, default=default),
-             RuntimeWarning)
+        warn(
+            "Method {name} could not be found. Defaulting to "
+            "{default}".format(name=method_name, default=default),
+            RuntimeWarning,
+        )
         return default
 
 
@@ -317,10 +329,10 @@ def normalize_bound(bound):
     min_, max_ = bound
 
     if min_ is None:
-        min_ = -float('inf')
+        min_ = -float("inf")
 
     if max_ is None:
-        max_ = float('inf')
+        max_ = float("inf")
 
     return min_, max_
 

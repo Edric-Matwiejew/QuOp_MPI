@@ -8,7 +8,7 @@ plt.rcParams["font.size"] = 16
 figure_size = (5, 4)
 
 nodes = 8
-system_size = 2 ** nodes
+system_size = 2**nodes
 
 Graph = nx.circular_ladder_graph(4)
 
@@ -32,9 +32,7 @@ plt.figure(figsize=figure_size)
 plt.bar(unique, bins, hatch=".", color="tab:green")
 plt.xticks(unique)
 plt.xlabel("solution quality (absolute value)")
-plt.ylabel(
-     "probability"
-)
+plt.ylabel("probability")
 plt.tight_layout()
 plt.savefig("maxcut_extended_qaoa_probabilities", dpi=200)
 plt.clf()

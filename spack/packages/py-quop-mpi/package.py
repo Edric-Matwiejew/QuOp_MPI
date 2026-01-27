@@ -17,7 +17,10 @@ class PyQuopMpi(PythonPackage):
     license("GPL-3.0-only")
 
     version("main", branch="main")
-    version("1.4.0", sha256="d999bf16187a0300b0bff0fe56c5d3a5966bc9e93381935e47cbbbc299d2ed56")
+    version(
+        "1.4.0",
+        sha256="d999bf16187a0300b0bff0fe56c5d3a5966bc9e93381935e47cbbbc299d2ed56",
+    )
 
     # Python version requirement
     depends_on("python@3.11:", type=("build", "link", "run"))

@@ -91,7 +91,7 @@ class Benchmark:
             the lowest objective function value for all repeats at ansatz_depth
             will be used as starting parameters for the first
             ansatz_depth * total_params at ansatz_depth += 1. if a parameter
-            map is set, the initial parameters will update whenever the 
+            map is set, the initial parameters will update whenever the
             objective function reaches a new minimum.
         verbose : bool, optional
             if True, print current the ansatz depth, repeat number and
@@ -118,7 +118,9 @@ class Benchmark:
         previous_params = None
 
         if initial_parameters is not None:
-            self.variational_parameters = np.asarray(initial_parameters, dtype=np.float64)
+            self.variational_parameters = np.asarray(
+                initial_parameters, dtype=np.float64
+            )
 
         self.destroy()
         self.setup()
@@ -170,7 +172,9 @@ class Benchmark:
                 else:
                     # Unmapped case
                     if (not param_persist) or (depth == 1):
-                        self.variational_parameters = self._Ansatz__gen_initial_params(depth)
+                        self.variational_parameters = self._Ansatz__gen_initial_params(
+                            depth
+                        )
                     else:
                         # Persist full-vector between repeats/depths
                         if self.subcomms.SUBCOMM.Get_rank() == 0:
@@ -183,32 +187,46 @@ class Benchmark:
                             if self.subcomms.SUBCOMM.Get_rank() == 0:
                                 if (
                                     self.tracker.job_list[self.tracker.job_index][1]
-                                    != self.tracker.job_list[self.tracker.job_index - 1][1]
+                                    != self.tracker.job_list[
+                                        self.tracker.job_index - 1
+                                    ][1]
                                 ) or (previous_params is None):
                                     funs = [
                                         result["fun"]
-                                        for result in self.tracker.results_dict[depth - 1]
+                                        for result in self.tracker.results_dict[
+                                            depth - 1
+                                        ]
                                     ]
                                     xs = [
                                         result["variational_parameters"]
-                                        for result in self.tracker.results_dict[depth - 1]
+                                        for result in self.tracker.results_dict[
+                                            depth - 1
+                                        ]
                                     ]
                                     previous_params = xs[np.argmin(funs)]
                             else:
                                 previous_params = None
 
-                            previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root=0)
+                            previous_params = self.subcomms.SUBCOMM.bcast(
+                                previous_params, root=0
+                            )
 
                             self.variational_parameters = np.empty(
                                 depth * self.total_params, dtype=np.float64
                             )
                             # fill with best from last depth
-                            self.variational_parameters[: len(previous_params)] = previous_params
+                            self.variational_parameters[: len(previous_params)] = (
+                                previous_params
+                            )
                             # new parameters for the final layer
                             new_params = self._Ansatz__gen_initial_params(1)
-                            self.variational_parameters[-self.total_params :] = new_params
+                            self.variational_parameters[-self.total_params :] = (
+                                new_params
+                            )
                         else:
-                            self.variational_parameters = self._Ansatz__gen_initial_params()
+                            self.variational_parameters = (
+                                self._Ansatz__gen_initial_params()
+                            )
 
                 if verbose and self.subcomms.SUBCOMM.Get_rank() == 0:
                     print(f"{repeat} of {repeats} at depth {depth}...", flush=True)
@@ -224,7 +242,9 @@ class Benchmark:
                             best_obj = current_obj
                             previous_params = current_free.copy()
                     # Broadcast updated previous_params to all ranks for next iteration
-                    previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root=0)
+                    previous_params = self.subcomms.SUBCOMM.bcast(
+                        previous_params, root=0
+                    )
 
                 if verbose:
                     self.print_result()

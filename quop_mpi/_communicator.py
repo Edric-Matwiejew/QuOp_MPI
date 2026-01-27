@@ -18,7 +18,7 @@ class Communicator:
 
     This class is not intended to be instantiated directly. It provides methods
     for creating and managing MPI subcommunicators used in QVA simulation.
-    
+
     The subcommunicator structure supports both single-communicator execution
     and multi-subcommunicator execution for parallel Jacobian computation.
     """
@@ -43,7 +43,7 @@ class Communicator:
 
     def _gen_parallel(self):
         """Creates MPI subcommunicators for QVA simulation.
-        
+
         Supports both single-communicator execution and multi-subcommunicator
         execution for parallel Jacobian computation. When multiple subcommunicators
         are created, also creates a Jacobian communicator (JACCOMM) for
@@ -64,7 +64,7 @@ class Communicator:
 
     def _post_parallel(self):
         """Free subcommunicators associated with the :class:`~quop_mpi.Ansatz` instance.
-        
+
         Called on simulation completion or when destroying the Ansatz instance.
         """
         self.subcomms.free()

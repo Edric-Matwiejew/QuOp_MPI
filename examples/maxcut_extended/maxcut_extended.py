@@ -7,9 +7,10 @@ from quop_mpi.toolkit import Z
 
 Graph = nx.circular_ladder_graph(4)
 vertices = len(Graph.nodes)
-system_size = 2 ** vertices
+system_size = 2**vertices
 G = nx.to_scipy_sparse_array(Graph)
 n_edges = 2 * Graph.number_of_edges()
+
 
 def maxcut_terms(G):
     vertices = G.shape[0]
@@ -21,13 +22,15 @@ def maxcut_terms(G):
                 terms.append(-0.5 * (1 - term.diagonal()))
     return terms
 
+
 def maxcut_qualities(G):
-    return np.sum(maxcut_terms(G), axis = 0)
+    return np.sum(maxcut_terms(G), axis=0)
+
 
 UQ = diagonal.unitary(
     diagonal.operator.serial,
     operator_dict={"args": [maxcut_terms, G]},
-    unitary_n_params=n_edges
+    unitary_n_params=n_edges,
 )
 
 UW = sparse.unitary(sparse.operator.hypercube)

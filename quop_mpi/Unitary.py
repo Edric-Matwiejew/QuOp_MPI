@@ -14,6 +14,7 @@ from typing import Callable, Union, Iterable, Any
 Intracomm = MPI.Intracomm
 iterable = Iterable
 
+
 class Unitary(Bindable):
     """Base class for a ``unitary``.
 
@@ -161,14 +162,14 @@ class Unitary(Bindable):
         self.lb = None
         self.ub = None
         self.variational_parameters = []
-        self.planned = False # modified by the Ansatz class
+        self.planned = False  # modified by the Ansatz class
 
         self.n_params += operator_n_params + unitary_n_params
 
         #: Constraints on valid MPI communicator sizes for this unitary.
         #: A list of 1-D integer arrays specifying divisibility requirements.
         #: Used by :meth:`quop_mpi.Ansatz` to determine compatible parallelization.
-        self.comm_size_constraints = [np.array([1], dtype = int)]
+        self.comm_size_constraints = [np.array([1], dtype=int)]
 
     # Bindable attributes for QuOp Functions bound to Unitary instances.
     # Subclasses (propagators) can extend this by defining their own BINDABLE_ATTRIBUTES dict.
@@ -289,7 +290,7 @@ class Unitary(Bindable):
         self.final_state = np.empty(self.alloc_local, dtype=np.complex128)
         self.initial_state = np.empty(self.alloc_local, dtype=np.complex128)
 
-    def __copy_plan(self, ex_unitary: 'Unitary'):
+    def __copy_plan(self, ex_unitary: "Unitary"):
 
         self.copy_plan(ex_unitary)
 
@@ -391,7 +392,7 @@ class Unitary(Bindable):
         """
         raise NotImplementedError("Method 'plan' not implemented by child class")
 
-    def copy_plan(self, ex_unitary : Unitary):
+    def copy_plan(self, ex_unitary: Unitary):
         """Perform any setup required by the propagation method called in
         :meth:`~Unitary.propagate`.
 
@@ -399,14 +400,14 @@ class Unitary(Bindable):
         :meth:`~Unitary.plan` using the ``local_i`` and ``alloc_local``
         attributes of ``ex_unitary``. Does **not** return ``[local_i,
         alloc_local]``.
- 
+
         .. warning::
 
-            Not implemented by the base ``Unitary`` class.       
+            Not implemented by the base ``Unitary`` class.
 
         Parameters
         ----------
-        ex_unitary : unitary 
+        ex_unitary : unitary
             a ``unitary`` instance with computed ``local_i`` and ``alloc_local``
             attributes
         """

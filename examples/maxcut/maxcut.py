@@ -5,9 +5,10 @@ import networkx as nx
 Graph = nx.circular_ladder_graph(4)
 
 vertices = len(Graph.nodes)
-system_size = 2 ** vertices
+system_size = 2**vertices
 
 G = nx.to_scipy_sparse_array(Graph)
+
 
 def maxcut_qualities(G):
     C = 0
@@ -19,7 +20,7 @@ def maxcut_qualities(G):
 
 
 alg = qaoa(system_size)
-alg.set_qualities(serial, {'args':[maxcut_qualities, G]})
+alg.set_qualities(serial, {"args": [maxcut_qualities, G]})
 alg.set_depth(2)
 
 alg.execute()

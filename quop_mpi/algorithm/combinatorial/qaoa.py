@@ -23,7 +23,7 @@ class qaoa(Ansatz):
     system_size : int
         :term:`system size` of the simulated :term:`QVA`
     MPI_COMM : Intracomm, optional
-        MPI communicator, default :literal:`mpi4py.MPI.COMM_WORLD` 
+        MPI communicator, default :literal:`mpi4py.MPI.COMM_WORLD`
     """
 
     def __init__(self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD):
@@ -44,11 +44,11 @@ class qaoa(Ansatz):
             :term:`FunctionDict` for :literal:`function`
         """
         self.set_observables(function, observables_dict)
-        #self.set_observables(0)
+        # self.set_observables(0)
 
     def set_params(self, param_function: Callable, param_dict: dict = None):
-        """Define the :term:`Parameter Function` for the 
-        :term:`phase-shift <phase-shift unitary>` and 
+        """Define the :term:`Parameter Function` for the
+        :term:`phase-shift <phase-shift unitary>` and
         :term:`mixing <mixing unitary>` unitaries.
 
         Parameters
@@ -67,7 +67,9 @@ class qaoa(Ansatz):
 
             if self.observable_function is None:
                 raise RuntimeError(
-                    "Rank {}: Solution qualities not defined.".format(self.MPI_COMM_WORLD.Get_rank())
+                    "Rank {}: Solution qualities not defined.".format(
+                        self.MPI_COMM_WORLD.Get_rank()
+                    )
                 )
 
             if self.param_function is None:
@@ -76,7 +78,7 @@ class qaoa(Ansatz):
 
                 self.set_params(uniform)
 
-                #operator_dict= self.operator_dict,
+                # operator_dict= self.operator_dict,
             UQ = diagonal.unitary(
                 diagonal.operator.observables,
                 parameter_function=self.param_function,

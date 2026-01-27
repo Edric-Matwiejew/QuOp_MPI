@@ -4,6 +4,7 @@ from ... import config
 from ...Unitary import Unitary
 from ..._lib.propagator import propagator
 
+
 class unitary(Unitary):
 
     def __init__(self, *args, **kwargs):
@@ -14,22 +15,25 @@ class unitary(Unitary):
 
         self.context = None
 
-        #TODO check number of unitary params
+        # TODO check number of unitary params
 
     def assign_backend(self, backend):
 
         self.propagator_module = backend.circulant_propagator
-        self.propagators = [propagator(self.propagator_module.circulant_propagator_wrapper)]
+        self.propagators = [
+            propagator(self.propagator_module.circulant_propagator_wrapper)
+        ]
 
     def plan(self, system_size, MPI_COMM):
 
         size = MPI_COMM.Get_size()
         rank = MPI_COMM.Get_rank()
 
-        local_i = int(system_size // size + np.ceil((system_size % size) // (rank + 1) / size))
+        local_i = int(
+            system_size // size + np.ceil((system_size % size) // (rank + 1) / size)
+        )
 
         return local_i, local_i
-
 
     def copy_plan(self, ex_unitary):
         pass

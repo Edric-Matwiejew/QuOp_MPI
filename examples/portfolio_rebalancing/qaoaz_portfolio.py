@@ -10,6 +10,7 @@ def parity_ring(i, j, n_qubits):
     parity = X(i, n_qubits) @ X(j, n_qubits) + Y(i, n_qubits) @ Y(j, n_qubits)
     return parity
 
+
 def parity_mixer(qubits, n_qubits):
 
     odd = 0
@@ -47,14 +48,11 @@ def parity_state(n_qubits, D):
 
 
 n_qubits = 8
-system_size = 2 ** n_qubits
+system_size = 2**n_qubits
 
 UQ = diagonal.unitary(diagonal.operator.observables)
 
-UW = sparse.unitary(
-    sparse.operator.serial,
-    operator_dict={"args": [mixer, n_qubits]}
-)
+UW = sparse.unitary(sparse.operator.serial, operator_dict={"args": [mixer, n_qubits]})
 
 alg = Ansatz(system_size)
 alg.set_unitaries([UQ, UW])
