@@ -6,6 +6,70 @@ QuOp Functions
         QuOp Functions define the various aspects of a :term:`QVA` or modify the
         simulation methods used by the :class:`quop_mpi.Ansatz` class.
 
+        **Implementation patterns**
+
+        QuOp Functions can be implemented in three ways, depending on whether
+        you need to maintain state between calls:
+
+        1. **Plain function** — simplest, for stateless computations:
+
+           .. code-block:: python
+
+               def my_observables(local_i, local_i_offset, scale, *args, **kwargs):
+                   """Compute observables from scratch each time."""
+                   result = np.zeros(local_i, dtype=np.float64)
+                   for j in range(local_i):
+                       result[j] = compute_cost(local_i_offset + j) * scale
+                   return result
+
+               # Usage:
+               ansatz.set_observables(my_observables, {"args": [2.0]})
+
+        2. **Factory function (closure)** — for caching or stateful behaviour:
+
+           .. code-block:: python
+
+               def create_my_function(config_param: float):
+                   """Factory returning a stateful QuOp Function."""
+                   _cache = {}  # state persists across calls
+
+                   def my_function(local_i, local_i_offset, *args, **kwargs):
+                       # config_param captured from enclosing scope
+                       # _cache persists between calls (e.g., for expensive one-time setup)
+                       if "data" not in _cache:
+                           _cache["data"] = expensive_computation()
+                       # ... use _cache["data"] ...
+                       return result
+
+                   return my_function
+
+               # Usage:
+               ansatz.set_observables(create_my_function(scale=2.0), obs_dict)
+
+        3. **Callable class** — for complex state or easier debugging:
+
+           .. code-block:: python
+
+               class MyFunction:
+                   def __init__(self, config_param: float):
+                       self.config_param = config_param
+                       self._cache = None  # state as instance attributes
+
+                   def __call__(self, local_i, local_i_offset, *args, **kwargs):
+                       if self._cache is None:
+                           self._cache = expensive_computation()
+                       # ... implementation ...
+                       return result
+
+               # Usage:
+               ansatz.set_observables(MyFunction(scale=2.0), obs_dict)
+
+        Use plain functions when no state is needed. Use the factory/closure
+        pattern when you need to cache expensive computations (e.g., computing
+        global statistics via MPI) or carry configuration. Use callable classes
+        when you need subclassing, multiple methods, or easier state inspection
+        for debugging.
+
     FunctionDict
         Prior to :term:`QVA` simulation, positional arguments of a QuOp Function
         are bound to the attributes of the receiving class if a match is found.
@@ -73,63 +137,75 @@ QuOp Functions
                 return initial_state
 
     Parameter Map Function
-        Defines a mapping from a reduced “free” parameter vector to the full
+        Defines a mapping from a reduced "free" parameter vector to the full
         variational-parameter vector used by a :term:`QVA`.  This allows you to
-        optimise only a subset of parameters while reconstructing the complete
-        vector internally.
-    
-        A Parameter Map Function is passed to
-        :meth:`quop_mpi.Ansatz.set_parameter_map` together with an optional
-        :term:`FunctionDict` of extra arguments.  At runtime the free vector
-        is bound via the same interface machinery used by other QuOp Functions.
-    
-        **FunctionDict usage:**
-    
+        optimise over a smaller parameter space while the mapping function
+        reconstructs the complete vector internally.
+
+        Passed to :meth:`quop_mpi.Ansatz.set_parameter_map` together with the
+        number of free parameters and an optional :term:`FunctionDict`.
+
+        **Method signature:**
+
         .. code-block:: python
-        
-            mapping_dict : {"args": List[Any], "kwargs": Dict[str,Any]}
-    
-        Any entries in `"args"` and `"kwargs"` will be forwarded to your map
-        function after the free-vector argument.
-    
+
+            ansatz.set_parameter_map(
+                n_free_params,   # int: dimensionality of the optimisation problem
+                mapping_fn,      # callable: your mapping function
+                mapping_dict     # optional FunctionDict for extra arguments
+            )
+
         **Typical structure:**
-    
+
+        The mapping function receives the free parameter vector as its first
+        argument. Additional positional parameters (e.g., ``ansatz_depth``,
+        ``observables``, ``MPI_COMM``) are automatically bound from the
+        :class:`quop_mpi.Ansatz` instance.
+
         .. code-block:: python
-        
-            def parameter_map_function(
-                ansatz_depth: int, # number of iterations
-                total_params: int, # parameters per ansatz iteration
+
+            def mapping_fn(
                 free_vec: np.ndarray,
+                ansatz_depth: int,
+                total_params: int,
                 *args,
                 **kwargs
             ) -> np.ndarray:
                 """
-                Return full_vec of shape (ansatz_depth * total_params,)
-                by embedding or expanding the entries in free_vec according
-                to your chosen scheme.
+                Map free_vec to full parameter vector of shape
+                (ansatz_depth * total_params,).
                 """
-                # e.g. start with a copy of the previous full vector or zeros
                 full_vec = np.zeros(ansatz_depth * total_params, dtype=np.float64)
-    
-                # insert free parameters into selected indices
-                for idx, var_idx in enumerate(free_indices):
-                    full_vec[var_idx] = free_vec[idx]
-    
-                # optionally fill remaining entries via some rule
-                # full_vec[other_indices] = ...
-    
+                # ... your mapping logic ...
                 return full_vec
-    
-        When you call
-    
+
+        **Factory pattern example:**
+
+        For Parameter Map Functions, the factory pattern conveniently returns
+        both ``n_free_params`` and the mapping function together:
+
         .. code-block:: python
-        
-            ansatz.set_parameter_map(parameter_map_function, mapping_dict)
-    
-        the `parameter_map_function` will be bound to the `Ansatz` instance and
-        invoked automatically whenever variational parameters must be expanded
-        from the free vector.
-   
+
+            def create_linear_schedule(scale: float):
+                """Factory returning (n_free_params, mapping_fn)."""
+                n_free_params = 3
+                _cache = {}
+
+                def mapping_fn(free_vec, ansatz_depth, observables, MPI_COMM):
+                    if "sigma" not in _cache:
+                        _cache["sigma"] = compute_global_std(observables, MPI_COMM)
+                    # ... build full_vec from free_vec ...
+                    return full_vec
+
+                return n_free_params, mapping_fn
+
+            # Usage:
+            n_free, param_map = create_linear_schedule(scale=1.0)
+            ansatz.set_parameter_map(n_free, param_map)
+
+        See :term:`QuOp Function` for the general implementation patterns
+        (factory/closure vs callable class).
+
     Sampling Function
         Returns an :term:`objective function` value computed from batches of
         :term:`observables` values that are sampled based on the probability
