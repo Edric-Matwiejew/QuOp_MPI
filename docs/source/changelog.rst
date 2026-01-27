@@ -21,6 +21,7 @@ Added
 - Comprehensive MPI-enabled test suite with pytest-mpi (380+ tests)
 - Unit tests for toolkit module (kronecker, pauli, string functions)
 - Unit tests for NLopt wrapper module
+- New ``mpi_momentum`` Fortran module for multivariable momentum-space propagation with FFTW MPI
 - Performance profiling support via ``QUOP_PROFILE=1`` environment variable
 - ``set_objective`` method for custom objective functions
 - Documentation restructure with navigable API reference
@@ -48,6 +49,8 @@ Changed
   - Renamed internal modules from ``__*.py`` to ``_*.py`` (single underscore for private modules)
   - Moved ``_utils/_nlopt_wrap.py`` -> ``_optimization/nlopt_wrap.py``
 
+- Circulant propagator now queries FFTW for optimal MPI distribution when determining max communicator size
+- Replaced legacy ``qhost_fourier.f08`` with modern ``mpi_momentum.f90`` implementation
 - Refactored optional dependencies in pyproject.toml (``[dev]`` replaces ``[all]``)
 - Updated documentation sidebar with grouped navigation
 - NumPy 2.x compatibility
