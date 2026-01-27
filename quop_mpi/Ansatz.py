@@ -562,6 +562,76 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
     # Sampling methods (set_sampling, unset_sampling, etc.) are inherited from Sampling mixin
     # Logging methods (set_log, save, etc.) are inherited from Logging mixin
 
+    # Bindable attributes for QuOp Functions - used for documentation and validation
+    BINDABLE_ATTRIBUTES = {
+        # Core partitioning
+        "system_size": "Total number of quantum basis states",
+        "local_i": "Number of elements in this rank's partition",
+        "local_i_offset": "Global index offset for this rank's partition",
+        "partition_table": "Array describing global partitioning scheme",
+        # Observables and state
+        "observables": "Local partition of observable values (after setup)",
+        "ansatz_initial_state": "Local partition of initial state vector",
+        "final_state": "Local partition of current/final state vector",
+        # Variational parameters
+        "variational_parameters": "Current variational parameter values",
+        "ansatz_depth": "Number of ansatz iterations (layers)",
+        "total_params": "Number of variational parameters per iteration",
+        # MPI
+        "MPI_COMM": "MPI subcommunicator for this Ansatz instance",
+        # Execution state
+        "expectation": "Last computed objective function value",
+        "seed": "Random seed for parameter generation",
+    }
+
+    def get_bindable_attributes(self) -> dict:
+        """Return a dictionary of attributes that can be bound to QuOp Function parameters.
+
+        QuOp Functions (observables, initial state, parameter map, etc.) can have
+        their positional parameters automatically bound to Ansatz attributes by
+        matching parameter names. This method shows which attributes are available
+        for binding and their current values.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping attribute names to (value, description) tuples.
+            Value is None if the attribute hasn't been set yet.
+
+        Examples
+        --------
+        >>> alg = Ansatz(1024)
+        >>> alg.get_bindable_attributes()
+        {'system_size': (1024, 'Total number of quantum basis states'),
+         'local_i': (None, 'Number of elements in this rank\\'s partition'),
+         ...}
+
+        See Also
+        --------
+        :term:`QuOp Function` : How parameter binding works
+        """
+        result = {}
+        for attr, description in self.BINDABLE_ATTRIBUTES.items():
+            value = getattr(self, attr, None)
+            result[attr] = (value, description)
+        return result
+
+    def print_bindable_attributes(self):
+        """Print a formatted table of attributes available for binding to QuOp Functions.
+
+        This is a convenience method for interactive use to discover which
+        parameter names can be used in custom QuOp Functions.
+        """
+        print("\nBindable Attributes for QuOp Functions")
+        print("=" * 60)
+        print(f"{'Attribute':<25} {'Set?':<6} Description")
+        print("-" * 60)
+        for attr, description in self.BINDABLE_ATTRIBUTES.items():
+            value = getattr(self, attr, None)
+            is_set = "Yes" if value is not None else "No"
+            print(f"{attr:<25} {is_set:<6} {description}")
+        print()
+
     def set_seed(self, seed: int):
         """Integer for seeding of random number generation.
 

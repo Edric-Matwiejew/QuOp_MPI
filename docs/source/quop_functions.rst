@@ -73,7 +73,7 @@ QuOp Functions
     FunctionDict
         Prior to :term:`QVA` simulation, positional arguments of a QuOp Function
         are bound to the attributes of the receiving class if a match is found.
-        Additional positional and keyword are specified via a FunctionDict:
+        Additional positional and keyword arguments are specified via a FunctionDict:
 
         .. code-block:: python
 
@@ -86,6 +86,92 @@ QuOp Functions
 
             bound_quop_function(*function_dict["args"], **function_dict["kwargs"])
 
+Bindable Attributes
+-------------------
+
+When defining a QuOp Function, positional parameters are automatically bound
+to :class:`quop_mpi.Ansatz` attributes **by matching the parameter name to the
+attribute name**. This is the key mechanism: if your function has a parameter
+named ``local_i``, it will automatically receive the value of ``ansatz.local_i``.
+
+The following attributes can be bound:
+
+.. list-table:: Bindable Ansatz Attributes
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Parameter Name
+     - Type
+     - Description
+   * - ``system_size``
+     - int
+     - Total number of quantum basis states
+   * - ``local_i``
+     - int
+     - Number of elements in this MPI rank's partition
+   * - ``local_i_offset``
+     - int
+     - Global index offset for this rank's partition
+   * - ``partition_table``
+     - ndarray[int]
+     - Array where ``partition_table[rank+1] - partition_table[rank] = local_i``
+   * - ``observables``
+     - ndarray[float64]
+     - Local partition of observable values (available after setup)
+   * - ``ansatz_initial_state``
+     - ndarray[complex128]
+     - Local partition of the initial state vector
+   * - ``final_state``
+     - ndarray[complex128]
+     - Local partition of current/final state vector
+   * - ``variational_parameters``
+     - ndarray[float64]
+     - Current variational parameter values
+   * - ``ansatz_depth``
+     - int
+     - Number of ansatz iterations (layers)
+   * - ``total_params``
+     - int
+     - Number of variational parameters per ansatz iteration
+   * - ``MPI_COMM``
+     - MPI.Intracomm
+     - MPI subcommunicator for this Ansatz instance
+   * - ``expectation``
+     - float
+     - Last computed objective function value
+   * - ``seed``
+     - int
+     - Random seed for parameter generation
+
+**Important**: Parameter names in your function signature must exactly match
+the attribute names above to be bound. Parameters that don't match will need
+to be provided via ``FunctionDict["args"]``.
+
+**Naming convention for custom parameters**: To avoid unintended binding, we
+recommend prefixing your custom parameter names with an underscore:
+
+.. code-block:: python
+
+    def my_observables(
+        local_i,           # bound from Ansatz
+        local_i_offset,    # bound from Ansatz  
+        _n_customers,      # custom - passed via FunctionDict["args"]
+        _penalty_weight,   # custom - passed via FunctionDict["args"]
+    ):
+        ...
+
+    # Usage:
+    ansatz.set_observables(my_observables, {"args": [10, 0.5]})
+
+This prevents accidental collisions with current or future Ansatz attributes
+(e.g., ``seed``, ``expectation``).
+
+**Runtime discovery**: Call ``ansatz.get_bindable_attributes()`` or
+``ansatz.print_bindable_attributes()`` to see available attributes and their
+current values.
+
+.. glossary::
+
     Observables Function
         Returns a 1-D  real array containing ``local_i`` elements of the
         :term:`observables` with global offset ``local_i_offset``. Passed to the
@@ -93,19 +179,24 @@ QuOp Functions
         attributes of the :class:`quop_mpi.Ansatz` class.
 
         Predefined Observables Functions are included in the
-        :mod:`quop_mpi.observable` module. See :class:`quop_mpi.Ansatz` for a
-        selected list of available attributes.
+        :mod:`quop_mpi.observable` module.
+
+        **Commonly used parameters**:
+
+        * ``local_i`` — number of observables this rank must compute
+        * ``local_i_offset`` — starting global index for this rank
+        * ``system_size`` — total number of basis states
+        * ``partition_table`` — for advanced partitioning schemes
 
         **Typical structure:**
 
         .. code-block:: python
 
             def observables_function(
-                system_size : int
                 local_i : int,
                 local_i_offset : int,
                 *args,
-                **kwargs) -> np.ndarray[np.complex128]:
+                **kwargs) -> np.ndarray[np.float64]:
 
                 ...
 
@@ -118,17 +209,22 @@ QuOp Functions
         attributes of the :class:`quop_mpi.Ansatz` class.
 
         Predefined Initial State Functions are included in the
-        :mod:`quop_mpi.state` module. See :class:`quop_mpi.Ansatz` for a
-        selected list of available attributes.
+        :mod:`quop_mpi.state` module.
+
+        **Commonly used parameters**:
+
+        * ``local_i`` — number of state elements this rank must compute
+        * ``local_i_offset`` — starting global index for this rank
+        * ``system_size`` — total number of basis states
 
         **Typical structure:**
 
         .. code-block:: python
 
             def initial_state_function(
-                system_size : int
                 local_i : int,
                 local_i_offset : int,
+                system_size : int,
                 *args,
                 **kwargs) -> np.ndarray[np.complex128]:
 
@@ -155,12 +251,17 @@ QuOp Functions
                 mapping_dict     # optional FunctionDict for extra arguments
             )
 
-        **Typical structure:**
+        **Parameters:**
 
-        The mapping function receives the free parameter vector as its first
-        argument. Additional positional parameters (e.g., ``ansatz_depth``,
-        ``observables``, ``MPI_COMM``) are automatically bound from the
-        :class:`quop_mpi.Ansatz` instance.
+        The first positional parameter always receives the free parameter vector
+        from the optimiser. Additional parameters depend on your mapping logic:
+
+        * ``ansatz_depth`` — number of ansatz iterations (for computing output size)
+        * ``total_params`` — parameters per iteration (for computing output size)
+        * ``observables`` — for normalising parameters by observable statistics
+        * ``MPI_COMM`` — for computing global statistics across ranks
+
+        **Typical structure:**
 
         .. code-block:: python
 
@@ -285,23 +386,29 @@ QuOp Functions
 
     Operator Function
         Returns an :term:`operator` object that is compatible with the propagation method of
-        specific :class:`unitary` class. See :class:`quop_mpi.Unitary`.
+        a specific :class:`unitary` class. See :class:`quop_mpi.Unitary`.
 
         Predefined Operator Functions are included with each ``unitary`` class
         in the :mod:`quop_mpi.propagator` module under
-        ``quop_mpi.propagator.<unitary>.operator``. See
-        :class:`quop_mpi.Unitary` and the predefined ``unitary`` classes in the
-        :mod:`quop_mpi.propagator` module for lists of available attributes.
+        ``quop_mpi.propagator.<unitary>.operator``.
+
+        **Required parameters** (commonly used):
+
+        * ``local_i`` — partition size for this rank
+        * ``local_i_offset`` — global index offset
+
+        **Optional parameters**:
+
+        * ``system_size`` — total number of basis states
+        * ``variational_parameters`` — only if the operator is parameterised
 
         **Typical Structure**
 
         .. code-block:: python
             
             def operator_function(
-                system_size : int,
                 local_i : int,
                 local_i_offset : int,
-                variational_parameters : ndarray[float],
                 *args,
                 **kwargs
             ) -> Any:
@@ -319,8 +426,11 @@ QuOp Functions
         with an instance of the :class:`quop_mpi.Unitary` class.
 
         Predefined Parameter Functions are included in the :mod:`quop_mpi.param`
-        module. See :class:`quop_mpi.Unitary` for a list of available
-        attributes.
+        module.
+
+        **Commonly used parameters**:
+
+        * ``n_params`` — number of parameters to generate (bound from Unitary)
 
         **Typical Structure**
 
@@ -341,13 +451,19 @@ QuOp Functions
         scalar value for minimisation.
         Passed to :meth:`quop_mpi.Ansatz.set_objective`.
 
+        **Commonly used parameters**:
+
+        * ``local_probabilities`` — probability amplitudes for this rank's partition
+        * ``observables`` — observable values for this rank's partition
+        * ``MPI_COMM`` — MPI subcommunicator (for global reductions, e.g., CVaR)
+
         **Typical Structure**
 
         .. code-block:: python
 
             def objective_function(
-               local_probabilities: nd.array[np.float64],
-               observables: nd.array[np.float64],
+               local_probabilities: np.ndarray[np.float64],
+               observables: np.ndarray[np.float64],
                MPI_COMM: MPI.Intracomm,
                *args,
                **kwargs
