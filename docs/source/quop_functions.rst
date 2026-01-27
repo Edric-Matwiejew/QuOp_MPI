@@ -29,7 +29,7 @@ QuOp Functions
         attributes of the :class:`quop_mpi.Ansatz` class.
 
         Predefined Observables Functions are included in the
-        :mod:`quop_mpi.state` module. See :class:`quop_mpi.Ansatz` for a
+        :mod:`quop_mpi.observable` module. See :class:`quop_mpi.Ansatz` for a
         selected list of available attributes.
 
         **Typical structure:**

@@ -1604,9 +1604,9 @@ class Ansatz:
             if True, print current the ansatz depth, repeat number and
             optimisation results (default True)
         filename : str or None, optional
-            name of *.h5 file in which to save the optimised system state and observables
+            name of \*.h5 file in which to save the optimised system state and observables
         label : str, optional
-            if filename is not None, *.h5 data will be saved as
+            if filename is not None, \*.h5 data will be saved as
             "filename/label_depth_repeat" (default "test")
         save_action : {'a', 'w'}, optional
             action taken during first file write: 'a' to append, 'w' to overwrite (default 'a')

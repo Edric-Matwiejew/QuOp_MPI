@@ -62,6 +62,11 @@ def enable():
     if os.getenv("QUOP_PROFILE") != "1":
         return
 
+    # Don't enable profiling if MPI is not properly initialized
+    # (e.g., when imported by Sphinx for documentation)
+    if not MPI.Is_initialized():
+        return
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 

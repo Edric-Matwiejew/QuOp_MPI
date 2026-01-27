@@ -18,13 +18,13 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'QuOp_MPI'
-copyright = '2021, Edric Matwiejew'
+copyright = '2021-2026, Edric Matwiejew'
 author = 'Edric Matwiejew'
 
 autodoc_mock_imports = ["mpi4py", "h5py","nlopt", "quop_mpi.__lib"]
 
 # The full version, including alpha/beta/rc tags
-release = '1.3.0'
+release = '1.3.1'
 
 
 # -- General configuration ---------------------------------------------------
