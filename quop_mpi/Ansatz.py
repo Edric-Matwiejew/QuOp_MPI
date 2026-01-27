@@ -486,7 +486,9 @@ class Ansatz:
         if (self.MPI_COMM_WORLD.Get_rank() == 0) and (self.result is not None):
             self.__populate_quop_result()
 
-        self.subcomms.SUBCOMM.barrier()
+        # Only ranks in the subcomm have a valid SUBCOMM to call barrier on
+        if self.subcomms.in_subcomm():
+            self.subcomms.SUBCOMM.barrier()
         self.variational_parameters = None
 
         for method in self.post_execution_methods:
