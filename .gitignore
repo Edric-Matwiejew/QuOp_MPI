@@ -21,3 +21,6 @@ _dist
 *.png
 Untitled.ipynb
 *.pyc
+trace_*.txt
+*.tex
+*.aux
