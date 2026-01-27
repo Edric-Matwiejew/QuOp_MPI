@@ -209,8 +209,6 @@ class swarm_tracker:
         sends a sublist of the task list to each subcomm.
         generates control flow tags
         """
-        # if self.subcomms.MPI_COMM.Get_rank() == 0:
-
         self.status = [False for i in range(len(self.tasks))]
         self.task_sublists = [None for _ in range(self.subcomms.get_n_subcomms())]
         self.seed_sublists = [None for _ in range(self.subcomms.get_n_subcomms())]
@@ -411,7 +409,6 @@ class swarm_tracker:
         """
         gathers and returns all of the results so far to all subcomms.
         """
-        #return self.subcomms.MPI_COMM.bcast(self.results_dict, root=0)
         return self.results_dict
 
     def __mark_time(self):

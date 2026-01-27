@@ -78,7 +78,6 @@ def serial(
     return terms
 
 
-#TODO Update docstring
 def csv(
     partition_table: list[int], MPI_COMM: Intracomm, *args, **kwargs) -> np.ndarray[np.float64]:
     """Load :term:`observables` from a :literal:`*.csv` using `pandas

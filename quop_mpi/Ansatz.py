@@ -699,10 +699,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
         Generates operators associated with the :literal:`Unitary` instances.
         """
         if self.subcomms.in_subcomm():
-            #for unitary in self.unitaries:
-            #    if unitary is not self.planner:
-            #        unitary._Unitary__copy_plan(self.planner)
-
             for i, unitary in enumerate(self.unitaries):
                 unitary._Unitary__plan(self.system_size, self.subcomms.SUBCOMM)
                 unitary.parse_plan([self.local_i, self.alloc_local])
@@ -735,9 +731,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
             self.ansatz_initial_state = self.initial_state_function.call(
                 *self.initial_state_dict["args"], **self.initial_state_dict["kwargs"]
             )
-
-            # do in evolve state
-            #self.context.state = self.ansatz_initial_state
 
     def __gen_observables(self):
         """Generates the observables for computation of the QVA objective
@@ -1169,7 +1162,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
         """
 
         if self.subcomms.in_subcomm() and self.subcomms.get_subcomm_index() == 0:
-            #prob = np.abs(self.final_state) ** 2
             return gather_array(
                 np.abs(self.context.state)**2, self.unitaries[0].partition_table, self.subcomms.SUBCOMM
             )
@@ -1278,10 +1270,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
         if self.subcomms.get_subcomm_index() == 0:
             self.state_norm = self.context.get_state_norm()
             return self.state_norm
-            #self.state_norm = self.subcomms.SUBCOMM.allreduce(
-            #    np.sum(self.__get_local_probabilities()), op=MPI.SUM
-            #)
-            #return self.state_norm
 
     def __get_expectation_value(self) -> float:
         """Compute the expectation value at :meth:`~quop_mpi.Ansatz.variational_parameters`.
@@ -1355,7 +1343,3 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark):
                 if self.record_objective:
                     self.total_n_evolutions.append(self.n_evolutions)
                 return self.expectation
-
-    # Logging methods (__gen_log, __create_new_logfile, __log_update) are inherited from Logging mixin
-
-    # __mpi_jacobian is inherited from Jacobian mixin

@@ -44,8 +44,6 @@ class qwoa(Ansatz):
         observable_dict : FunctionDict, optional
             :term:`FunctionDict` for ``function``
         """
-        #self.operator_function = function
-        #self.operator_dict = operator_dict
         self.set_observables(function, observable_dict)
 
     def set_params(self, param_function, param_dict=None):

@@ -4,20 +4,6 @@ from logging import warn
 from .. import config
 
 
-#def select_context():
-#    module_name = None
-#    if config.backend == "wavefront":
-#        backend_path = "wavefront"
-#    elif config.backend != "mpi":
-#        warn("Invalid backend selected, defaulting to 'mpi'.")
-#
-#    if module_name is None:
-#        module_name = "mpi"
-#
-#    context = import_module(module_name, package="quop_mpi").context_wrapper
-#
-#    return context
-
 class context:
     def __init__(self, backend, system_size, alloc_local, local_i, local_i_offset, SUBCOMM):
 

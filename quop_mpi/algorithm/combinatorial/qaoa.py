@@ -33,8 +33,6 @@ class qaoa(Ansatz):
         self.operator_function = None
         self.param_function = None
 
-    #TODO Update docstring
-
     def set_qualities(self, function: Callable, observables_dict: dict = None):
         """Define the :term:`observables` and :term:`phase-shift unitary` :term:`operator`
 

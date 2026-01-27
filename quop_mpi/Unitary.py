@@ -164,7 +164,9 @@ class Unitary:
 
         self.n_params += operator_n_params + unitary_n_params
 
-        #TODO document
+        #: Constraints on valid MPI communicator sizes for this unitary.
+        #: A list of 1-D integer arrays specifying divisibility requirements.
+        #: Used by :meth:`quop_mpi.Ansatz` to determine compatible parallelization.
         self.comm_size_constraints = [np.array([1], dtype = int)]
 
     def __parse_function_dict__(self, function_dict, attribute_name):

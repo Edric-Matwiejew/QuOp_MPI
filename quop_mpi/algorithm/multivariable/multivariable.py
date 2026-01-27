@@ -60,7 +60,6 @@ class multivariable(Ansatz):
 
         self.set_unitaries([self.UQ, self.UW])
 
-    #TODO update docstring
     def set_qualities(self, function: Callable, operator_dict : dict = None):
         """Define the :term:`observables` and :term:`phase-shift unitary` :term:`operator`
 
