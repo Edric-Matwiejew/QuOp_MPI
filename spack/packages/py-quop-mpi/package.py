@@ -39,7 +39,7 @@ class PyQuopMpi(PythonPackage):
 
     # External library dependencies
     depends_on("mpi", type=("build", "link", "run"))
-    depends_on("fftw@3:+mpi+fortran", type=("build", "link", "run"))
+    depends_on("fftw@3:+mpi", type=("build", "link", "run"))
     depends_on("hdf5@1.10:+fortran+shared+mpi", type=("build", "link", "run"))
 
     # Optional dependencies for documentation (available in Spack builtin)
