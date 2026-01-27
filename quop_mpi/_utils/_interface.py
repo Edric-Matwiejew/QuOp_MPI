@@ -1,8 +1,6 @@
 from mpi4py import MPI
-from inspect import signature
+from inspect import signature, Parameter
 from functools import partial
-import warnings
-import numpy as np
 
 
 class interface:
@@ -50,47 +48,31 @@ class interface:
         function_signature = signature(function)
         function_parameters = function_signature.parameters
 
+        # Only consider regular positional parameters (no defaults)
+        # Skip *args and **kwargs (VAR_POSITIONAL and VAR_KEYWORD)
         positional_params = [
             str(param)
             for param in function_parameters.values()
             if param.default == param.empty
+            and param.kind not in (Parameter.VAR_POSITIONAL, Parameter.VAR_KEYWORD)
         ]
 
         self.function = function
         self.positional_params = positional_params
         self.objs = objs
-        self.unbound_params = []  # Track which params couldn't be bound
 
         self.update_parameters()
 
     def update_parameters(self):
 
         self.args = []
-        self.unbound_params = []
         
         for positional_param in self.positional_params:
             param_name = positional_param.split(":")[0]
-            bound = False
             for obj in self.objs:
                 param_value = getattr(obj, param_name, None)
                 if param_value is not None:
                     self.args.append(param_value)
-                    bound = True
                     break
-            if not bound:
-                self.unbound_params.append(param_name)
-        
-        # Warn on rank 0 if there are unbound parameters that look like they
-        # should bind (i.e., don't start with underscore). Underscore-prefixed
-        # params are conventionally custom and expected to come from FunctionDict.
-        if self.rank == 0 and self.unbound_params:
-            unexpected_unbound = [p for p in self.unbound_params if not p.startswith('_')]
-            if unexpected_unbound:
-                warnings.warn(
-                    f"{self.function_name} function: positional parameter(s) not bound: "
-                    f"{unexpected_unbound}. These must be provided via FunctionDict['args']. "
-                    f"Use print_all_bindable_attributes() to see available bindings.",
-                    stacklevel=4
-                )
         
         self.call = partial(self.function, *self.args)
