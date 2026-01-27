@@ -26,7 +26,7 @@ class PyQuopMpi(PythonPackage):
     depends_on("py-setuptools@42:68", type="build")
     depends_on("py-scikit-build@0.13:", type="build")
     depends_on("py-wheel", type="build")
-    depends_on("py-ninja", type="build")
+    depends_on("ninja", type="build")
     depends_on("cmake@3.18:", type="build")
 
     # Runtime dependencies
