@@ -9,74 +9,171 @@ All notable changes to QuOp_MPI are documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-Version 1.3.1 (2026-01-27)
-==========================
+Unreleased
+==========
+
+Added
+-----
+
+- Comprehensive MPI-enabled test suite with pytest-mpi (380+ tests)
+- Unit tests for toolkit module (kronecker, pauli, string functions)
+- Unit tests for NLopt wrapper module
+- Performance profiling support via ``QUOP_PROFILE=1`` environment variable
+- ``set_objective`` method for custom objective functions
+- Documentation restructure with navigable API reference
+- Quick Start example in documentation
+- Changelog documentation
+
+Changed
+-------
+
+- Refactored optional dependencies in pyproject.toml (``[dev]`` replaces ``[all]``)
+- Updated documentation sidebar with grouped navigation
+- NumPy 2.x compatibility
 
 Fixed
 -----
 
-- Fixed FFTW MPI crash when system_size is 1 in circulant propagator
-- Fixed deadlock in ``Ansatz.__post()`` when MPI ranks are excluded from subcommunicator
-- Fixed profiler crash when importing module outside MPI context (e.g., Sphinx docs)
-- Fixed docstring formatting warnings (unescaped asterisks in ``*.h5``)
+- FFTW MPI crash with system_size=1 (edge case in circulant propagator)
+- Deadlock in ``Ansatz.__post()`` when MPI ranks are excluded from subcomm
+- Profiler crash during Sphinx doc builds (outside MPI context)
+- OpenMP thread contention causing apparent deadlock with >2 MPI processes
+- Circulant eigenvalue generation bug when graph is complete
+- Parallel Jacobian implementation compatibility with parameter maps
+- Docstring formatting warnings (unescaped asterisks)
 
-Added
------
-
-- Added ``nlopt`` as optional dependency (``pip install QuOp_MPI[nlopt]``)
-- Added comprehensive MPI test suite (384+ tests across 21 test files)
-- Added unit tests for toolkit module (kronecker, pauli, string)
-- Added unit tests for NLopt wrapper
-- Reorganized API documentation into navigable multi-page structure
+Version 1.2.1 (2025-03-07)
+==========================
 
 Changed
 -------
 
-- Renamed ``[all]`` optional dependency group to ``[dev]``
-- Updated optional dependencies to use self-referencing extras
-- Improved README documentation structure and clarity
+- Build system update with modern GitHub Actions workflow
+- Bumped dawidd6/action-download-artifact from 2 to 6
+- Updated dependency version ranges
+- Removed outdated test directory
 
-Version 1.3.0 (2024-XX-XX)
+Version 1.2.0 (2024-08-13)
 ==========================
 
 Added
 -----
 
-- Parameter mapping support for custom variational parameter structures
-- Job suspension and resumption for long-running benchmarks
-- Profiler for performance analysis (``QUOP_PROFILE=1``)
+- Parameter mapping functionality for flexible variational parameter control (#11, #12)
+- Parallel gradient evaluation with MPI subcommunicators
+- Broadcast of variational parameters from root of MPI_COMM_WORLD
+- Basic profiling functionality with OpenMP support in release builds
+- Interleaved local spMV with parallel communication for improved performance
+- Documentation build GitHub workflow
 
 Changed
 -------
 
-- Improved MPI subcommunicator handling for swarm meta-algorithm
+- CMake build requires cmake>=3.5,<4
+- Removed self.Ns from operator dict
 
-Version 1.2.0 (2023-XX-XX)
+Version 1.1.0 (2022-10-12)
 ==========================
 
 Added
 -----
 
-- Multivariable optimization algorithms (QMOA)
-- Momentum-space propagator
-- Composite propagator for Cartesian sums
+- Composite Ansatz class for multivariable optimization problems
+- Multivariable optimization examples
+- QMOA (Quantum Multivariable Optimization Algorithm) experiments
+- Link to preprint article
 
-Version 1.1.0 (2022-XX-XX)
+Changed
+-------
+
+- Evaluate returns results to all calling MPI ranks
+- Support for Python 3.6 and 3.7 builds
+
+Version 1.0.0 (2021-09-30)
+==========================
+
+This is the first major release, coinciding with the `Computer Physics Communications publication <https://doi.org/10.1016/j.cpc.2023.108724>`_.
+
+Added
+-----
+
+- Complete API redesign with modular Ansatz architecture
+- QAOA and QWOA algorithm implementations  
+- Circulant, diagonal, and sparse propagator classes
+- Observable and state modules
+- Toolkit for common quantum operators (Pauli matrices, Kronecker products)
+- MPI-parallel state vector simulation
+- Parallel HDF5 I/O for saving and loading simulation data
+- Support for NLopt optimizers alongside SciPy
+- Benchmark infrastructure for performance evaluation
+- Comprehensive documentation with Sphinx
+- GitHub Actions CI/CD pipeline
+- Installation scripts for Ubuntu 20.04
+- Singularity container support
+- License (GPLv3) and contributor acknowledgements
+
+Changed
+-------
+
+- Refactored pre-post execution cycle for unitaries
+- Communicator resizing for optimal MPI process utilization
+- Default optimizer changed to L-BFGS-B
+- Parallel post methods with total_params tracking
+
+Fixed
+-----
+
+- Circulant operators FFTW compatibility
+- Deadlock issues in communicator shrinking
+- Various MPI edge cases for ranks with zero-length local arrays
+- evolve_state converts list parameters into ndarray
+- Check for pre or post on cold call to evolve_state
+
+Version 0.0.2 (2020-02-23)
 ==========================
 
 Added
 -----
 
-- QWOA algorithm implementation
-- Sparse matrix propagator
-- HDF5 save/load functionality
+- Zenodo DOI for citation
+- Support for multiple mixing operators in QAOA class
+- Custom optimizer support beyond default SciPy minimize
+- Basin-hopping optimization option
+- Process-independent quality generation using integers or random floats
+- Updated sparse matrix exponentiation subroutines
+- Benchmark construct with parameter reuse option
+- Parallel HDF5 write functionality
+- MPI hypercube mixer
+- Objective function mapping to custom scalar values
+- MacOS installation support
 
-Version 1.0.0 (2021-XX-XX)
+Changed
+-------
+
+- QuOp_MPI now minimizes the objective function (was maximizing)
+- Optimizer result 'success' field renamed to 'optimizer_success'
+- 'success' metric replaced by 'quality cutoff'
+- Method ``log_success`` replaced by ``log_results`` (**breaking change from 0.0.1**)
+- Switched to L-BFGS-B optimizer
+- Split QAOA and QWOA into separate classes
+- Networkx added as required dependency
+
+Fixed
+-----
+
+- Bug fix in MPI.py (#1)
+- Handling of zero-length quality arrays at local MPI process
+- Initial state handling when rank 0 has local_i = 0
+- Fourier transform ordering
+- Initial state defaults to equal superposition if undefined
+
+Version 0.0.1 (2020-01-12)
 ==========================
 
 Initial release.
 
-- Core Ansatz class for quantum variational algorithms
-- QAOA algorithm implementation
-- Circulant and diagonal propagators
-- MPI-parallel distributed memory simulation
+- QWAO_MPI: Quantum Walk-Assisted Optimizer with MPI parallelization
+- Basic CTQW (Continuous-Time Quantum Walk) implementation
+- Parallel eigenvalue computation with FFTW
+- Parallel HDF5 output support
+- Draft documentation
