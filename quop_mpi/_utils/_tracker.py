@@ -8,7 +8,7 @@ from copy import copy
 from logging import warn, info
 import numpy as np
 from mpi4py import MPI
-from quop_mpi.__utils.__filenames import ensure_path_and_extension
+from quop_mpi._utils._filenames import ensure_path_and_extension
 import __main__
 
 

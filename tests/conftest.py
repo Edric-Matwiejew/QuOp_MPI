@@ -410,7 +410,7 @@ def make_complete_graph_operator(system_size: int):
         
         Returns CSR partition for a complete graph (all-to-all connectivity).
         """
-        from quop_mpi.__utils.__mpi import __scatter_sparse
+        from quop_mpi._utils._mpi import __scatter_sparse
         
         rank = MPI_COMM.Get_rank()
         

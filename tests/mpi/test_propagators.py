@@ -43,7 +43,7 @@ def create_partition_table(system_size, comm_size):
 
 def gather_state(local_state, partition_table, mpi_comm):
     """Gather distributed state to rank 0."""
-    from quop_mpi.__utils.__mpi import gather_array
+    from quop_mpi._utils._mpi import gather_array
     return gather_array(local_state, partition_table, mpi_comm)
 
 

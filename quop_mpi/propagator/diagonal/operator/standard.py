@@ -2,9 +2,9 @@
 from __future__ import annotations
 import numpy as np
 from mpi4py import MPI
-from ....__utils.__mpi import __scatter_1D_array
-#from ....__lib import fCQAOA
-from ....__lib import cartesian as cart
+from ...._utils._mpi import __scatter_1D_array
+#from ...._lib import fCQAOA
+from ...._lib import cartesian as cart
 
 ####################################
 # imports and classes for type hints

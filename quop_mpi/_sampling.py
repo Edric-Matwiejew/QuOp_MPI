@@ -9,7 +9,7 @@ from typing import Callable, TYPE_CHECKING
 import numpy as np
 from mpi4py import MPI
 
-from .__utils.__interface import interface
+from ._utils._interface import interface
 
 if TYPE_CHECKING:
     from .Ansatz import Ansatz

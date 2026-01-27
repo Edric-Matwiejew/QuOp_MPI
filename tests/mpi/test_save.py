@@ -443,7 +443,7 @@ class TestParallelIODataIntegrity:
     def test_distributed_state_assembled_correctly(self, mpi_comm, temp_h5_file):
         """Verify that distributed state pieces are correctly assembled in HDF5."""
         from quop_mpi.algorithm.combinatorial import qwoa
-        from quop_mpi.__utils.__mpi import gather_array
+        from quop_mpi._utils._mpi import gather_array
         import h5py
         
         system_size = 16
@@ -484,7 +484,7 @@ class TestParallelIODataIntegrity:
     def test_distributed_observables_assembled_correctly(self, mpi_comm, temp_h5_file):
         """Verify that distributed observables are correctly assembled in HDF5."""
         from quop_mpi.algorithm.combinatorial import qwoa
-        from quop_mpi.__utils.__mpi import gather_array
+        from quop_mpi._utils._mpi import gather_array
         import h5py
         
         system_size = 32

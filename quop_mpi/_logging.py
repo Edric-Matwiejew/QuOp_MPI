@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from mpi4py import MPI
 
-from .__utils.__filenames import ensure_path_and_extension
+from ._utils._filenames import ensure_path_and_extension
 
 if TYPE_CHECKING:
     from .Ansatz import Ansatz
@@ -232,7 +232,7 @@ class Logging:
         if self.subcomms.get_subcomm_index() != 0:
             return
 
-        from quop_mpi.__lib import parallel_io
+        from quop_mpi._lib import parallel_io
 
         if self.MPI_COMM_WORLD.Get_rank() == 0:
 

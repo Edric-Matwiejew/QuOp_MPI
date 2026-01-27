@@ -5,7 +5,7 @@ from importlib import import_module
 import numpy as np
 from ... import config
 from ...Unitary import Unitary
-from ...__lib.propagator import propagator
+from ..._lib.propagator import propagator
 
 
 class unitary(Unitary):

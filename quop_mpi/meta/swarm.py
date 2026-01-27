@@ -7,9 +7,9 @@ from quop_mpi import Ansatz
 from functools import wraps
 from mpi4py import MPI
 from logging import warn
-from ..__utils.__filenames import ensure_path_and_extension
-from ..__utils.__mpi import subcomms, MPI_COMM_type
-from ..__utils.__tracker import swarm_tracker
+from .._utils._filenames import ensure_path_and_extension
+from .._utils._mpi import subcomms, MPI_COMM_type
+from .._utils._tracker import swarm_tracker
 
 #### Type hints ######################
 from ..Unitary import Unitary

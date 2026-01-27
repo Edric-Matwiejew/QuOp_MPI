@@ -2,7 +2,7 @@ from __future__ import annotations
 from importlib import import_module
 import numpy as np
 from mpi4py import MPI
-from ..__utils.__mpi import __scatter_1D_array
+from .._utils._mpi import __scatter_1D_array
 
 ####################################
 # imports and classes for type hints
@@ -275,7 +275,7 @@ def position_grid(
     if function is None:
         function = squeezed
 
-    from quop_mpi.__lib import cartesian as cart
+    from quop_mpi._lib import cartesian as cart
 
     strides = np.empty(len(Ns), dtype=int)
     strides[-1] = 1

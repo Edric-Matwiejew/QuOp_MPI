@@ -1,6 +1,6 @@
 from __future__ import annotations
 import numpy as np
-from ..__utils.__mpi import __scatter_1D_array
+from .._utils._mpi import __scatter_1D_array
 
 ####################################
 # imports and classes for type hints

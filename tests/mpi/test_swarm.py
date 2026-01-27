@@ -420,7 +420,7 @@ class TestSubcomms:
 
     def test_subcomms_in_subcomm(self, mpi_comm):
         """Test in_subcomm returns correct value."""
-        from quop_mpi.__utils.__mpi import subcomms
+        from quop_mpi._utils._mpi import subcomms
         
         # With nodes_per_subcomm=None, all ranks should be in subcomm
         sc = subcomms(None, 1, 1, mpi_comm)
@@ -430,7 +430,7 @@ class TestSubcomms:
 
     def test_subcomms_get_n_subcomms(self, mpi_comm):
         """Test get_n_subcomms returns correct count."""
-        from quop_mpi.__utils.__mpi import subcomms
+        from quop_mpi._utils._mpi import subcomms
         
         sc = subcomms(None, 1, 1, mpi_comm)
         
@@ -440,7 +440,7 @@ class TestSubcomms:
 
     def test_subcomms_get_subcomm_index(self, mpi_comm):
         """Test get_subcomm_index returns valid index."""
-        from quop_mpi.__utils.__mpi import subcomms
+        from quop_mpi._utils._mpi import subcomms
         
         sc = subcomms(None, 1, 1, mpi_comm)
         

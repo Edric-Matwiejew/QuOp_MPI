@@ -2,7 +2,7 @@ from __future__ import annotations
 from importlib import import_module
 import numpy as np
 from mpi4py import MPI
-from .__utils.__interface import interface
+from ._utils._interface import interface
 
 ####################################
 # imports and classes for type hints

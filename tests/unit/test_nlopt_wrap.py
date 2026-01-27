@@ -1,5 +1,5 @@
 """
-Unit tests for the quop_mpi.__utils.__nlopt_wrap module.
+Unit tests for the quop_mpi._optimization.nlopt_wrap module.
 
 This module tests the NLopt wrapper which provides a scipy-like interface
 to the NLopt optimization library.
@@ -17,35 +17,35 @@ class TestNloptEnumLookup:
 
     def test_get_nlopt_enum_uppercase(self):
         """Look up algorithm by uppercase name."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         result = get_nlopt_enum('LN_NELDERMEAD')
         assert result == nlopt.LN_NELDERMEAD
 
     def test_get_nlopt_enum_lowercase(self):
         """Look up algorithm by lowercase name."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         result = get_nlopt_enum('ln_neldermead')
         assert result == nlopt.LN_NELDERMEAD
 
     def test_get_nlopt_enum_mixed_case(self):
         """Look up algorithm by mixed case name."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         result = get_nlopt_enum('ln_NelderMead')
         assert result == nlopt.LN_NELDERMEAD
 
     def test_get_nlopt_enum_none_returns_default(self):
         """None returns default algorithm (LN_BOBYQA)."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         result = get_nlopt_enum(None)
         assert result == nlopt.LN_BOBYQA
 
     def test_get_nlopt_enum_unknown_returns_default(self):
         """Unknown algorithm returns default with warning."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         with pytest.warns(RuntimeWarning, match="could not be found"):
             result = get_nlopt_enum('foobar')
@@ -54,21 +54,21 @@ class TestNloptEnumLookup:
 
     def test_get_nlopt_enum_bobyqa(self):
         """Look up LN_BOBYQA."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         result = get_nlopt_enum('LN_BOBYQA')
         assert result == nlopt.LN_BOBYQA
 
     def test_get_nlopt_enum_cobyla(self):
         """Look up LN_COBYLA."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         result = get_nlopt_enum('LN_COBYLA')
         assert result == nlopt.LN_COBYLA
 
     def test_get_nlopt_enum_lbfgs(self):
         """Look up LD_LBFGS."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_enum
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_enum
         
         result = get_nlopt_enum('LD_LBFGS')
         assert result == nlopt.LD_LBFGS
@@ -79,35 +79,35 @@ class TestNormalizeBound:
 
     def test_normalize_bound_both_finite(self):
         """Both bounds finite - no change."""
-        from quop_mpi.__utils.__nlopt_wrap import normalize_bound
+        from quop_mpi._optimization.nlopt_wrap import normalize_bound
         
         result = normalize_bound((2.6, 7.2))
         assert result == (2.6, 7.2)
 
     def test_normalize_bound_lower_none(self):
         """Lower bound None becomes -inf."""
-        from quop_mpi.__utils.__nlopt_wrap import normalize_bound
+        from quop_mpi._optimization.nlopt_wrap import normalize_bound
         
         result = normalize_bound((None, 7.2))
         assert result == (-float('inf'), 7.2)
 
     def test_normalize_bound_upper_none(self):
         """Upper bound None becomes +inf."""
-        from quop_mpi.__utils.__nlopt_wrap import normalize_bound
+        from quop_mpi._optimization.nlopt_wrap import normalize_bound
         
         result = normalize_bound((2.6, None))
         assert result == (2.6, float('inf'))
 
     def test_normalize_bound_both_none(self):
         """Both bounds None become -inf, +inf."""
-        from quop_mpi.__utils.__nlopt_wrap import normalize_bound
+        from quop_mpi._optimization.nlopt_wrap import normalize_bound
         
         result = normalize_bound((None, None))
         assert result == (-float('inf'), float('inf'))
 
     def test_normalize_bound_idempotent(self):
         """Operation is idempotent."""
-        from quop_mpi.__utils.__nlopt_wrap import normalize_bound
+        from quop_mpi._optimization.nlopt_wrap import normalize_bound
         
         result = normalize_bound((-float("inf"), float("inf")))
         assert result == (-float('inf'), float('inf'))
@@ -118,7 +118,7 @@ class TestNormalizeBounds:
 
     def test_normalize_bounds_multiple(self):
         """Normalize multiple bounds."""
-        from quop_mpi.__utils.__nlopt_wrap import normalize_bounds
+        from quop_mpi._optimization.nlopt_wrap import normalize_bounds
         
         bounds = [(2.6, 7.2), (None, 2), (3.14, None), (None, None)]
         result = list(normalize_bounds(bounds))
@@ -129,7 +129,7 @@ class TestNormalizeBounds:
 
     def test_normalize_bounds_empty(self):
         """Empty bounds list."""
-        from quop_mpi.__utils.__nlopt_wrap import normalize_bounds
+        from quop_mpi._optimization.nlopt_wrap import normalize_bounds
         
         result = list(normalize_bounds([]))
         assert result == []
@@ -140,35 +140,35 @@ class TestNloptMessage:
 
     def test_get_nlopt_message_success(self):
         """Message for SUCCESS."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_message
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_message
         
         result = get_nlopt_message(nlopt.SUCCESS)
         assert result == 'Success'
 
     def test_get_nlopt_message_ftol_reached(self):
         """Message for FTOL_REACHED."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_message
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_message
         
         result = get_nlopt_message(nlopt.FTOL_REACHED)
         assert 'ftol' in result.lower()
 
     def test_get_nlopt_message_xtol_reached(self):
         """Message for XTOL_REACHED."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_message
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_message
         
         result = get_nlopt_message(nlopt.XTOL_REACHED)
         assert 'xtol' in result.lower()
 
     def test_get_nlopt_message_maxeval_reached(self):
         """Message for MAXEVAL_REACHED."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_message
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_message
         
         result = get_nlopt_message(nlopt.MAXEVAL_REACHED)
         assert 'maxeval' in result.lower()
 
     def test_get_nlopt_message_invalid_args(self):
         """Message for INVALID_ARGS."""
-        from quop_mpi.__utils.__nlopt_wrap import get_nlopt_message
+        from quop_mpi._optimization.nlopt_wrap import get_nlopt_message
         
         result = get_nlopt_message(nlopt.INVALID_ARGS)
         assert 'invalid' in result.lower()
@@ -179,7 +179,7 @@ class TestMakeNloptFun:
 
     def test_make_nlopt_fun_no_gradient(self):
         """Create function without gradient."""
-        from quop_mpi.__utils.__nlopt_wrap import make_nlopt_fun
+        from quop_mpi._optimization.nlopt_wrap import make_nlopt_fun
         
         def simple_fun(x):
             return np.sum(x**2)
@@ -196,7 +196,7 @@ class TestMakeNloptFun:
 
     def test_make_nlopt_fun_with_callable_gradient(self):
         """Create function with callable gradient."""
-        from quop_mpi.__utils.__nlopt_wrap import make_nlopt_fun
+        from quop_mpi._optimization.nlopt_wrap import make_nlopt_fun
         
         def simple_fun(x):
             return np.sum(x**2)
@@ -216,7 +216,7 @@ class TestMakeNloptFun:
 
     def test_make_nlopt_fun_with_tuple_return(self):
         """Function returns (value, gradient) tuple."""
-        from quop_mpi.__utils.__nlopt_wrap import make_nlopt_fun
+        from quop_mpi._optimization.nlopt_wrap import make_nlopt_fun
         
         def fun_with_grad(x):
             return np.sum(x**2), 2 * x
@@ -233,7 +233,7 @@ class TestMakeNloptFun:
 
     def test_make_nlopt_fun_with_args(self):
         """Function with additional arguments."""
-        from quop_mpi.__utils.__nlopt_wrap import make_nlopt_fun
+        from quop_mpi._optimization.nlopt_wrap import make_nlopt_fun
         
         def scaled_fun(x, scale):
             return scale * np.sum(x**2)
@@ -249,7 +249,7 @@ class TestMakeNloptFun:
 
     def test_make_nlopt_fun_records_path(self):
         """Function records optimization path."""
-        from quop_mpi.__utils.__nlopt_wrap import make_nlopt_fun
+        from quop_mpi._optimization.nlopt_wrap import make_nlopt_fun
         
         def simple_fun(x):
             return np.sum(x**2)
@@ -274,7 +274,7 @@ class TestMinimize:
 
     def test_minimize_rosenbrock_derivative_free(self):
         """Minimize Rosenbrock function with derivative-free method."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         x0 = np.array([0.5, 0.5])
         
@@ -289,7 +289,7 @@ class TestMinimize:
 
     def test_minimize_rosenbrock_with_gradient(self):
         """Minimize Rosenbrock function with gradient-based method."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         x0 = np.array([1.3, 0.7, 0.8, 1.9, 1.2])
         
@@ -302,7 +302,7 @@ class TestMinimize:
 
     def test_minimize_with_ftol(self):
         """Minimize with ftol_abs stopping criterion."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         x0 = np.array([1.3, 0.7, 0.8, 1.9, 1.2])
         
@@ -313,7 +313,7 @@ class TestMinimize:
 
     def test_minimize_returns_optimize_result(self):
         """Minimize returns OptimizeResult-like object."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return np.sum(x**2)
@@ -330,7 +330,7 @@ class TestMinimize:
 
     def test_minimize_with_bounds(self):
         """Minimize with parameter bounds."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return np.sum((x - 2)**2)
@@ -345,7 +345,7 @@ class TestMinimize:
 
     def test_minimize_invalid_option_raises(self):
         """Invalid option raises ValueError."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return np.sum(x**2)
@@ -357,7 +357,7 @@ class TestMinimize:
 
     def test_minimize_simple_quadratic(self):
         """Minimize simple quadratic function."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return (x[0] - 3)**2 + (x[1] + 2)**2
@@ -371,7 +371,7 @@ class TestMinimize:
 
     def test_minimize_nfev_tracked(self):
         """Number of function evaluations is tracked."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         call_count = [0]
         
@@ -393,7 +393,7 @@ class TestNloptAlgorithms:
 
     def test_ln_cobyla(self):
         """Test LN_COBYLA algorithm."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return np.sum(x**2)
@@ -405,7 +405,7 @@ class TestNloptAlgorithms:
 
     def test_ln_sbplx(self):
         """Test LN_SBPLX (Subplex) algorithm."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return np.sum(x**2)
@@ -417,7 +417,7 @@ class TestNloptAlgorithms:
 
     def test_ld_mma(self):
         """Test LD_MMA (Method of Moving Asymptotes) algorithm."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return np.sum(x**2)
@@ -432,7 +432,7 @@ class TestNloptAlgorithms:
 
     def test_gn_direct(self):
         """Test GN_DIRECT global optimization algorithm."""
-        from quop_mpi.__utils.__nlopt_wrap import minimize
+        from quop_mpi._optimization.nlopt_wrap import minimize
         
         def quadratic(x):
             return np.sum(x**2)
@@ -451,31 +451,31 @@ class TestNloptAlgorithmsRegistry:
 
     def test_nlopt_algorithms_not_empty(self):
         """NLOPT_ALGORITHMS contains algorithms."""
-        from quop_mpi.__utils.__nlopt_wrap import NLOPT_ALGORITHMS
+        from quop_mpi._optimization.nlopt_wrap import NLOPT_ALGORITHMS
         
         assert len(NLOPT_ALGORITHMS) > 0
 
     def test_nlopt_algorithms_contains_bobyqa(self):
         """NLOPT_ALGORITHMS contains LN_BOBYQA."""
-        from quop_mpi.__utils.__nlopt_wrap import NLOPT_ALGORITHMS
+        from quop_mpi._optimization.nlopt_wrap import NLOPT_ALGORITHMS
         
         assert 'LN_BOBYQA' in NLOPT_ALGORITHMS
 
     def test_nlopt_algorithms_contains_lbfgs(self):
         """NLOPT_ALGORITHMS contains LD_LBFGS."""
-        from quop_mpi.__utils.__nlopt_wrap import NLOPT_ALGORITHMS
+        from quop_mpi._optimization.nlopt_wrap import NLOPT_ALGORITHMS
         
         assert 'LD_LBFGS' in NLOPT_ALGORITHMS
 
     def test_nlopt_algorithms_contains_cobyla(self):
         """NLOPT_ALGORITHMS contains LN_COBYLA."""
-        from quop_mpi.__utils.__nlopt_wrap import NLOPT_ALGORITHMS
+        from quop_mpi._optimization.nlopt_wrap import NLOPT_ALGORITHMS
         
         assert 'LN_COBYLA' in NLOPT_ALGORITHMS
 
     def test_nlopt_algorithms_keys_format(self):
         """All algorithm keys match expected format (G/L)(N/D)_*."""
-        from quop_mpi.__utils.__nlopt_wrap import NLOPT_ALGORITHMS_KEYS
+        from quop_mpi._optimization.nlopt_wrap import NLOPT_ALGORITHMS_KEYS
         import re
         
         pattern = r'^[GL][ND]_'
