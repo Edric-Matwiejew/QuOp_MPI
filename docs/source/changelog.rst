@@ -15,6 +15,22 @@ Unreleased
 Added
 -----
 
+- ``Bindable`` base class in ``_utils/_bindable.py`` providing extensible attribute discovery for QuOp Functions
+- ``Ansatz.prepare()`` method to fully initialize the Ansatz for inspection without running optimization
+- ``Ansatz.print_all_bindable_attributes()`` method to display bindable attributes for Ansatz and all Unitaries
+- ``get_bindable_attributes()`` and ``print_bindable_attributes()`` methods on both Ansatz and Unitary classes
+- Extensible ``BINDABLE_ATTRIBUTES`` class variable pattern — subclasses (algorithms, propagators) can define their own bindable attributes
+- Comprehensive QuOp Functions documentation with implementation patterns (plain function, factory/closure, callable class)
+- Bindable attributes tables in documentation for both Ansatz and Unitary
+- Naming convention recommendation (underscore prefix) for custom QuOp Function parameters
+
+Changed
+-------
+
+- Ansatz now inherits from ``Bindable`` base class
+- Unitary now inherits from ``Bindable`` base class
+- ``_interface.py`` now properly skips ``*args`` and ``**kwargs`` when parsing function signatures
+
 - Comprehensive MPI-enabled test suite with pytest-mpi (380+ tests)
 - Unit tests for toolkit module (kronecker, pauli, string functions)
 - Unit tests for NLopt wrapper module
