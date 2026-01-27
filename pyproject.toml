@@ -54,17 +54,11 @@ test = [
     "pytest>=7.0",
     "pytest-mpi>=0.6",
 ]
-all = [
-    "yfinance==0.2.54",
-    "matplotlib>=3.6.0",
-    "seaborn>=0.11.2",
-    "jupyter-client>=6.1.2",
-    "jupyter-core>=4.6.3",
-    "numpydoc==1.5.0",
-    "sphinxcontrib-bibtex==2.5.0",
-    "sphinx-rtd-theme==1.2.0",
-    "pytest>=7.0",
-    "pytest-mpi>=0.6",
+nlopt = [
+    "nlopt>=2.7",
+]
+dev = [
+    "QuOp_MPI[examples,docs,test,nlopt]",
 ]
 
 [tool.pytest.ini_options]
