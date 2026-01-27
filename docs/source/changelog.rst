@@ -27,6 +27,22 @@ Added
 Changed
 -------
 
+- **Major refactor of Ansatz.py**: Extracted cohesive subsystems into mixins for improved maintainability
+
+  - ``_sampling.py``: Simulated quantum measurement functionality
+  - ``_logging.py``: CSV logging and HDF5 parallel I/O
+  - ``_communicator.py``: MPI subcommunicator management
+  - ``_optimization/parallel_jacobian.py``: Parallel gradient computation
+  - ``_optimization/finite_differences.py``: Numerical gradient approximation methods
+  - ``_benchmark.py``: Systematic depth study workflow
+
+- Reorganized internal module structure with consistent naming conventions
+
+  - Renamed ``__lib/`` → ``_lib/``, ``__utils/`` → ``_utils/``, ``__profile/`` → ``_profile/``
+  - Renamed internal modules from ``__*.py`` to ``_*.py`` (single underscore for private modules)
+  - Moved ``_utils/_nlopt_wrap.py`` → ``_optimization/nlopt_wrap.py``
+
+- Removed orphaned ``algorithm/multivariable.py`` (duplicate of ``algorithm/multivariable/``)
 - Refactored optional dependencies in pyproject.toml (``[dev]`` replaces ``[all]``)
 - Updated documentation sidebar with grouped navigation
 - NumPy 2.x compatibility
