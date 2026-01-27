@@ -882,6 +882,40 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self.reset = False
             self.setup_called = True
 
+    def prepare(self):
+        """Fully initialize the Ansatz for inspection without running optimization.
+        
+        This method runs both :meth:`setup` and internal preparation steps,
+        bringing the Ansatz to its runtime state. After calling this method:
+        
+        - All Unitary instances have their attributes populated
+        - Observables, initial state, and operators are generated
+        - :meth:`print_all_bindable_attributes` shows actual runtime values
+        - :meth:`get_expectation_value` can be called
+        
+        This is useful for:
+        
+        - Debugging QuOp Functions before optimization
+        - Inspecting the parallel partitioning scheme
+        - Querying bindable attributes with their runtime values
+        - Testing observables and initial state functions
+        
+        Examples
+        --------
+        >>> alg = qwoa(1024)
+        >>> alg.set_qualities(my_observables)
+        >>> alg.prepare()  # Fully initialize
+        >>> alg.print_all_bindable_attributes()  # Now shows actual values
+        >>> print(f"Observables range: {alg.observables.min():.2f} to {alg.observables.max():.2f}")
+        
+        See Also
+        --------
+        setup : Lower-level setup (parallel resources only)
+        execute : Run optimization
+        """
+        self.setup()
+        self._Ansatz__pre()
+
     def __post_unitaries(self):
         """Free memory managed by extension modules on simulation completion."""
         if self.subcomms.in_subcomm():
