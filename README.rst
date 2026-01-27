@@ -8,7 +8,7 @@ QuOp_MPI is a Python 3 module designed for parallel, distributed-memory simulati
 
 **Current Version:** 1.3.1
 
-For an in-depth discussion on design, usage, and performance, see the `paper on arXiv <https://arxiv.org/abs/2110.03963>`_.
+For an in-depth discussion on design, usage, and performance, see the `Journal of Computational Science paper <https://doi.org/10.1016/j.jocs.2022.101711>`_ (also available on `arXiv <https://arxiv.org/abs/2110.03963>`_).
 
 Related Publications
 --------------------
@@ -185,4 +185,4 @@ Contact Information
 For bug reports or inquiries, please submit an issue on GitHub or contact:
 
 Edric Matwiejew  
-Email: edric.matwiejew@research.uwa.edu.au
+Email: edric_matwiejew@CSIRO.au
