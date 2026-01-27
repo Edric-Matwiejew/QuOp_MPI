@@ -98,6 +98,18 @@ contains
 
         self%system_size = self%context%system_size
 
+        ! Handle trivial case: system_size == 1
+        ! FFTW MPI cannot handle 1D DFTs of size 1 (crashes with invalid pointer)
+        ! For size 1, the DFT is the identity transformation, so we skip FFTW
+        if (self%system_size <= 1) then
+            self%local_i = self%context%local_i
+            self%local_i_offset = self%context%local_i_offset
+            self%local_o = self%context%local_i
+            self%local_o_offset = self%context%local_i_offset
+            ! Don't set planned=.true. since we didn't create FFTW plans
+            return
+        endif
+
         alloc_local = fftw_mpi_local_size_1d(   self%system_size, &
                                                 self%context%SUBCOMM, &
                                                 FFTW_FORWARD, &
@@ -185,6 +197,17 @@ contains
 
         class(circulant_propagator), intent(inout) :: self
         real(dp), dimension(:), intent(in) :: ts
+
+        ! Handle trivial case: system_size == 1
+        ! For size 1, the circulant propagator just applies a phase shift
+        ! The eigenvalue for a single-element circulant is just the single element itself
+        if (self%system_size <= 1) then
+            if (self%local_i > 0) then
+                self%context%initial_state(1:self%local_i) = exp(cmplx(0.0_dp, -ts(1)*self%eigenvalues(1), kind=dp)) * &
+                                                             self%context%initial_state(1:self%local_i)
+            endif
+            return
+        endif
 
         call fftw_mpi_execute_dft(self%fftw_plan_forward, self%context%initial_state, self%context%initial_state)
 
