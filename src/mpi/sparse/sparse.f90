@@ -49,6 +49,37 @@ module Sparse
         integer, dimension(:), pointer :: send_disps => null()
         integer, dimension(:), pointer :: num_rec_inds => null()
         integer, dimension(:), pointer :: rec_disps => null()
+        
+        ! Graph communicator for O(neighbors) scaling (MPI-3.0)
+        integer :: graph_comm = MPI_COMM_NULL
+        integer :: num_in_neighbors = 0
+        integer :: num_out_neighbors = 0
+        integer, dimension(:), pointer :: in_neighbors => null()
+        integer, dimension(:), pointer :: out_neighbors => null()
+        
+        ! Graph-based counts/displacements (indexed by neighbor, not rank)
+        integer, dimension(:), pointer :: graph_send_counts => null()
+        integer, dimension(:), pointer :: graph_send_disps => null()
+        integer, dimension(:), pointer :: graph_recv_counts => null()
+        integer, dimension(:), pointer :: graph_recv_disps => null()
+        
+        ! Sorted indices for O(unique_remote) binary search lookup
+        integer(dp), dimension(:), pointer :: recv_indices_sorted => null()
+        integer, dimension(:), pointer :: sort_perm => null()
+        
+        ! Send indices as local offsets (pre-subtracted lb)
+        integer(dp), dimension(:), pointer :: send_local_offsets => null()
+        
+        ! Total send/recv counts
+        integer :: total_send = 0
+        integer :: total_recv = 0
+        
+        ! Local bounds (cached for SpMV)
+        integer(dp) :: lb = 0
+        integer(dp) :: ub = 0
+        
+        ! Unit-valued optimization flag
+        logical :: is_unit_valued = .false.
 
     end type CSR
 
@@ -79,6 +110,96 @@ module Sparse
     end type SPA
 
     contains
+
+    !> @brief Binary search for position in sorted array.
+    pure function binary_search_int64(arr, val) result(pos)
+        integer(dp), dimension(:), intent(in) :: arr
+        integer(dp), intent(in) :: val
+        integer :: pos
+        
+        integer :: lo, hi, mid
+        
+        lo = 1
+        hi = size(arr)
+        
+        do while (lo <= hi)
+            mid = (lo + hi) / 2
+            if (arr(mid) == val) then
+                pos = mid
+                return
+            else if (arr(mid) < val) then
+                lo = mid + 1
+            else
+                hi = mid - 1
+            end if
+        end do
+        
+        pos = -1  ! Not found
+    end function binary_search_int64
+
+    !> @brief Sort array in-place and remove duplicates.
+    subroutine sort_unique_int64_inplace(arr, n_unique)
+        integer(dp), dimension(:), intent(inout) :: arr
+        integer, intent(out) :: n_unique
+        
+        integer :: n, i, j
+        integer(dp) :: temp
+        
+        n = size(arr)
+        if (n <= 1) then
+            n_unique = n
+            return
+        end if
+        
+        ! Simple insertion sort (arrays are typically small per-neighbor)
+        do i = 2, n
+            temp = arr(i)
+            j = i - 1
+            do while (j >= 1 .and. arr(j) > temp)
+                arr(j + 1) = arr(j)
+                j = j - 1
+            end do
+            arr(j + 1) = temp
+        end do
+        
+        ! Remove duplicates
+        n_unique = 1
+        do i = 2, n
+            if (arr(i) /= arr(n_unique)) then
+                n_unique = n_unique + 1
+                arr(n_unique) = arr(i)
+            end if
+        end do
+        
+    end subroutine sort_unique_int64_inplace
+
+    !> @brief Sort array and track permutation.
+    subroutine sort_with_perm_int64_inplace(arr, perm, n)
+        integer(dp), dimension(:), intent(inout) :: arr
+        integer, dimension(:), intent(inout) :: perm
+        integer, intent(in) :: n
+        
+        integer :: i, j
+        integer(dp) :: temp_val
+        integer :: temp_perm
+        
+        if (n <= 1) return
+        
+        ! Simple insertion sort with permutation tracking
+        do i = 2, n
+            temp_val = arr(i)
+            temp_perm = perm(i)
+            j = i - 1
+            do while (j >= 1 .and. arr(j) > temp_val)
+                arr(j + 1) = arr(j)
+                perm(j + 1) = perm(j)
+                j = j - 1
+            end do
+            arr(j + 1) = temp_val
+            perm(j + 1) = temp_perm
+        end do
+        
+    end subroutine sort_with_perm_int64_inplace
 
     !
     !   Function: Kronecker_Delta
@@ -1374,6 +1495,23 @@ module Sparse
 
         integer, dimension(:), allocatable :: requires
         integer :: ind
+        
+        ! Graph communicator variables
+        integer, dimension(:), allocatable :: need_from, sends_to
+        integer, dimension(:), allocatable :: in_neighbor_list, out_neighbor_list
+        integer :: num_in, num_out
+        integer, dimension(:), allocatable :: requests
+        integer :: req_count
+        
+        ! Temporary storage for indices grouped by rank
+        integer, dimension(:), allocatable :: indices_per_rank
+        integer(dp), dimension(:,:), allocatable :: recv_indices_by_rank
+        integer, dimension(:), allocatable :: rank_counts
+        integer(dp), dimension(:), allocatable :: all_recv_indices
+        integer(dp), dimension(:), allocatable :: all_send_indices
+        integer(dp), dimension(:), allocatable :: temp_sorted
+        integer, dimension(:), allocatable :: temp_perm
+        integer :: owner
 
         call mpi_comm_size( mpi_communicator, &
                             flock, &
@@ -1386,6 +1524,10 @@ module Sparse
 
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
+        
+        ! Cache local bounds in CSR structure
+        A%lb = lb
+        A%ub = ub
 
         allocate(requires(partition_table(flock + 1) - 1))
 
@@ -1461,7 +1603,7 @@ module Sparse
             A%local_col_inds(i) = A%col_indexes(i)
         enddo
 
-        allocate(RHS_rec_inds(total_rec_inds))
+        allocate(RHS_rec_inds(max(total_rec_inds, 1)))
         RHS_rec_inds = 0
 
         do i = lb_elements, ub_elements
@@ -1498,7 +1640,7 @@ module Sparse
                             ierr)
 
         if (.not. associated(A%RHS_send_inds)) then
-            allocate(A%RHS_send_inds(sum(A%num_send_inds)))
+            allocate(A%RHS_send_inds(max(sum(A%num_send_inds), 1)))
         endif
 
         if (.not. associated(A%send_disps)) then
@@ -1525,6 +1667,146 @@ module Sparse
                             MPI_LONG, &
                             MPI_communicator, &
                             ierr)
+
+        ! =====================================================================
+        ! Graph Communicator Setup (MPI-3.0)
+        ! =====================================================================
+        ! This provides O(neighbors) scaling instead of O(ranks) for collectives
+        
+        ! Discover neighbors
+        allocate(need_from(flock))
+        allocate(sends_to(flock))
+        need_from = 0
+        sends_to = 0
+        
+        do j = 1, flock
+            if (A%num_rec_inds(j) > 0) then
+                need_from(j) = 1
+            end if
+            if (A%num_send_inds(j) > 0) then
+                sends_to(j) = 1
+            end if
+        end do
+        
+        ! Build neighbor lists
+        num_in = count(need_from > 0)
+        num_out = count(sends_to > 0)
+        
+        A%num_in_neighbors = num_in
+        A%num_out_neighbors = num_out
+        
+        allocate(in_neighbor_list(max(num_in, 1)))
+        allocate(out_neighbor_list(max(num_out, 1)))
+        
+        num_in = 0
+        num_out = 0
+        do j = 1, flock
+            if (need_from(j) > 0) then
+                num_in = num_in + 1
+                in_neighbor_list(num_in) = j - 1  ! 0-based rank
+            end if
+            if (sends_to(j) > 0) then
+                num_out = num_out + 1
+                out_neighbor_list(num_out) = j - 1
+            end if
+        end do
+        
+        if (.not. associated(A%in_neighbors)) then
+            allocate(A%in_neighbors(max(A%num_in_neighbors, 1)))
+        end if
+        if (.not. associated(A%out_neighbors)) then
+            allocate(A%out_neighbors(max(A%num_out_neighbors, 1)))
+        end if
+        
+        if (A%num_in_neighbors > 0) A%in_neighbors(1:A%num_in_neighbors) = in_neighbor_list(1:A%num_in_neighbors)
+        if (A%num_out_neighbors > 0) A%out_neighbors(1:A%num_out_neighbors) = out_neighbor_list(1:A%num_out_neighbors)
+        
+        ! Create graph communicator
+        call MPI_Dist_graph_create_adjacent(MPI_communicator, &
+            A%num_in_neighbors, in_neighbor_list, MPI_UNWEIGHTED, &
+            A%num_out_neighbors, out_neighbor_list, MPI_UNWEIGHTED, &
+            MPI_INFO_NULL, .false., A%graph_comm, ierr)
+        
+        ! Build graph-based counts and displacements (indexed by neighbor, not rank)
+        if (.not. associated(A%graph_recv_counts)) then
+            allocate(A%graph_recv_counts(max(A%num_in_neighbors, 1)))
+        end if
+        if (.not. associated(A%graph_recv_disps)) then
+            allocate(A%graph_recv_disps(max(A%num_in_neighbors, 1)))
+        end if
+        if (.not. associated(A%graph_send_counts)) then
+            allocate(A%graph_send_counts(max(A%num_out_neighbors, 1)))
+        end if
+        if (.not. associated(A%graph_send_disps)) then
+            allocate(A%graph_send_disps(max(A%num_out_neighbors, 1)))
+        end if
+        
+        ! Map from rank-indexed arrays to neighbor-indexed arrays
+        do j = 1, A%num_in_neighbors
+            A%graph_recv_counts(j) = A%num_rec_inds(in_neighbor_list(j) + 1)
+        end do
+        
+        do j = 1, A%num_out_neighbors
+            A%graph_send_counts(j) = A%num_send_inds(out_neighbor_list(j) + 1)
+        end do
+        
+        ! Compute displacements
+        if (A%num_in_neighbors > 0) then
+            A%graph_recv_disps(1) = 0
+            do j = 2, A%num_in_neighbors
+                A%graph_recv_disps(j) = A%graph_recv_disps(j-1) + A%graph_recv_counts(j-1)
+            end do
+        end if
+        
+        if (A%num_out_neighbors > 0) then
+            A%graph_send_disps(1) = 0
+            do j = 2, A%num_out_neighbors
+                A%graph_send_disps(j) = A%graph_send_disps(j-1) + A%graph_send_counts(j-1)
+            end do
+        end if
+        
+        A%total_recv = sum(A%num_rec_inds)
+        A%total_send = sum(A%num_send_inds)
+        
+        ! =====================================================================
+        ! Build sorted index array for O(unique_remote) binary search
+        ! =====================================================================
+        
+        if (.not. associated(A%recv_indices_sorted)) then
+            allocate(A%recv_indices_sorted(max(A%total_recv, 1)))
+        end if
+        if (.not. associated(A%sort_perm)) then
+            allocate(A%sort_perm(max(A%total_recv, 1)))
+        end if
+        
+        if (A%total_recv > 0) then
+            ! Copy recv indices and create initial permutation
+            A%recv_indices_sorted(1:A%total_recv) = RHS_rec_inds(1:A%total_recv)
+            do j = 1, A%total_recv
+                A%sort_perm(j) = j
+            end do
+            
+            ! Sort and track permutation
+            call sort_with_perm_int64_inplace(A%recv_indices_sorted, A%sort_perm, A%total_recv)
+        end if
+        
+        ! =====================================================================
+        ! Build send indices as local offsets (pre-subtracted lb)
+        ! =====================================================================
+        
+        if (.not. associated(A%send_local_offsets)) then
+            allocate(A%send_local_offsets(max(A%total_send, 1)))
+        end if
+        
+        if (A%total_send > 0) then
+            A%send_local_offsets(1:A%total_send) = A%RHS_send_inds(1:A%total_send) - lb
+        end if
+        
+        ! Cleanup temporaries
+        deallocate(requires)
+        deallocate(RHS_rec_inds)
+        deallocate(need_from, sends_to)
+        deallocate(in_neighbor_list, out_neighbor_list)
 
     end subroutine Reconcile_Communications
 
@@ -1695,80 +1977,125 @@ module Sparse
        complex(dp), intent(inout) :: v_local( partition_table(rank+1): &
                                               partition_table(rank+2)-1 )
     
-       complex(dp), allocatable, save :: u_resize(:)
        complex(dp), allocatable, save :: send_values(:), rec_values(:)
        integer,            save :: req = MPI_REQUEST_NULL
        logical,            save :: first_call = .true.
     
-       integer :: lb, ub, lb_resize, ub_resize
+       integer(dp) :: lb, ub
        integer :: num_send, num_rec
        integer :: i, j, ierr
+       integer :: sorted_pos, buf_pos
+       integer(dp) :: col
     
        if (start_it == 0 .and. max_it == 0) then
-          if (allocated(u_resize)) then
-             deallocate(u_resize, send_values, rec_values)
+          if (allocated(send_values)) then
+             deallocate(send_values, rec_values)
              first_call = .true.
           end if
           return
        end if
     
-       lb = partition_table(rank+1)
-       ub = partition_table(rank+2)-1
+       lb = A%lb
+       ub = A%ub
     
-       num_rec  = sum(A%num_rec_inds)
-       num_send = sum(A%num_send_inds)
+       num_rec  = A%total_recv
+       num_send = A%total_send
     
-       lb_resize = ub + 1
-       ub_resize = ub + num_rec
-    
-       if ( first_call .or. .not.allocated(u_resize) .or. size(u_resize) /= ub_resize-lb+1 ) then
-          if (allocated(u_resize)) deallocate(u_resize, send_values, rec_values)
-          allocate(u_resize(lb:ub_resize), send_values(num_send), rec_values(num_rec))
+       if ( first_call .or. .not.allocated(send_values) ) then
+          if (allocated(send_values)) deallocate(send_values, rec_values)
+          allocate(send_values(max(num_send, 1)), rec_values(max(num_rec, 1)))
           first_call = .false.
        end if
     
-       u_resize(lb:ub) = u_local
-    
+       ! Pack send buffer using pre-computed local offsets
        !$omp parallel do default(shared) schedule(static)
-        do i = 1, num_send
-             send_values(i) = u_resize( A%RHS_send_inds(i) )
-        end do
+       do i = 1, num_send
+            send_values(i) = u_local( A%send_local_offsets(i) + lb )
+       end do
        !$omp end parallel do
     
-       call MPI_Ialltoallv( send_values, A%num_send_inds, A%send_disps, MPI_DOUBLE_COMPLEX, &
-                            rec_values,  A%num_rec_inds,  A%rec_disps,  MPI_DOUBLE_COMPLEX, &
-                            mpi_communicator, req, ierr )
+       ! Use graph communicator for O(neighbors) scaling
+       if (A%graph_comm /= MPI_COMM_NULL .and. A%num_in_neighbors > 0) then
+          call MPI_Ineighbor_alltoallv( &
+               send_values, A%graph_send_counts, A%graph_send_disps, MPI_DOUBLE_COMPLEX, &
+               rec_values,  A%graph_recv_counts, A%graph_recv_disps, MPI_DOUBLE_COMPLEX, &
+               A%graph_comm, req, ierr )
+       else if (A%graph_comm /= MPI_COMM_NULL) then
+          ! No neighbors - no communication needed
+          req = MPI_REQUEST_NULL
+       else
+          ! Fallback to old Alltoallv (should not happen after Reconcile_Communications)
+          call MPI_Ialltoallv( send_values, A%num_send_inds, A%send_disps, MPI_DOUBLE_COMPLEX, &
+                               rec_values,  A%num_rec_inds,  A%rec_disps,  MPI_DOUBLE_COMPLEX, &
+                               mpi_communicator, req, ierr )
+       end if
     
        v_local = (0.0_dp, 0.0_dp)
     
-       ! local contribution while waiting for remote
-       !$omp parallel do default(shared) private(j) schedule(static)
+       ! Local contribution while waiting for remote data
+       if (A%is_unit_valued) then
+          ! Unit-valued optimization: skip multiplication
+          !$omp parallel do default(shared) private(j, col) schedule(static)
+          do i = lb, ub
+             do j = A%row_starts(i), A%row_starts(i+1)-1
+                col = A%col_indexes(j)
+                if (col >= lb .and. col <= ub) then
+                   v_local(i) = v_local(i) + u_local(col)
+                end if
+             end do
+          end do
+          !$omp end parallel do
+       else
+          ! General case: multiply by value
+          !$omp parallel do default(shared) private(j) schedule(static)
           do i = lb, ub
              do j = A%row_starts(i), A%row_starts(i+1)-1
                 if (A%local_col_inds(j) <= ub) then
-                   v_local(i) = v_local(i) + A%values(j) * u_resize( A%local_col_inds(j) )
+                   v_local(i) = v_local(i) + A%values(j) * u_local( A%local_col_inds(j) )
                 end if
              end do
           end do
-       !$omp end parallel do
+          !$omp end parallel do
+       end if
     
-       call MPI_Wait( req, MPI_STATUS_IGNORE, ierr )
+       ! Wait for communication to complete
+       if (req /= MPI_REQUEST_NULL) then
+          call MPI_Wait( req, MPI_STATUS_IGNORE, ierr )
+       end if
     
-       if (num_rec > 0) u_resize(lb_resize:ub_resize) = rec_values
-    
-       ! remote contribution
-       !$omp parallel do default(shared) private(j) schedule(static)
-          do i = lb, ub
-             do j = A%row_starts(i), A%row_starts(i+1)-1
-                if (A%local_col_inds(j) > ub) then
-                   v_local(i) = v_local(i) + A%values(j) * u_resize( A%local_col_inds(j) )
-                end if
+       ! Remote contribution using binary search for O(unique_remote) memory
+       if (num_rec > 0) then
+          if (A%is_unit_valued) then
+             ! Unit-valued optimization: skip multiplication
+             !$omp parallel do default(shared) private(j, col, sorted_pos, buf_pos) schedule(static)
+             do i = lb, ub
+                do j = A%row_starts(i), A%row_starts(i+1)-1
+                   col = A%col_indexes(j)
+                   if (col < lb .or. col > ub) then
+                      sorted_pos = binary_search_int64(A%recv_indices_sorted(1:num_rec), col)
+                      buf_pos = A%sort_perm(sorted_pos)
+                      v_local(i) = v_local(i) + rec_values(buf_pos)
+                   end if
+                end do
              end do
-          end do
-       !$omp end parallel do
+             !$omp end parallel do
+          else
+             ! General case: use local_col_inds remapping and multiply
+             !$omp parallel do default(shared) private(j) schedule(static)
+             do i = lb, ub
+                do j = A%row_starts(i), A%row_starts(i+1)-1
+                   if (A%local_col_inds(j) > ub) then
+                      ! Map from local_col_inds to recv buffer position
+                      v_local(i) = v_local(i) + A%values(j) * rec_values( A%local_col_inds(j) - ub )
+                   end if
+                end do
+             end do
+             !$omp end parallel do
+          end if
+       end if
     
        if (current_it == max_it) then
-          deallocate(u_resize, send_values, rec_values)
+          deallocate(send_values, rec_values)
           first_call = .true.
        end if
     end subroutine SpMV_Series

@@ -201,9 +201,41 @@ contains
             deallocate (self%generator%send_disps)
             deallocate (self%generator%num_rec_inds)
             deallocate (self%generator%rec_disps)
-            
-            !call MPI_Comm_free(self%generator%MPI_graph_communicator, ierr)
 
+        end if
+        
+        ! Free graph communicator resources
+        if (self%generator%graph_comm /= MPI_COMM_NULL) then
+            call MPI_Comm_free(self%generator%graph_comm, ierr)
+            self%generator%graph_comm = MPI_COMM_NULL
+        end if
+        
+        if (associated(self%generator%in_neighbors)) then
+            deallocate(self%generator%in_neighbors)
+        end if
+        if (associated(self%generator%out_neighbors)) then
+            deallocate(self%generator%out_neighbors)
+        end if
+        if (associated(self%generator%graph_send_counts)) then
+            deallocate(self%generator%graph_send_counts)
+        end if
+        if (associated(self%generator%graph_send_disps)) then
+            deallocate(self%generator%graph_send_disps)
+        end if
+        if (associated(self%generator%graph_recv_counts)) then
+            deallocate(self%generator%graph_recv_counts)
+        end if
+        if (associated(self%generator%graph_recv_disps)) then
+            deallocate(self%generator%graph_recv_disps)
+        end if
+        if (associated(self%generator%recv_indices_sorted)) then
+            deallocate(self%generator%recv_indices_sorted)
+        end if
+        if (associated(self%generator%sort_perm)) then
+            deallocate(self%generator%sort_perm)
+        end if
+        if (associated(self%generator%send_local_offsets)) then
+            deallocate(self%generator%send_local_offsets)
         end if
 
         self%generator%row_starts => null()
