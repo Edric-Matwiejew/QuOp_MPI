@@ -16,8 +16,7 @@ module csr_generators
                                 lb, &
                                 ub, &
                                 row_starts, &
-                                col_indexes, &
-                                values)
+                                col_indexes)
         
         
             integer(dp), intent(in) :: N
@@ -25,7 +24,6 @@ module csr_generators
             integer(dp), intent(in) :: ub
             integer(dp), target, dimension(ub - lb + 2), intent(out) :: row_starts
             integer(dp), target, dimension(N*(lb - 1) + 1 : N*ub), intent(out) :: col_indexes
-            complex(dp), target, dimension(N*(lb - 1) + 1 : N*ub), intent(out) :: values
         
             integer(dp) :: local_rows
             integer(dp) :: columns
@@ -83,7 +81,6 @@ module csr_generators
                 row_starts(i + 1) = row_starts(i + 1) + row_starts(i)
             enddo
         
-            values(:) = cmplx(1.0_dp, 0.0_dp, dp)
         end subroutine hypercube
 
     subroutine qmoa_mixer(  local_i, &

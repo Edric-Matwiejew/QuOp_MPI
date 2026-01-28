@@ -62,11 +62,12 @@ def hypercube(
 
     n_qubits = np.log2(system_size)
 
-    W_row_starts, W_col_indexes, W_values = csr_generators.hypercube(
+    W_row_starts, W_col_indexes = csr_generators.hypercube(
         n_qubits, lb + 1, ub 
     )
 
-    return [W_row_starts], [W_col_indexes], [W_values]
+    # Hypercube is always unit-valued, so we return None for values
+    return [W_row_starts], [W_col_indexes], None
 
 
 def serial(
@@ -151,7 +152,10 @@ def serial(
         col_indexes = None
         values = None
 
-    return __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
+    W_row_starts, W_col_indexes, W_values, is_unit_valued = __scatter_sparse(
+        row_starts, col_indexes, values, partition_table, MPI_COMM
+    )
+    return W_row_starts, W_col_indexes, W_values, is_unit_valued
 
 def qmoa_mixer(local_i, local_i_offset, Ns, Gs): 
 

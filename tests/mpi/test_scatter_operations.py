@@ -367,7 +367,7 @@ class TestScatterSparse:
             col_indexes = None
             values = None
 
-        W_row_starts, W_col_indexes, W_values = scatter_sparse(
+        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
@@ -375,6 +375,7 @@ class TestScatterSparse:
         assert len(W_row_starts) == 1
         assert len(W_col_indexes) == 1
         assert len(W_values) == 1
+        assert is_unit_valued == False  # We passed explicit values
 
         local_i = partition_table[rank + 1] - partition_table[rank]
 
@@ -413,7 +414,7 @@ class TestScatterSparse:
 
         original_data = mpi_comm.bcast(original_data, root=0)
 
-        W_row_starts, W_col_indexes, W_values = scatter_sparse(
+        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
@@ -455,7 +456,7 @@ class TestScatterSparse:
             col_indexes = None
             values = None
 
-        W_row_starts, W_col_indexes, W_values = scatter_sparse(
+        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
@@ -496,7 +497,7 @@ class TestScatterSparse:
             values = None
 
         # Should not raise even with empty rows
-        W_row_starts, W_col_indexes, W_values = scatter_sparse(
+        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 

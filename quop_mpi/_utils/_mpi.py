@@ -25,7 +25,28 @@ def __scatter_1D_array(array, partition_table, MPI_COMM, dtype):
 
 
 def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM):
-
+    """Scatter sparse CSR matrix data to all ranks.
+    
+    Parameters
+    ----------
+    row_starts : list[ndarray] or None
+        List of row_starts arrays (one per matrix term), only on rank 0
+    col_indexes : list[ndarray] or None  
+        List of col_indexes arrays, only on rank 0
+    values : list[ndarray] or None
+        List of values arrays, only on rank 0. If None or contains None,
+        the matrix is unit-valued (all non-zeros are 1.0).
+    partition_table : ndarray
+        Partition table for distribution
+    MPI_COMM : MPI.Comm
+        MPI communicator
+        
+    Returns
+    -------
+    tuple
+        (W_row_starts, W_col_indexes, W_values, is_unit_valued)
+        W_values will be None if is_unit_valued is True
+    """
     rank = MPI_COMM.Get_rank()
     size = MPI_COMM.Get_size()
 
@@ -34,12 +55,21 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
     if rank == 0:
         n_terms = MPI_COMM.bcast(len(row_starts), 0)
+        # Check if unit-valued: values is None or all values are 1.0
+        if values is None:
+            is_unit_valued = True
+        else:
+            is_unit_valued = all(
+                v is None or np.allclose(v, 1.0) for v in values
+            )
+        is_unit_valued = MPI_COMM.bcast(is_unit_valued, 0)
     else:
         n_terms = MPI_COMM.bcast(None, 0)
+        is_unit_valued = MPI_COMM.bcast(None, 0)
 
     W_row_starts = []
     W_col_indexes = []
-    W_values = []
+    W_values = [] if not is_unit_valued else None
 
     for i in range(n_terms):
 
@@ -60,7 +90,8 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
         n_local_nnz = W_row_starts[-1][-1] - W_row_starts[-1][0]
 
         W_col_indexes.append(np.empty(n_local_nnz, dtype=np.int64))
-        W_values.append(np.empty(n_local_nnz, np.complex128))
+        if not is_unit_valued:
+            W_values.append(np.empty(n_local_nnz, np.complex128))
 
         counts = np.zeros(size, int)
         counts[rank] = n_local_nnz
@@ -74,20 +105,25 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
         if rank == 0:
             send_indexes = [col_indexes[i].astype(np.int64), counts, disps, MPI.LONG]
-            send_values = [
-                values[i].astype(np.complex128),
-                counts,
-                disps,
-                MPI.DOUBLE_COMPLEX,
-            ]
         else:
-            send_indexes = None  # [None, counts, disps, MPI.INT]
-            send_values = None  # [None, counts, disps, MPI.DOUBLE_COMPLEX]
+            send_indexes = None
 
         MPI_COMM.Scatterv(send_indexes, W_col_indexes[-1], 0)
-        MPI_COMM.Scatterv(send_values, W_values[-1], 0)
+        
+        # Only scatter values if not unit-valued
+        if not is_unit_valued:
+            if rank == 0:
+                send_values = [
+                    values[i].astype(np.complex128),
+                    counts,
+                    disps,
+                    MPI.DOUBLE_COMPLEX,
+                ]
+            else:
+                send_values = None
+            MPI_COMM.Scatterv(send_values, W_values[-1], 0)
 
-    return W_row_starts, W_col_indexes, W_values
+    return W_row_starts, W_col_indexes, W_values, is_unit_valued
 
 
 def shrink_communicator(newsize, colours, COMM, COMM_OPT, COMM_JAC, jac_ranks):

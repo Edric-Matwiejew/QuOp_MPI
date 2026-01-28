@@ -4,6 +4,20 @@
 Changelog
 =========
 
+Version 1.5.0 (2026-01-28)
+==========================
+
+Added
+-----
+
+- Chebyshev polynomial expansion for sparse matrix exponentiation, replacing scaling-and-squaring method
+- Unit-valued sparse propagator optimization: automatically detects matrices where all non-zero entries are 1.0 and skips value storage/computation for improved performance
+
+Fixed
+-----
+
+- Sparse propagator crash when running with single MPI rank (uninitialized arrays in graph communicator setup)
+
 Version 1.4.0 (2026-01-27)
 ==========================
 

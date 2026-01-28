@@ -9,7 +9,7 @@ from setuptools import find_packages
 
 setup(
     name="QuOp_MPI",
-    version="1.4.0",
+    version="1.5.0",
     description="A parallel framework for the design and simulation of quantum variational algorithms.",
     packages=find_packages(where="."),
     cmake_languages=["Fortran", "C"],

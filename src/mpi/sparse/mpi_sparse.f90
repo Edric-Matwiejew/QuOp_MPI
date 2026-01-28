@@ -5,8 +5,7 @@ module mpi_sparse
     use mpi
     use mpi_backend
     use sparse
-    use one_norms
-    use expm
+    use chebyshev
 
     implicit none
 
@@ -14,16 +13,12 @@ module mpi_sparse
 
     public :: sparse_propagator
 
-    integer(sp), parameter :: p_max = 8
-
     type sparse_propagator
 
         type(mpi_context), pointer :: context
         integer(sp), dimension(:), allocatable :: partition_table
         type(CSR) :: generator
-        integer(sp) :: m_star
-        integer(sp) :: s
-        real(dp), dimension(p_max + 1) :: one_norm_series
+        real(dp) :: spectral_radius
 
     contains
 
@@ -78,22 +73,30 @@ contains
         integer(dp), dimension(:), pointer :: local_col_indexes
         complex(dp), dimension(:), pointer :: local_values
 
-        type(CSR) :: generator_T
-
-        integer(sp), parameter :: l = 3
-        integer(sp) :: itmax, i, p
-
-        integer(sp) :: lb, ub, lb_elements, ub_elements
+        integer(sp) :: i, lb, ub, lb_elements, ub_elements
+        integer(sp) :: n_arrays
 
         integer(sp) :: ierr, rank, flock
+
+        ! Determine if values are provided (3 arrays) or implicit ones (2 arrays)
+        n_arrays = size(array_sizes)
 
         ! map array pointers to original inputs
         array_ptr = transfer(array_ptrs(1), array_ptr)
         call c_f_pointer(array_ptr, local_row_starts, [array_sizes(1)])
         array_ptr = transfer(array_ptrs(2), array_ptr)
         call c_f_pointer(array_ptr, local_col_indexes, [array_sizes(2)])
-        array_ptr = transfer(array_ptrs(3), array_ptr)
-        call c_f_pointer(array_ptr, local_values, [array_sizes(3)])
+        
+        if (n_arrays >= 3) then
+            ! Explicit values provided
+            array_ptr = transfer(array_ptrs(3), array_ptr)
+            call c_f_pointer(array_ptr, local_values, [array_sizes(3)])
+            self%generator%has_values = .true.
+        else
+            ! Implicit ones - no values array
+            nullify(local_values)
+            self%generator%has_values = .false.
+        end if
 
         ! moved from plan
         call MPI_Comm_size(self%context%SUBCOMM, flock, ierr)
@@ -128,32 +131,23 @@ contains
         self%generator%columns = self%context%system_size
         self%generator%row_starts(lb:ub + 1) => local_row_starts
         self%generator%col_indexes(lb_elements:ub_elements) => local_col_indexes
-        self%generator%values(lb_elements:ub_elements) => local_values
-
-        self%generator%values = -cmplx(0.0_dp, 1.0_dp)*self%generator%values
-
-        call Reconcile_Communications(self%generator, self%partition_table, self%context%SUBCOMM)
         
-        call One_Norm(self%generator, &
-                      self%one_norm_series(1), &
-                      self%partition_table, &
-                      self%context%SUBCOMM)
+        if (self%generator%has_values) then
+            self%generator%values(lb_elements:ub_elements) => local_values
+            ! Note: Unlike expm, Chebyshev expects Hermitian H, not -i*H.
+            ! The -i factors are in the Bessel coefficients.
+        else
+            nullify(self%generator%values)
+        end if
+
+        ! Setup graph communicator for efficient SpMV
+        call Setup_Graph_Communications(self%generator, self%partition_table, self%context%SUBCOMM)
         
-        p = p_max
-
-        itmax = self%generator%columns/l
-
-        do i = 2, p_max + 1
-
-            call One_Norm_Estimation(self%generator, &
-                                     self%generator, &
-                                     i, &
-                                     l, &
-                                     itmax, &
-                                     self%partition_table, &
-                                     self%one_norm_series(i), &
-                                     self%context%SUBCOMM)
-        end do
+        ! Estimate spectral radius for Chebyshev expansion
+        call Estimate_Spectral_Radius(self%generator, &
+                                      self%partition_table, &
+                                      self%context%SUBCOMM, &
+                                      self%spectral_radius)
 
     end subroutine mpi_sparse_gen_operator
 
@@ -162,22 +156,17 @@ contains
         class(sparse_propagator), intent(inout) :: self
         real(dp), intent(in) :: ts(:)
         real(dp) :: t
-        integer(sp) :: p
         complex(dp), dimension(:), pointer :: ptr_tmp
-
-        p = 8
 
         t = ts(1)
 
-        call expm_multiply(self%generator, &
-                           self%context%initial_state, &
-                           t, &
-                           self%partition_table, &
-                           self%context%final_state, &
-                           self%context%SUBCOMM, &
-                           self%one_norm_series, &
-                           p, &
-                          "dp")
+        call Chebyshev_Multiply(self%generator, &
+                                self%context%initial_state, &
+                                t, &
+                                self%partition_table, &
+                                self%context%final_state, &
+                                self%context%SUBCOMM, &
+                                self%spectral_radius)
 
         ptr_tmp => self%context%initial_state
         self%context%initial_state => self%context%final_state
@@ -193,18 +182,9 @@ contains
         if (allocated(self%partition_table)) then
             deallocate (self%partition_table)
         end if
-
-        if (associated(self%generator%local_col_inds)) then
-            deallocate (self%generator%local_col_inds)
-            deallocate (self%generator%RHS_send_inds)
-            deallocate (self%generator%num_send_inds)
-            deallocate (self%generator%send_disps)
-            deallocate (self%generator%num_rec_inds)
-            deallocate (self%generator%rec_disps)
-            
-            !call MPI_Comm_free(self%generator%MPI_graph_communicator, ierr)
-
-        end if
+        
+        ! Free graph communicator resources
+        call Cleanup_Graph_Communications(self%generator)
 
         self%generator%row_starts => null()
         self%generator%col_indexes => null()

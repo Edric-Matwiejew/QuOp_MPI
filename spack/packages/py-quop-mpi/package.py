@@ -9,7 +9,7 @@ class PyQuopMpi(PythonPackage):
     quantum variational algorithms."""
 
     homepage = "https://github.com/Edric-Matwiejew/QuOp_MPI"
-    url = "https://github.com/Edric-Matwiejew/QuOp_MPI/archive/refs/tags/v1.4.0.tar.gz"
+    url = "https://github.com/Edric-Matwiejew/QuOp_MPI/archive/refs/tags/v1.5.0.tar.gz"
     git = "https://github.com/Edric-Matwiejew/QuOp_MPI.git"
 
     maintainers("Edric-Matwiejew")
@@ -17,6 +17,10 @@ class PyQuopMpi(PythonPackage):
     license("GPL-3.0-only")
 
     version("main", branch="main")
+    version(
+        "1.5.0",
+        sha256="FIXME",  # TODO: Update with actual checksum after release
+    )
     version(
         "1.4.0",
         sha256="d999bf16187a0300b0bff0fe56c5d3a5966bc9e93381935e47cbbbc299d2ed56",

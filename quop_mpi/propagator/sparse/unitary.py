@@ -72,20 +72,36 @@ class unitary(Unitary):
         pass
 
     def gen_operator(self, *args):
+        import sys
 
         for propagator in self.propagators:
             propagator.plan(self.context)
 
         super().gen_operator(*args)
 
-        self.W_row_starts, self.W_col_indexes, self.W_values = self.operator
+        # Unpack operator result - may have 3 or 4 elements depending on source
+        if len(self.operator) == 4:
+            self.W_row_starts, self.W_col_indexes, self.W_values, self.is_unit_valued = self.operator
+        else:
+            self.W_row_starts, self.W_col_indexes, self.W_values = self.operator
+            # Detect unit-valued from None values
+            self.is_unit_valued = self.W_values is None
 
         for i, propagator in enumerate(self.propagators):
-            operator_args = [
-                self.W_row_starts[i],
-                self.W_col_indexes[i],
-                self.W_values[i],
-            ]
+            if self.is_unit_valued:
+                # Unit-valued matrix: only pass row_starts and col_indexes
+                # Fortran will detect this and set has_values = .false.
+                operator_args = [
+                    self.W_row_starts[i],
+                    self.W_col_indexes[i],
+                ]
+            else:
+                # Full matrix with explicit values
+                operator_args = [
+                    self.W_row_starts[i],
+                    self.W_col_indexes[i],
+                    self.W_values[i],
+                ]
             propagator.gen_operator(operator_args)
 
     def propagate(self, ts):

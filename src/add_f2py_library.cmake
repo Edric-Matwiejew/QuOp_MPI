@@ -155,7 +155,7 @@ function(add_f2py_library)
 
   install(
     TARGETS "${f2py_target_name}"
-    DESTINATION "quop_mpi/__lib/${F2PY_LIBRARY_INSTALL_SUBDIR}"
+    DESTINATION "quop_mpi/_lib/${F2PY_LIBRARY_INSTALL_SUBDIR}"
   )
 
   if(NOT DEFINED Python3_EXECUTABLE)

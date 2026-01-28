@@ -235,7 +235,7 @@ module Expm
                             A_T, &
                             MPI_communicator)
 
-            call Reconcile_Communications(  A_T, &
+            call Setup_Graph_Communications(A_T, &
                                             partition_table, &
                                             MPI_communicator)
 
@@ -535,12 +535,63 @@ module Expm
         A_temp%rows = A%rows
         A_temp%columns = A%columns
         A_temp%row_starts => A%row_starts
-        A_temp%local_col_inds => A%local_col_inds
-        A_temp%RHS_send_inds => A%RHS_send_inds
-        A_temp%num_send_inds => A%num_send_inds
-        A_temp%send_disps => A%send_disps
-        A_temp%num_rec_inds => A%num_rec_inds
-        A_temp%rec_disps => A%rec_disps
+        A_temp%col_indexes => A%col_indexes
+        ! Share graph communicator data - copy scalars
+        A_temp%graph_comm = A%graph_comm
+        A_temp%total_recv = A%total_recv
+        A_temp%total_send = A%total_send
+        A_temp%hash_size = A%hash_size
+        A_temp%lb_graph = A%lb_graph
+        A_temp%ub_graph = A%ub_graph
+        A_temp%graph_comm_ready = A%graph_comm_ready
+        A_temp%col_indexes => A%col_indexes
+        
+        ! Copy allocatable graph comm arrays (shallow copy for arrays we don't modify)
+        if (allocated(A%recv_indices_sorted)) then
+            allocate(A_temp%recv_indices_sorted, source=A%recv_indices_sorted)
+        end if
+        if (allocated(A%sort_perm)) then
+            allocate(A_temp%sort_perm, source=A%sort_perm)
+        end if
+        if (allocated(A%graph_recv_counts)) then
+            allocate(A_temp%graph_recv_counts, source=A%graph_recv_counts)
+        end if
+        if (allocated(A%graph_recv_disps)) then
+            allocate(A_temp%graph_recv_disps, source=A%graph_recv_disps)
+        end if
+        if (allocated(A%send_offsets)) then
+            allocate(A_temp%send_offsets, source=A%send_offsets)
+        end if
+        if (allocated(A%graph_send_counts)) then
+            allocate(A_temp%graph_send_counts, source=A%graph_send_counts)
+        end if
+        if (allocated(A%graph_send_disps)) then
+            allocate(A_temp%graph_send_disps, source=A%graph_send_disps)
+        end if
+        if (allocated(A%in_neighbors)) then
+            allocate(A_temp%in_neighbors, source=A%in_neighbors)
+        end if
+        if (allocated(A%out_neighbors)) then
+            allocate(A_temp%out_neighbors, source=A%out_neighbors)
+        end if
+        if (allocated(A%hash_keys)) then
+            allocate(A_temp%hash_keys, source=A%hash_keys)
+        end if
+        if (allocated(A%hash_vals)) then
+            allocate(A_temp%hash_vals, source=A%hash_vals)
+        end if
+        if (allocated(A%send_buf)) then
+            allocate(A_temp%send_buf, source=A%send_buf)
+        end if
+        if (allocated(A%recv_buf)) then
+            allocate(A_temp%recv_buf, source=A%recv_buf)
+        end if
+        if (allocated(A%row_starts_local)) then
+            allocate(A_temp%row_starts_local, source=A%row_starts_local)
+        end if
+        if (allocated(A%col_indexes_local)) then
+            allocate(A_temp%col_indexes_local, source=A%col_indexes_local)
+        end if
 
         allocate(A_temp%values(A%row_starts(partition_table(rank + 1)): &
             A%row_starts(partition_table(rank + 2)) - 1))
@@ -549,6 +600,12 @@ module Expm
                 A%row_starts(ubound(A%row_starts, 1)) - 1
             A_temp%values(i) = t*A%values(i)
         enddo
+        
+        ! Create scaled values_local for SpMV_Graph
+        if (allocated(A%values_local)) then
+            allocate(A_temp%values_local(size(A%values_local)))
+            A_temp%values_local = t * A%values_local
+        end if
 
         B_temp_1(lb:ub) = B(lb:ub)
         C(lb:ub) = B(lb:ub)
@@ -559,15 +616,12 @@ module Expm
 
             do j = 1, m_star
 
-                call SpMV_Series(   A_temp, &
-                                    B_temp_1, &
-                                    partition_table, &
-                                    1, &
-                                    j, &
-                                    m_star, &
-                                    rank, &
-                                    B_temp_2, &
-                                    mpi_communicator)
+                call SpMV_Graph(A_temp, &
+                                B_temp_1(lb:ub), &
+                                partition_table, &
+                                rank, &
+                                B_temp_2(lb:ub), &
+                                mpi_communicator=mpi_communicator)
 
                 B_temp_2(lb:ub) = B_temp_2(lb:ub)/real(s*j, dp)
 
@@ -590,16 +644,23 @@ module Expm
 
         enddo
 
-        ! Final call to deallocate saved arrays.
-        call SpMV_Series(   A_temp, &
-                            B_temp_1, &
-                            partition_table, &
-                            0, &
-                            0, &
-                            0, &
-                            rank, &
-                            B_temp_2, &
-                            mpi_communicator)
+        ! Cleanup A_temp allocatable graph comm arrays
+        if (allocated(A_temp%recv_indices_sorted)) deallocate(A_temp%recv_indices_sorted)
+        if (allocated(A_temp%sort_perm)) deallocate(A_temp%sort_perm)
+        if (allocated(A_temp%graph_recv_counts)) deallocate(A_temp%graph_recv_counts)
+        if (allocated(A_temp%graph_recv_disps)) deallocate(A_temp%graph_recv_disps)
+        if (allocated(A_temp%send_offsets)) deallocate(A_temp%send_offsets)
+        if (allocated(A_temp%graph_send_counts)) deallocate(A_temp%graph_send_counts)
+        if (allocated(A_temp%graph_send_disps)) deallocate(A_temp%graph_send_disps)
+        if (allocated(A_temp%in_neighbors)) deallocate(A_temp%in_neighbors)
+        if (allocated(A_temp%out_neighbors)) deallocate(A_temp%out_neighbors)
+        if (allocated(A_temp%hash_keys)) deallocate(A_temp%hash_keys)
+        if (allocated(A_temp%hash_vals)) deallocate(A_temp%hash_vals)
+        if (allocated(A_temp%send_buf)) deallocate(A_temp%send_buf)
+        if (allocated(A_temp%recv_buf)) deallocate(A_temp%recv_buf)
+        if (allocated(A_temp%row_starts_local)) deallocate(A_temp%row_starts_local)
+        if (allocated(A_temp%col_indexes_local)) deallocate(A_temp%col_indexes_local)
+        if (allocated(A_temp%values_local)) deallocate(A_temp%values_local)
 
         deallocate(A_temp%values)
 
@@ -771,15 +832,12 @@ module Expm
 
                     if (p > m_hat) then
 
-                        call SpMV_series(   A, &
-                                            K(:, p), &
-                                            partition_table, &
-                                            1, &
-                                            p, &
-                                            m_star, &
-                                            rank, &
-                                            K(:, p + 1), &
-                                            MPI_communicator)
+                        call SpMV_Graph(A, &
+                                        K(:, p), &
+                                        partition_table, &
+                                        rank, &
+                                        K(:, p + 1), &
+                                        mpi_communicator=MPI_communicator)
 
                         K(:, p + 1) = h*K(:, p+1)/real(p,dp)
 
