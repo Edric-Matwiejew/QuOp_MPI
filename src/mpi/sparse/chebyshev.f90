@@ -121,16 +121,27 @@ contains
             diag_element = 0.0_dp
             row_sum = 0.0_dp
 
-            do j = start_j, end_j
-                if (A%col_indexes(j) == global_row) then
-                    ! Diagonal element - take magnitude
-                    ! For A = -i*H, the diagonal of H is i*A_ii
-                    diag_element = abs(A%values(j))
-                else
-                    ! Off-diagonal element
-                    row_sum = row_sum + abs(A%values(j))
-                end if
-            end do
+            if (A%has_values) then
+                do j = start_j, end_j
+                    if (A%col_indexes(j) == global_row) then
+                        ! Diagonal element - take magnitude
+                        ! For A = -i*H, the diagonal of H is i*A_ii
+                        diag_element = abs(A%values(j))
+                    else
+                        ! Off-diagonal element
+                        row_sum = row_sum + abs(A%values(j))
+                    end if
+                end do
+            else
+                ! Implicit ones: all nonzeros have value 1
+                do j = start_j, end_j
+                    if (A%col_indexes(j) == global_row) then
+                        diag_element = 1.0_dp
+                    else
+                        row_sum = row_sum + 1.0_dp
+                    end if
+                end do
+            end if
 
             local_bound = diag_element + row_sum
             local_max = max(local_max, local_bound)

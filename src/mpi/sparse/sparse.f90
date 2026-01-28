@@ -76,6 +76,8 @@ module Sparse
         complex(dp), dimension(:), allocatable :: values_local
         ! Flag to indicate if graph comm is set up
         logical :: graph_comm_ready = .false.
+        ! Flag to indicate if values are explicit (false = all ones)
+        logical :: has_values = .true.
 
     end type CSR
 
@@ -622,6 +624,7 @@ module Sparse
 
     !--------------------------------------------------------------------------
     ! SpMV using graph communicator and prebuilt hash table
+    ! values is optional - if not present, assumes all nonzeros are 1
     !--------------------------------------------------------------------------
     subroutine spmv(row_starts, col_indexes, u, v, scalar, &
                                  graph_comm, &
@@ -648,7 +651,7 @@ module Sparse
         integer(int64), intent(in) :: hash_keys(:)
         integer(int64), intent(in) :: hash_vals(:)
         integer(int64), intent(in) :: hash_size
-        complex(dp), intent(in) :: values(:)
+        complex(dp), intent(in), optional :: values(:)
         
         integer :: ierr, request
         integer(int64) :: i, n_local, col, start_j, end_j, j
@@ -656,8 +659,10 @@ module Sparse
         complex(dp) :: row_sum
         integer :: status(MPI_STATUS_SIZE)
         complex(dp), allocatable :: recv_buf_sorted(:)
+        logical :: has_values
         
         n_local = ub - lb + 1
+        has_values = present(values)
         
         ! Pack send buffer
         !$omp parallel do
@@ -672,23 +677,43 @@ module Sparse
                                      graph_comm, request, ierr)
         
         ! Compute LOCAL contributions while communication proceeds
-        !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end)
-        do i = 1, n_local
-            start_j = row_starts(i)
-            end_j = row_starts(i + 1) - 1
-            row_sum = (0.0_dp, 0.0_dp)
-            
-            local_start = lower_bound(col_indexes, start_j, end_j, lb)
-            local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
-            
-            do j = local_start, local_end
-                col = col_indexes(j)
-                row_sum = row_sum + values(j) * u(col - lb + 1)
+        if (has_values) then
+            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end)
+            do i = 1, n_local
+                start_j = row_starts(i)
+                end_j = row_starts(i + 1) - 1
+                row_sum = (0.0_dp, 0.0_dp)
+                
+                local_start = lower_bound(col_indexes, start_j, end_j, lb)
+                local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
+                
+                do j = local_start, local_end
+                    col = col_indexes(j)
+                    row_sum = row_sum + values(j) * u(col - lb + 1)
+                end do
+                
+                v(i) = row_sum
             end do
-            
-            v(i) = row_sum
-        end do
-        !$omp end parallel do
+            !$omp end parallel do
+        else
+            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end)
+            do i = 1, n_local
+                start_j = row_starts(i)
+                end_j = row_starts(i + 1) - 1
+                row_sum = (0.0_dp, 0.0_dp)
+                
+                local_start = lower_bound(col_indexes, start_j, end_j, lb)
+                local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
+                
+                do j = local_start, local_end
+                    col = col_indexes(j)
+                    row_sum = row_sum + u(col - lb + 1)
+                end do
+                
+                v(i) = row_sum
+            end do
+            !$omp end parallel do
+        end if
         
         ! Wait for communication
         call MPI_Wait(request, status, ierr)
@@ -702,45 +727,87 @@ module Sparse
         !$omp end parallel do
         
         ! Add REMOTE contributions
-        !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, sorted_pos)
-        do i = 1, n_local
-            start_j = row_starts(i)
-            end_j = row_starts(i + 1) - 1
-            
-            if (start_j > end_j) then
-                v(i) = scalar * v(i)
-                cycle
-            end if
-            
-            if (col_indexes(start_j) >= lb .and. col_indexes(end_j) <= ub) then
-                v(i) = scalar * v(i)
-                cycle
-            end if
-            
-            row_sum = v(i)
-            
-            local_start = lower_bound(col_indexes, start_j, end_j, lb)
-            local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
-            
-            do j = start_j, local_start - 1
-                col = col_indexes(j)
-                sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
-                if (sorted_pos > 0) then
-                    row_sum = row_sum + values(j) * recv_buf_sorted(sorted_pos)
+        if (has_values) then
+            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, sorted_pos)
+            do i = 1, n_local
+                start_j = row_starts(i)
+                end_j = row_starts(i + 1) - 1
+                
+                if (start_j > end_j) then
+                    v(i) = scalar * v(i)
+                    cycle
                 end if
-            end do
-            
-            do j = local_end + 1, end_j
-                col = col_indexes(j)
-                sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
-                if (sorted_pos > 0) then
-                    row_sum = row_sum + values(j) * recv_buf_sorted(sorted_pos)
+                
+                if (col_indexes(start_j) >= lb .and. col_indexes(end_j) <= ub) then
+                    v(i) = scalar * v(i)
+                    cycle
                 end if
+                
+                row_sum = v(i)
+                
+                local_start = lower_bound(col_indexes, start_j, end_j, lb)
+                local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
+                
+                do j = start_j, local_start - 1
+                    col = col_indexes(j)
+                    sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                    if (sorted_pos > 0) then
+                        row_sum = row_sum + values(j) * recv_buf_sorted(sorted_pos)
+                    end if
+                end do
+                
+                do j = local_end + 1, end_j
+                    col = col_indexes(j)
+                    sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                    if (sorted_pos > 0) then
+                        row_sum = row_sum + values(j) * recv_buf_sorted(sorted_pos)
+                    end if
+                end do
+                
+                v(i) = scalar * row_sum
             end do
-            
-            v(i) = scalar * row_sum
-        end do
-        !$omp end parallel do
+            !$omp end parallel do
+        else
+            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, sorted_pos)
+            do i = 1, n_local
+                start_j = row_starts(i)
+                end_j = row_starts(i + 1) - 1
+                
+                if (start_j > end_j) then
+                    v(i) = scalar * v(i)
+                    cycle
+                end if
+                
+                if (col_indexes(start_j) >= lb .and. col_indexes(end_j) <= ub) then
+                    v(i) = scalar * v(i)
+                    cycle
+                end if
+                
+                row_sum = v(i)
+                
+                local_start = lower_bound(col_indexes, start_j, end_j, lb)
+                local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
+                
+                do j = start_j, local_start - 1
+                    col = col_indexes(j)
+                    sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                    if (sorted_pos > 0) then
+                        row_sum = row_sum + recv_buf_sorted(sorted_pos)
+                    end if
+                end do
+                
+                do j = local_end + 1, end_j
+                    col = col_indexes(j)
+                    sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                    if (sorted_pos > 0) then
+                        row_sum = row_sum + recv_buf_sorted(sorted_pos)
+                    end if
+                end do
+                
+                v(i) = scalar * row_sum
+            end do
+            !$omp end parallel do
+        end if
         
         deallocate(recv_buf_sorted)
     end subroutine spmv
@@ -1188,9 +1255,11 @@ module Sparse
         allocate(A%col_indexes_local(local_nnz))
         A%col_indexes_local = A%col_indexes(lb_elem:ub_elem)
         
-        ! Create local values copy
-        allocate(A%values_local(local_nnz))
-        A%values_local = A%values(lb_elem:ub_elem)
+        ! Create local values copy (only if has_values is true)
+        if (A%has_values .and. associated(A%values)) then
+            allocate(A%values_local(local_nnz))
+            A%values_local = A%values(lb_elem:ub_elem)
+        end if
 
         ! Call chunked_spmv_mod setup
         call setup_graph_comm(A%row_starts_local, A%col_indexes_local, partition_table_64, &
@@ -1241,16 +1310,28 @@ module Sparse
             sc = (1.0_dp, 0.0_dp)
         end if
 
-        call spmv(A%row_starts_local, A%col_indexes_local, &
-                  x_local, y_local, sc, &
-                  A%graph_comm, &
-                  A%recv_indices_sorted, A%sort_perm, &
-                  A%graph_recv_counts, A%graph_recv_disps, &
-                  A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
-                  A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
-                  A%send_buf, A%recv_buf, &
-                  A%hash_keys, A%hash_vals, A%hash_size, &
-                  A%values_local)
+        if (A%has_values) then
+            call spmv(A%row_starts_local, A%col_indexes_local, &
+                      x_local, y_local, sc, &
+                      A%graph_comm, &
+                      A%recv_indices_sorted, A%sort_perm, &
+                      A%graph_recv_counts, A%graph_recv_disps, &
+                      A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                      A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                      A%send_buf, A%recv_buf, &
+                      A%hash_keys, A%hash_vals, A%hash_size, &
+                      values=A%values_local)
+        else
+            call spmv(A%row_starts_local, A%col_indexes_local, &
+                      x_local, y_local, sc, &
+                      A%graph_comm, &
+                      A%recv_indices_sorted, A%sort_perm, &
+                      A%graph_recv_counts, A%graph_recv_disps, &
+                      A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                      A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                      A%send_buf, A%recv_buf, &
+                      A%hash_keys, A%hash_vals, A%hash_size)
+        end if
 
     end subroutine SpMV_Graph
 
@@ -1285,16 +1366,28 @@ module Sparse
             ! Simple case: single multiplication
             do col = 1, n_cols
                 col_in = B_local(:, col)
-                call spmv(A%row_starts_local, A%col_indexes_local, &
-                          col_in, col_out, (1.0_dp, 0.0_dp), &
-                          A%graph_comm, &
-                          A%recv_indices_sorted, A%sort_perm, &
-                          A%graph_recv_counts, A%graph_recv_disps, &
-                          A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
-                          A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
-                          A%send_buf, A%recv_buf, &
-                          A%hash_keys, A%hash_vals, A%hash_size, &
-                          A%values_local)
+                if (A%has_values) then
+                    call spmv(A%row_starts_local, A%col_indexes_local, &
+                              col_in, col_out, (1.0_dp, 0.0_dp), &
+                              A%graph_comm, &
+                              A%recv_indices_sorted, A%sort_perm, &
+                              A%graph_recv_counts, A%graph_recv_disps, &
+                              A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                              A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                              A%send_buf, A%recv_buf, &
+                              A%hash_keys, A%hash_vals, A%hash_size, &
+                              values=A%values_local)
+                else
+                    call spmv(A%row_starts_local, A%col_indexes_local, &
+                              col_in, col_out, (1.0_dp, 0.0_dp), &
+                              A%graph_comm, &
+                              A%recv_indices_sorted, A%sort_perm, &
+                              A%graph_recv_counts, A%graph_recv_disps, &
+                              A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                              A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                              A%send_buf, A%recv_buf, &
+                              A%hash_keys, A%hash_vals, A%hash_size)
+                end if
                 C_local(:, col) = col_out
             end do
         else
@@ -1305,16 +1398,28 @@ module Sparse
             do k = 1, n
                 do col = 1, n_cols
                     col_in = temp_in(:, col)
-                    call spmv(A%row_starts_local, A%col_indexes_local, &
-                              col_in, col_out, (1.0_dp, 0.0_dp), &
-                              A%graph_comm, &
-                              A%recv_indices_sorted, A%sort_perm, &
-                              A%graph_recv_counts, A%graph_recv_disps, &
-                              A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
-                              A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
-                              A%send_buf, A%recv_buf, &
-                              A%hash_keys, A%hash_vals, A%hash_size, &
-                              A%values_local)
+                    if (A%has_values) then
+                        call spmv(A%row_starts_local, A%col_indexes_local, &
+                                  col_in, col_out, (1.0_dp, 0.0_dp), &
+                                  A%graph_comm, &
+                                  A%recv_indices_sorted, A%sort_perm, &
+                                  A%graph_recv_counts, A%graph_recv_disps, &
+                                  A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                                  A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                                  A%send_buf, A%recv_buf, &
+                                  A%hash_keys, A%hash_vals, A%hash_size, &
+                                  values=A%values_local)
+                    else
+                        call spmv(A%row_starts_local, A%col_indexes_local, &
+                                  col_in, col_out, (1.0_dp, 0.0_dp), &
+                                  A%graph_comm, &
+                                  A%recv_indices_sorted, A%sort_perm, &
+                                  A%graph_recv_counts, A%graph_recv_disps, &
+                                  A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                                  A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                                  A%send_buf, A%recv_buf, &
+                                  A%hash_keys, A%hash_vals, A%hash_size)
+                    end if
                     temp_out(:, col) = col_out
                 end do
                 if (k < n) then
