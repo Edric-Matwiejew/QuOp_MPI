@@ -20,12 +20,18 @@ sequence of :term:`mixing unitaries <mixing unitary>` with independent
         a 1-D integer array containing non-zero column indexes for rows :literal:`lb` 
         to :literal:`ub` , grouped by ascending row index
 
-    W_values : ndarray[float] 
+    W_values : ndarray[float] or None
         a 1-D real array containing non-zero values for rows :literal:`lb`  to :literal:`ub` ,
-        grouped by ascending row index in the same order as :literal:`W_col_index` 
+        grouped by ascending row index in the same order as :literal:`W_col_index`.
+        
+        For **unit-valued matrices** (where all non-zero entries are 1.0), this
+        may be :literal:`None`. When :literal:`W_values` is :literal:`None`, the propagator
+        skips value storage and uses an optimized code path, reducing memory
+        usage and improving performance. This is automatically detected for
+        adjacency matrices such as those used by the hypercube mixer.
 
     W_row_start : ndarray[int] 
-        an 1-D integer array of length :literal:`ub - lb + 1` , a cumulative sum of the
+        a 1-D integer array of length :literal:`ub - lb + 1` , a cumulative sum of the
         number of non-zero elements in each row such that
         :literal:`W_row_start[row_index + 1] - W_row_start[row_index]`  is equal to the
         number of non-zero elements in the row with index :literal:`row_index`  and
@@ -35,6 +41,17 @@ sequence of :term:`mixing unitaries <mixing unitary>` with independent
 
 These are returned by the Operator Function as 
 :literal:`list[list[W_row_start], list[W_col_indexes], list[W_values]]`.
+
+**Propagation Method**
+
+The sparse propagator uses **Chebyshev polynomial expansion** to compute the
+matrix exponential :math:`e^{-itH}`. This method:
+
+- Automatically estimates the spectral radius of the operator
+- Expands the matrix exponential as a sum of Chebyshev polynomials
+- Is numerically stable and efficient for sparse Hermitian matrices
+
+This replaces the previous scaling-and-squaring approach.
 """
 from .standard import serial, hypercube, qmoa_mixer
 
