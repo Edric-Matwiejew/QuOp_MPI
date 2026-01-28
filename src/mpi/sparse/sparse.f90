@@ -23,10 +23,14 @@
 !
 module Sparse
 
-    use, intrinsic :: iso_fortran_env, only: sp => real32, dp => real64, qp => real128
+    use, intrinsic :: iso_fortran_env, only: sp => real32, dp => real64, qp => real128, int64
     use :: MPI
 
     implicit none
+    
+    ! Hash table constants (Knuth's golden ratio multiplier)
+    integer(int64), parameter, private :: HASH_MULT = 2654435769_int64
+    integer(int64), parameter, private :: MASK32 = int(Z'FFFFFFFF', int64)
 
     !> @brief Compressed sparse rows (CSR) complex matrix derived type.
     !
@@ -43,925 +47,707 @@ module Sparse
         integer(dp), dimension(:), pointer :: col_indexes => null()
         complex(dp), dimension(:), pointer :: values => null()
 
-        integer(dp), dimension(:), pointer :: local_col_inds => null()
-        integer(dp), dimension(:), pointer :: RHS_send_inds => null()
-        integer, dimension(:), pointer :: num_send_inds => null()
-        integer, dimension(:), pointer :: send_disps => null()
-        integer, dimension(:), pointer :: num_rec_inds => null()
-        integer, dimension(:), pointer :: rec_disps => null()
+        ! Graph communicator data for O(neighbors) SpMV
+        integer :: graph_comm = MPI_COMM_NULL
+        integer(int64), dimension(:), allocatable :: recv_indices_sorted
+        integer(int64), dimension(:), allocatable :: sort_perm
+        integer, dimension(:), allocatable :: graph_recv_counts
+        integer, dimension(:), allocatable :: graph_recv_disps
+        integer(int64), dimension(:), allocatable :: send_offsets
+        integer, dimension(:), allocatable :: graph_send_counts
+        integer, dimension(:), allocatable :: graph_send_disps
+        integer, dimension(:), allocatable :: in_neighbors
+        integer, dimension(:), allocatable :: out_neighbors
+        integer(int64) :: total_recv = 0
+        integer(int64) :: total_send = 0
+        integer(int64) :: lb_graph = 0
+        integer(int64) :: ub_graph = 0
+        ! Local copies of row_starts and col_indexes (1-based indexing for spmv)
+        integer(int64), dimension(:), allocatable :: row_starts_local
+        integer(int64), dimension(:), allocatable :: col_indexes_local
+        ! Hash table for O(1) remote column lookup
+        integer(int64), dimension(:), allocatable :: hash_keys
+        integer(int64), dimension(:), allocatable :: hash_vals
+        integer(int64) :: hash_size = 0
+        ! Persistent communication buffers
+        complex(dp), dimension(:), allocatable :: send_buf
+        complex(dp), dimension(:), allocatable :: recv_buf
+        ! Local values for SpMV (slice of global values)
+        complex(dp), dimension(:), allocatable :: values_local
+        ! Flag to indicate if graph comm is set up
+        logical :: graph_comm_ready = .false.
 
     end type CSR
 
-    !
-    !>  @brief Compressed Co-ordinates spase matrix derived type.
-    !
-
-    type, public :: COO
-
-        integer :: rows
-        integer :: columns
-        integer :: nnz = 0
-        integer, dimension(:), pointer :: row_indexes => null()
-        integer, dimension(:), pointer :: col_indexes => null()
-        complex(dp), dimension(:), pointer :: values => null()
-
-    end type COO
-
-    !
-    !>  @brief Sparse matrix accumulator, used in COO sum.
-    !
-
-    type, private :: SPA
-        complex(dp), dimension(:), allocatable :: w
-        integer, dimension(:), allocatable :: b
-        integer, dimension(:), allocatable :: LS
-        integer :: LS_ind = 1
-    end type SPA
-
     contains
 
-    !
-    !   Function: Kronecker_Delta
-    !
-    !>  @brief Kronecker delta function of integers i and j.
-    !
-    !>  @details This function is equal to 1 if i = j and 0 otherwise.
-
-    function Kronecker_Delta(i, j)
-
-        integer :: Kronecker_Delta
-        integer, intent(in) :: i, j
-
-        Kronecker_Delta = int((real((i+j)-abs(i-j)))/(real((i+j)+abs(i-j))))
-
-    end function Kronecker_Delta
-
-    !
-    !   Subroutine: Prefix_Sum
-    !
-    !>  @brief Prefix sum of an integer array.
-    !
-    !>  @details Perfroms an in-place prefix (or cumulative) sum on an integer
-    !>  array.
-    !>
-    !>> Prefix_Sum([1,2,3]) -> [1,3,6]
-
-    subroutine Prefix_Sum(array)
-
-            integer(dp), dimension(:), intent(inout) :: array
-
-            integer :: i
-
-            do i = 2, size(array, 1)
-                array(i) = array(i - 1) + array(i)
-            enddo
-
-    end subroutine Prefix_Sum
-
-    !
-    ! COO (Compressed Co-ordiantes) subroutines.
-    !
-
-    !> @brief Convert a COO matrix to a CSR matrix.
-
-    subroutine COO_to_CSR(A, B, partition_table, MPI_communicator)
-
-        type(COO), intent(inout) :: A
-        type(CSR), intent(inout) :: B
-        integer, dimension(:), intent(in) :: partition_table
-        integer, intent(in) :: MPI_communicator
-
-        integer :: lower_bound, upper_bound
-
-        integer :: rank, flock, ierr
-        integer, dimension(:), allocatable :: nnz_per_rank, nnz_per_rank_temp
-
-        integer :: i
-
-        call mpi_comm_rank(MPI_communicator, rank, ierr)
-        call mpi_comm_size(MPI_communicator, flock, ierr)
-
-        lower_bound = partition_table(rank + 1)
-        upper_bound = partition_table(rank + 2) - 1
-
-        B%rows = A%rows
-        B%columns = A%columns
-
-        allocate(B%row_starts(lower_bound:upper_bound + 1))
-        allocate(B%col_indexes(A%nnz))
-        allocate(B%values(A%nnz))
-
-        B%row_starts = 0
-
-        i = 1
-        do i = 1, A%nnz
-            B%values(i) = A%values(i)
-            B%col_indexes(i) = A%col_indexes(i)
-            B%row_starts(A%row_indexes(i) + 1) = B%row_starts(A%row_indexes(i) + 1) + 1
-        enddo
-
-        allocate(nnz_per_rank(flock + 1))
-        allocate(nnz_per_rank_temp(flock + 1))
-
-        nnz_per_rank_temp = 0
-
-        nnz_per_rank_temp(rank + 2) = A%nnz
-
-        if (rank == 0) then
-            nnz_per_rank_temp(1) = 1
-        endif
-
-        call mpi_allreduce( nnz_per_rank_temp, &
-                            nnz_per_rank, &
-                            flock + 1, &
-                            MPI_INTEGER, &
-                            MPI_SUM, &
-                            MPI_communicator, &
-                            ierr)
-
-        do i = 2, rank + 2
-            nnz_per_rank(i) = nnz_per_rank(i) + nnz_per_rank(i - 1)
-        enddo
-
-        B%row_starts(lower_bound) = nnz_per_rank(rank + 1)
-
-        call prefix_sum(B%row_starts)
-
-    end subroutine COO_to_CSR
-
-    !
-    !> @brief Sparse matrix gather, used in COO sum.
-    !
-
-    subroutine Gather_SPA(row_spa, A, current_row)
-
-        type(SPA), intent(inout) :: row_spa
-        type(COO), intent(inout) :: A
-        integer, intent(in) :: current_row
-        real(dp) :: x
-        integer :: starting_nnz
-        integer :: i
-
-        starting_nnz = A%nnz
-
-        do i = 1, row_spa%LS_ind - 1
-            if (abs(row_spa%w(row_spa%LS(i))) > epsilon(x)) then
-                A%nnz = A%nnz + 1
-                !A%row_indexes(A%nnz) = current_row
-                A%col_indexes(A%nnz) = row_spa%LS(i)
-                A%values(A%nnz) = row_spa%w(row_spa%LS(i))
-            endif
-        enddo
-
-        A%row_indexes(starting_nnz + 1: A%nnz) = current_row
-
-        row_spa%LS_ind = 1
-
-    end subroutine Gather_SPA
-
-    !
-    !> @brief Scatter elements of a sparse matrix, used in COO matrix sum.
-    !
-
-    subroutine Scatter_SPA(row_spa, value, col_index, current_row)
-
-        type(SPA), intent(inout) :: row_spa
-        complex(dp), intent(in) :: value
-        integer, intent(in) :: col_index
-        integer, intent(in) :: current_row
-
-        if (row_spa%b(col_index) < current_row) then
-            row_spa%w(col_index) = value
-            row_spa%b(col_index) = current_row
-            row_spa%LS(row_spa%LS_ind) = col_index
-            row_spa%LS_ind = row_spa%LS_ind + 1
-        else
-            row_spa%w(col_index) = row_spa%w(col_index) + value
-        endif
-
-    end subroutine Scatter_SPA
-
-    !
-    !> @brief Allocate COO arrays prior to a matrix sum.
-    !
-
-    subroutine COO_Allocate_Sum(A, B, local_rows, C)
-
-        type(COO), intent(in) :: A
-        type(COO), intent(in) :: B
-        integer, intent(in) :: local_rows
-        type(COO), intent(inout) :: C
-
-        integer(qp) :: dense_dim
-
-        integer :: estimated_nnz
-
-        estimated_nnz = A%nnz + B%nnz
-
-        dense_dim = int(A%columns,qp)*int(local_rows,qp)
-
-        if (estimated_nnz > dense_dim) then
-            estimated_nnz = A%columns*local_rows
-        endif
-
-        allocate(C%row_indexes(estimated_nnz))
-        allocate(C%col_indexes(estimated_nnz))
-        allocate(C%values(estimated_nnz))
-
-    end subroutine COO_Allocate_Sum
-
-    !> @brief Deallocate a COO matrix.
-
-    subroutine COO_Deallocate(A)
-
-        type(COO), intent(inout) :: A
-
-        deallocate(A%row_indexes)
-        deallocate(A%col_indexes)
-        deallocate(A%values)
-
-        A%nnz = 0
-        A%rows = 0
-        A%columns = 0
-
-    end subroutine COO_Deallocate
-
-    !> @brief Copy COO matrix A to B, deallocate A.
-
-    subroutine COO_Move(A,B)
-
-        type(COO), intent(inout) :: A
-        type(COO), intent(inout) :: B
-
-        allocate(B%row_indexes(A%nnz))
-        allocate(B%col_indexes(A%nnz))
-        allocate(B%values(A%nnz))
-
-        B%rows = A%rows
-        B%columns = A%columns
-        B%nnz = A%nnz
-        B%row_indexes = A%row_indexes(1:A%nnz)
-        B%col_indexes = A%col_indexes(1:A%nnz)
-        B%values = A%values(1:A%nnz)
-
-        call COO_Deallocate(A)
-
-    end subroutine COO_Move
-
-    !> @brief Sum distributed COO matrices, A + B = C.
-
-    subroutine COO_Sum(A, B, C, partition_table, MPI_communicator)
-
-        type(COO), intent(inout) :: A
-        type(COO), intent(inout) :: B
-        type(COO), intent(inout) :: C
-        integer, dimension(:), intent(in) :: partition_table
-        integer, intent(in) :: MPI_communicator
-
-        type(SPA) :: row_spa
-
-        integer :: ka, kb
-        integer :: i
-
-        ! MPI
-        integer :: rank
-        integer :: ierr
-
-        call MPI_comm_rank(MPI_communicator, rank, ierr)
-
-        allocate(row_spa%w(A%columns))
-        allocate(row_spa%b(A%columns))
-        allocate(row_spa%LS(A%columns))
-
-        row_spa%b = 0
-        row_spa%LS = 0
-
-        ka = 1
-        kb = 1
-
-        do i = partition_table(rank + 1), partition_table(rank + 2) - 1
-            do while (ka <= A%nnz)
-                if (A%row_indexes(ka) /= i) exit
-                call scatter_spa(row_spa, A%values(ka), A%col_indexes(ka), i)
-                ka = ka + 1
-            enddo
-            do while (kb <= B%nnz)
-                if (B%row_indexes(kb) /= i) exit
-                call scatter_spa(row_spa, B%values(kb), B%col_indexes(kb), i)
-                kb = kb + 1
-            enddo
-            call Gather_SPA(row_spa, C, i)
-            row_spa%LS_ind = 1
-        enddo
-
-        C%rows = A%rows
-        C%columns = A%columns
-
-    end subroutine COO_Sum
-
-    !> @brief Transpose a CSR matrix.
-
-    subroutine CSR_Transpose(A, A_D)
-
-        type(CSR), intent(in) :: A
-        type(CSR), intent(out) :: A_D
-
-        integer, dimension(:), allocatable :: A_D_row_indexes
-        integer :: nnz
-
-        integer :: A_D_row_ind, A_D_col_ind
-        complex(dp) val
-
-        integer :: i, j
-
-        nnz = size(A%col_indexes,1)
-
-        A_D%rows = A%rows
-        A_D%columns = A%columns
-
-        allocate(A_D%row_starts(A%rows + 1))
-        allocate(A_D%col_indexes(nnz))
-        allocate(A_D%values(nnz))
-
-        A_D%row_starts = 0
-        A_D%row_starts(1) = 1
-        A_D%col_indexes = 0
-        A_D%values = A%values
-
-        allocate(A_D_row_indexes(nnz))
-
-        A_D_row_indexes = A%col_indexes
-
-        do i = 1, A%rows
-            do j = A%row_starts(i), A%row_starts(i + 1) - 1
-                A_D%col_indexes(j) = i
-                A_D%row_starts(A%col_indexes(j) + 1) = A_D%row_starts(A%col_indexes(j) + 1) + 1
-            enddo
-        enddo
-
-        call prefix_sum(A_D%row_starts)
-
-        do i = 2, nnz
-
-            A_D_row_ind = A_D_row_indexes(i)
-            A_D_col_ind = A_D%col_indexes(i)
-            val = A_D%values(i)
-
-            j = i - 1
-
-            do while (j >= 1)
-
-                if (A_D_row_indexes(j) <= A_D_row_ind) exit
-                    A_D_row_indexes(j + 1) = A_D_row_indexes(j)
-                    A_D%col_indexes(j + 1) = A_D%col_indexes(j)
-                    A_D%values(j + 1) = A_D%values(j)
-                    j = j - 1
-            enddo
-
-            A_D_row_indexes(j + 1) = A_D_row_ind
-            A_D%col_indexes(j + 1) = A_D_col_ind
-            A_D%values(j + 1) = val
-
-        enddo
-
-        deallocate(A_D_row_indexes)
-
-    end subroutine CSR_Transpose
-
-    !
-    ! Subroutine: Generate_Partition_Table
-    !
-    !> @brief Determines a matrix/vector partition scheme.
-    !>
-    !> @details A given number of rows is divided evenly (if possible) over an
-    !> MPI communicator of size *N* nodes. If even division is not possible the
-    !> remainder is given to the node of highest rank.
-    !>
-    !> Array *partition_table* is of size N + 1 and follows a format similar to
-    !> that of the *row_start* array in the *CSR* data type:
-    !>
-    !>> (starting row for rank 0, starting row for rank 1, ..., rows + 1)
-    !>
-    !> As such the number of rows at a node is given by:
-    !>
-    !>> partition_table(rank + 2) - partition_table(rank + 1)
-    !>
-    !> @note Must be called from within an MPI instance.
-    !
-    !> @todo send row data to MPI communicator from root process.
-
-    subroutine Generate_Partition_Table(rows, partition_table, MPI_communicator)
-
-        integer, intent(in) :: rows !< @param Number of matrix/vector rows.
-        integer, intent(out), dimension(:), allocatable :: partition_table !< @param Start/Finish of partitions.
-        integer, intent(in) :: MPI_communicator !< @param MPI communicator over which to distribute.
-
-        integer :: remainder
-
-        integer :: i
-
-        ! MPI environment
-        integer :: flock ! size of MPI communicator.
-        integer :: ierr
-
-        call MPI_comm_size(mpi_communicator, flock, ierr)
-
-        allocate(partition_table(flock + 1))
-
-        do i = 1, flock + 1
-            partition_table(i) = (i - 1)*rows/flock + 1
-        enddo
-
-        remainder = rows - partition_table(flock + 1)
-
-        do i = 1, remainder
-            partition_table(flock - mod(i, flock):flock + 1) = &
-                partition_table(flock - mod(i, flock):flock + 1) + 1
-        enddo
-
-        partition_table(flock + 1) = rows + 1
-
-    end subroutine Generate_Partition_Table
-
-    !> @brief Distribute complex array v row-wise over an MPI communicator.
-
-    subroutine Distribute_Dense_Vector( v, &
-                                        partition_table, &
-                                        root, &
-                                        v_local, &
-                                        MPI_communicator)
-
-        complex(dp), dimension(:), intent(in) :: v !< @param Array to distribute.
-        integer, dimension(:), intent(in) :: partition_table !< @param MPI communicator partitioning scheme.
-        integer, intent(in) :: root !< @param Node from which the array is distributed.
-        complex(dp), dimension(:), allocatable, intent(out) :: v_local !< @param Local array partition.
-        integer, intent(in) :: mpi_communicator !< @param MPI communicator over which to distribute.
-
-        integer :: lb_send, ub_send, lb_recv, ub_recv
-
-        integer :: i
-
-        ! MPI ENVIRONMENT
-        integer :: flock, rank
-        integer, dimension(:), allocatable :: requests_out
-        integer :: buff_size
-        integer :: ierr
-
-        call MPI_comm_size(MPI_communicator, flock, ierr)
-        call MPI_comm_rank(MPI_communicator, rank, ierr)
-
-        allocate(requests_out(0:flock - 1))
-
-        if (rank == root) then
-            do i = 0, flock - 1
-                if (i /= root) then
-                    lb_send = partition_table(i + 1)
-                    ub_send = partition_table(i + 2) - 1
-                    buff_size = ub_send - lb_send + 1
-
-                    call MPI_Isend( v(lb_send:ub_send), buff_size, &
-                               MPI_double_complex, i, &
-                               rank*10 + i, MPI_communicator, &
-                               requests_out(i), ierr)
-                endif
-            enddo
-        endif
-
-
-        lb_recv = partition_table(rank + 1)
-        ub_recv = partition_table(rank + 2) - 1
-
-        allocate(v_local(lb_recv:ub_recv))
-        if (rank == root) then
-            v_local = v(lb_recv:ub_recv)
-        else
-            buff_size = ub_recv - lb_recv + 1
-            call MPI_recv(  v_local(lb_recv:ub_recv), buff_size, &
-                            MPI_double_complex, root, &
-                            root*10 + rank, MPI_communicator, &
-                            MPI_status_ignore, ierr)
-        endif
-
-        call mpi_barrier(MPI_communicator, ierr)
-
-    end subroutine Distribute_Dense_Vector
-
-    !
-    !   subroutine: Distribute_CSR_Matrix
-    !
-    !> @brief Distribute complex CSR matrix over an MPI communicator.
-    !>
-    !> @details CSR matrix is partitioned following a scheme given by
-    !> the *partition_table* array, see @ref generate_partition_table for more.
-    !>
-    !> @note Must be called from within an MPI instance.
-
-    subroutine Distribute_CSR_Matrix(   A, &
-                                        partition_table, &
-                                        root, &
-                                        A_local, &
-                                        MPI_communicator)
-
-        type(CSR), intent(in) :: A  !< @param CSR matrix to distribute.
-        integer, dimension(:), intent(in) :: partition_table    !< @param MPI communicator paritioning scheme.
-        integer, intent(in) :: root !< @param Node from which A is distributed.
-        type(CSR), intent(out) :: A_local !< @param Local CSR parition.
-        integer, intent(in) :: MPI_communicator !< @param MPU communicator over which to distribute.
-
-        integer, dimension(:), allocatable :: block_lens, disps
-        integer, dimension(:), allocatable :: block_lens_vals, disps_vals
-
-        integer :: lb, ub, lb_vals, ub_vals
-
-        integer :: i
-
-        !MPI ENVIRONMENT
-        integer :: rank, flock
-        integer :: ierr
-
-        call MPI_comm_size(MPI_communicator, flock, ierr)
-        call MPI_comm_rank(MPI_communicator, rank, ierr)
-
-
-        if (rank == root) then
-            A_local%rows = A%rows
-            A_local%columns = A%columns
-        endif
-
-        call MPI_bcast( A_local%rows, &
-                        1, &
-                        MPI_integer, &
-                        root, &
-                        MPI_communicator, &
-                        ierr)
-
-        call MPI_bcast( A_local%columns, &
-                        1, &
-                        MPI_integer, &
-                        root, &
-                        MPI_communicator, &
-                        ierr)
-
-        allocate(block_lens(flock))
-        allocate(disps(flock))
-
-        do i = 1, flock
-            block_lens(i) = partition_table(i + 1) - partition_table(i) + 1
-        enddo
-
-        disps = 0
-
-        do i = 2, flock
-            disps(i) = disps(i - 1) + block_lens(i - 1) - 1
-        enddo
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2)
-
-        allocate(A_local%row_starts(lb:ub))
-
-        call MPI_scatterv(  A%row_starts, &
-                            block_lens, &
-                            disps, &
-                            MPI_LONG, &
-                            A_local%row_starts, &
-                            block_lens(rank + 1), &
-                            MPI_LONG, &
-                            root, &
-                            MPI_communicator, &
-                            ierr)
-
-        lb_vals = A_local%row_starts(lb)
-        ub_vals = A_local%row_starts(ub) - 1
-
-        allocate(A_local%col_indexes(lb_vals:ub_vals))
-        allocate(A_local%values(lb_vals:ub_vals))
-
-        allocate(block_lens_vals(flock))
-        allocate(disps_vals(flock))
-
-        if (rank == root) then
-
-            do i = 1, flock
-
-                block_lens_vals(i) = A%row_starts(partition_table(i + 1)) &
-                                        - A%row_starts(partition_table(i))
-
-            enddo
-
-        endif
-
-        call MPI_bcast( block_lens_vals, &
-                        flock, &
-                        MPI_integer, &
-                        root, &
-                        MPI_communicator, &
-                        ierr)
-
-        disps_vals = 0
-
-        do i = 2, flock
-
-            disps_vals(i) = disps_vals(i - 1) + block_lens_vals(i - 1)
-
-        enddo
-
-
-        call MPI_scatterv(  A%col_indexes, &
-                            block_lens_vals, &
-                            disps_vals, &
-                            MPI_LONG, &
-                            A_local%col_indexes, &
-                            block_lens_vals(rank + 1), &
-                            MPI_LONG, &
-                            root, &
-                            MPI_communicator, &
-                            ierr)
-
-        call MPI_scatterv(  A%values, &
-                            block_lens_vals, &
-                            disps_vals, &
-                            MPI_double_complex, &
-                            A_local%values, &
-                            block_lens_vals(rank + 1), &
-                            MPI_double_complex, &
-                            root, &
-                            MPI_communicator, &
-                            ierr)
-
-    end subroutine Distribute_CSR_Matrix
-
-    !
-    !   subroutine: Gather_Dense_Vector
-    !
-    !> @brief Gather a 1D double precision complex array distributed over an MPI
-    !> communicator.
-    !>
-    !> @details The array is partitioned following a scheme given by
-    !> the *partition_table* array, see @ref generate_partition_table for more.
-    !>
-    !> @note Must be called from within an MPI instance.
-    !>
-    !> @todo rewriting Distribute_dense_vector with MPI_scatterv
-
-    subroutine Gather_Dense_Vector( u_local, &
-                                    partition_table, &
-                                    root, &
-                                    u, &
-                                    MPI_communicator)
-
-        complex(dp), dimension(:), intent(in) :: u_local !< @param Array to gather.
-        integer, dimension(:), intent(in) :: partition_table !< @param MPI communicator partitioning scheme.
-        integer, intent(in) :: root !< @param Node to which the array is gathered.
-        complex(dp), dimension(:), intent(out) :: u !< @param Gathered array.
-        integer, intent(in) :: mpi_communicator !< @param MPI communicator over which to gather.
-
-        integer, dimension(:), allocatable :: block_lens, disps
-        integer :: lb, ub
-        integer :: i
-
-        !MPI ENVIRONMENT
-        integer :: rank, flock
-        integer :: ierr
-
-        call MPI_comm_size(MPI_communicator, flock, ierr)
-        call MPI_comm_rank(MPI_communicator, rank, ierr)
-
-        allocate(block_lens(flock))
-        allocate(disps(flock))
-
-        do i = 1, flock
-
-            block_lens(i) = partition_table(i + 1) - partition_table(i)
-
-        enddo
-
-        disps = 0
-
-        do i = 2, flock
-
-            disps(i) = disps(i - 1) + block_lens(i - 1)
-
-        enddo
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2)
-
-        call MPI_gatherv(   u_local, &
-                            block_lens(rank + 1), &
-                            MPI_double_complex, &
-                            u, &
-                            block_lens, &
-                            disps, &
-                            MPI_double_complex, &
-                            root, &
-                            MPI_communicator, &
-                            ierr)
-
-    end subroutine Gather_Dense_Vector
-
-    !> @brief Distribute a 2 x 2 complex matrix row-wise over a MPI communicator.
-
-    subroutine Scatter_Dense_Matrix(   A, &
-                                        partition_table, &
-                                        root, &
-                                        A_local, &
-                                        MPI_communicator)
-
-        complex(dp), dimension(:,:), intent(in) :: A
-        integer, dimension(:), intent(in) :: partition_table
-        integer, intent(in) :: root
-        complex(dp), dimension(:,:), allocatable, intent(out) :: A_local
-        integer, intent(in) :: MPI_communicator
-
-        integer :: rec_lb, rec_ub
-        integer :: send_lb, send_ub
-        integer :: rec_row, rec_col
-        integer :: send_row, send_col
-        integer :: i
-
-        !MPI ENVIRONMENT
-        integer, dimension(:), allocatable :: requests_out
-        integer, dimension(MPI_status_size) :: status
-        integer :: rank, flock
-        integer :: ierr
-
-        call MPI_comm_size(MPI_communicator, flock, ierr)
-        call MPI_comm_rank(MPI_communicator, rank, ierr)
-
-        rec_lb = partition_table(rank + 1)
-        rec_ub = partition_table(rank + 2) - 1
-
-        rec_row = rec_ub - rec_lb + 1
-        rec_col = size(A,2)
-
-        CALL mpi_bcast( rec_col, &
-                        1, &
-                        MPI_integer, &
-                        root, &
-                        MPI_communicator, &
-                        ierr)
-
-        allocate(requests_out(0:flock-1))
-
-
-        if (rank == root) then
-
-            send_col = rec_col
-
-            do i = 0, flock - 1
-
-                if (i /= root) then
-
-                send_lb = partition_table(i + 1)
-                send_ub = partition_table(i + 2) - 1
-
-                send_row = partition_table(i + 2) - partition_table(i + 1)
-
-                call MPI_send( A(send_lb:send_ub, 1:rec_col), &
-                                send_row*send_col, &
-                                MPI_double_complex, &
-                                i, &
-                                i*10, &
-                                MPI_communicator, &
-                                ierr)
-
-            endif
-
-            enddo
-
-        else
-
-            allocate(A_local(rec_lb:rec_ub, rec_col))
-
-            call MPI_Recv(  A_local(rec_lb:rec_ub, 1:rec_col), &
-                            rec_row*rec_col, &
-                            MPI_double_complex, &
-                            root, &
-                            rank*10, &
-                            MPI_communicator, &
-                            status, &
-                            ierr)
-
-        endif
-
-        if (rank == root) then
-
-            allocate(A_local(rec_lb:rec_ub, rec_col))
-
-            A_local = A(rec_lb:rec_ub, :)
-
-        endif
-
-        call mpi_barrier(MPI_communicator, ierr)
-
-    end subroutine Scatter_Dense_Matrix
-
-    !> @brief Gather a row-wise distributed 2 x 2 complex array to MPI rank root.
-
-    subroutine Gather_Dense_Matrix( A_local, &
-                                    partition_table, &
-                                    root, &
-                                    A, &
-                                    MPI_communicator)
-
-        complex(dp), dimension(:,:), intent(in) :: A_local
-        integer, dimension(:), intent(in) :: partition_table
-        integer, intent(in) :: root
-        complex(dp), dimension(:,:), intent(out) :: A
-        integer, intent(in) :: MPI_communicator
-
-        integer :: rec_lb, rec_ub
-        integer :: send_row, send_col
-        integer :: rec_row, rec_col
-        logical, dimension(:), allocatable :: received
-        integer :: i
-
-        !MPI ENVIRONMENT
-        integer, dimension(MPI_status_size) :: status
-        integer :: rank, flock
-        integer :: ierr
-
-        call MPI_comm_size(MPI_communicator, flock, ierr)
-        call MPI_comm_rank(MPI_communicator, rank, ierr)
-
-        if (rank /= root) then
-
-            send_row = partition_table(rank + 2) - partition_table(rank + 1)
-            send_col = size(A_local, 2)
-
-            call MPI_send(  A_local, &
-                            send_row*send_col, &
-                            MPI_double_complex, &
-                            root, &
-                            rank*10, &
-                            MPI_communicator, &
-                            ierr)
-
-        else
-
-            if (flock > 1) then
-
-                rec_col = size(A_local, 2)
-
-                rec_lb = partition_table(rank + 1)
-                rec_ub = partition_table(rank + 2) - 1
-
-                A(rec_lb:rec_ub, :) = A_local
-
-                allocate(received(0:flock - 1))
-
-                received = .false.
-
-                received(rank) = .true.
-
-                do
-
-                    do i = 0, flock - 1
-
-                        if (.not. received(i)) then
-
-                            call MPI_Iprobe(    i, &
-                                                i*10, &
-                                                MPI_communicator, &
-                                                received(i), &
-                                                status, &
-                                                ierr)
-
-                            if (received (i)) then
-
-                                rec_lb = partition_table(i + 1)
-                                rec_ub = partition_table(i + 2) - 1
-
-                                rec_row = rec_ub - rec_lb + 1
-
-                                call MPI_Recv(  A(rec_lb:rec_ub, :), &
-                                                rec_row*rec_col, &
-                                                MPI_double_complex, &
-                                                i, &
-                                                i*10, &
-                                                MPI_communicator, &
-                                                status, &
-                                                ierr)
-                            endif
-
-                        endif
-
-                    enddo
-
-                    if(all(received)) exit
-
-                enddo
-
+    !--------------------------------------------------------------------------
+    ! Graph Communicator SpMV Helper Functions
+    ! (Integrated from chunked_spmv_mod for self-contained module)
+    !--------------------------------------------------------------------------
+
+    !--------------------------------------------------------------------------
+    ! Find first position where arr(pos) >= val (lower bound)
+    !--------------------------------------------------------------------------
+    pure function lower_bound(arr, lo_in, hi_in, val) result(pos)
+        integer(int64), intent(in) :: arr(*)
+        integer(int64), intent(in) :: lo_in, hi_in, val
+        integer(int64) :: pos
+        integer(int64) :: lo, hi, mid
+        
+        lo = lo_in
+        hi = hi_in + 1
+        do while (lo < hi)
+            mid = (lo + hi) / 2
+            if (arr(mid) < val) then
+                lo = mid + 1
             else
+                hi = mid
+            end if
+        end do
+        pos = lo
+    end function lower_bound
+    
+    !--------------------------------------------------------------------------
+    ! Find first position where arr(pos) > val (upper bound)
+    !--------------------------------------------------------------------------
+    pure function upper_bound(arr, lo_in, hi_in, val) result(pos)
+        integer(int64), intent(in) :: arr(*)
+        integer(int64), intent(in) :: lo_in, hi_in, val
+        integer(int64) :: pos
+        integer(int64) :: lo, hi, mid
+        
+        lo = lo_in
+        hi = hi_in + 1
+        do while (lo < hi)
+            mid = (lo + hi) / 2
+            if (arr(mid) <= val) then
+                lo = mid + 1
+            else
+                hi = mid
+            end if
+        end do
+        pos = lo
+    end function upper_bound
 
-                A = A_local
+    !--------------------------------------------------------------------------
+    ! Compute hash index for a column
+    !--------------------------------------------------------------------------
+    pure function compute_hash(col, hash_size) result(hash_pos)
+        integer(int64), intent(in) :: col, hash_size
+        integer(int64) :: hash_pos
+        integer(int64) :: folded
+        
+        folded = iand(ieor(col, ishft(col, -32)), MASK32)
+        hash_pos = mod(folded * HASH_MULT, hash_size) + 1_int64
+        if (hash_pos < 1) hash_pos = hash_pos + hash_size
+    end function compute_hash
 
-            endif
+    !--------------------------------------------------------------------------
+    ! Look up a column in the hash table
+    !--------------------------------------------------------------------------
+    pure function hash_lookup(col, hash_keys, hash_vals, hash_size) result(pos)
+        integer(int64), intent(in) :: col
+        integer(int64), intent(in) :: hash_keys(:), hash_vals(:)
+        integer(int64), intent(in) :: hash_size
+        integer(int64) :: pos
+        integer(int64) :: hash_pos, probe
+        
+        pos = 0_int64
+        hash_pos = compute_hash(col, hash_size)
+        do probe = 0, hash_size - 1
+            if (hash_keys(hash_pos) == col) then
+                pos = hash_vals(hash_pos)
+                return
+            else if (hash_keys(hash_pos) < 0) then
+                return
+            end if
+            hash_pos = mod(hash_pos, hash_size) + 1_int64
+        end do
+    end function hash_lookup
 
-        endif
+    !--------------------------------------------------------------------------
+    ! Find owner rank for a column index
+    !--------------------------------------------------------------------------
+    pure function find_owner(col, partition_table) result(owner)
+        integer(int64), intent(in) :: col
+        integer(int64), intent(in) :: partition_table(:)
+        integer :: owner
+        integer :: lo, hi, mid
+        
+        lo = 1
+        hi = size(partition_table) - 1
+        do while (lo < hi)
+            mid = (lo + hi + 1) / 2
+            if (partition_table(mid) <= col) then
+                lo = mid
+            else
+                hi = mid - 1
+            end if
+        end do
+        owner = lo - 1
+    end function find_owner
 
-    end subroutine Gather_Dense_Matrix
+    !--------------------------------------------------------------------------
+    ! Sort small int64 array (insertion sort)
+    !--------------------------------------------------------------------------
+    pure subroutine sort_int64(arr)
+        integer(int64), intent(inout) :: arr(:)
+        integer :: i, j, n
+        integer(int64) :: key
+        
+        n = size(arr)
+        do i = 2, n
+            key = arr(i)
+            j = i - 1
+            do while (j >= 1 .and. arr(j) > key)
+                arr(j + 1) = arr(j)
+                j = j - 1
+            end do
+            arr(j + 1) = key
+        end do
+    end subroutine sort_int64
+    
+    !--------------------------------------------------------------------------
+    ! Sort int64 array with permutation tracking
+    !--------------------------------------------------------------------------
+    pure subroutine sort_with_perm(arr, perm)
+        integer(int64), intent(inout) :: arr(:)
+        integer(int64), intent(inout) :: perm(:)
+        integer(int64) :: i, j, n, temp_p, key
+        
+        n = size(arr)
+        do i = 2, n
+            key = arr(i)
+            temp_p = perm(i)
+            j = i - 1
+            do while (j >= 1 .and. arr(j) > key)
+                arr(j + 1) = arr(j)
+                perm(j + 1) = perm(j)
+                j = j - 1
+            end do
+            arr(j + 1) = key
+            perm(j + 1) = temp_p
+        end do
+    end subroutine sort_with_perm
+
+    !--------------------------------------------------------------------------
+    ! Merge sort for int64 array - O(n log n)
+    !--------------------------------------------------------------------------
+    recursive subroutine merge_sort_int64(arr)
+        integer(int64), intent(inout) :: arr(:)
+        integer :: n, mid
+        integer(int64), allocatable :: left(:), right(:)
+        
+        n = size(arr)
+        if (n <= 1) return
+        
+        mid = n / 2
+        allocate(left(mid), right(n - mid))
+        left = arr(1:mid)
+        right = arr(mid+1:n)
+        
+        call merge_sort_int64(left)
+        call merge_sort_int64(right)
+        call merge_arrays_int64(left, right, arr)
+        
+        deallocate(left, right)
+    end subroutine merge_sort_int64
+    
+    !--------------------------------------------------------------------------
+    ! Merge two sorted arrays into one
+    !--------------------------------------------------------------------------
+    pure subroutine merge_arrays_int64(left, right, arr)
+        integer(int64), intent(in) :: left(:), right(:)
+        integer(int64), intent(out) :: arr(:)
+        integer :: i, j, k
+        
+        i = 1; j = 1; k = 1
+        do while (i <= size(left) .and. j <= size(right))
+            if (left(i) <= right(j)) then
+                arr(k) = left(i)
+                i = i + 1
+            else
+                arr(k) = right(j)
+                j = j + 1
+            end if
+            k = k + 1
+        end do
+        do while (i <= size(left))
+            arr(k) = left(i)
+            i = i + 1
+            k = k + 1
+        end do
+        do while (j <= size(right))
+            arr(k) = right(j)
+            j = j + 1
+            k = k + 1
+        end do
+    end subroutine merge_arrays_int64
+
+    !--------------------------------------------------------------------------
+    ! Setup graph communicator with O(unique_remote) storage
+    !--------------------------------------------------------------------------
+    subroutine setup_graph_comm(row_starts, col_indexes, partition_table, &
+                                 graph_comm, &
+                                 recv_indices_sorted, sort_perm, &
+                                 recv_counts, recv_disps, &
+                                 send_offsets, send_counts, send_disps, &
+                                 in_neighbors, out_neighbors, &
+                                 total_recv, total_send, lb, ub)
+        integer(int64), intent(in) :: row_starts(:), col_indexes(:)
+        integer(int64), intent(in) :: partition_table(:)
+        integer, intent(out) :: graph_comm
+        integer(int64), allocatable, intent(out) :: recv_indices_sorted(:)
+        integer(int64), allocatable, intent(out) :: sort_perm(:)
+        integer, allocatable, intent(out) :: recv_counts(:), recv_disps(:)
+        integer(int64), allocatable, intent(out) :: send_offsets(:)
+        integer, allocatable, intent(out) :: send_counts(:), send_disps(:)
+        integer, allocatable, intent(out) :: in_neighbors(:), out_neighbors(:)
+        integer(int64), intent(out) :: total_recv, total_send
+        integer(int64), intent(out) :: lb, ub
+        
+        integer :: rank, nprocs, ierr, i, r, owner, n_out, n_in, idx, pos
+        integer(int64) :: col, n_local, j
+        integer, allocatable :: in_weights(:), out_weights(:)
+        integer, allocatable :: in_neighbor_list(:), out_neighbor_list(:)
+        integer(int64), allocatable :: all_recv_indices(:), requested(:)
+        integer(int64), allocatable :: temp_sort_perm(:)
+        logical, allocatable :: is_out_neighbor(:), is_in_neighbor(:)
+        integer(int64), allocatable :: seen_cols(:)
+        integer(int64) :: n_seen
+        
+        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+        call MPI_Comm_size(MPI_COMM_WORLD, nprocs, ierr)
+        
+        lb = partition_table(rank + 1)
+        ub = partition_table(rank + 2) - 1
+        n_local = ub - lb + 1
+        
+        ! Step 1: Identify out_neighbors (ranks we need data from)
+        allocate(is_out_neighbor(0:nprocs-1))
+        is_out_neighbor = .false.
+        
+        do j = 1, size(col_indexes)
+            col = col_indexes(j)
+            if (col < lb .or. col > ub) then
+                owner = find_owner(col, partition_table)
+                is_out_neighbor(owner) = .true.
+            end if
+        end do
+        is_out_neighbor(rank) = .false.
+        
+        n_out = count(is_out_neighbor)
+        allocate(out_neighbor_list(max(n_out, 1)))
+        allocate(out_neighbors(max(n_out, 1)))
+        idx = 1
+        do r = 0, nprocs - 1
+            if (is_out_neighbor(r)) then
+                out_neighbor_list(idx) = r
+                out_neighbors(idx) = r
+                idx = idx + 1
+            end if
+        end do
+        
+        ! Step 2: Exchange to find in_neighbors
+        allocate(is_in_neighbor(0:nprocs-1))
+        is_in_neighbor = .false.
+        
+        call MPI_Alltoall(is_out_neighbor, 1, MPI_LOGICAL, &
+                          is_in_neighbor, 1, MPI_LOGICAL, MPI_COMM_WORLD, ierr)
+        
+        n_in = count(is_in_neighbor)
+        allocate(in_neighbor_list(max(n_in, 1)))
+        allocate(in_neighbors(max(n_in, 1)))
+        idx = 1
+        do r = 0, nprocs - 1
+            if (is_in_neighbor(r)) then
+                in_neighbor_list(idx) = r
+                in_neighbors(idx) = r
+                idx = idx + 1
+            end if
+        end do
+        
+        ! Step 3: Create graph communicator
+        allocate(in_weights(max(n_in, 1)), out_weights(max(n_out, 1)))
+        in_weights = 1
+        out_weights = 1
+        
+        call MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, &
+                n_out, out_neighbor_list, out_weights, &
+                n_in, in_neighbor_list, in_weights, &
+                MPI_INFO_NULL, .false., graph_comm, ierr)
+        
+        deallocate(in_weights, out_weights)
+        
+        ! Step 4: Collect all remote columns, sort, deduplicate
+        n_seen = 0
+        do j = 1, size(col_indexes)
+            col = col_indexes(j)
+            if (col < lb .or. col > ub) then
+                n_seen = n_seen + 1
+            end if
+        end do
+        
+        allocate(seen_cols(max(n_seen, 1)))
+        idx = 1
+        do j = 1, size(col_indexes)
+            col = col_indexes(j)
+            if (col < lb .or. col > ub) then
+                seen_cols(idx) = col
+                idx = idx + 1
+            end if
+        end do
+        
+        if (n_seen > 1) call merge_sort_int64(seen_cols(1:n_seen))
+        
+        if (n_seen > 0) then
+            total_recv = 1
+            do j = 2, n_seen
+                if (seen_cols(j) /= seen_cols(j-1)) then
+                    total_recv = total_recv + 1
+                end if
+            end do
+        else
+            total_recv = 0
+        end if
+        
+        allocate(all_recv_indices(max(total_recv, 1)))
+        if (n_seen > 0) then
+            all_recv_indices(1) = seen_cols(1)
+            idx = 1
+            do j = 2, n_seen
+                if (seen_cols(j) /= seen_cols(j-1)) then
+                    idx = idx + 1
+                    all_recv_indices(idx) = seen_cols(j)
+                end if
+            end do
+        end if
+        
+        deallocate(seen_cols)
+        
+        ! Step 5: Count per neighbor and build displacements
+        allocate(recv_counts(max(n_out, 1)))
+        recv_counts = 0
+        
+        do j = 1, total_recv
+            owner = find_owner(all_recv_indices(j), partition_table)
+            do i = 1, n_out
+                if (out_neighbor_list(i) == owner) then
+                    recv_counts(i) = recv_counts(i) + 1
+                    exit
+                end if
+            end do
+        end do
+        
+        allocate(recv_disps(max(n_out, 1)))
+        if (n_out > 0) then
+            recv_disps(1) = 0
+            do i = 2, n_out
+                recv_disps(i) = recv_disps(i-1) + recv_counts(i-1)
+            end do
+        end if
+        
+        ! Reorder all_recv_indices to be grouped by neighbor
+        block
+            integer(int64), allocatable :: temp_indices(:)
+            integer, allocatable :: neighbor_pos(:)
+            
+            allocate(temp_indices(max(total_recv, 1)))
+            allocate(neighbor_pos(max(n_out, 1)))
+            neighbor_pos = recv_disps + 1
+            
+            do j = 1, total_recv
+                owner = find_owner(all_recv_indices(j), partition_table)
+                do i = 1, n_out
+                    if (out_neighbor_list(i) == owner) then
+                        temp_indices(neighbor_pos(i)) = all_recv_indices(j)
+                        neighbor_pos(i) = neighbor_pos(i) + 1
+                        exit
+                    end if
+                end do
+            end do
+            
+            all_recv_indices(1:total_recv) = temp_indices(1:total_recv)
+            deallocate(temp_indices, neighbor_pos)
+        end block
+        
+        ! Step 6: Sort recv indices for binary search and create permutation
+        allocate(recv_indices_sorted(max(total_recv, 1)))
+        allocate(sort_perm(max(total_recv, 1)))
+        allocate(temp_sort_perm(max(total_recv, 1)))
+        
+        do i = 1, max(total_recv, 1)
+            temp_sort_perm(i) = i
+        end do
+        if (total_recv > 0) then
+            recv_indices_sorted(1:total_recv) = all_recv_indices(1:total_recv)
+            call sort_with_perm(recv_indices_sorted(1:total_recv), temp_sort_perm(1:total_recv))
+            sort_perm(1:total_recv) = temp_sort_perm(1:total_recv)
+        end if
+        
+        deallocate(temp_sort_perm)
+        
+        ! Step 7: Exchange counts to set up send side
+        block
+            integer, allocatable :: all_recv_counts(:), all_send_counts(:)
+            
+            allocate(all_recv_counts(nprocs), all_send_counts(nprocs))
+            all_recv_counts = 0
+            
+            do i = 1, n_out
+                all_recv_counts(out_neighbor_list(i) + 1) = recv_counts(i)
+            end do
+            
+            call MPI_Alltoall(all_recv_counts, 1, MPI_INTEGER, &
+                              all_send_counts, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            
+            allocate(send_counts(max(n_in, 1)))
+            do i = 1, n_in
+                send_counts(i) = all_send_counts(in_neighbor_list(i) + 1)
+            end do
+            
+            deallocate(all_recv_counts, all_send_counts)
+        end block
+        
+        total_send = sum(send_counts)
+        
+        allocate(send_disps(max(n_in, 1)))
+        if (n_in > 0) then
+            send_disps(1) = 0
+            do i = 2, n_in
+                send_disps(i) = send_disps(i-1) + send_counts(i-1)
+            end do
+        end if
+        
+        ! Step 8: Exchange indices to know what neighbors need from us
+        block
+            integer, allocatable :: all_recv_counts(:), all_send_counts(:)
+            integer, allocatable :: all_recv_disps(:), all_send_disps(:)
+            integer(int64), allocatable :: all_send_indices(:), all_recv_requested(:)
+            integer :: total_all_send, total_all_recv
+            
+            allocate(all_recv_counts(nprocs), all_send_counts(nprocs))
+            all_recv_counts = 0
+            all_send_counts = 0
+            
+            do i = 1, n_out
+                all_recv_counts(out_neighbor_list(i) + 1) = recv_counts(i)
+            end do
+            do i = 1, n_in
+                all_send_counts(in_neighbor_list(i) + 1) = send_counts(i)
+            end do
+            
+            allocate(all_recv_disps(nprocs), all_send_disps(nprocs))
+            all_recv_disps(1) = 0
+            all_send_disps(1) = 0
+            do i = 2, nprocs
+                all_recv_disps(i) = all_recv_disps(i-1) + all_recv_counts(i-1)
+                all_send_disps(i) = all_send_disps(i-1) + all_send_counts(i-1)
+            end do
+            
+            total_all_send = sum(all_recv_counts)
+            total_all_recv = sum(all_send_counts)
+            
+            allocate(all_send_indices(max(total_all_send, 1)))
+            do i = 1, n_out
+                do j = 1, recv_counts(i)
+                    all_send_indices(all_recv_disps(out_neighbor_list(i) + 1) + j) = &
+                        all_recv_indices(recv_disps(i) + j)
+                end do
+            end do
+            
+            allocate(all_recv_requested(max(total_all_recv, 1)))
+            
+            call MPI_Alltoallv(all_send_indices, all_recv_counts, all_recv_disps, MPI_INTEGER8, &
+                               all_recv_requested, all_send_counts, all_send_disps, MPI_INTEGER8, &
+                               MPI_COMM_WORLD, ierr)
+            
+            allocate(requested(max(total_send, 1)))
+            do i = 1, n_in
+                do j = 1, send_counts(i)
+                    requested(send_disps(i) + j) = &
+                        all_recv_requested(all_send_disps(in_neighbor_list(i) + 1) + j)
+                end do
+            end do
+            
+            deallocate(all_recv_counts, all_send_counts)
+            deallocate(all_recv_disps, all_send_disps)
+            deallocate(all_send_indices, all_recv_requested)
+        end block
+        
+        allocate(send_offsets(max(total_send, 1)))
+        do i = 1, total_send
+            send_offsets(i) = requested(i) - lb + 1
+        end do
+        
+        deallocate(all_recv_indices, requested)
+        deallocate(is_out_neighbor, is_in_neighbor)
+        deallocate(in_neighbor_list, out_neighbor_list)
+    end subroutine setup_graph_comm
+
+    !--------------------------------------------------------------------------
+    ! Build hash table for O(1) average remote column lookup
+    !--------------------------------------------------------------------------
+    subroutine build_hash_table(recv_indices_sorted, sort_perm, total_recv, &
+                                 hash_keys, hash_vals, hash_size)
+        integer(int64), intent(in) :: recv_indices_sorted(:)
+        integer(int64), intent(in) :: sort_perm(:)
+        integer(int64), intent(in) :: total_recv
+        integer(int64), allocatable, intent(out) :: hash_keys(:)
+        integer(int64), allocatable, intent(out) :: hash_vals(:)
+        integer(int64), intent(out) :: hash_size
+        
+        integer(int64) :: i, hash_pos, probe
+        
+        hash_size = 2_int64 * total_recv + 1_int64
+        if (mod(hash_size, 2_int64) == 0) hash_size = hash_size + 1_int64
+        
+        allocate(hash_keys(hash_size), hash_vals(hash_size))
+        hash_keys = -1_int64
+        hash_vals = 0_int64
+        
+        do i = 1, total_recv
+            hash_pos = compute_hash(recv_indices_sorted(i), hash_size)
+            do probe = 0, hash_size - 1
+                if (hash_keys(hash_pos) < 0) then
+                    hash_keys(hash_pos) = recv_indices_sorted(i)
+                    hash_vals(hash_pos) = i
+                    exit
+                end if
+                hash_pos = mod(hash_pos, hash_size) + 1_int64
+            end do
+        end do
+    end subroutine build_hash_table
+
+    !--------------------------------------------------------------------------
+    ! SpMV using graph communicator and prebuilt hash table
+    !--------------------------------------------------------------------------
+    subroutine spmv(row_starts, col_indexes, u, v, scalar, &
+                                 graph_comm, &
+                                 recv_indices_sorted, sort_perm, &
+                                 recv_counts, recv_disps, &
+                                 send_offsets, send_counts, send_disps, &
+                                 total_recv, total_send, lb, ub, &
+                                 send_buf, recv_buf, &
+                                 hash_keys, hash_vals, hash_size, &
+                                 values)
+        integer(int64), intent(in) :: row_starts(:), col_indexes(:)
+        complex(dp), intent(in) :: u(:)
+        complex(dp), intent(out) :: v(:)
+        complex(dp), intent(in) :: scalar
+        integer, intent(in) :: graph_comm
+        integer(int64), intent(in) :: recv_indices_sorted(:)
+        integer(int64), intent(in) :: sort_perm(:)
+        integer, intent(in) :: recv_counts(:), recv_disps(:)
+        integer(int64), intent(in) :: send_offsets(:)
+        integer, intent(in) :: send_counts(:), send_disps(:)
+        integer(int64), intent(in) :: total_recv, total_send
+        integer(int64), intent(in) :: lb, ub
+        complex(dp), intent(inout) :: send_buf(:), recv_buf(:)
+        integer(int64), intent(in) :: hash_keys(:)
+        integer(int64), intent(in) :: hash_vals(:)
+        integer(int64), intent(in) :: hash_size
+        complex(dp), intent(in) :: values(:)
+        
+        integer :: ierr, request
+        integer(int64) :: i, n_local, col, start_j, end_j, j
+        integer(int64) :: local_start, local_end, sorted_pos
+        complex(dp) :: row_sum
+        integer :: status(MPI_STATUS_SIZE)
+        complex(dp), allocatable :: recv_buf_sorted(:)
+        
+        n_local = ub - lb + 1
+        
+        ! Pack send buffer
+        !$omp parallel do
+        do i = 1, total_send
+            send_buf(i) = u(send_offsets(i))
+        end do
+        !$omp end parallel do
+        
+        ! Start non-blocking exchange
+        call MPI_Ineighbor_alltoallv(send_buf, send_counts, send_disps, MPI_DOUBLE_COMPLEX, &
+                                     recv_buf, recv_counts, recv_disps, MPI_DOUBLE_COMPLEX, &
+                                     graph_comm, request, ierr)
+        
+        ! Compute LOCAL contributions while communication proceeds
+        !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end)
+        do i = 1, n_local
+            start_j = row_starts(i)
+            end_j = row_starts(i + 1) - 1
+            row_sum = (0.0_dp, 0.0_dp)
+            
+            local_start = lower_bound(col_indexes, start_j, end_j, lb)
+            local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
+            
+            do j = local_start, local_end
+                col = col_indexes(j)
+                row_sum = row_sum + values(j) * u(col - lb + 1)
+            end do
+            
+            v(i) = row_sum
+        end do
+        !$omp end parallel do
+        
+        ! Wait for communication
+        call MPI_Wait(request, status, ierr)
+        
+        ! Reorder recv_buf to sorted order
+        allocate(recv_buf_sorted(max(total_recv, 1_int64)))
+        !$omp parallel do
+        do i = 1, total_recv
+            recv_buf_sorted(i) = recv_buf(sort_perm(i))
+        end do
+        !$omp end parallel do
+        
+        ! Add REMOTE contributions
+        !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, sorted_pos)
+        do i = 1, n_local
+            start_j = row_starts(i)
+            end_j = row_starts(i + 1) - 1
+            
+            if (start_j > end_j) then
+                v(i) = scalar * v(i)
+                cycle
+            end if
+            
+            if (col_indexes(start_j) >= lb .and. col_indexes(end_j) <= ub) then
+                v(i) = scalar * v(i)
+                cycle
+            end if
+            
+            row_sum = v(i)
+            
+            local_start = lower_bound(col_indexes, start_j, end_j, lb)
+            local_end = upper_bound(col_indexes, start_j, end_j, ub) - 1
+            
+            do j = start_j, local_start - 1
+                col = col_indexes(j)
+                sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                if (sorted_pos > 0) then
+                    row_sum = row_sum + values(j) * recv_buf_sorted(sorted_pos)
+                end if
+            end do
+            
+            do j = local_end + 1, end_j
+                col = col_indexes(j)
+                sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                if (sorted_pos > 0) then
+                    row_sum = row_sum + values(j) * recv_buf_sorted(sorted_pos)
+                end if
+            end do
+            
+            v(i) = scalar * row_sum
+        end do
+        !$omp end parallel do
+        
+        deallocate(recv_buf_sorted)
+    end subroutine spmv
+
+    !--------------------------------------------------------------------------
+    ! Original Sparse module functions below
+    !--------------------------------------------------------------------------
 
     !> @brief Merge sort a CSR matrix A by an array of column indexes,
     !> used to form the conjugate transpose of A.
@@ -1348,617 +1134,233 @@ module Sparse
 
     end subroutine CSR_Dagger
 
-    !> @briefs Determines which unique vector/matrix elements need to be communicated
-    !> between MPI process during sparse matrix multiplication.
-
-    subroutine Reconcile_Communications(A, &
-                                        partition_table, &
-                                        MPI_communicator)
-
+    !--------------------------------------------------------------------------
+    ! Setup graph communicator for efficient neighbor-based SpMV
+    ! This replaces Reconcile_Communications for the new SpMV method
+    !--------------------------------------------------------------------------
+    subroutine Setup_Graph_Communications(A, partition_table, MPI_communicator)
         type(CSR), intent(inout) :: A
         integer, dimension(:), intent(in) :: partition_table
         integer, intent(in) :: MPI_communicator
 
-        integer :: lb, ub, lb_elements, ub_elements
-
-        integer :: total_rec_inds
-        integer(dp), dimension(:), allocatable :: RHS_rec_inds
-        integer :: node
-
-        integer :: i, j
-
-        !MPI ENVIRONMENT
-        integer :: rank
-        integer :: flock
-        integer :: ierr
-
-        integer, dimension(:), allocatable :: requires
-        integer :: ind
-
-        call mpi_comm_size( mpi_communicator, &
-                            flock, &
-                            ierr)
-
-        call mpi_comm_rank( mpi_communicator, &
-                            rank, &
-                            ierr)
-
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2) - 1
-
-        allocate(requires(partition_table(flock + 1) - 1))
-
-        requires = 0
-
-        lb_elements = lbound(A%col_indexes, 1)
-        ub_elements = ubound(A%col_indexes, 1)
-
-        ! Determine the number of unique RHS indexes to recieve from each node
-        ! and their total.
-
-        if (.not. associated(A%num_rec_inds)) then
-            allocate(A%num_rec_inds(flock))
-        endif
-
-        A%num_rec_inds = 0
-
-        total_rec_inds = 0
-
-        ind = 1
-
-        node = 0
-        do i = lb_elements, ub_elements
-
-            if ((A%col_indexes(i) < lb) .or. (A%col_indexes(i) > ub)) then
-
-                    do j = flock, 1, -1
-
-                        if (A%col_indexes(i) >= partition_table(j)) then
-                            node = j
-                            exit
-                        endif
-
-                    enddo
-
-                    if (requires(A%col_indexes(i)) == 0) then
-                        requires(A%col_indexes(i)) = 1
-                        A%num_rec_inds(node) = A%num_rec_inds(node) + 1
-                        total_rec_inds = total_rec_inds + 1
-                    endif
-
-            endif
-        enddo
-
-        ind = 0
-        do i = 1, size(requires)
-            if (requires(i) /= 0) then
-                requires(i) = requires(i) + ind
-                ind = ind + 1
-            endif
-        enddo
-
-        ! Calculate the offset of the external elements in the 1D receive buffer.
-
-        if (.not. associated(A%rec_disps)) then
-            allocate(A%rec_disps(flock))
-        endif
-
-        A%rec_disps = 0
-        do i = 2, flock
-            A%rec_disps(i) = A%rec_disps(i - 1) + A%num_rec_inds(i - 1)
-        enddo
-
-        ! Create an ordered list of unique RHS receive indexes. Remap CSR column
-        ! indexes pointing to external RHS vector elements such that their
-        ! access occurs with the same efficiency as the local RHS elements.
-
-        if (.not. associated(A%local_col_inds)) then
-            allocate(A%local_col_inds(lb_elements:ub_elements))
-        endif
-
-        do i = lb_elements, ub_elements
-            A%local_col_inds(i) = A%col_indexes(i)
-        enddo
-
-        allocate(RHS_rec_inds(total_rec_inds))
-        RHS_rec_inds = 0
-
-        do i = lb_elements, ub_elements
-
-            if ((A%local_col_inds(i) < lb) .or. (A%local_col_inds(i) > ub)) then
-
-                    do j = flock, 1, -1
-
-                        if (A%local_col_inds(i) >= partition_table(j)) then
-                            node = j
-                            exit
-                        endif
-
-                    enddo
-
-                    RHS_rec_inds(requires(A%local_col_inds(i))) = A%local_col_inds(i)
-
-                    A%local_col_inds(i) = ub + requires(A%local_col_inds(i))
-
-            endif
-        enddo
-
-        if (.not. associated(A%num_send_inds)) then
-            allocate(A%num_send_inds(flock))
-        endif
-
-        call MPI_alltoall(  A%num_rec_inds, &
-                            1, &
-                            MPI_INTEGER, &
-                            A%num_send_inds, &
-                            1, &
-                            MPI_INTEGER, &
-                            MPI_communicator, &
-                            ierr)
-
-        if (.not. associated(A%RHS_send_inds)) then
-            allocate(A%RHS_send_inds(sum(A%num_send_inds)))
-        endif
-
-        if (.not. associated(A%send_disps)) then
-            allocate(A%send_disps(flock))
-        endif
-
-        ! Calculate the offset of the local send elements in the 1D send buffer.
-
-        A%send_disps = 0
-        do i = 2, flock
-            A%send_disps(i) = A%send_disps(i - 1) + A%num_send_inds(i - 1)
-        enddo
-
-        ! Obtain which RHS indexes to send to each node from the locally
-        ! determined receive elements.
-
-        call MPI_alltoallv( RHS_rec_inds, &
-                            A%num_rec_inds, &
-                            A%rec_disps, &
-                            MPI_LONG, &
-                            A%RHS_send_inds, &
-                            A%num_send_inds, &
-                            A%send_disps, &
-                            MPI_LONG, &
-                            MPI_communicator, &
-                            ierr)
-
-    end subroutine Reconcile_Communications
-
-    !
-    !   subroutine: SpMM
-    !
-    !> @brief MPI parallel CSR sparse-matrix dense-matrix multiplication.
-    !>
-    !> @details Computes A^(n)*B = C where *A* is a matrix, *B*, *C* are matrices
-    !> and *n* is an integer.
-    !>
-    !> *CSR* matrix *A* and matrix *B* must be paritioned as given by
-    !> *partition_table*, see @ref sparse_parts::generate_partition_table for more.
-    !>
-    !> @warning *spmm* requires that the *col_index* and *value* arrays of the CSR
-    !> data type are stored in accending column order for each row subsection.
-
-
-    subroutine SpMM(A, &
-                    n, &
-                    B_local, &
-                    partition_table, &
-                    rank, &
-                    C_local, &
-                    mpi_communicator)
-
-        type(CSR), intent(inout) :: A !< @param Local CSR array partition.
-        integer, intent(in) :: n !< @param Exponent on A.
-        complex(dp), dimension(:,:), intent(in) :: B_local !< @param Local input dense matrix partition.
-        integer, dimension(:), intent(in) :: partition_table !< @param MPI communicator partition scheme.
-        integer, intent(in) :: rank
-        complex(dp), &
-        dimension(partition_table(rank + 1):partition_table(rank + 2) - 1, size(B_local, 2)), &
-            intent(out) :: C_local  !< Local output matrix partition.
-        integer, intent(in) :: mpi_communicator !< @param MPI communicator handel.
-
-        complex(dp), dimension(:,:), allocatable :: B_resize
-        complex(dp), dimension(:), allocatable :: rec_values, send_values
-
-        integer :: num_rec, num_send
-        integer :: lb, ub, lb_resize, ub_resize
-
-        integer ::  B_col
-
-        integer :: i, j, k, l
-
-        ! MPI environment
-        integer :: ierr
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2) - 1
-
-        num_rec = sum(A%num_rec_inds)
-        num_send = sum(A%num_send_inds)
-
-        lb_resize = ub + 1
-        ub_resize = ub + num_rec
-
-        B_col = size(B_local, 2)
-
-        allocate(B_resize(lb:ub_resize, B_col))
-
-        B_resize(lb:ub,:) = B_local
-
-        allocate(rec_values(num_rec))
-        allocate(send_values(num_send))
-
-        do l = 1, n
-
-            do j = 1, B_col
-
-                !$omp parallel do
-                do i = 1, num_send
-                    send_values(i) = B_resize(A%RHS_send_inds(i), j)
-                enddo
-                !$omp end parallel do
-
-                call MPI_alltoallv( send_values, &
-                                    A%num_send_inds, &
-                                    A%send_disps, &
-                                    MPI_double_complex, &
-                                    rec_values, &
-                                    A%num_rec_inds, &
-                                    A%rec_disps, &
-                                    MPI_double_complex, &
-                                    MPI_communicator, &
-                                    ierr)
-
-                B_resize(lb_resize:ub_resize, j) = rec_values
-
-            enddo
-
-            C_local = 0
-
-            ! !$omp parallel do
-            ! do i = lb, ub
-            !     do j = A%row_starts(i), A%row_starts(i + 1) - 1
-            !         do k = 1, B_col
-            !             C_local(i, k) = A%values(j)*B_resize(A%local_col_inds(j), k) &
-            !                 + C_local(i, k)
-            !         enddo
-            !     enddo
-            ! enddo
-            ! !$omp end parallel do
-
-            call SpMM_kernel(A, lb, ub, B_resize, C_local)
-
-            if (l < n) then
-                B_resize(lb:ub,:) = C_local
-            endif
-
-        enddo
-
-    end subroutine SpMM
-
-    subroutine SpMM_kernel(A, lb, ub, B, C)
-            type(CSR), intent(in) :: A
-            integer, intent(in) :: lb, ub
-            complex(dp), dimension(lb:,:), intent(in) :: B
-            complex(dp), dimension(lb:,:), intent(inout) :: C
-
-            integer :: i, j, k
-
-            do i = lb, ub
-                do j = A%row_starts(i), A%row_starts(i + 1) - 1
-                    do k = 1, size(B,2)
-                        C(i, k) = A%values(j)*B(A%local_col_inds(j), k) + C(i, k)
-                    enddo
-                enddo
-            enddo
-
-
-    end subroutine SpMM_kernel
-
-    !
-    !   subroutine: SpMV_Series
-    !
-    !> @brief MPI parallel CSR sparse-matrix dense-vector series multiplication.
-    !>
-    !> @details Computes A^(n)*u = v where *A* is a matrix, *u*, *v* are vectors,
-    !> *n* is an integer and is given by n = max_it - start_it + 1.
-    !> This SpMV varient is designed to be called repeatedly
-    !> from within a loop, such that additional operations may be performed on
-    !> *v* between iterations. Various optimisation assocaited arrays  are saved
-    !> and are deallocated after the final iteration as given by *max_it*.
-    !>
-    !> *CSR* matrix *A* and vector *u* must be paritioned as given by
-    !> *partition_table*, see @ref sparse_parts::generate_partition_table for more.
-    !>
-    !> @warning *spmv_series* requires that the *col_index* and *value* arrays of the CSR
-    !> data type are stored in accending column order for each row subsection.
-
-    subroutine SpMV_Series( A, &
-                            u_local, &
-                            partition_table, &
-                            start_it, &
-                            current_it, &
-                            max_it, &
-                            rank, &
-                            v_local, &
-                            mpi_communicator)
-
-        type(CSR), intent(in) :: A !< @param Local CSR array partition.
-        complex(dp), dimension(:), intent(inout) :: u_local !< @param Local input vector partition.
-        integer, dimension(:), intent(in) :: partition_table !< @param MPI communicator partition scheme.
-        integer, intent(in) :: start_it !< @param starting multiplication index.
-        integer, intent(in) :: current_it !< @param Current multiplication index
-        integer, intent(in) :: max_it !< @param Final multiplication index.
-        integer, intent(in) :: rank
-        integer, intent(in) :: mpi_communicator !< @param MPI communicator handel.
-        complex(dp), dimension(partition_table(rank + 1):partition_table(rank + 2) - 1), &
-            intent(inout) :: v_local !< @param Local output vector partition.
-
-        complex(dp), dimension(:), allocatable, save :: u_resize
-        complex(dp), dimension(:), allocatable, save :: send_values
-        complex(dp), dimension(:), allocatable, save :: rec_values
-
-        integer :: lb, ub, lb_resize, ub_resize
-        integer :: num_send, num_rec
-
-        integer :: i, j
-
-        ! MPI environment
-        integer :: ierr
-
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2) - 1
-
-        num_rec = sum(A%num_rec_inds)
-        num_send = sum(A%num_send_inds)
-
-        lb_resize = ub + 1
-        ub_resize = ub + num_rec
-
-        if ((start_it == current_it) .and. allocated(u_resize)) then
-            deallocate(u_resize)
-            deallocate(rec_values)
-            deallocate(send_values)
-        endif
-
-        if (.not. allocated(u_resize)) then
-            !comm = 0
-            !calc = 0
-            allocate(u_resize(lb:ub_resize))
-            allocate(rec_values(num_rec))
-            allocate(send_values(num_send))
-        endif
-
-        !Calling with start_it = 0 and max_it = 0 clears the saved arrays if need.
-        if ((start_it == 0) .and. (max_it == 0)) then
-            if (allocated(u_resize)) then
-                deallocate(u_resize)
-                deallocate(rec_values)
-                deallocate(send_values)
-            endif
-            return
-        endif
-
-        u_resize(lb:ub) = u_local
-
-        !$omp parallel do
-        do i = 1, num_send
-            send_values(i) = u_resize(A%RHS_send_inds(i))
-        enddo
-        !$omp end parallel do
-
-        call MPI_alltoallv( send_values, &
-                            A%num_send_inds, &
-                            A%send_disps, &
-                            MPI_double_complex, &
-                            rec_values, &
-                            A%num_rec_inds, &
-                            A%rec_disps, &
-                            MPI_double_complex, &
-                            MPI_communicator, &
-                            ierr)
-
-        u_resize(lb_resize:ub_resize) = rec_values
-
-        v_local = 0
-
-
-        ! !$omp parallel do
-        ! do i = lb, ub
-        !     do j = A%row_starts(i), A%row_starts(i + 1) - 1
-
-        !         v_local(i) = A%values(j)*u_resize(A%local_col_inds(j)) &
-        !             + v_local(i)
-
-        !     enddo
-        ! enddo
-        ! !$omp end parallel do
-
-        call SpMV_kernel(A, lb, ub, u_resize, v_local)
-
-        if (current_it == max_it) then
-            deallocate(u_resize)
-            deallocate(rec_values)
-            deallocate(send_values)
-        endif
-
-    end subroutine SpMV_Series
-
-    subroutine SpMV_kernel(A, lb, ub, u, v)
-        type(CSR), intent(in) :: A
-        integer, intent(in) :: lb, ub
-        complex(dp), dimension(lb:), intent(in) :: u
-        complex(dp), dimension(lb:), intent(inout) :: v
-
-        integer :: i, j
-
-        do i = lb, ub
-            do j = A%row_starts(i), A%row_starts(i + 1) - 1
-                v(i) = A%values(j)*u(A%local_col_inds(j)) + v(i)
-            enddo
-        enddo
-
-
-    end subroutine SpMV_kernel
-
-    !> @brief Sort the rows of a distributed CSR matrix.
-
-    subroutine Merge_CSR(   column_indexes, &
-                            values, &
-                            start, &
-                            mid, &
-                            finish)
-
-        integer(dp), intent(inout), dimension(:) :: column_indexes
-        complex(dp), intent(inout), dimension(:) :: values
-        integer(dp), intent(in) :: start
-        integer(dp), intent(in) :: mid
-        integer(dp), intent(in) :: finish
-
-        integer(dp), dimension(:), allocatable :: col_ind_temp
-        complex(dp), dimension(:), allocatable :: val_temp
-        integer :: i, j, k
-
-        allocate(col_ind_temp(finish - start + 1))
-        allocate(val_temp(finish - start + 1))
-
-        i = start
-        j = mid + 1
-        k = 1
-
-        do while (i <= mid .and. j <= finish)
-
-            if (column_indexes(i) <= column_indexes(j)) then
-                col_ind_temp(k) = column_indexes(i)
-                val_temp(k) = values(i)
-                k = k + 1
-                i = i + 1
-            else
-                col_ind_temp(k) = column_indexes(j)
-                val_temp(k) = values(j)
-                k = k + 1
-                j = j+ 1
-            endif
-
-        enddo
-
-        do while (i <= mid)
-            col_ind_temp(k) = column_indexes(i)
-            val_temp(k) = values(i)
-            k = k + 1
-            i = i + 1
-        enddo
-
-        do while (j <= finish)
-            col_ind_temp(k) = column_indexes(j)
-            val_temp(k) = values(j)
-            k = k + 1
-            j = j + 1
-        enddo
-
-        do i = start, finish
-            column_indexes(i) = col_ind_temp(i - start + 1)
-            values(i) = val_temp(i - start + 1)
-        enddo
-
-    end subroutine Merge_CSR
-
-    !> @brief Sort the rows of a distributed CSR matrix.
-
-    subroutine Insertion_Sort_CSR(   column_indexes, &
-                                        values)
-
-        integer(dp), intent(inout), dimension(:) :: column_indexes
-        complex(dp), intent(inout), dimension(:) :: values
-
-        integer(dp) :: col_ind_temp
-        complex(dp) :: val_temp
-
-        integer :: i, j
-
-        do i = 2, size(column_indexes)
-
-            col_ind_temp = column_indexes(i)
-            val_temp = values(i)
-
-            j = i - 1
-
-            do while (j >= 1)
-
-                if (column_indexes(j) <= col_ind_temp) exit
-                    column_indexes(j + 1) = column_indexes(j)
-                    values(j + 1) = values(j)
-                    j = j - 1
-            enddo
-            column_indexes(j + 1) = col_ind_temp
-            values(j + 1) = val_temp
-
-        enddo
-
-    end subroutine Insertion_Sort_CSR
-
-    !> @brief Sort the rows of a distributed CSR matrix.
-
-    recursive subroutine Merge_Sort_CSR( column_indexes, &
-                                            values, &
-                                            start, &
-                                            finish)
-
-        integer(dp), intent(inout), dimension(:) :: column_indexes
-        complex(dp), intent(inout), dimension(:) :: values
-        integer(dp), intent(in) :: start
-        integer(dp), intent(in) :: finish
-
-        integer(dp) :: mid
-
-        if (start < finish) then
-            if (finish - start >= 512) then
-
-                mid = (start + finish) / 2
-
-                call Merge_Sort_CSR( column_indexes, &
-                                        values, &
-                                        start, &
-                                        mid)
-
-                call Merge_Sort_CSR( column_indexes, &
-                                        values, &
-                                        mid + 1, &
-                                        finish)
-
-                call Merge_CSR(  column_indexes, &
-                                    values, &
-                                    start, &
-                                    mid, &
-                                    finish)
-
-            else
-                call insertion_sort_CSR( column_indexes(start:finish), &
-                                            values(start:finish))
-            endif
-        endif
-
-    end subroutine Merge_Sort_CSR
-
-    subroutine Sort_CSR(A)
-
-        type(CSR), intent(inout) :: A
-
+        integer :: rank, flock, ierr
+        integer(int64) :: lb, ub, n_local, local_nnz
+        integer(int64) :: lb_elem, ub_elem
+        integer(int64), allocatable :: partition_table_64(:)
         integer :: i
 
-        do i = lbound(A%row_starts,1), ubound(A%row_starts,1) - 1
+        call MPI_Comm_rank(MPI_communicator, rank, ierr)
+        call MPI_Comm_size(MPI_communicator, flock, ierr)
 
-            call Merge_Sort_CSR(A%col_indexes(A%row_starts(i):A%row_starts(i + 1) - 1), &
-                                A%values(A%row_starts(i):A%row_starts(i + 1) - 1), &
-                                1_dp, &
-                                A%row_starts(i + 1) - A%row_starts(i))
+        lb = int(partition_table(rank + 1), int64)
+        ub = int(partition_table(rank + 2) - 1, int64)
+        n_local = ub - lb + 1
 
-        enddo
+        ! Convert partition table to int64
+        allocate(partition_table_64(flock + 1))
+        do i = 1, flock + 1
+            partition_table_64(i) = int(partition_table(i), int64)
+        end do
 
-    end subroutine Sort_CSR
+        ! Determine element bounds from the array itself
+        ! A%row_starts can be indexed either locally (1:n_local+1) or globally (lb:ub+1)
+        ! A%col_indexes and A%values should be consistent with row_starts
+        lb_elem = int(lbound(A%col_indexes, 1), int64)
+        ub_elem = int(ubound(A%col_indexes, 1), int64)
+        local_nnz = ub_elem - lb_elem + 1
+        
+        ! Create local row_starts (1-indexed, relative values)
+        allocate(A%row_starts_local(n_local + 1))
+        ! Check if row_starts is locally indexed (starts at 1) or globally indexed (starts at lb)
+        if (lbound(A%row_starts, 1) == 1) then
+            ! Locally indexed: row_starts(1:n_local+1), values start at 1
+            do i = 1, int(n_local + 1)
+                A%row_starts_local(i) = A%row_starts(i) - A%row_starts(1) + 1
+            end do
+        else
+            ! Globally indexed: row_starts(lb:ub+1), values start at row_starts(lb)
+            do i = 1, int(n_local + 1)
+                A%row_starts_local(i) = A%row_starts(lb + i - 1) - A%row_starts(lb) + 1
+            end do
+        end if
+        
+        ! Create local col_indexes copy (global column indices)
+        allocate(A%col_indexes_local(local_nnz))
+        A%col_indexes_local = A%col_indexes(lb_elem:ub_elem)
+        
+        ! Create local values copy
+        allocate(A%values_local(local_nnz))
+        A%values_local = A%values(lb_elem:ub_elem)
+
+        ! Call chunked_spmv_mod setup
+        call setup_graph_comm(A%row_starts_local, A%col_indexes_local, partition_table_64, &
+                              A%graph_comm, &
+                              A%recv_indices_sorted, A%sort_perm, &
+                              A%graph_recv_counts, A%graph_recv_disps, &
+                              A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                              A%in_neighbors, A%out_neighbors, &
+                              A%total_recv, A%total_send, A%lb_graph, A%ub_graph)
+
+        ! Build hash table for O(1) remote column lookup
+        call build_hash_table(A%recv_indices_sorted, A%sort_perm, A%total_recv, &
+                              A%hash_keys, A%hash_vals, A%hash_size)
+
+        ! Allocate persistent communication buffers
+        allocate(A%send_buf(max(A%total_send, 1_int64)))
+        allocate(A%recv_buf(max(A%total_recv, 1_int64)))
+
+        A%graph_comm_ready = .true.
+
+        deallocate(partition_table_64)
+
+    end subroutine Setup_Graph_Communications
+
+    !--------------------------------------------------------------------------
+    ! Graph-communicator-based SpMV: y = scalar * A * x
+    ! Uses neighbor collectives for O(neighbors) scaling
+    !--------------------------------------------------------------------------
+    subroutine SpMV_Graph(A, x_local, partition_table, rank, y_local, &
+                          scalar, MPI_communicator)
+        type(CSR), intent(inout) :: A
+        complex(dp), dimension(:), intent(in) :: x_local
+        integer, dimension(:), intent(in) :: partition_table
+        integer, intent(in) :: rank
+        complex(dp), dimension(:), intent(out) :: y_local
+        complex(dp), intent(in), optional :: scalar
+        integer, intent(in) :: MPI_communicator
+
+        complex(dp) :: sc
+
+        if (.not. A%graph_comm_ready) then
+            call Setup_Graph_Communications(A, partition_table, MPI_communicator)
+        end if
+
+        if (present(scalar)) then
+            sc = scalar
+        else
+            sc = (1.0_dp, 0.0_dp)
+        end if
+
+        call spmv(A%row_starts_local, A%col_indexes_local, &
+                  x_local, y_local, sc, &
+                  A%graph_comm, &
+                  A%recv_indices_sorted, A%sort_perm, &
+                  A%graph_recv_counts, A%graph_recv_disps, &
+                  A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                  A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                  A%send_buf, A%recv_buf, &
+                  A%hash_keys, A%hash_vals, A%hash_size, &
+                  A%values_local)
+
+    end subroutine SpMV_Graph
+
+    !--------------------------------------------------------------------------
+    ! Graph-communicator-based SpMM: C = A^n * B
+    ! Uses neighbor collectives for O(neighbors) scaling
+    ! For n > 1, iterates with temporary storage
+    !--------------------------------------------------------------------------
+    subroutine SpMM_Graph(A, n, B_local, partition_table, rank, C_local, MPI_communicator)
+        type(CSR), intent(inout) :: A
+        integer, intent(in) :: n
+        complex(dp), dimension(:,:), intent(in) :: B_local
+        integer, dimension(:), intent(in) :: partition_table
+        integer, intent(in) :: rank
+        complex(dp), dimension(:,:), intent(out) :: C_local
+        integer, intent(in) :: MPI_communicator
+
+        integer :: k, col, n_cols, n_local
+        complex(dp), allocatable :: temp_in(:,:), temp_out(:,:)
+        complex(dp), allocatable :: col_in(:), col_out(:)
+
+        if (.not. A%graph_comm_ready) then
+            call Setup_Graph_Communications(A, partition_table, MPI_communicator)
+        end if
+
+        n_local = int(A%ub_graph - A%lb_graph + 1)
+        n_cols = size(B_local, 2)
+
+        allocate(col_in(n_local), col_out(n_local))
+
+        if (n == 1) then
+            ! Simple case: single multiplication
+            do col = 1, n_cols
+                col_in = B_local(:, col)
+                call spmv(A%row_starts_local, A%col_indexes_local, &
+                          col_in, col_out, (1.0_dp, 0.0_dp), &
+                          A%graph_comm, &
+                          A%recv_indices_sorted, A%sort_perm, &
+                          A%graph_recv_counts, A%graph_recv_disps, &
+                          A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                          A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                          A%send_buf, A%recv_buf, &
+                          A%hash_keys, A%hash_vals, A%hash_size, &
+                          A%values_local)
+                C_local(:, col) = col_out
+            end do
+        else
+            ! Multiple multiplications: A^n * B
+            allocate(temp_in(n_local, n_cols), temp_out(n_local, n_cols))
+            temp_in = B_local
+
+            do k = 1, n
+                do col = 1, n_cols
+                    col_in = temp_in(:, col)
+                    call spmv(A%row_starts_local, A%col_indexes_local, &
+                              col_in, col_out, (1.0_dp, 0.0_dp), &
+                              A%graph_comm, &
+                              A%recv_indices_sorted, A%sort_perm, &
+                              A%graph_recv_counts, A%graph_recv_disps, &
+                              A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
+                              A%total_recv, A%total_send, A%lb_graph, A%ub_graph, &
+                              A%send_buf, A%recv_buf, &
+                              A%hash_keys, A%hash_vals, A%hash_size, &
+                              A%values_local)
+                    temp_out(:, col) = col_out
+                end do
+                if (k < n) then
+                    temp_in = temp_out
+                end if
+            end do
+
+            C_local = temp_out
+            deallocate(temp_in, temp_out)
+        end if
+
+        deallocate(col_in, col_out)
+
+    end subroutine SpMM_Graph
+
+    !--------------------------------------------------------------------------
+    ! Cleanup graph communicator resources
+    !--------------------------------------------------------------------------
+    subroutine Cleanup_Graph_Communications(A)
+        type(CSR), intent(inout) :: A
+        integer :: ierr
+
+        if (A%graph_comm /= MPI_COMM_NULL) then
+            call MPI_Comm_free(A%graph_comm, ierr)
+            A%graph_comm = MPI_COMM_NULL
+        end if
+
+        if (allocated(A%recv_indices_sorted)) deallocate(A%recv_indices_sorted)
+        if (allocated(A%sort_perm)) deallocate(A%sort_perm)
+        if (allocated(A%graph_recv_counts)) deallocate(A%graph_recv_counts)
+        if (allocated(A%graph_recv_disps)) deallocate(A%graph_recv_disps)
+        if (allocated(A%send_offsets)) deallocate(A%send_offsets)
+        if (allocated(A%graph_send_counts)) deallocate(A%graph_send_counts)
+        if (allocated(A%graph_send_disps)) deallocate(A%graph_send_disps)
+        if (allocated(A%in_neighbors)) deallocate(A%in_neighbors)
+        if (allocated(A%out_neighbors)) deallocate(A%out_neighbors)
+        if (allocated(A%hash_keys)) deallocate(A%hash_keys)
+        if (allocated(A%hash_vals)) deallocate(A%hash_vals)
+        if (allocated(A%send_buf)) deallocate(A%send_buf)
+        if (allocated(A%recv_buf)) deallocate(A%recv_buf)
+        if (allocated(A%row_starts_local)) deallocate(A%row_starts_local)
+        if (allocated(A%col_indexes_local)) deallocate(A%col_indexes_local)
+        if (allocated(A%values_local)) deallocate(A%values_local)
+
+        A%graph_comm_ready = .false.
+
+    end subroutine Cleanup_Graph_Communications
 
 end module Sparse

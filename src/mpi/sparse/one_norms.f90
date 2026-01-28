@@ -215,13 +215,13 @@ module One_Norms
 
         do
 
-            call SpMM(  A, &
-                        n, &
-                        X, &
-                        partition_table, &
-                        rank, &
-                        Y, &
-                        MPI_communicator)
+            call SpMM_Graph(A, &
+                            n, &
+                            X, &
+                            partition_table, &
+                            rank, &
+                            Y, &
+                            MPI_communicator)
 
             Y_norms_local = 0
 
@@ -285,13 +285,13 @@ module One_Norms
                 enddo
             enddo
 
-            call SpMM(  A_T, &
-                        n, &
-                        S, &
-                        partition_table, &
-                        rank, &
-                        Z, &
-                        MPI_communicator)
+            call SpMM_Graph(A_T, &
+                            n, &
+                            S, &
+                            partition_table, &
+                            rank, &
+                            Z, &
+                            MPI_communicator)
 
             Z_norms_local = 0
 
