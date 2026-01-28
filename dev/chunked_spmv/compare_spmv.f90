@@ -297,15 +297,17 @@ contains
         integer(int64), allocatable :: row_starts(:), col_indexes(:)
         complex(dp), allocatable :: u(:), v(:)
         complex(dp), allocatable :: send_buf(:), recv_buf(:)
-        integer :: graph_comm, total_recv, total_send
+        integer :: graph_comm
+        integer(int64) :: total_recv, total_send
         integer(int64), allocatable :: recv_indices_sorted(:), send_offsets(:)
-        integer, allocatable :: sort_perm(:), recv_counts(:), recv_disps(:)
+        integer(int64), allocatable :: sort_perm(:)
+        integer, allocatable :: recv_counts(:), recv_disps(:)
         integer, allocatable :: send_counts(:), send_disps(:)
         integer, allocatable :: in_neighbors(:), out_neighbors(:)
         ! Hash table for O(1) lookup
         integer(int64), allocatable :: hash_keys(:)
-        integer, allocatable :: hash_vals(:)
-        integer :: hash_size
+        integer(int64), allocatable :: hash_vals(:)
+        integer(int64) :: hash_size, max_chunk_64
         real(dp) :: t_start, max_err, global_max_err
         
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
@@ -344,7 +346,10 @@ contains
         
         ! Allocate vectors and buffers
         allocate(u(n_local), v(n_local))
-        allocate(send_buf(max(total_send, 1)), recv_buf(max(total_recv, 1)))
+        allocate(send_buf(max(total_send, 1_int64)), recv_buf(max(total_recv, 1_int64)))
+        
+        ! Convert max_recv_chunk to int64
+        max_chunk_64 = int(max_recv_chunk, int64)
         
         ! Test correctness: all-ones vector
         u = (1.0_dp, 0.0_dp)
@@ -352,7 +357,7 @@ contains
                               graph_comm, recv_indices_sorted, sort_perm, &
                               recv_counts, recv_disps, send_offsets, send_counts, send_disps, &
                               total_recv, total_send, lb, ub, send_buf, recv_buf, &
-                              hash_keys, hash_vals, hash_size, max_recv_chunk)
+                              hash_keys, hash_vals, hash_size, max_chunk_64)
         
         max_err = 0.0_dp
         do i = 1, n_local
@@ -375,7 +380,7 @@ contains
                                   graph_comm, recv_indices_sorted, sort_perm, &
                                   recv_counts, recv_disps, send_offsets, send_counts, send_disps, &
                                   total_recv, total_send, lb, ub, send_buf, recv_buf, &
-                                  hash_keys, hash_vals, hash_size, max_recv_chunk)
+                                  hash_keys, hash_vals, hash_size, max_chunk_64)
         end do
         
         ! Timed runs
@@ -387,7 +392,7 @@ contains
                                   graph_comm, recv_indices_sorted, sort_perm, &
                                   recv_counts, recv_disps, send_offsets, send_counts, send_disps, &
                                   total_recv, total_send, lb, ub, send_buf, recv_buf, &
-                                  hash_keys, hash_vals, hash_size, max_recv_chunk)
+                                  hash_keys, hash_vals, hash_size, max_chunk_64)
         end do
         
         call MPI_Barrier(MPI_COMM_WORLD, ierr)
@@ -398,10 +403,10 @@ contains
         !   - row_starts: (n_local+1) * 8 bytes
         !   - col_indexes: local_nnz * 8 bytes (NO values - unit matrix)
         !   - recv_indices_sorted: total_recv * 8 bytes
-        !   - sort_perm: total_recv * 4 bytes
+        !   - sort_perm: total_recv * 8 bytes (int64)
         !   - send_offsets: total_send * 8 bytes
         !   - hash_keys: hash_size * 8 bytes
-        !   - hash_vals: hash_size * 4 bytes
+        !   - hash_vals: hash_size * 8 bytes (int64)
         !   - recv/send_counts, disps: ~4 * n_neighbors * 4 bytes (small)
         ! New method runtime buffers:
         !   - send_buf: total_send * 16 bytes
@@ -412,16 +417,16 @@ contains
         mem_mb = real(n_local + 1) * 8 / 1e6  ! row_starts
         mem_mb = mem_mb + real(local_nnz) * 8 / 1e6  ! col_indexes (no values!)
         mem_mb = mem_mb + real(total_recv) * 8 / 1e6  ! recv_indices_sorted
-        mem_mb = mem_mb + real(total_recv) * 4 / 1e6  ! sort_perm
+        mem_mb = mem_mb + real(total_recv) * 8 / 1e6  ! sort_perm (int64)
         mem_mb = mem_mb + real(total_send) * 8 / 1e6  ! send_offsets
         mem_mb = mem_mb + real(hash_size) * 8 / 1e6   ! hash_keys
-        mem_mb = mem_mb + real(hash_size) * 4 / 1e6   ! hash_vals
+        mem_mb = mem_mb + real(hash_size) * 8 / 1e6   ! hash_vals (int64)
         
         ! Runtime buffers
         mem_mb = mem_mb + real(total_send) * 16 / 1e6  ! send_buf
         mem_mb = mem_mb + real(total_recv) * 16 / 1e6  ! recv_buf
-        if (max_recv_chunk > 0 .and. total_recv > max_recv_chunk) then
-            mem_mb = mem_mb + real(max_recv_chunk) * 16 / 1e6  ! recv_buf_sorted (chunked)
+        if (max_chunk_64 > 0 .and. total_recv > max_chunk_64) then
+            mem_mb = mem_mb + real(max_chunk_64) * 16 / 1e6  ! recv_buf_sorted (chunked)
         else
             mem_mb = mem_mb + real(total_recv) * 16 / 1e6  ! recv_buf_sorted (full)
         end if
@@ -431,8 +436,8 @@ contains
             print '(A,F10.2,A)', 'SpMV time:   ', t_spmv * 1000, ' ms/iter'
             print '(A,I0)', 'Total recv:  ', total_recv
             print '(A,I0)', 'Total send:  ', total_send
-            if (max_recv_chunk > 0 .and. total_recv > max_recv_chunk) then
-                print '(A,I0)', 'Chunks used: ', (total_recv + max_recv_chunk - 1) / max_recv_chunk
+            if (max_chunk_64 > 0 .and. total_recv > max_chunk_64) then
+                print '(A,I0)', 'Chunks used: ', (total_recv + max_chunk_64 - 1) / max_chunk_64
             end if
         end if
         

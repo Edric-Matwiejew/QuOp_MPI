@@ -17,6 +17,10 @@ module chunked_spmv_mod
     
     private
     
+    ! Hash table constants (Knuth's golden ratio multiplier)
+    integer(int64), parameter :: HASH_MULT = 2654435769_int64
+    integer(int64), parameter :: MASK32 = int(Z'FFFFFFFF', int64)
+    
     ! Public routines
     public :: generate_partition_table
     public :: build_hypercube_csr
@@ -26,7 +30,6 @@ module chunked_spmv_mod
     public :: cleanup_graph_comm
     
     ! Public helper functions (useful for testing)
-    public :: binary_search
     public :: lower_bound
     public :: upper_bound
     public :: find_owner
@@ -34,36 +37,8 @@ module chunked_spmv_mod
 contains
 
     !--------------------------------------------------------------------------
-    ! Binary search in sorted array - returns position or 0 if not found
-    ! Takes explicit bounds to avoid array slice temporaries
-    !--------------------------------------------------------------------------
-    pure function binary_search(arr, n, val) result(pos)
-        integer(int64), intent(in) :: arr(*)  ! Assumed-size to avoid copy
-        integer, intent(in) :: n              ! Number of elements to search
-        integer(int64), intent(in) :: val
-        integer :: pos
-        
-        integer :: lo, hi, mid
-        
-        lo = 1
-        hi = n
-        pos = 0  ! Not found
-        
-        do while (lo <= hi)
-            mid = (lo + hi) / 2
-            if (arr(mid) == val) then
-                pos = mid
-                return
-            else if (arr(mid) < val) then
-                lo = mid + 1
-            else
-                hi = mid - 1
-            end if
-        end do
-    end function binary_search
-    
-    !--------------------------------------------------------------------------
     ! Find first position where arr(pos) >= val (lower bound)
+    ! Uses assumed-size array to avoid array slice temporaries in hot loops
     !--------------------------------------------------------------------------
     pure function lower_bound(arr, lo_in, hi_in, val) result(pos)
         integer(int64), intent(in) :: arr(*)
@@ -88,6 +63,7 @@ contains
     
     !--------------------------------------------------------------------------
     ! Find first position where arr(pos) > val (upper bound)
+    ! Uses assumed-size array to avoid array slice temporaries in hot loops
     !--------------------------------------------------------------------------
     pure function upper_bound(arr, lo_in, hi_in, val) result(pos)
         integer(int64), intent(in) :: arr(*)
@@ -109,6 +85,46 @@ contains
         end do
         pos = lo
     end function upper_bound
+
+    !--------------------------------------------------------------------------
+    ! Compute hash index for a column using XOR-folding and golden ratio multiply
+    ! Folds 64-bit key to 32-bit to avoid overflow, then applies multiplicative hash
+    !--------------------------------------------------------------------------
+    pure function compute_hash(col, hash_size) result(hash_pos)
+        integer(int64), intent(in) :: col, hash_size
+        integer(int64) :: hash_pos
+        
+        integer(int64) :: folded
+        
+        folded = iand(ieor(col, ishft(col, -32)), MASK32)
+        hash_pos = mod(folded * HASH_MULT, hash_size) + 1_int64
+        if (hash_pos < 1) hash_pos = hash_pos + hash_size
+    end function compute_hash
+
+    !--------------------------------------------------------------------------
+    ! Look up a column in the hash table, returns position in sorted array or 0
+    !--------------------------------------------------------------------------
+    pure function hash_lookup(col, hash_keys, hash_vals, hash_size) result(pos)
+        integer(int64), intent(in) :: col
+        integer(int64), intent(in) :: hash_keys(:), hash_vals(:)
+        integer(int64), intent(in) :: hash_size
+        integer(int64) :: pos
+        
+        integer(int64) :: hash_pos, probe
+        
+        pos = 0_int64
+        hash_pos = compute_hash(col, hash_size)
+        
+        do probe = 0, hash_size - 1
+            if (hash_keys(hash_pos) == col) then
+                pos = hash_vals(hash_pos)
+                return
+            else if (hash_keys(hash_pos) < 0) then
+                return  ! Not found
+            end if
+            hash_pos = mod(hash_pos, hash_size) + 1_int64
+        end do
+    end function hash_lookup
 
     !--------------------------------------------------------------------------
     ! Find owner rank for a column index
@@ -228,13 +244,13 @@ contains
     end subroutine sort_int64
     
     !--------------------------------------------------------------------------
-    ! Sort int64 array with permutation tracking
+    ! Sort int64 array with permutation tracking (int64 permutation)
     !--------------------------------------------------------------------------
-    subroutine sort_with_perm(arr, perm)
+    pure subroutine sort_with_perm(arr, perm)
         integer(int64), intent(inout) :: arr(:)
-        integer, intent(inout) :: perm(:)
+        integer(int64), intent(inout) :: perm(:)
         
-        integer :: i, j, n, temp_p
+        integer(int64) :: i, j, n, temp_p
         integer(int64) :: key
         
         n = size(arr)
@@ -276,7 +292,10 @@ contains
         deallocate(left, right)
     end subroutine merge_sort_int64
     
-    subroutine merge_arrays(left, right, arr)
+    !--------------------------------------------------------------------------
+    ! Merge two sorted arrays into one
+    !--------------------------------------------------------------------------
+    pure subroutine merge_arrays(left, right, arr)
         integer(int64), intent(in) :: left(:), right(:)
         integer(int64), intent(out) :: arr(:)
         integer :: i, j, k
@@ -320,30 +339,27 @@ contains
         integer(int64), intent(in) :: partition_table(:)
         integer, intent(out) :: graph_comm
         integer(int64), allocatable, intent(out) :: recv_indices_sorted(:)
-        integer, allocatable, intent(out) :: sort_perm(:)
+        integer(int64), allocatable, intent(out) :: sort_perm(:)
         integer, allocatable, intent(out) :: recv_counts(:), recv_disps(:)
         integer(int64), allocatable, intent(out) :: send_offsets(:)
         integer, allocatable, intent(out) :: send_counts(:), send_disps(:)
         integer, allocatable, intent(out) :: in_neighbors(:), out_neighbors(:)
-        integer, intent(out) :: total_recv, total_send
+        integer(int64), intent(out) :: total_recv, total_send
         integer(int64), intent(out) :: lb, ub
         
-        integer :: rank, nprocs, ierr, i, j, r, owner, n_out, n_in, idx, pos
-        integer(int64) :: col, n_local
+        integer :: rank, nprocs, ierr, i, r, owner, n_out, n_in, idx, pos
+        integer(int64) :: col, n_local, j
         integer, allocatable :: in_weights(:), out_weights(:)
         integer, allocatable :: in_neighbor_list(:), out_neighbor_list(:)
         integer(int64), allocatable :: all_recv_indices(:), requested(:)
-        integer, allocatable :: temp_sort_perm(:)
+        integer(int64), allocatable :: temp_sort_perm(:)
         logical, allocatable :: is_out_neighbor(:), is_in_neighbor(:)
         integer(int64), allocatable :: seen_cols(:)
-        integer :: n_seen
+        integer(int64) :: n_seen
         logical :: found
         
         call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
         call MPI_Comm_size(MPI_COMM_WORLD, nprocs, ierr)
-        
-        if (rank == 0) write(*,*) 'DEBUG: setup_graph_comm started'
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
@@ -378,14 +394,8 @@ contains
         allocate(is_in_neighbor(0:nprocs-1))
         is_in_neighbor = .false.
         
-        if (rank == 0) write(*,*) 'DEBUG: before MPI_Alltoall'
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        
         call MPI_Alltoall(is_out_neighbor, 1, MPI_LOGICAL, &
                           is_in_neighbor, 1, MPI_LOGICAL, MPI_COMM_WORLD, ierr)
-        
-        if (rank == 0) write(*,*) 'DEBUG: after MPI_Alltoall, n_out=', n_out
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         
         n_in = count(is_in_neighbor)
         allocate(in_neighbor_list(max(n_in, 1)))
@@ -399,15 +409,10 @@ contains
             end if
         end do
         
-        if (rank == 0) write(*,*) 'DEBUG: n_in=', n_in
-        
         ! Step 3: Create graph communicator
         allocate(in_weights(max(n_in, 1)), out_weights(max(n_out, 1)))
         in_weights = 1
         out_weights = 1
-        
-        if (rank == 0) write(*,*) 'DEBUG: before MPI_Dist_graph_create_adjacent'
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         
         ! MPI_Dist_graph_create_adjacent(comm, indegree, sources, srcweights, 
         !                                 outdegree, destinations, destweights, ...)
@@ -417,9 +422,6 @@ contains
                 n_out, out_neighbor_list, out_weights, &
                 n_in, in_neighbor_list, in_weights, &
                 MPI_INFO_NULL, .false., graph_comm, ierr)
-        
-        if (rank == 0) write(*,*) 'DEBUG: after MPI_Dist_graph_create_adjacent'
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         
         deallocate(in_weights, out_weights)
         
@@ -541,9 +543,6 @@ contains
         
         deallocate(temp_sort_perm)
         
-        if (rank == 0) write(*,*) 'DEBUG: before count exchange, total_recv=', total_recv
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
-        
         ! Step 7: Exchange counts to set up send side
         ! Use temporary full-sized arrays just for count exchange
         block
@@ -569,9 +568,6 @@ contains
             
             deallocate(all_recv_counts, all_send_counts)
         end block
-        
-        if (rank == 0) write(*,*) 'DEBUG: after count exchange'
-        call MPI_Barrier(MPI_COMM_WORLD, ierr)
         
         total_send = sum(send_counts)
         
@@ -665,7 +661,8 @@ contains
                                    send_counts, send_disps, in_neighbors, out_neighbors)
         integer, intent(inout) :: graph_comm
         integer(int64), allocatable, intent(inout) :: recv_indices_sorted(:), send_offsets(:)
-        integer, allocatable, intent(inout) :: sort_perm(:), recv_counts(:), recv_disps(:)
+        integer(int64), allocatable, intent(inout) :: sort_perm(:)
+        integer, allocatable, intent(inout) :: recv_counts(:), recv_disps(:)
         integer, allocatable, intent(inout) :: send_counts(:), send_disps(:)
         integer, allocatable, intent(inout) :: in_neighbors(:), out_neighbors(:)
         
@@ -694,41 +691,33 @@ contains
     subroutine build_hash_table(recv_indices_sorted, sort_perm, total_recv, &
                                  hash_keys, hash_vals, hash_size)
         integer(int64), intent(in) :: recv_indices_sorted(:)
-        integer, intent(in) :: sort_perm(:)
-        integer, intent(in) :: total_recv
+        integer(int64), intent(in) :: sort_perm(:)
+        integer(int64), intent(in) :: total_recv
         integer(int64), allocatable, intent(out) :: hash_keys(:)
-        integer, allocatable, intent(out) :: hash_vals(:)
-        integer, intent(out) :: hash_size
+        integer(int64), allocatable, intent(out) :: hash_vals(:)
+        integer(int64), intent(out) :: hash_size
         
-        integer :: i, hash_pos, probe
-        integer(int64) :: folded
-        ! Golden ratio multiplier (Knuth). XOR-fold 64-bit keys to 32-bit first
-        ! to avoid overflow: folded <= 2^32, folded * HASH_MULT <= 2^64
-        integer(int64), parameter :: HASH_MULT = 2654435769_int64
-        integer(int64), parameter :: MASK32 = int(Z'FFFFFFFF', int64)
+        integer(int64) :: i, hash_pos, probe
         
         ! Size hash table with load factor ~0.5 for good performance
-        hash_size = 2 * total_recv + 1
-        ! Make hash_size prime-ish (odd) for better distribution
-        if (mod(hash_size, 2) == 0) hash_size = hash_size + 1
+        hash_size = 2_int64 * total_recv + 1_int64
+        ! Make hash_size odd for better distribution
+        if (mod(hash_size, 2_int64) == 0) hash_size = hash_size + 1_int64
         
         allocate(hash_keys(hash_size), hash_vals(hash_size))
         hash_keys = -1_int64  ! Empty marker
-        hash_vals = 0
+        hash_vals = 0_int64
         
-        ! Build hash table with linear probing using multiplicative hash
+        ! Build hash table with linear probing
         do i = 1, total_recv
-            ! XOR-fold 64-bit index to 32-bit, then mask to prevent overflow
-            folded = iand(ieor(recv_indices_sorted(i), ishft(recv_indices_sorted(i), -32)), MASK32)
-            hash_pos = int(mod(folded * HASH_MULT, int(hash_size, int64))) + 1
-            if (hash_pos < 1) hash_pos = hash_pos + hash_size  ! Handle negative mod
+            hash_pos = compute_hash(recv_indices_sorted(i), hash_size)
             do probe = 0, hash_size - 1
                 if (hash_keys(hash_pos) < 0) then
                     hash_keys(hash_pos) = recv_indices_sorted(i)
                     hash_vals(hash_pos) = i  ! Position in sorted array
                     exit
                 end if
-                hash_pos = mod(hash_pos, hash_size) + 1
+                hash_pos = mod(hash_pos, hash_size) + 1_int64
             end do
         end do
     end subroutine build_hash_table
@@ -754,43 +743,32 @@ contains
         complex(dp), intent(in) :: scalar
         integer, intent(in) :: graph_comm
         integer(int64), intent(in) :: recv_indices_sorted(:)
-        integer, intent(in) :: sort_perm(:)
+        integer(int64), intent(in) :: sort_perm(:)
         integer, intent(in) :: recv_counts(:), recv_disps(:)
         integer(int64), intent(in) :: send_offsets(:)
         integer, intent(in) :: send_counts(:), send_disps(:)
-        integer, intent(in) :: total_recv, total_send
+        integer(int64), intent(in) :: total_recv, total_send
         integer(int64), intent(in) :: lb, ub
         complex(dp), intent(inout) :: send_buf(:), recv_buf(:)
         integer(int64), intent(in) :: hash_keys(:)
-        integer, intent(in) :: hash_vals(:)
-        integer, intent(in) :: hash_size
-        integer, intent(in), optional :: max_recv_chunk
+        integer(int64), intent(in) :: hash_vals(:)
+        integer(int64), intent(in) :: hash_size
+        integer(int64), intent(in), optional :: max_recv_chunk
         
-        integer :: ierr, i, request, hash_pos, probe
-        integer(int64) :: n_local, col, start_j, end_j, j
+        integer :: ierr, request
+        integer(int64) :: i, n_local, col, start_j, end_j, j
         integer(int64) :: local_start, local_end
+        integer(int64) :: hash_pos, probe
         complex(dp) :: row_sum
         integer :: status(MPI_STATUS_SIZE)
         complex(dp), allocatable :: recv_buf_sorted(:)
         
         ! Chunking variables
-        integer :: chunk_size, chunk_start, chunk_end, n_chunks, chunk
-        integer :: actual_chunk_size
+        integer(int64) :: chunk_size, chunk_start, chunk_end, n_chunks, chunk
+        integer(int64) :: actual_chunk_size
         logical :: use_chunking
         
-        ! Debug timing
-        real(dp) :: t1, t2, t3, t4
-        integer :: rank_debug
-        
         n_local = ub - lb + 1
-        
-        call MPI_Comm_rank(MPI_COMM_WORLD, rank_debug, ierr)
-        
-        ! Debug: print hash_size
-        !if (rank_debug <= 1) then
-            write(*,'(A,I0,A,I0,A,I0,A,I0)') 'DEBUG rank ', rank_debug, &
-                ': n_local=', n_local, ' total_recv=', total_recv, ' hash_size=', hash_size
-        !end if
         
         ! Determine if chunking is needed
         use_chunking = .false.
@@ -802,18 +780,11 @@ contains
         end if
         
         ! Pack send buffer
-        t1 = MPI_Wtime()
         !$omp parallel do
         do i = 1, total_send
             send_buf(i) = u(send_offsets(i))
         end do
         !$omp end parallel do
-        t2 = MPI_Wtime()
-        
-        ! DEBUG: Check sizes
-        !write(*,'(A,I0,A,I0,A,I0,A,I0,A,I0)') 'SpMV rank ', rank, &
-        !    ': n_out=', size(recv_counts), ' n_in=', size(send_counts), &
-        !    ' total_recv=', total_recv, ' total_send=', total_send
         
         ! Start non-blocking exchange using graph communicator
         ! Graph: sources = out_neighbors (indegree), destinations = in_neighbors (outdegree)
@@ -822,7 +793,6 @@ contains
         call MPI_Ineighbor_alltoallv(send_buf, send_counts, send_disps, MPI_DOUBLE_COMPLEX, &
                                      recv_buf, recv_counts, recv_disps, MPI_DOUBLE_COMPLEX, &
                                      graph_comm, request, ierr)
-        t3 = MPI_Wtime()
         
         ! Compute LOCAL contributions while communication proceeds
         !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end)
@@ -847,7 +817,6 @@ contains
         
         ! Wait for communication to complete
         call MPI_Wait(request, status, ierr)
-        t4 = MPI_Wtime()
         
         if (.not. use_chunking) then
             ! Fast path: process all remote data at once
@@ -857,24 +826,13 @@ contains
             call process_remote_chunked()
         end if
         
-        t1 = MPI_Wtime()  ! Reuse t1 for end time
-        !if ((t4-t3)*1000 > 10.0_dp .or. (t1-t4)*1000 > 10.0_dp) then
-            write(*,'(A,I0,A,F8.3,A,F8.3,A)') 'DEBUG SpMV rank ', rank_debug, &
-                ': wait=', (t4-t3)*1000, ' ms, process_remote=', (t1-t4)*1000, ' ms'
-        !end if
-        
     contains
     
         subroutine process_remote_unchunked()
-            real(dp) :: t_reorder, t_hash, t_tmp
-            integer(int64) :: remote_count, total_probes, folded
-            ! Golden ratio multiplier with XOR-folding to avoid overflow
-            integer(int64), parameter :: HASH_MULT = 2654435769_int64
-            integer(int64), parameter :: MASK32 = int(Z'FFFFFFFF', int64)
+            integer(int64) :: sorted_pos
             
             ! Allocate full recv_buf_sorted
-            t_tmp = MPI_Wtime()
-            allocate(recv_buf_sorted(max(total_recv, 1)))
+            allocate(recv_buf_sorted(max(total_recv, 1_int64)))
             
             ! Reorder recv_buf to sorted order
             !$omp parallel do
@@ -882,15 +840,9 @@ contains
                 recv_buf_sorted(i) = recv_buf(sort_perm(i))
             end do
             !$omp end parallel do
-            t_reorder = MPI_Wtime() - t_tmp
-            
-            t_tmp = MPI_Wtime()
-            remote_count = 0
-            total_probes = 0
             
             ! Add REMOTE contributions using prebuilt hash table
-            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, hash_pos, probe) &
-            !$omp reduction(+:remote_count, total_probes)
+            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, sorted_pos)
             do i = 1, n_local
                 start_j = row_starts(i)
                 end_j = row_starts(i + 1) - 1
@@ -910,53 +862,20 @@ contains
                 ! Remote columns before local range
                 do j = start_j, local_start - 1
                     col = col_indexes(j)
-                    remote_count = remote_count + 1
-                    folded = iand(ieor(col, ishft(col, -32)), MASK32)
-                    hash_pos = int(mod(folded * HASH_MULT, int(hash_size, int64))) + 1
-                    if (hash_pos < 1) hash_pos = hash_pos + hash_size
-                    do probe = 0, hash_size - 1
-                        total_probes = total_probes + 1
-                        if (hash_keys(hash_pos) == col) then
-                            row_sum = row_sum + recv_buf_sorted(hash_vals(hash_pos))
-                            exit
-                        else if (hash_keys(hash_pos) < 0) then
-                            exit
-                        end if
-                        hash_pos = mod(hash_pos, hash_size) + 1
-                    end do
+                    sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                    if (sorted_pos > 0) row_sum = row_sum + recv_buf_sorted(sorted_pos)
                 end do
                 
                 ! Remote columns after local range
                 do j = local_end + 1, end_j
                     col = col_indexes(j)
-                    remote_count = remote_count + 1
-                    folded = iand(ieor(col, ishft(col, -32)), MASK32)
-                    hash_pos = int(mod(folded * HASH_MULT, int(hash_size, int64))) + 1
-                    if (hash_pos < 1) hash_pos = hash_pos + hash_size
-                    do probe = 0, hash_size - 1
-                        total_probes = total_probes + 1
-                        if (hash_keys(hash_pos) == col) then
-                            row_sum = row_sum + recv_buf_sorted(hash_vals(hash_pos))
-                            exit
-                        else if (hash_keys(hash_pos) < 0) then
-                            exit
-                        end if
-                        hash_pos = mod(hash_pos, hash_size) + 1
-                    end do
+                    sorted_pos = hash_lookup(col, hash_keys, hash_vals, hash_size)
+                    if (sorted_pos > 0) row_sum = row_sum + recv_buf_sorted(sorted_pos)
                 end do
                 
                 v(i) = scalar * row_sum
             end do
             !$omp end parallel do
-            
-            t_hash = MPI_Wtime() - t_tmp
-            
-            if (t_reorder*1000 > 1.0_dp .or. t_hash*1000 > 10.0_dp) then
-                write(*,'(A,I0,A,F8.3,A,F8.3,A,I0,A,I0,A,F6.2)') 'DEBUG process_remote rank ', rank_debug, &
-                    ': reorder=', t_reorder*1000, ' ms, hash_loop=', t_hash*1000, &
-                    ' ms, remote=', remote_count, ', probes=', total_probes, &
-                    ', avg=', real(total_probes)/max(remote_count,1_int64)
-            end if
             
             deallocate(recv_buf_sorted)
         end subroutine process_remote_unchunked
@@ -995,102 +914,71 @@ contains
                 end if
             end do
             
-            ! If only one chunk, scalar was already applied in last iteration
-            ! If multiple chunks but we haven't applied scalar, apply now
-            if (n_chunks == 1) then
-                ! Scalar was applied in the single chunk call
-            end if
-            
             deallocate(recv_buf_sorted)
         end subroutine process_remote_chunked
         
-        subroutine add_chunk_contributions(c_start, c_end, apply_scalar)
-            integer, intent(in) :: c_start, c_end
+        subroutine add_chunk_contributions(chunk_start, chunk_end, apply_scalar)
+            integer(int64), intent(in) :: chunk_start, chunk_end
             logical, intent(in) :: apply_scalar
             
-            integer :: ii, pp, hh
-            integer(int64) :: ss_j, ee_j, jj, cc, folded
-            integer(int64) :: ll_start, ll_end
+            integer(int64) :: row_idx, col_idx
+            integer(int64) :: row_start_j, row_end_j
+            integer(int64) :: local_start_j, local_end_j
             integer(int64) :: min_col, max_col
-            integer(int64) :: rem_start, rem_end
-            complex(dp) :: rr_sum
-            integer :: pos
-            ! Golden ratio multiplier with XOR-folding to avoid overflow
-            integer(int64), parameter :: HASH_MULT = 2654435769_int64
-            integer(int64), parameter :: MASK32 = int(Z'FFFFFFFF', int64)
+            integer(int64) :: remote_start, remote_end
+            integer(int64) :: sorted_pos
+            complex(dp) :: row_sum
             
             ! Column range for this chunk
-            min_col = recv_indices_sorted(c_start)
-            max_col = recv_indices_sorted(c_end)
+            min_col = recv_indices_sorted(chunk_start)
+            max_col = recv_indices_sorted(chunk_end)
             
-            !$omp parallel do private(ss_j, ee_j, rr_sum, jj, cc, ll_start, ll_end, &
-            !$omp&                    rem_start, rem_end, hh, pp, pos)
-            do ii = 1, n_local
-                ss_j = row_starts(ii)
-                ee_j = row_starts(ii + 1) - 1
+            !$omp parallel do private(row_start_j, row_end_j, row_sum, col_idx, &
+            !$omp&    local_start_j, local_end_j, remote_start, remote_end, sorted_pos)
+            do row_idx = 1, n_local
+                row_start_j = row_starts(row_idx)
+                row_end_j = row_starts(row_idx + 1) - 1
                 
                 ! Quick check: if row has no non-local columns, apply scalar on last chunk
-                if (col_indexes(ss_j) >= lb .and. col_indexes(ee_j) <= ub) then
-                    if (apply_scalar) v(ii) = scalar * v(ii)
+                if (col_indexes(row_start_j) >= lb .and. col_indexes(row_end_j) <= ub) then
+                    if (apply_scalar) v(row_idx) = scalar * v(row_idx)
                     cycle
                 end if
                 
-                rr_sum = (0.0_dp, 0.0_dp)
+                row_sum = (0.0_dp, 0.0_dp)
                 
                 ! Find local boundaries
-                ll_start = lower_bound(col_indexes, ss_j, ee_j, lb)
-                ll_end = upper_bound(col_indexes, ss_j, ee_j, ub) - 1
+                local_start_j = lower_bound(col_indexes, row_start_j, row_end_j, lb)
+                local_end_j = upper_bound(col_indexes, row_start_j, row_end_j, ub) - 1
                 
                 ! Remote columns before local range - narrow to [min_col, max_col]
-                if (ss_j <= ll_start - 1) then
-                    rem_start = lower_bound(col_indexes, ss_j, ll_start - 1, min_col)
-                    rem_end = upper_bound(col_indexes, ss_j, ll_start - 1, max_col)
+                if (row_start_j <= local_start_j - 1) then
+                    remote_start = lower_bound(col_indexes, row_start_j, local_start_j - 1, min_col)
+                    remote_end = upper_bound(col_indexes, row_start_j, local_start_j - 1, max_col)
                     
-                    do jj = rem_start, rem_end - 1
-                        cc = col_indexes(jj)
-                        ! Hash lookup to get position in recv_indices_sorted
-                        folded = iand(ieor(cc, ishft(cc, -32)), MASK32)
-                        hh = int(mod(folded * HASH_MULT, int(hash_size, int64))) + 1
-                        if (hh < 1) hh = hh + hash_size
-                        do pp = 0, hash_size - 1
-                            if (hash_keys(hh) == cc) then
-                                pos = hash_vals(hh)
-                                ! Column is in range, so pos should be in [c_start, c_end]
-                                rr_sum = rr_sum + recv_buf_sorted(pos - c_start + 1)
-                                exit
-                            else if (hash_keys(hh) < 0) then
-                                exit
-                            end if
-                            hh = mod(hh, hash_size) + 1
-                        end do
+                    do col_idx = remote_start, remote_end - 1
+                        sorted_pos = hash_lookup(col_indexes(col_idx), hash_keys, hash_vals, hash_size)
+                        if (sorted_pos > 0) then
+                            row_sum = row_sum + recv_buf_sorted(sorted_pos - chunk_start + 1)
+                        end if
                     end do
                 end if
                 
                 ! Remote columns after local range - narrow to [min_col, max_col]
-                if (ll_end + 1 <= ee_j) then
-                    rem_start = lower_bound(col_indexes, ll_end + 1, ee_j, min_col)
-                    rem_end = upper_bound(col_indexes, ll_end + 1, ee_j, max_col)
+                if (local_end_j + 1 <= row_end_j) then
+                    remote_start = lower_bound(col_indexes, local_end_j + 1, row_end_j, min_col)
+                    remote_end = upper_bound(col_indexes, local_end_j + 1, row_end_j, max_col)
                     
-                    do jj = rem_start, rem_end - 1
-                        cc = col_indexes(jj)
-                        folded = iand(ieor(cc, ishft(cc, -32)), MASK32)
-                        hh = int(mod(folded * HASH_MULT, int(hash_size, int64))) + 1
-                        if (hh < 1) hh = hh + hash_size
-                        do pp = 0, hash_size - 1
-                            if (hash_keys(hh) == cc) then
-                                pos = hash_vals(hh)
-                                rr_sum = rr_sum + recv_buf_sorted(pos - c_start + 1)
-                                exit
-                            else if (hash_keys(hh) < 0) then
-                                exit
-                            end if
-                            hh = mod(hh, hash_size) + 1
-                        end do
+                    do col_idx = remote_start, remote_end - 1
+                        sorted_pos = hash_lookup(col_indexes(col_idx), hash_keys, hash_vals, hash_size)
+                        if (sorted_pos > 0) then
+                            row_sum = row_sum + recv_buf_sorted(sorted_pos - chunk_start + 1)
+                        end if
                     end do
                 end if
                 
-                v(ii) = v(ii) + rr_sum
-                if (apply_scalar) v(ii) = scalar * v(ii)
+                v(row_idx) = v(row_idx) + row_sum
+                if (apply_scalar) v(row_idx) = scalar * v(row_idx)
             end do
             !$omp end parallel do
         end subroutine add_chunk_contributions
