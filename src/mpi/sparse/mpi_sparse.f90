@@ -134,7 +134,8 @@ contains
         
         if (self%generator%has_values) then
             self%generator%values(lb_elements:ub_elements) => local_values
-            self%generator%values = -cmplx(0.0_dp, 1.0_dp)*self%generator%values
+            ! Note: Unlike expm, Chebyshev expects Hermitian H, not -i*H.
+            ! The -i factors are in the Bessel coefficients.
         else
             nullify(self%generator%values)
         end if

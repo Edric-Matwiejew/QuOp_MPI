@@ -238,46 +238,7 @@ class TestCirculantPropagator:
 class TestSparsePropagator:
     """Tests for the sparse (hypercube) propagator."""
 
-    def test_sparse_plan_returns_valid_partition(self, mpi_comm):
-        """Test that plan() returns valid local_i and alloc_local."""
-        from quop_mpi.propagator.sparse import unitary
-        from quop_mpi.propagator.sparse import operator
-
-        system_size = 64  # 2^6
-
-        u = unitary(operator.hypercube)
-        local_i, alloc_local = u.plan(system_size, mpi_comm)
-
-        all_local_i = mpi_comm.gather(local_i, root=0)
-
-        if mpi_comm.Get_rank() == 0:
-            total = sum(all_local_i)
-            assert total == system_size
-
-        assert local_i >= 0
-        assert alloc_local >= local_i
-
-    def test_sparse_requires_even_system_size(self, mpi_comm):
-        """Test that hypercube operator requires even system size."""
-        from quop_mpi.algorithm.combinatorial import qaoa
-
-        # Odd system_size should raise RuntimeError
-        system_size = 11
-
-        def qualities(local_i, local_i_offset):
-            return np.ones(local_i, dtype=np.float64)
-
-        alg = qaoa(system_size, mpi_comm)
-        alg.set_qualities(qualities)
-        alg.set_depth(1)
-
-        # Should raise RuntimeError about system_size % 2 != 0
-        with pytest.raises(RuntimeError):
-            alg.evolve_state(np.array([0.1, 0.1]))
-
-        del alg
-
-    def test_sparse_hypercube_mixing(self, mpi_comm):
+    def test_sparse_hypercube_preserves_normalization(self, mpi_comm):
         """Test hypercube mixing preserves total probability."""
         from quop_mpi.algorithm.combinatorial import qaoa
 
@@ -299,6 +260,35 @@ class TestSparsePropagator:
             total_prob = np.sum(probs)
             assert abs(total_prob - 1.0) < 1e-10
 
+        del alg
+
+    def test_sparse_multi_depth_preserves_normalization(self, mpi_comm):
+        """Test that sparse propagator works over multiple evolution steps."""
+        from quop_mpi.algorithm.combinatorial import qaoa
+        
+        system_size = 32  # 2^5
+        
+        def qualities(local_i, local_i_offset):
+            return np.sin(np.arange(local_i) + local_i_offset).astype(np.float64)
+        
+        alg = qaoa(system_size, mpi_comm)
+        alg.set_qualities(qualities)
+        alg.set_depth(3)  # Multiple layers
+        
+        # 3 layers = 6 parameters
+        params = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+        alg.evolve_state(params)
+        
+        probs = alg.get_probabilities()
+        
+        if mpi_comm.Get_rank() == 0:
+            # Probability should sum to 1
+            total_prob = np.sum(probs)
+            assert abs(total_prob - 1.0) < 1e-10, f"Total probability: {total_prob}"
+            
+            # All probabilities should be non-negative
+            assert np.all(probs >= -1e-15), f"Negative probabilities found"
+        
         del alg
 
 

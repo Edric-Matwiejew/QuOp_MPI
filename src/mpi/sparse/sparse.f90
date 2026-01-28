@@ -291,7 +291,7 @@ module Sparse
     ! Setup graph communicator with O(unique_remote) storage
     !--------------------------------------------------------------------------
     subroutine setup_graph_comm(row_starts, col_indexes, partition_table, &
-                                 graph_comm, &
+                                 MPI_communicator, graph_comm, &
                                  recv_indices_sorted, sort_perm, &
                                  recv_counts, recv_disps, &
                                  send_offsets, send_counts, send_disps, &
@@ -299,6 +299,7 @@ module Sparse
                                  total_recv, total_send, lb, ub)
         integer(int64), intent(in) :: row_starts(:), col_indexes(:)
         integer(int64), intent(in) :: partition_table(:)
+        integer, intent(in) :: MPI_communicator
         integer, intent(out) :: graph_comm
         integer(int64), allocatable, intent(out) :: recv_indices_sorted(:)
         integer(int64), allocatable, intent(out) :: sort_perm(:)
@@ -319,8 +320,8 @@ module Sparse
         integer(int64), allocatable :: seen_cols(:)
         integer(int64) :: n_seen
         
-        call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-        call MPI_Comm_size(MPI_COMM_WORLD, nprocs, ierr)
+        call MPI_Comm_rank(MPI_communicator, rank, ierr)
+        call MPI_Comm_size(MPI_communicator, nprocs, ierr)
         
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
@@ -356,7 +357,7 @@ module Sparse
         is_in_neighbor = .false.
         
         call MPI_Alltoall(is_out_neighbor, 1, MPI_LOGICAL, &
-                          is_in_neighbor, 1, MPI_LOGICAL, MPI_COMM_WORLD, ierr)
+                          is_in_neighbor, 1, MPI_LOGICAL, MPI_communicator, ierr)
         
         n_in = count(is_in_neighbor)
         allocate(in_neighbor_list(max(n_in, 1)))
@@ -375,7 +376,7 @@ module Sparse
         in_weights = 1
         out_weights = 1
         
-        call MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, &
+        call MPI_Dist_graph_create_adjacent(MPI_communicator, &
                 n_out, out_neighbor_list, out_weights, &
                 n_in, in_neighbor_list, in_weights, &
                 MPI_INFO_NULL, .false., graph_comm, ierr)
@@ -443,6 +444,7 @@ module Sparse
         end do
         
         allocate(recv_disps(max(n_out, 1)))
+        recv_disps = 0  ! Initialize to zero
         if (n_out > 0) then
             recv_disps(1) = 0
             do i = 2, n_out
@@ -502,9 +504,10 @@ module Sparse
             end do
             
             call MPI_Alltoall(all_recv_counts, 1, MPI_INTEGER, &
-                              all_send_counts, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                              all_send_counts, 1, MPI_INTEGER, MPI_communicator, ierr)
             
             allocate(send_counts(max(n_in, 1)))
+            send_counts = 0  ! Initialize to zero
             do i = 1, n_in
                 send_counts(i) = all_send_counts(in_neighbor_list(i) + 1)
             end do
@@ -515,6 +518,7 @@ module Sparse
         total_send = sum(send_counts)
         
         allocate(send_disps(max(n_in, 1)))
+        send_disps = 0  ! Initialize to zero
         if (n_in > 0) then
             send_disps(1) = 0
             do i = 2, n_in
@@ -563,7 +567,7 @@ module Sparse
             
             call MPI_Alltoallv(all_send_indices, all_recv_counts, all_recv_disps, MPI_INTEGER8, &
                                all_recv_requested, all_send_counts, all_send_disps, MPI_INTEGER8, &
-                               MPI_COMM_WORLD, ierr)
+                               MPI_communicator, ierr)
             
             allocate(requested(max(total_send, 1)))
             do i = 1, n_in
@@ -1263,7 +1267,7 @@ module Sparse
 
         ! Call chunked_spmv_mod setup
         call setup_graph_comm(A%row_starts_local, A%col_indexes_local, partition_table_64, &
-                              A%graph_comm, &
+                              MPI_communicator, A%graph_comm, &
                               A%recv_indices_sorted, A%sort_perm, &
                               A%graph_recv_counts, A%graph_recv_disps, &
                               A%send_offsets, A%graph_send_counts, A%graph_send_disps, &
