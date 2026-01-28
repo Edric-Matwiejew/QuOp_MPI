@@ -74,16 +74,29 @@ contains
         complex(dp), dimension(:), pointer :: local_values
 
         integer(sp) :: i, lb, ub, lb_elements, ub_elements
+        integer(sp) :: n_arrays
 
         integer(sp) :: ierr, rank, flock
+
+        ! Determine if values are provided (3 arrays) or implicit ones (2 arrays)
+        n_arrays = size(array_sizes)
 
         ! map array pointers to original inputs
         array_ptr = transfer(array_ptrs(1), array_ptr)
         call c_f_pointer(array_ptr, local_row_starts, [array_sizes(1)])
         array_ptr = transfer(array_ptrs(2), array_ptr)
         call c_f_pointer(array_ptr, local_col_indexes, [array_sizes(2)])
-        array_ptr = transfer(array_ptrs(3), array_ptr)
-        call c_f_pointer(array_ptr, local_values, [array_sizes(3)])
+        
+        if (n_arrays >= 3) then
+            ! Explicit values provided
+            array_ptr = transfer(array_ptrs(3), array_ptr)
+            call c_f_pointer(array_ptr, local_values, [array_sizes(3)])
+            self%generator%has_values = .true.
+        else
+            ! Implicit ones - no values array
+            nullify(local_values)
+            self%generator%has_values = .false.
+        end if
 
         ! moved from plan
         call MPI_Comm_size(self%context%SUBCOMM, flock, ierr)
@@ -118,9 +131,13 @@ contains
         self%generator%columns = self%context%system_size
         self%generator%row_starts(lb:ub + 1) => local_row_starts
         self%generator%col_indexes(lb_elements:ub_elements) => local_col_indexes
-        self%generator%values(lb_elements:ub_elements) => local_values
-
-        self%generator%values = -cmplx(0.0_dp, 1.0_dp)*self%generator%values
+        
+        if (self%generator%has_values) then
+            self%generator%values(lb_elements:ub_elements) => local_values
+            self%generator%values = -cmplx(0.0_dp, 1.0_dp)*self%generator%values
+        else
+            nullify(self%generator%values)
+        end if
 
         ! Setup graph communicator for efficient SpMV
         call Setup_Graph_Communications(self%generator, self%partition_table, self%context%SUBCOMM)
