@@ -193,7 +193,7 @@ contains
         integer :: lb, ub, n_local
         integer :: k, m_order
         real(dp) :: M, eps, z, Jk
-        complex(dp) :: ck, scalar_i_inv_M
+        real(dp) :: scalar_inv_M
         complex(dp), allocatable, target :: work1(:), work2(:), work3(:)
         complex(dp), pointer :: w_km1(:), w_k(:), w_kp1(:), w_swap(:)
         complex(dp), allocatable :: coeffs(:)
@@ -218,18 +218,24 @@ contains
             eps = 1.0e-14_dp
         end if
 
-        ! The matrix stores A = -i*H
-        ! We want exp(A*t) = exp(-i*H*t)
-        ! The Chebyshev expansion for exp(-i*H*t) with H rescaled to [-1,1]:
-        !   exp(-i*M*t * (H/M)) = sum_k c_k T_k(H/M)
-        ! where z = M*t and c_k = 2*(-i)^k*J_k(z) for k>=1, c_0 = J_0(z)
+        ! Chebyshev expansion for exp(-i*H*t) where H is Hermitian with 
+        ! eigenvalues in [-M, M]:
         !
-        ! But we have A = -i*H, so H = i*A
-        ! Thus (H/M) = (i/M)*A
-        ! So we apply the SpMV with scalar = i/M
+        !   exp(-i*H*t) = exp(-i*(H/M)*M*t)
+        !
+        ! Let X = H/M (eigenvalues in [-1, 1]) and z = M*t. Then:
+        !   exp(-i*X*z) = J_0(z) + 2*sum_{k=1}^inf (-i)^k * J_k(z) * T_k(X)
+        !
+        ! The Chebyshev polynomials T_k(X) are computed via recurrence:
+        !   T_0(X) = I
+        !   T_1(X) = X
+        !   T_{k+1}(X) = 2*X*T_k(X) - T_{k-1}(X)
+        !
+        ! Note: The input matrix A is the Hermitian generator (e.g., adjacency 
+        ! matrix). We scale by 1/M for the Chebyshev recurrence.
         
         z = t * M
-        scalar_i_inv_M = cmplx(0.0_dp, 1.0_dp / M, dp)
+        scalar_inv_M = 1.0_dp / M
 
         ! Determine expansion order based on when Bessel coefficients become negligible
         m_order = 0
@@ -257,12 +263,12 @@ contains
         w_k   => work2
         w_kp1 => work3
 
-        ! T_0(H/M)|psi> = |psi>
+        ! T_0(X)|psi> = |psi>
         w_km1 = B
 
-        ! T_1(H/M)|psi> = (H/M)|psi> = (i/M)*A|psi>
-        call SpMV_Graph(A, w_km1, partition_table, rank, w_k, scalar_i_inv_M, &
-                        MPI_communicator)
+        ! T_1(X)|psi> = X|psi> = (1/M)*H|psi>
+        call SpMV_Graph(A, w_km1, partition_table, rank, w_k, &
+                        cmplx(scalar_inv_M, 0.0_dp, dp), MPI_communicator)
 
         ! Initialize: C = c_0*T_0 + c_1*T_1
         if (m_order >= 1) then
@@ -272,16 +278,17 @@ contains
         end if
 
         ! Chebyshev recurrence: T_{k+1}(X) = 2*X*T_k(X) - T_{k-1}(X)
-        ! where X = H/M = (i/M)*A
+        ! where X = H/M
         do k = 2, m_order
-            ! w_kp1 = (i/M)*A*w_k
-            call SpMV_Graph(A, w_k, partition_table, rank, w_kp1, scalar_i_inv_M, &
-                            MPI_communicator)
+            ! w_kp1 = (1/M)*H*w_k = X*w_k
+            call SpMV_Graph(A, w_k, partition_table, rank, w_kp1, &
+                            cmplx(scalar_inv_M, 0.0_dp, dp), MPI_communicator)
             
-            ! Apply recurrence and accumulate
-            ck = coeffs(k)
+            ! Apply recurrence: T_{k+1} = 2*X*T_k - T_{k-1}
             w_kp1 = 2.0_dp * w_kp1 - w_km1
-            C = C + ck * w_kp1
+            
+            ! Accumulate contribution
+            C = C + coeffs(k) * w_kp1
 
             ! Rotate pointers
             w_swap => w_km1
@@ -291,7 +298,7 @@ contains
         end do
 
         nullify(w_km1, w_k, w_kp1, w_swap)
-        deallocate(work1, work2, work3, coeffs)
+        deallocate(work1, work2, coeffs)
 
     end subroutine Chebyshev_Multiply
 

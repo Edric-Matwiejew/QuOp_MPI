@@ -70,7 +70,7 @@ case $TEST_TYPE in
         echo "========================================"
         echo "Running integration tests (4 MPI processes)..."
         echo "========================================"
-        python tests/integration/run_integration_tests.py 4
+        OMP_NUM_THREADS=1 python tests/integration/run_integration_tests.py 4
         ;;
     *)
         echo "Unknown test type: $TEST_TYPE"
