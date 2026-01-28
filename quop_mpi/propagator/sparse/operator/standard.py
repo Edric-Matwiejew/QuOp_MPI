@@ -62,7 +62,7 @@ def hypercube(
 
     n_qubits = np.log2(system_size)
 
-    W_row_starts, W_col_indexes, _ = csr_generators.hypercube(
+    W_row_starts, W_col_indexes = csr_generators.hypercube(
         n_qubits, lb + 1, ub 
     )
 
