@@ -56,7 +56,9 @@ contains
 
         self%context => context
 
-        allocate(self%context%final_state(self%context%alloc_local))
+        if (.not. associated(self%context%final_state)) then
+            allocate(self%context%final_state(self%context%alloc_local))
+        end if
 
     end subroutine mpi_sparse_plan
 
