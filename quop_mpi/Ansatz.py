@@ -570,9 +570,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         "local_i_offset": "Global index offset for this rank's partition",
         "partition_table": "Array describing global partitioning scheme",
         # Observables and state
-        "observables": "Local partition of observable values (after setup)",
+        "observables": "Local partition of observable values",
         "ansatz_initial_state": "Local partition of initial state vector",
         "final_state": "Local partition of current/final state vector",
+        "local_probabilities": "Local partition of state probabilities",
         # Variational parameters
         "variational_parameters": "Current variational parameter values",
         "ansatz_depth": "Number of ansatz iterations (layers)",
