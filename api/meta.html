@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meta &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Toolkit" href="toolkit.html" />
+    <link rel="prev" title="Param" href="param.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#propagators">Propagators</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#supporting-modules">Supporting Modules</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="state.html">State</a></li>
+<li class="toctree-l3"><a class="reference internal" href="observable.html">Observable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="param.html">Param</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Meta</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#swarm">Swarm</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="toolkit.html">Toolkit</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Overview</a></li>
+      <li class="breadcrumb-item active">Meta</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/meta.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="meta">
+<span id="api-meta"></span><h1>Meta<a class="headerlink" href="#meta" title="Link to this heading"></a></h1>
+<p>Meta-algorithms that coordinate multiple Ansatz instances.</p>
+<section id="swarm">
+<h2>Swarm<a class="headerlink" href="#swarm" title="Link to this heading"></a></h2>
+<p>The swarm class enables parallel execution of multiple independent Ansatz instances, useful for parameter sweeps or ensemble methods.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quop_mpi.meta.</span></span><span class="sig-name descname"><span class="pre">swarm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nodes_per_subcomm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">processes_per_node</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxcomm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">COMM_WORLD</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">type</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.meta.swarm" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Create and operate on a swarm of identical <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> instances.</p>
+<p>Each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> instance is associated with an MPI subcommunicator
+such that they can carry out <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation independently.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> instance is initialised by the <code class="docutils literal notranslate"><span class="pre">swarm</span></code>
+instance as,</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Ansatz</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">MPI_COMM</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>nodes_per_subcomm</strong><span class="classifier">int</span></dt><dd><p>number of compute nodes associated with each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>
+subcommunicator, if <code class="docutils literal notranslate"><span class="pre">nodes_per_subcomm</span> <span class="pre">==</span> <span class="pre">1</span></code> create
+<code class="docutils literal notranslate"><span class="pre">maxcomm</span></code> subcommunicators per available compute node.</p>
+</dd>
+<dt><strong>processes_per_node</strong><span class="classifier">int</span></dt><dd><p>number of MPI processes per compute node, must be the same for all nodes</p>
+</dd>
+<dt><strong>maxcomm</strong><span class="classifier">int</span></dt><dd><p>target number of <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> subcommunicators</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator from which to create the <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>
+subcommunicators</p>
+</dd>
+<dt><strong>alg</strong><span class="classifier">Ansatz</span></dt><dd><p>an <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> or a predefined algorithm
+(see <code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.algorithm</span></code>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm.benchmark">
+<span class="sig-name descname"><span class="pre">benchmark</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.meta.swarm.benchmark" title="Link to this definition"></a></dt>
+<dd><p>Test <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> performance as a function of <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">Ansatz Depth</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>args: list[Ans] or list[list[Any]]</strong></dt><dd><p>positional arguments for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.benchmark()</span></code>, or a
+list of positional arguments specifying unique input for
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.benchmark()</span></code> for each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>
+instance.</p>
+</dd>
+<dt><strong>kwargs: dict</strong></dt><dd><p>keyword arguments for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.benchmark()</span></code>, or keywords
+pointing to a list of positional arguments specifying unique input
+for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.benchmark()</span></code> for each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>
+instance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code></dt><dd></dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm.benchmark_swarm">
+<span class="sig-name descname"><span class="pre">benchmark_swarm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ansatz_depths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">repeats</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">basename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_persist</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_action</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'a'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_limit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logging</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suspend_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.meta.swarm.benchmark_swarm" title="Link to this definition"></a></dt>
+<dd><p>Test <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> performance with increasing <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depth</span></a>
+with repeats at each depth computed in parallel over the
+<code class="docutils literal notranslate"><span class="pre">swarm</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>ansatz_depths</strong><span class="classifier">Iterable[int]</span></dt><dd><p>simulated <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depths</span></a></p>
+</dd>
+<dt><strong>repeats</strong><span class="classifier">int</span></dt><dd><p>number of repeats at each ansatz depth</p>
+</dd>
+<dt><strong>basename</strong><span class="classifier">str</span></dt><dd><p>path to directory in which to write simulation results and logs, by
+default <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt><strong>param_persist</strong><span class="classifier">bool, optional</span></dt><dd><p>if <code class="docutils literal notranslate"><span class="pre">True</span></code> the <a class="reference internal" href="../glossary.html#term-optimiser"><span class="xref std std-term">optimised</span></a>
+<a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameter</span></a> values which
+achieved the lowest <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value  for all
+repeats at <code class="docutils literal notranslate"><span class="pre">ansatz_depth</span></code> will be used as starting
+parameters for the first <code class="docutils literal notranslate"><span class="pre">ansatz_depth</span> <span class="pre">*</span> <span class="pre">total_params</span></code> at
+<code class="docutils literal notranslate"><span class="pre">ansatz_depth</span> <span class="pre">+=</span> <span class="pre">1</span></code>, by default <code class="docutils literal notranslate"><span class="pre">True</span></code></p>
+</dd>
+<dt><strong>verbose</strong><span class="classifier">bool, optional</span></dt><dd><p>if <code class="docutils literal notranslate"><span class="pre">True</span></code>, print current the <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depth</span></a>, repeat
+number and <a class="reference internal" href="../glossary.html#term-optimiser"><span class="xref std std-term">optimisation</span></a> results, by default
+<code class="docutils literal notranslate"><span class="pre">True</span></code></p>
+</dd>
+<dt><strong>save_action</strong><span class="classifier">{‘a’, ‘w’}</span></dt><dd><p>‘a’ to append, ‘w’ to (over)write, by default “a”</p>
+</dd>
+<dt><strong>time_limit</strong><span class="classifier">float, optional</span></dt><dd><p>time limit in seconds, program will suspend if the time remaining is
+less than the time taken by the last simulation, by default
+<code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt><strong>logging</strong><span class="classifier">bool, optional</span></dt><dd><p>write simulation results to log files, by default <code class="docutils literal notranslate"><span class="pre">True</span></code></p>
+</dd>
+<dt><strong>suspend_path</strong><span class="classifier">str, optional</span></dt><dd><p>path to directory in which to write suspend data, by default
+<code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>list[dict]</dt><dd><p>optimisation results ordered by ansatz depth</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm.execute_swarm">
+<span class="sig-name descname"><span class="pre">execute_swarm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param_lists</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">basename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h5_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_action</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'a'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_limit</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suspend_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.meta.swarm.execute_swarm" title="Link to this definition"></a></dt>
+<dd><p>Parallel simulation of <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVAs</span></a> over a set of initial
+<a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>param_lists</strong><span class="classifier">list[np.ndarray[np.float64]]</span></dt><dd><p>list of 1-D real arrays containing initial <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational
+parameters</span></a></p>
+</dd>
+<dt><strong>basename</strong><span class="classifier">str</span></dt><dd><p>folder in which to store simulation results and suspend data unless
+otherwise specified, by default <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt><strong>log_path</strong><span class="classifier">str, optional</span></dt><dd><p>folder in which to write simulation log files, by default
+<code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt><strong>h5_path</strong><span class="classifier">str, optional</span></dt><dd><p>folder in which to write simulation results, by default
+<code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt><strong>labels</strong><span class="classifier">str or list[str], optional</span></dt><dd><p>labels(s) for each simulation, by default <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt><strong>save_action</strong><span class="classifier">{“a”, “w”}</span></dt><dd><p>“a” to append “w” to (over)write, by default <code class="docutils literal notranslate"><span class="pre">&quot;a&quot;</span></code></p>
+</dd>
+<dt><strong>time_limit</strong><span class="classifier">float, optional</span></dt><dd><p>suspend if the time remaining is less than the time taken by the
+last <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation, by default <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt><strong>verbose</strong><span class="classifier">bool, optional</span></dt><dd><p>print the simulation results and simulation progress, by default
+<code class="docutils literal notranslate"><span class="pre">True</span></code></p>
+</dd>
+<dt><strong>suspend_path</strong><span class="classifier">str, optional</span></dt><dd><p>folder in which to store suspend data, by default <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>dict</dt><dd><p>a dictionary of optimisation results with keys
+<code class="docutils literal notranslate"><span class="pre">str(params_list[i])</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm.get_optimal_result">
+<span class="sig-name descname"><span class="pre">get_optimal_result</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#quop_mpi.meta.swarm.get_optimal_result" title="Link to this definition"></a></dt>
+<dd><p>Retrieve the result with the lowest <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value
+out of the last set of simulations executed by the <code class="docutils literal notranslate"><span class="pre">swarm</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>dict</dt><dd><p>simulation result</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.meta.swarm.save" title="Link to this definition"></a></dt>
+<dd><p>Save simulation results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>args:</strong></dt><dd><p>positional arguments for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.save()</span></code>, or a list of
+positional arguments specifying unique input for
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.save()</span></code> for each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> instance.</p>
+</dd>
+<dt><strong>kwargs:</strong></dt><dd><p>keyword arguments for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.save()</span></code>, or keywords
+pointing to a list of positional arguments specifying unique input
+for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.save()</span></code> for each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>
+instance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-meth docutils literal notranslate"><span class="pre">save()</span></code></dt><dd></dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm.set_log">
+<span class="sig-name descname"><span class="pre">set_log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.meta.swarm.set_log" title="Link to this definition"></a></dt>
+<dd><p>Log simulation information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>args: list[Any] or list[list[Any]]</strong></dt><dd><p>positional arguments for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_log()</span></code>, or a list
+of positional arguments specifying unique input for
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_log()</span></code> for each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> instance.</p>
+</dd>
+<dt><strong>kwargs: dict</strong></dt><dd><p>keyword arguments for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_log()</span></code>, or keywords
+pointing to a list of positional arguments specifying unique input
+for <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_log()</span></code> for each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>
+instance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_log()</span></code></dt><dd></dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.meta.swarm.set_unitaries">
+<span class="sig-name descname"><span class="pre">set_unitaries</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">unitaries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><span class="pre">Unitary</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><span class="pre">Unitary</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.meta.swarm.set_unitaries" title="Link to this definition"></a></dt>
+<dd><p>Set the unitaries of an <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> swarm.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>unitaries :list[Unitary] or list[list[Unitary]]</strong></dt><dd><p>a list of <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances (broadcast to all swarm instances)
+or a list of <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances for each <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> instance in
+the <code class="docutils literal notranslate"><span class="pre">swarm</span></code></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>RuntimeError</dt><dd><p>if <code class="docutils literal notranslate"><span class="pre">unitaries`is</span> <span class="pre">a</span> <span class="pre">list</span> <span class="pre">of</span> <span class="pre">lists</span> <span class="pre">that</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">equal</span> <span class="pre">to</span> <span class="pre">the</span>
+<span class="pre">:literal:`swarm</span></code> size</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="param.html" class="btn btn-neutral float-left" title="Param" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="toolkit.html" class="btn btn-neutral float-right" title="Toolkit" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

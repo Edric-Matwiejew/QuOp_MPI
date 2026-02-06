@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Changelog &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=e0a75244"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Glossary" href="glossary.html" />
+    <link rel="prev" title="Citing QuOp_MPI" href="cite.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">Overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#version-1-5-0-2026-01-28">Version 1.5.0 (2026-01-28)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#added">Added</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fixed">Fixed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#version-1-4-0-2026-01-27">Version 1.4.0 (2026-01-27)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Added</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#changed">Changed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#removed">Removed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">Fixed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#version-1-2-1-2025-03-07">Version 1.2.1 (2025-03-07)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id4">Changed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#version-1-2-0-2024-08-13">Version 1.2.0 (2024-08-13)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id5">Added</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id6">Changed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#version-1-1-0-2022-10-12">Version 1.1.0 (2022-10-12)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id7">Added</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id8">Changed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#version-1-0-0-2021-09-30">Version 1.0.0 (2021-09-30)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id9">Added</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id10">Changed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id11">Fixed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#version-0-0-2-2020-02-23">Version 0.0.2 (2020-02-23)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id12">Added</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id13">Changed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id14">Fixed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#version-0-0-1-2020-01-12">Version 0.0.1 (2020-01-12)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Changelog</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/changelog.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="changelog">
+<span id="id1"></span><h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading"></a></h1>
+<section id="version-1-5-0-2026-01-28">
+<h2>Version 1.5.0 (2026-01-28)<a class="headerlink" href="#version-1-5-0-2026-01-28" title="Link to this heading"></a></h2>
+<section id="added">
+<h3>Added<a class="headerlink" href="#added" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Chebyshev polynomial expansion for sparse matrix exponentiation, replacing scaling-and-squaring method</p></li>
+<li><p>Unit-valued sparse propagator optimization: automatically detects matrices where all non-zero entries are 1.0 and skips value storage/computation for improved performance</p></li>
+</ul>
+</section>
+<section id="fixed">
+<h3>Fixed<a class="headerlink" href="#fixed" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Sparse propagator crash when running with single MPI rank (uninitialized arrays in graph communicator setup)</p></li>
+</ul>
+</section>
+</section>
+<section id="version-1-4-0-2026-01-27">
+<h2>Version 1.4.0 (2026-01-27)<a class="headerlink" href="#version-1-4-0-2026-01-27" title="Link to this heading"></a></h2>
+<section id="id2">
+<h3>Added<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Bindable</span></code> base class in <code class="docutils literal notranslate"><span class="pre">_utils/_bindable.py</span></code> providing extensible attribute discovery for QuOp Functions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Ansatz.prepare()</span></code> method to fully initialize the Ansatz for inspection without running optimization</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Ansatz.print_all_bindable_attributes()</span></code> method to display bindable attributes for Ansatz and all Unitaries</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_bindable_attributes()</span></code> and <code class="docutils literal notranslate"><span class="pre">print_bindable_attributes()</span></code> methods on both Ansatz and Unitary classes</p></li>
+<li><p>Extensible <code class="docutils literal notranslate"><span class="pre">BINDABLE_ATTRIBUTES</span></code> class variable pattern – subclasses (algorithms, propagators) can define their own bindable attributes</p></li>
+<li><p>Comprehensive QuOp Functions documentation with implementation patterns (plain function, factory/closure, callable class)</p></li>
+<li><p>Bindable attributes tables in documentation for both Ansatz and Unitary</p></li>
+<li><p>Naming convention recommendation (underscore prefix) for custom QuOp Function parameters</p></li>
+<li><p>Comprehensive MPI-enabled test suite with pytest-mpi (380+ tests)</p></li>
+<li><p>Unit tests for toolkit module (kronecker, pauli, string functions)</p></li>
+<li><p>Unit tests for NLopt wrapper module</p></li>
+<li><p>New <code class="docutils literal notranslate"><span class="pre">mpi_momentum</span></code> Fortran module for multivariable momentum-space propagation with FFTW MPI</p></li>
+<li><p>Performance profiling support via <code class="docutils literal notranslate"><span class="pre">QUOP_PROFILE=1</span></code> environment variable</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">set_objective</span></code> method for custom objective functions</p></li>
+<li><p>Documentation restructure with navigable API reference</p></li>
+<li><p>Quick Start example in documentation</p></li>
+<li><p>Changelog documentation</p></li>
+</ul>
+</section>
+<section id="changed">
+<h3>Changed<a class="headerlink" href="#changed" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Ansatz now inherits from <code class="docutils literal notranslate"><span class="pre">Bindable</span></code> base class</p></li>
+<li><p>Unitary now inherits from <code class="docutils literal notranslate"><span class="pre">Bindable</span></code> base class</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_interface.py</span></code> now properly skips <code class="docutils literal notranslate"><span class="pre">*args</span></code> and <code class="docutils literal notranslate"><span class="pre">**kwargs</span></code> when parsing function signatures</p></li>
+<li><p><strong>Major refactor of Ansatz.py</strong>: Extracted cohesive subsystems into mixins for improved maintainability</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">_sampling.py</span></code>: Simulated quantum measurement functionality</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_logging.py</span></code>: CSV logging and HDF5 parallel I/O</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_communicator.py</span></code>: MPI subcommunicator management</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_optimization/parallel_jacobian.py</span></code>: Parallel gradient computation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_optimization/finite_differences.py</span></code>: Numerical gradient approximation methods</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_benchmark.py</span></code>: Systematic depth study workflow</p></li>
+</ul>
+</li>
+<li><p>Reorganized internal module structure with consistent naming conventions</p>
+<ul>
+<li><p>Renamed <code class="docutils literal notranslate"><span class="pre">__lib/</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">_lib/</span></code>, <code class="docutils literal notranslate"><span class="pre">__utils/</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">_utils/</span></code>, <code class="docutils literal notranslate"><span class="pre">__profile/</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">_profile/</span></code></p></li>
+<li><p>Renamed internal modules from <code class="docutils literal notranslate"><span class="pre">__*.py</span></code> to <code class="docutils literal notranslate"><span class="pre">_*.py</span></code> (single underscore for private modules)</p></li>
+<li><p>Moved <code class="docutils literal notranslate"><span class="pre">_utils/_nlopt_wrap.py</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">_optimization/nlopt_wrap.py</span></code></p></li>
+</ul>
+</li>
+<li><p>Circulant propagator now queries FFTW for optimal MPI distribution when determining max communicator size</p></li>
+<li><p>Replaced legacy <code class="docutils literal notranslate"><span class="pre">qhost_fourier.f08</span></code> with modern <code class="docutils literal notranslate"><span class="pre">mpi_momentum.f90</span></code> implementation</p></li>
+<li><p>Refactored optional dependencies in pyproject.toml (<code class="docutils literal notranslate"><span class="pre">[dev]</span></code> replaces <code class="docutils literal notranslate"><span class="pre">[all]</span></code>)</p></li>
+<li><p>Updated documentation sidebar with grouped navigation</p></li>
+<li><p>NumPy 2.x compatibility</p></li>
+</ul>
+</section>
+<section id="removed">
+<h3>Removed<a class="headerlink" href="#removed" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Orphaned <code class="docutils literal notranslate"><span class="pre">algorithm/multivariable.py</span></code> (duplicate of <code class="docutils literal notranslate"><span class="pre">algorithm/multivariable/</span></code>)</p></li>
+</ul>
+</section>
+<section id="id3">
+<h3>Fixed<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>FFTW MPI crash with system_size=1 (edge case in circulant propagator)</p></li>
+<li><p>Deadlock in <code class="docutils literal notranslate"><span class="pre">Ansatz.__post()</span></code> when MPI ranks are excluded from subcomm</p></li>
+<li><p>Profiler crash during Sphinx doc builds (outside MPI context)</p></li>
+<li><p>OpenMP thread contention causing apparent deadlock with &gt;2 MPI processes</p></li>
+<li><p>Circulant eigenvalue generation bug when graph is complete</p></li>
+<li><p>Parallel Jacobian implementation compatibility with parameter maps</p></li>
+<li><p>Docstring formatting warnings (unescaped asterisks)</p></li>
+</ul>
+</section>
+</section>
+<section id="version-1-2-1-2025-03-07">
+<h2>Version 1.2.1 (2025-03-07)<a class="headerlink" href="#version-1-2-1-2025-03-07" title="Link to this heading"></a></h2>
+<section id="id4">
+<h3>Changed<a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Build system update with modern GitHub Actions workflow</p></li>
+<li><p>Bumped dawidd6/action-download-artifact from 2 to 6</p></li>
+<li><p>Updated dependency version ranges</p></li>
+<li><p>Removed outdated test directory</p></li>
+</ul>
+</section>
+</section>
+<section id="version-1-2-0-2024-08-13">
+<h2>Version 1.2.0 (2024-08-13)<a class="headerlink" href="#version-1-2-0-2024-08-13" title="Link to this heading"></a></h2>
+<section id="id5">
+<h3>Added<a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Parameter mapping functionality for flexible variational parameter control (#11, #12)</p></li>
+<li><p>Parallel gradient evaluation with MPI subcommunicators</p></li>
+<li><p>Broadcast of variational parameters from root of MPI_COMM_WORLD</p></li>
+<li><p>Basic profiling functionality with OpenMP support in release builds</p></li>
+<li><p>Interleaved local spMV with parallel communication for improved performance</p></li>
+<li><p>Documentation build GitHub workflow</p></li>
+</ul>
+</section>
+<section id="id6">
+<h3>Changed<a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>CMake build requires cmake&gt;=3.5,&lt;4</p></li>
+<li><p>Removed self.Ns from operator dict</p></li>
+</ul>
+</section>
+</section>
+<section id="version-1-1-0-2022-10-12">
+<h2>Version 1.1.0 (2022-10-12)<a class="headerlink" href="#version-1-1-0-2022-10-12" title="Link to this heading"></a></h2>
+<section id="id7">
+<h3>Added<a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Composite Ansatz class for multivariable optimization problems</p></li>
+<li><p>Multivariable optimization examples</p></li>
+<li><p>QMOA (Quantum Multivariable Optimization Algorithm) experiments</p></li>
+<li><p>Link to preprint article</p></li>
+</ul>
+</section>
+<section id="id8">
+<h3>Changed<a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Evaluate returns results to all calling MPI ranks</p></li>
+<li><p>Support for Python 3.6 and 3.7 builds</p></li>
+</ul>
+</section>
+</section>
+<section id="version-1-0-0-2021-09-30">
+<h2>Version 1.0.0 (2021-09-30)<a class="headerlink" href="#version-1-0-0-2021-09-30" title="Link to this heading"></a></h2>
+<p>This is the first major release, coinciding with the <a class="reference external" href="https://doi.org/10.1016/j.jocs.2022.101711">Journal of Computational Science publication</a>.</p>
+<section id="id9">
+<h3>Added<a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Complete API redesign with modular Ansatz architecture</p></li>
+<li><p>QAOA and QWOA algorithm implementations</p></li>
+<li><p>Circulant, diagonal, and sparse propagator classes</p></li>
+<li><p>Observable and state modules</p></li>
+<li><p>Toolkit for common quantum operators (Pauli matrices, Kronecker products)</p></li>
+<li><p>MPI-parallel state vector simulation</p></li>
+<li><p>Parallel HDF5 I/O for saving and loading simulation data</p></li>
+<li><p>Support for NLopt optimizers alongside SciPy</p></li>
+<li><p>Benchmark infrastructure for performance evaluation</p></li>
+<li><p>Comprehensive documentation with Sphinx</p></li>
+<li><p>GitHub Actions CI/CD pipeline</p></li>
+<li><p>Installation scripts for Ubuntu 20.04</p></li>
+<li><p>Singularity container support</p></li>
+<li><p>License (GPLv3) and contributor acknowledgements</p></li>
+</ul>
+</section>
+<section id="id10">
+<h3>Changed<a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Refactored pre-post execution cycle for unitaries</p></li>
+<li><p>Communicator resizing for optimal MPI process utilization</p></li>
+<li><p>Default optimizer changed to L-BFGS-B</p></li>
+<li><p>Parallel post methods with total_params tracking</p></li>
+</ul>
+</section>
+<section id="id11">
+<h3>Fixed<a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Circulant operators FFTW compatibility</p></li>
+<li><p>Deadlock issues in communicator shrinking</p></li>
+<li><p>Various MPI edge cases for ranks with zero-length local arrays</p></li>
+<li><p>evolve_state converts list parameters into ndarray</p></li>
+<li><p>Check for pre or post on cold call to evolve_state</p></li>
+</ul>
+</section>
+</section>
+<section id="version-0-0-2-2020-02-23">
+<h2>Version 0.0.2 (2020-02-23)<a class="headerlink" href="#version-0-0-2-2020-02-23" title="Link to this heading"></a></h2>
+<section id="id12">
+<h3>Added<a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Zenodo DOI for citation</p></li>
+<li><p>Support for multiple mixing operators in QAOA class</p></li>
+<li><p>Custom optimizer support beyond default SciPy minimize</p></li>
+<li><p>Basin-hopping optimization option</p></li>
+<li><p>Process-independent quality generation using integers or random floats</p></li>
+<li><p>Updated sparse matrix exponentiation subroutines</p></li>
+<li><p>Benchmark construct with parameter reuse option</p></li>
+<li><p>Parallel HDF5 write functionality</p></li>
+<li><p>MPI hypercube mixer</p></li>
+<li><p>Objective function mapping to custom scalar values</p></li>
+<li><p>MacOS installation support</p></li>
+</ul>
+</section>
+<section id="id13">
+<h3>Changed<a class="headerlink" href="#id13" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>QuOp_MPI now minimizes the objective function (was maximizing)</p></li>
+<li><p>Optimizer result ‘success’ field renamed to ‘optimizer_success’</p></li>
+<li><p>‘success’ metric replaced by ‘quality cutoff’</p></li>
+<li><p>Method <code class="docutils literal notranslate"><span class="pre">log_success</span></code> replaced by <code class="docutils literal notranslate"><span class="pre">log_results</span></code> (<strong>breaking change from 0.0.1</strong>)</p></li>
+<li><p>Switched to L-BFGS-B optimizer</p></li>
+<li><p>Split QAOA and QWOA into separate classes</p></li>
+<li><p>Networkx added as required dependency</p></li>
+</ul>
+</section>
+<section id="id14">
+<h3>Fixed<a class="headerlink" href="#id14" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Bug fix in MPI.py (#1)</p></li>
+<li><p>Handling of zero-length quality arrays at local MPI process</p></li>
+<li><p>Initial state handling when rank 0 has local_i = 0</p></li>
+<li><p>Fourier transform ordering</p></li>
+<li><p>Initial state defaults to equal superposition if undefined</p></li>
+</ul>
+</section>
+</section>
+<section id="version-0-0-1-2020-01-12">
+<h2>Version 0.0.1 (2020-01-12)<a class="headerlink" href="#version-0-0-1-2020-01-12" title="Link to this heading"></a></h2>
+<p>Initial release.</p>
+<ul class="simple">
+<li><p>QWAO_MPI: Quantum Walk-Assisted Optimizer with MPI parallelization</p></li>
+<li><p>Basic CTQW (Continuous-Time Quantum Walk) implementation</p></li>
+<li><p>Parallel eigenvalue computation with FFTW</p></li>
+<li><p>Parallel HDF5 output support</p></li>
+<li><p>Draft documentation</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cite.html" class="btn btn-neutral float-left" title="Citing QuOp_MPI" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="glossary.html" class="btn btn-neutral float-right" title="Glossary" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Toolkit &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="QuOp Functions" href="../quop_functions.html" />
+    <link rel="prev" title="Meta" href="meta.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#propagators">Propagators</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#supporting-modules">Supporting Modules</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="state.html">State</a></li>
+<li class="toctree-l3"><a class="reference internal" href="observable.html">Observable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="param.html">Param</a></li>
+<li class="toctree-l3"><a class="reference internal" href="meta.html">Meta</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Toolkit</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#module-quop_mpi.toolkit">Module Reference</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Overview</a></li>
+      <li class="breadcrumb-item active">Toolkit</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/toolkit.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="toolkit">
+<span id="api-toolkit"></span><h1>Toolkit<a class="headerlink" href="#toolkit" title="Link to this heading"></a></h1>
+<p>Utility functions for constructing quantum operators and states.</p>
+<section id="module-quop_mpi.toolkit">
+<span id="module-reference"></span><h2>Module Reference<a class="headerlink" href="#module-quop_mpi.toolkit" title="Link to this heading"></a></h2>
+<p>Convieniance functions for use in user-defined <a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State</span></a> and <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables</span></a> functions.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.toolkit.I">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.toolkit.</span></span><span class="sig-name descname"><span class="pre">I</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_qubits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">csr_matrix</span></span></span><a class="headerlink" href="#quop_mpi.toolkit.I" title="Link to this definition"></a></dt>
+<dd><p>Generate a sparse identity matrix of size <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">**</span> <span class="pre">n_qubits</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>n_qubits: int</strong></dt><dd><p>generate the identity operator for <code class="docutils literal notranslate"><span class="pre">n_qubits</span></code></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>csr_matrix</dt><dd><p>the identity operator for <code class="docutils literal notranslate"><span class="pre">n_qubits</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.toolkit.X">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.toolkit.</span></span><span class="sig-name descname"><span class="pre">X</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_qubits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">csr_matrix</span></span></span><a class="headerlink" href="#quop_mpi.toolkit.X" title="Link to this definition"></a></dt>
+<dd><p>Generate the Pauli X operator acting on qubit <code class="docutils literal notranslate"><span class="pre">index</span></code> in a system of
+<code class="docutils literal notranslate"><span class="pre">n_qubits</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>index</strong><span class="classifier">int</span></dt><dd><p>index of the qubit to which the X operator is applied</p>
+</dd>
+<dt><strong>n_qubits</strong><span class="classifier">int</span></dt><dd><p>total number of qubits in the system</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>csr_matrix</dt><dd><p>the Pauli X operator acting on qubit <code class="docutils literal notranslate"><span class="pre">index</span></code> in a system of <code class="docutils literal notranslate"><span class="pre">n_qubits</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.toolkit.Y">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.toolkit.</span></span><span class="sig-name descname"><span class="pre">Y</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_qubits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">csr_matrix</span></span></span><a class="headerlink" href="#quop_mpi.toolkit.Y" title="Link to this definition"></a></dt>
+<dd><p>Generate the Pauli Y operator acting on qubit <code class="docutils literal notranslate"><span class="pre">index</span></code> in a system of
+<code class="docutils literal notranslate"><span class="pre">n_qubits</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>index</strong><span class="classifier">int</span></dt><dd><p>index of the qubit to which the Y operator is applied</p>
+</dd>
+<dt><strong>n_qubits</strong><span class="classifier">int</span></dt><dd><p>total number of qubits in the system</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>csr_matrix</dt><dd><p>the Pauli Y operator acting on qubit <code class="docutils literal notranslate"><span class="pre">index</span></code> in a system of <code class="docutils literal notranslate"><span class="pre">n_qubits</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.toolkit.Z">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.toolkit.</span></span><span class="sig-name descname"><span class="pre">Z</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_qubits</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.toolkit.Z" title="Link to this definition"></a></dt>
+<dd><p>Generate the Pauli Z operator acting on qubit <code class="docutils literal notranslate"><span class="pre">index</span></code> in a system of
+<code class="docutils literal notranslate"><span class="pre">n_qubits</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>index</strong><span class="classifier">int</span></dt><dd><p>index of the qubit to which the Z operator is applied</p>
+</dd>
+<dt><strong>n_qubits</strong><span class="classifier">int</span></dt><dd><p>total number of qubits in the system</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>csr_matrix</dt><dd><p>the Pauli Z operator acting on qubit <code class="docutils literal notranslate"><span class="pre">index</span></code> in a system of <code class="docutils literal notranslate"><span class="pre">n_qubits</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.toolkit.kron">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.toolkit.</span></span><span class="sig-name descname"><span class="pre">kron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">terms</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'sparse'</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">csr_matrix</span></span></span><a class="headerlink" href="#quop_mpi.toolkit.kron" title="Link to this definition"></a></dt>
+<dd><p>Compute the tensor (Kronecker) product of a sequence of sparse matrices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>terms</strong><span class="classifier">list[sparse]</span></dt><dd><p>a list of scipy sparse matrices</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>csr_matrix</dt><dd><p>the tensor product of <code class="docutils literal notranslate"><span class="pre">terms</span></code>, computed from left to right</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.toolkit.kron_power">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.toolkit.</span></span><span class="sig-name descname"><span class="pre">kron_power</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">term</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">sparse</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">csr_matrix</span></span></span><a class="headerlink" href="#quop_mpi.toolkit.kron_power" title="Link to this definition"></a></dt>
+<dd><p>Compute the tensor (Kronecker) product of <code class="docutils literal notranslate"><span class="pre">n</span></code> instances of a sparse matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>term</strong><span class="classifier">sparse</span></dt><dd><p>a scipy sparse matrix</p>
+</dd>
+<dt><strong>n</strong><span class="classifier">int</span></dt><dd><p>length of the tensor product sequence</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>csr_matrix</dt><dd><p>tensor product of <code class="docutils literal notranslate"><span class="pre">n</span></code> occurences of <code class="docutils literal notranslate"><span class="pre">term</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.toolkit.string">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.toolkit.</span></span><span class="sig-name descname"><span class="pre">string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.toolkit.string" title="Link to this definition"></a></dt>
+<dd><p>Generate an <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> from a bit-string representation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>state</strong><span class="classifier">str</span></dt><dd><p>a bit string state.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[complex128]</dt><dd><p>the parsed quantum state</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<section id="pauli-matrices">
+<h3>Pauli Matrices<a class="headerlink" href="#pauli-matrices" title="Link to this heading"></a></h3>
+<p>Functions for generating Pauli operators on multi-qubit systems:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#quop_mpi.toolkit.I" title="quop_mpi.toolkit.I"><code class="xref py py-func docutils literal notranslate"><span class="pre">I()</span></code></a> - Identity operator</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.toolkit.X" title="quop_mpi.toolkit.X"><code class="xref py py-func docutils literal notranslate"><span class="pre">X()</span></code></a> - Pauli-X operator on specified qubit</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.toolkit.Y" title="quop_mpi.toolkit.Y"><code class="xref py py-func docutils literal notranslate"><span class="pre">Y()</span></code></a> - Pauli-Y operator on specified qubit</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.toolkit.Z" title="quop_mpi.toolkit.Z"><code class="xref py py-func docutils literal notranslate"><span class="pre">Z()</span></code></a> - Pauli-Z operator on specified qubit</p></li>
+</ul>
+</section>
+<section id="kronecker-products">
+<h3>Kronecker Products<a class="headerlink" href="#kronecker-products" title="Link to this heading"></a></h3>
+<p>Functions for tensor products:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#quop_mpi.toolkit.kron" title="quop_mpi.toolkit.kron"><code class="xref py py-func docutils literal notranslate"><span class="pre">kron()</span></code></a> - Kronecker product of a list of matrices</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.toolkit.kron_power" title="quop_mpi.toolkit.kron_power"><code class="xref py py-func docutils literal notranslate"><span class="pre">kron_power()</span></code></a> - n-fold tensor product of a matrix</p></li>
+</ul>
+</section>
+<section id="state-preparation">
+<h3>State Preparation<a class="headerlink" href="#state-preparation" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><a class="reference internal" href="#quop_mpi.toolkit.string" title="quop_mpi.toolkit.string"><code class="xref py py-func docutils literal notranslate"><span class="pre">string()</span></code></a> - Convert bit-string to computational basis state</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="meta.html" class="btn btn-neutral float-left" title="Meta" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../quop_functions.html" class="btn btn-neutral float-right" title="QuOp Functions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

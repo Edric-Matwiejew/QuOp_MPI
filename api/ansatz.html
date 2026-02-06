@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ansatz &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Unitary" href="unitary.html" />
+    <link rel="prev" title="Overview" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Overview</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#core-classes">Core Classes</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Ansatz</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#class-reference">Class Reference</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="unitary.html">Unitary</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#propagators">Propagators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#supporting-modules">Supporting Modules</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Overview</a></li>
+      <li class="breadcrumb-item active">Ansatz</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/ansatz.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ansatz">
+<span id="api-ansatz"></span><h1>Ansatz<a class="headerlink" href="#ansatz" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> class is the core building block for quantum variational algorithms in QuOp_MPI. It manages the quantum state, unitary operators, observables, and classical optimization.</p>
+<section id="class-reference">
+<h2>Class Reference<a class="headerlink" href="#class-reference" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quop_mpi.</span></span><span class="sig-name descname"><span class="pre">Ansatz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">system_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_communicator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">mpi4py.MPI.Intracomm</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">mpi4py.MPI.COMM_WORLD</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Sampling</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Logging</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Communicator</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Jacobian</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Benchmark</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Bindable</span></code></p>
+<p>Define and simulate a <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a>.</p>
+<p>Associated QuOp Functions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State Function</span></a> (<a class="reference internal" href="#quop_mpi.Ansatz.set_initial_state" title="quop_mpi.Ansatz.set_initial_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_initial_state()</span></code></a>)</p></li>
+<li><p><a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a> (<a class="reference internal" href="#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_observables()</span></code></a>)</p></li>
+<li><p><a class="reference internal" href="../quop_functions.html#term-Parameter-Map-Function"><span class="xref std std-term">Parameter Map Function</span></a> (<a class="reference internal" href="#quop_mpi.Ansatz.set_parameter_map" title="quop_mpi.Ansatz.set_parameter_map"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_parameter_map()</span></code></a>)</p></li>
+<li><p><a class="reference internal" href="../quop_functions.html#term-Jacobian-Function"><span class="xref std std-term">Jacobian Function</span></a> (<code class="xref py py-meth docutils literal notranslate"><span class="pre">set_parallel_jacobian()</span></code>)</p></li>
+<li><p><a class="reference internal" href="../quop_functions.html#term-Sampling-Function"><span class="xref std std-term">Sampling Function</span></a> (<code class="xref py py-meth docutils literal notranslate"><span class="pre">set_sampling()</span></code>)</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>number of quantum basis states in the simulated system</p>
+</dd>
+<dt><strong>MPI_communicator</strong><span class="classifier">Intracomm, optional</span></dt><dd><p>MPI Intracomm, by default MPI.COMM_WORLD</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Minimal definition of an arbitrary <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a>, of size <a class="reference internal" href="../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a>.
+Where <code class="docutils literal notranslate"><span class="pre">[UQ,</span> <span class="pre">UW]</span></code> defines the <a class="reference internal" href="../glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a> and
+<code class="docutils literal notranslate"><span class="pre">observable_function</span></code> is an <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">alg</span> <span class="o">=</span> <span class="n">Ansatz</span><span class="p">(</span><span class="n">system_size</span><span class="p">)</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_unitaries</span><span class="p">([</span><span class="n">UQ</span><span class="p">,</span> <span class="n">UW</span><span class="p">])</span>
+<span class="n">alg</span><span class="o">.</span><span class="n">set_observables</span><span class="p">(</span><span class="n">observable_function</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>The size of the <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">simulated quantum system</span></a>.</p>
+</dd>
+<dt><strong>local_i</strong><span class="classifier">int</span></dt><dd><p>parallel partition size of <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> and <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a></p>
+</dd>
+<dt><strong>local_i_offset</strong><span class="classifier">int</span></dt><dd><p>global index offset of the local parallel partition</p>
+</dd>
+<dt><strong>partition_table</strong><span class="classifier">ndarray[int]</span></dt><dd><p>1-D integer array describing the global partitioning scheme such that
+for a given MPI rank <code class="docutils literal notranslate"><span class="pre">partition_table[rank</span> <span class="pre">+</span> <span class="pre">1]</span> <span class="pre">-</span> <span class="pre">partition_table[rank]</span> <span class="pre">=</span> <span class="pre">local_i</span></code></p>
+</dd>
+<dt><strong>observables</strong><span class="classifier">ndarray[float64]</span></dt><dd><p>1-D real array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a></p>
+</dd>
+<dt><strong>variational_parameters</strong><span class="classifier">ndarray[float64]</span></dt><dd><p>1-D real array of <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a>, updated during
+<a class="reference internal" href="../glossary.html#term-optimiser"><span class="xref std std-term">optimisation</span></a></p>
+</dd>
+<dt><strong>ansatz_depth</strong><span class="classifier">int</span></dt><dd><p>number of <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz iterations</span></a>, by default <code class="docutils literal notranslate"><span class="pre">1</span></code></p>
+</dd>
+<dt><strong>total_params</strong><span class="classifier">int</span></dt><dd><p>number of <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> associated with each
+<a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz iteration</span></a></p>
+</dd>
+<dt><strong>expectation</strong><span class="classifier">float</span></dt><dd><p>last computed <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value, updated during
+<a class="reference internal" href="../glossary.html#term-optimiser"><span class="xref std std-term">optimisation</span></a></p>
+</dd>
+<dt><strong>ansatz_initial_state</strong><span class="classifier">ndarray[complex128]</span></dt><dd><p>1-D complex array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> values, the <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial system state</span></a></p>
+</dd>
+<dt><strong>final_state</strong><span class="classifier">ndarray[complex128]</span></dt><dd><p>1-D array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements, the <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> after
+computation of the state evolution under the action of an
+<a class="reference internal" href="../glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a>.</p>
+</dd>
+<dt><strong>last_evaluated</strong><span class="classifier">ndarray[float]</span></dt><dd><p>1-D real array, the last <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> passed to
+<a class="reference internal" href="#quop_mpi.Ansatz.evolve_state" title="quop_mpi.Ansatz.evolve_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">evolve_state()</span></code></a></p>
+</dd>
+<dt><strong>objective_cnt</strong><span class="classifier">int</span></dt><dd><p>number of <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> evaluations during <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation</p>
+</dd>
+<dt><strong>result</strong><span class="classifier">dict</span></dt><dd><p>last result returned by the  <a class="reference internal" href="#quop_mpi.Ansatz.execute" title="quop_mpi.Ansatz.execute"><code class="xref py py-meth docutils literal notranslate"><span class="pre">execute()</span></code></a> method</p>
+</dd>
+<dt><strong>seed</strong><span class="classifier">int</span></dt><dd><p>seeds random number generation, incremented before each repeat in the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code> method</p>
+</dd>
+<dt><strong>sample_indexes</strong><span class="classifier">list[ndarray[int32]]</span></dt><dd><p>if simulating sampling, contains the global indexes for each block of
+sampled <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a>, resets to <code class="docutils literal notranslate"><span class="pre">[]</span></code> when the
+<a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value is accepted</p>
+</dd>
+<dt><strong>samples</strong><span class="classifier">list[ndarray[float64]]</span></dt><dd><p>if simulating sampling, contains the observable value for each block of
+sampled <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a>, resets to <code class="docutils literal notranslate"><span class="pre">[]</span></code> when the
+<a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value is accepted</p>
+</dd>
+<dt><strong>sample_minimum_indexes</strong><span class="classifier">list[int]</span></dt><dd><p>if simulating sampling, contains the index of the minimum
+<a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observable</span></a> sampled for each computation
+of the <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Key Methods</p>
+<p><strong>Configuration</strong></p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_unitaries()</span></code></a> - Define the sequence of unitary operators</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_observables()</span></code></a> - Set the observable for computing expectation values</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Ansatz.set_initial_state" title="quop_mpi.Ansatz.set_initial_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_initial_state()</span></code></a> - Define the initial quantum state</p></li>
+</ul>
+<p><strong>Execution</strong></p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#quop_mpi.Ansatz.execute" title="quop_mpi.Ansatz.execute"><code class="xref py py-meth docutils literal notranslate"><span class="pre">execute()</span></code></a> - Run the variational algorithm</p></li>
+<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code> - Study performance across ansatz depths</p></li>
+</ul>
+<p><strong>Results</strong></p>
+<ul class="simple">
+<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">save()</span></code> - Save results to HDF5</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Ansatz.print_result" title="quop_mpi.Ansatz.print_result"><code class="xref py py-meth docutils literal notranslate"><span class="pre">print_result()</span></code></a> - Display optimization results</p></li>
+</ul>
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.evaluate">
+<span class="sig-name descname"><span class="pre">evaluate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variational_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#quop_mpi.Ansatz.evaluate" title="Link to this definition"></a></dt>
+<dd><p>Lazily computes the <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value.</p>
+<p>The <a class="reference internal" href="#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> instance stores the last <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational
+parameters</span></a> passed to <code class="docutils literal notranslate"><span class="pre">evaluate</span></code> and the corresponding objective
+function value. If the input variational parameters match,
+re-computation of the <a class="reference internal" href="../glossary.html#term-final-state"><span class="xref std std-term">final state</span></a> is skipped and the previously
+computed objective function value is returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>variational_parameters</strong><span class="classifier">list[float] or ndarray[float]</span></dt><dd><p>1-D <code class="docutils literal notranslate"><span class="pre">(ansatz_depth</span> <span class="pre">*</span> <span class="pre">total_params,)</span></code> real array of variational
+parameters</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float</dt><dd><p>objective function value</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.evolve_state">
+<span class="sig-name descname"><span class="pre">evolve_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variational_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.evolve_state" title="Link to this definition"></a></dt>
+<dd><p>Compute the <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> under the action of the
+<a class="reference internal" href="../glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>variational_parameters</strong><span class="classifier">list[float] or ndarray[float]</span></dt><dd><p>1-D <code class="docutils literal notranslate"><span class="pre">(ansatz_depth</span> <span class="pre">*</span> <span class="pre">total_params,)</span></code> real array of
+<a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_unitaries()</span></code></a></dt><dd></dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.execute">
+<span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variational_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.execute" title="Link to this definition"></a></dt>
+<dd><p>Simulate a <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>, initial parameter values are
+generated using the <a class="reference internal" href="../quop_functions.html#term-Parameter-Function"><span class="xref std std-term">Parameter Function</span></a> of the corresponding
+<code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>variational_parameters</strong><span class="classifier">list[float] or ndarray[float]</span></dt><dd><p>1-D <code class="docutils literal notranslate"><span class="pre">(ansatz_depth</span> <span class="pre">*</span> <span class="pre">total_params,)</span></code> real array of
+<a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.gen_initial_params">
+<span class="sig-name descname"><span class="pre">gen_initial_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ansatz_depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.Ansatz.gen_initial_params" title="Link to this definition"></a></dt>
+<dd><p>Generate initial <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a>.</p>
+<p>Values are generated using the <a class="reference internal" href="../quop_functions.html#term-Parameter-Function"><span class="xref std std-term">Parameter Function</span></a> associated
+with each <code class="docutils literal notranslate"><span class="pre">unitary</span></code> passed to the <a class="reference internal" href="#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_unitaries()</span></code></a>
+method.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">ansatz_depth</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> the <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depth</span></a> defaults
+to <cite>1</cite> or the depth specified by the <a class="reference internal" href="#quop_mpi.Ansatz.set_depth" title="quop_mpi.Ansatz.set_depth"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_depth()</span></code></a> method.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>ansatz_depth</strong><span class="classifier">int, optional</span></dt><dd><p>number of <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz iterations</span></a></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p>1-D <code class="docutils literal notranslate"><span class="pre">(ansatz_depth</span> <span class="pre">*</span> <span class="pre">total_params,)</span></code> real array of variational
+parameters</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.get_expectation_value">
+<span class="sig-name descname"><span class="pre">get_expectation_value</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#quop_mpi.Ansatz.get_expectation_value" title="Link to this definition"></a></dt>
+<dd><p>Compute the <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> at the current
+value of <code class="xref py py-attr docutils literal notranslate"><span class="pre">variational_parameters</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>float</dt><dd><p>objective function value</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.get_final_state">
+<span class="sig-name descname"><span class="pre">get_final_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#quop_mpi.Ansatz.get_final_state" title="Link to this definition"></a></dt>
+<dd><p>Gather the <a class="reference internal" href="../glossary.html#term-final-state"><span class="xref std std-term">final state</span></a> to rank 0 of the <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> MPI subcommunicator.</p>
+<p>Requires a previous call to <a class="reference internal" href="#quop_mpi.Ansatz.execute" title="quop_mpi.Ansatz.execute"><code class="xref py py-meth docutils literal notranslate"><span class="pre">execute()</span></code></a>, <a class="reference internal" href="#quop_mpi.Ansatz.evolve_state" title="quop_mpi.Ansatz.evolve_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">evolve_state()</span></code></a>
+or <code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code>. If called after <code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code> the
+gathered state will correspond to the last performed simulation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>ndarray[complex128] or None</dt><dd><p>the final state at rank 0 of the <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> subcommunicator, <code class="docutils literal notranslate"><span class="pre">None</span></code> otherwise</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.get_probabilities">
+<span class="sig-name descname"><span class="pre">get_probabilities</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#quop_mpi.Ansatz.get_probabilities" title="Link to this definition"></a></dt>
+<dd><p>Gather probabilities computed from the <a class="reference internal" href="../glossary.html#term-final-state"><span class="xref std std-term">final state</span></a> at rank 0
+of the <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> MPI subcommunicator.</p>
+<p>Requires a previous call to <a class="reference internal" href="#quop_mpi.Ansatz.execute" title="quop_mpi.Ansatz.execute"><code class="xref py py-meth docutils literal notranslate"><span class="pre">execute()</span></code></a>,
+<a class="reference internal" href="#quop_mpi.Ansatz.evolve_state" title="quop_mpi.Ansatz.evolve_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">evolve_state()</span></code></a> or <code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code>. If called after
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">benchmark()</span></code> the gathered state will correspond to the last
+performed simulation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>ndarray[float64] or None</dt><dd><p>1-D real array of state probabilities at rank 0 of the <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code>
+subcommunicator, <code class="docutils literal notranslate"><span class="pre">None</span></code> otherwise</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.n_free_params">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">n_free_params</span></span><a class="headerlink" href="#quop_mpi.Ansatz.n_free_params" title="Link to this definition"></a></dt>
+<dd><p>Number of free parameters presented to the optimizer.</p>
+<p>Without a parameter map, this equals n_variational_parameters.
+With a parameter map, this is the size of the reduced parameter vector.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.objective">
+<span class="sig-name descname"><span class="pre">objective</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variational_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#quop_mpi.Ansatz.objective" title="Link to this definition"></a></dt>
+<dd><p>Compute the <a class="reference internal" href="../glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> at <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a>
+<code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>variational_parameters</strong><span class="classifier">list or ndarray[float]</span></dt><dd></dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>float</dt><dd><p>objective function value</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.prepare">
+<span class="sig-name descname"><span class="pre">prepare</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.prepare" title="Link to this definition"></a></dt>
+<dd><p>Fully initialize the Ansatz for inspection without running optimization.</p>
+<p>This method runs both <code class="xref py py-meth docutils literal notranslate"><span class="pre">setup()</span></code> and internal preparation steps,
+bringing the Ansatz to its runtime state. After calling this method:</p>
+<ul class="simple">
+<li><p>All Unitary instances have their attributes populated</p></li>
+<li><p>Observables, initial state, and operators are generated</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Ansatz.print_all_bindable_attributes" title="quop_mpi.Ansatz.print_all_bindable_attributes"><code class="xref py py-meth docutils literal notranslate"><span class="pre">print_all_bindable_attributes()</span></code></a> shows actual runtime values</p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Ansatz.get_expectation_value" title="quop_mpi.Ansatz.get_expectation_value"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_expectation_value()</span></code></a> can be called</p></li>
+</ul>
+<p>This is useful for:</p>
+<ul class="simple">
+<li><p>Debugging QuOp Functions before optimization</p></li>
+<li><p>Inspecting the parallel partitioning scheme</p></li>
+<li><p>Querying bindable attributes with their runtime values</p></li>
+<li><p>Testing observables and initial state functions</p></li>
+</ul>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup</span></code></dt><dd><p>Lower-level setup (parallel resources only)</p>
+</dd>
+<dt><a class="reference internal" href="#quop_mpi.Ansatz.execute" title="quop_mpi.Ansatz.execute"><code class="xref py py-obj docutils literal notranslate"><span class="pre">execute</span></code></a></dt><dd><p>Run optimization</p>
+</dd>
+</dl>
+</div>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alg</span> <span class="o">=</span> <span class="n">qwoa</span><span class="p">(</span><span class="mi">1024</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alg</span><span class="o">.</span><span class="n">set_qualities</span><span class="p">(</span><span class="n">my_observables</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alg</span><span class="o">.</span><span class="n">prepare</span><span class="p">()</span>  <span class="c1"># Fully initialize</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alg</span><span class="o">.</span><span class="n">print_all_bindable_attributes</span><span class="p">()</span>  <span class="c1"># Now shows actual values</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Observables range: </span><span class="si">{</span><span class="n">alg</span><span class="o">.</span><span class="n">observables</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">alg</span><span class="o">.</span><span class="n">observables</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.print_all_bindable_attributes">
+<span class="sig-name descname"><span class="pre">print_all_bindable_attributes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.print_all_bindable_attributes" title="Link to this definition"></a></dt>
+<dd><p>Print bindable attributes for this Ansatz AND all its Unitaries.</p>
+<p>This shows the complete picture of what parameters can be bound in
+QuOp Functions:</p>
+<ul class="simple">
+<li><p>Ansatz-level functions (Observables, Initial State, Parameter Map,
+Sampling, Objective) bind to Ansatz attributes</p></li>
+<li><p>Unitary-level functions (Operator, Parameter) bind to Unitary attributes</p></li>
+</ul>
+<p>Call this after <a class="reference internal" href="#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_unitaries()</span></code></a> to see Unitary attributes.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">print_bindable_attributes</span></code></dt><dd><p>Ansatz attributes only</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.print_optimiser_result">
+<span class="sig-name descname"><span class="pre">print_optimiser_result</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.print_optimiser_result" title="Link to this definition"></a></dt>
+<dd><p>Print the result returned from the <a class="reference internal" href="../glossary.html#term-optimiser"><span class="xref std std-term">optimiser</span></a> for the last
+<a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.print_result">
+<span class="sig-name descname"><span class="pre">print_result</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.print_result" title="Link to this definition"></a></dt>
+<dd><p>Print a summary of the results of the last <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_depth">
+<span class="sig-name descname"><span class="pre">set_depth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_depth" title="Link to this definition"></a></dt>
+<dd><p>Set the simulated <a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz depth</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>depth</strong><span class="classifier">int</span></dt><dd><p>number of ansatz iterations</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_initial_state">
+<span class="sig-name descname"><span class="pre">set_initial_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_state_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_initial_state" title="Link to this definition"></a></dt>
+<dd><p>Define the <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>function</strong><span class="classifier">callable</span></dt><dd><p><a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State Function</span></a></p>
+</dd>
+<dt><strong>initial_state_dict</strong><span class="classifier">FunctionDict, optional</span></dt><dd><p><a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> for the Initial State Function</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_objective">
+<span class="sig-name descname"><span class="pre">set_objective</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">objective_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_objective" title="Link to this definition"></a></dt>
+<dd><p>Set a custom objective function (i.e. an objective function other
+than the expectation value of the prepared state).</p>
+<p>The function is called after state evolution - returning a scalar
+value that is passed to the minimizer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>function: callable</strong></dt><dd><p>an <a class="reference internal" href="../quop_functions.html#term-Objective-Function"><span class="xref std std-term">Objective Function</span></a></p>
+</dd>
+<dt><strong>objective_dict: FunctionDict, optional</strong></dt><dd><p><a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> for the <cite>Objective Function</cite></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_observables">
+<span class="sig-name descname"><span class="pre">set_observables</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">observable_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_observables" title="Link to this definition"></a></dt>
+<dd><p>Specify the <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>function</strong><span class="classifier">callable or int</span></dt><dd><p>an <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a> or an integer specifying the index
+of a phase-shift unitary in the list passed to
+<a class="reference internal" href="#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_unitaries()</span></code></a> whose exponent contains the
+observable vector.</p>
+</dd>
+<dt><strong>observable_dict</strong><span class="classifier">FunctionDict, optional</span></dt><dd><p><a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> for the Observables Function</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_optimiser">
+<span class="sig-name descname"><span class="pre">set_optimiser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimiser</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimiser_args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimiser_log</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_optimiser" title="Link to this definition"></a></dt>
+<dd><p>Define the classical <a class="reference internal" href="../glossary.html#term-optimiser"><span class="xref std std-term">optimiser</span></a> for <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation.</p>
+<p>Optionally allows for specification of arguments passed to the optimiser
+and fields in the optimiser dictionary to write to the log file (see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">set_log()</span></code>). QuOp_MPI supports optimisers provided by SciPy
+through its minimize method <a class="reference external" href="http://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html">minimize</a>
+and optimisers provided by the <a class="reference external" href="http://nlopt.readthedocs.io/en/latest/">NLopt</a> package with respect to
+minimisation with scalar constraints through a SciPy-like interface.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>optimiser: {‘scipy’, ‘nlopt’}</strong></dt><dd><p>‘scipy’ to use the SciPy, ‘nlopt’ to use NLopt, or a callable
+QuOp_MPI-compatible optimisation function.</p>
+</dd>
+<dt><strong>optimiser_args: dict</strong></dt><dd><p>arguments to pass to the optimiser</p>
+</dd>
+<dt><strong>optimiser_log: list[str]</strong></dt><dd><p>results of the optimisation process are stored in a dictionary.
+These values may be logged by passing a list of the corresponding
+keys</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>The default optimiser is the BFGS algorithm, which is set internally as
+follows:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Ansatz</span><span class="o">.</span><span class="n">set_optimiser</span><span class="p">(</span> <span class="s1">&#39;scipy&#39;</span><span class="p">,</span>
+        <span class="p">{</span><span class="s1">&#39;method&#39;</span><span class="p">:</span><span class="s1">&#39;BFGS&#39;</span><span class="p">,</span><span class="s1">&#39;options&#39;</span><span class="p">:{</span><span class="s1">&#39;gtol&#39;</span><span class="p">:</span><span class="mf">1e-3</span><span class="p">}},</span>
+                    <span class="p">[</span><span class="s1">&#39;fun&#39;</span><span class="p">,</span><span class="s1">&#39;nfev&#39;</span><span class="p">,</span><span class="s1">&#39;success&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_parameter_map">
+<span class="sig-name descname"><span class="pre">set_parameter_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_free_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mapping_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mapping_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_parameter_map" title="Link to this definition"></a></dt>
+<dd><p>Register a mapping from a subset of optimisable parameters to the full
+set of variational parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>n_free_params</strong><span class="classifier">int</span></dt><dd><p>The number of free parameters in the reduced parameter vector.
+This is the dimensionality of the optimization problem.</p>
+</dd>
+<dt><strong>mapping_fn</strong><span class="classifier">callable</span></dt><dd><p><code class="docutils literal notranslate"><span class="pre">mapping_fn(free_vec,</span> <span class="pre">*args,</span> <span class="pre">**kwargs)</span> <span class="pre">-&gt;</span> <span class="pre">full_vec</span></code>.
+<em>free_vec</em> is the vector presented to the optimiser;
+<em>full_vec</em> must have length <code class="docutils literal notranslate"><span class="pre">ansatz_depth</span> <span class="pre">*</span> <span class="pre">total_params</span></code>.</p>
+</dd>
+<dt><strong>mapping_dict</strong><span class="classifier">FunctionDict, optional</span></dt><dd><p>FunctionDict supplying extra positional and keyword arguments
+to the mapping function.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_seed">
+<span class="sig-name descname"><span class="pre">set_seed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_seed" title="Link to this definition"></a></dt>
+<dd><p>Integer for seeding of random number generation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>seed</strong><span class="classifier">int</span></dt><dd><p>seeds the generation of random parameters</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Ansatz.set_unitaries">
+<span class="sig-name descname"><span class="pre">set_unitaries</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">unitaries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><span class="pre">Unitary</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Ansatz.set_unitaries" title="Link to this definition"></a></dt>
+<dd><p>Define the <a class="reference internal" href="../glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a>.</p>
+<blockquote>
+<div><p><a class="reference internal" href="../glossary.html#term-unitary"><span class="xref std std-term">Unitaries</span></a> are passed as a python list in order of
+application from left to right.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>unitaries: list[unitary]</strong></dt><dd><p>list of <a class="reference internal" href="../glossary.html#term-unitary"><span class="xref std std-term">unitaries</span></a> specifying the action of one
+<a class="reference internal" href="../glossary.html#term-ansatz-depth"><span class="xref std std-term">ansatz iteration</span></a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="unitary.html" class="btn btn-neutral float-right" title="Unitary" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

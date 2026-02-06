@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Momentum &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script>window.MathJax = {"tex": {"macros": {"bm": ["{\\boldsymbol #1}", 1], "Bar": ["{\\bar #1}", 1], "dag": ["\\dagger"], "QWOA{}": ["QWOA"]}}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="State" href="../state.html" />
+    <link rel="prev" title="Composite" href="composite.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index.html#propagators">Propagators</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="index.html">Propagators</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="circulant.html">Circulant</a></li>
+<li class="toctree-l4"><a class="reference internal" href="diagonal.html">Diagonal</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sparse.html">Sparse</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite.html">Composite</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Momentum</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#supporting-modules">Supporting Modules</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Overview</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Propagators</a></li>
+      <li class="breadcrumb-item active">Momentum</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/propagators/momentum.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="momentum">
+<span id="api-propagators-momentum"></span><h1>Momentum<a class="headerlink" href="#momentum" title="Link to this heading"></a></h1>
+<p>Propagators where the state evolves in momentum space. Used for gradient-descent search algorithms inspired by continuous-variable photonic quantum computing. See <a class="reference internal" href="../../theoretical_background.html"><span class="doc">Theoretical Background</span></a> for details.</p>
+<section id="module-quop_mpi.propagator.momentum">
+<span id="propagator-class"></span><h2>Propagator Class<a class="headerlink" href="#module-quop_mpi.propagator.momentum" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="quop_mpi.propagator.momentum.unitary">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.momentum.</span></span><span class="sig-name descname"><span class="pre">unitary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">minsq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">minsk</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deltasq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deltask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.momentum.unitary" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a></p>
+<p>Implements the <a class="reference internal" href="../../theoretical_background.html#qowe"><span class="std std-ref">QOWE</span></a> <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a>.</p>
+<p>This propagator uses Fourier transforms to evolve the quantum state
+in momentum space, applying kinetic energy evolution.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances of type <code class="docutils literal notranslate"><span class="pre">'momentum</span></code> require that the <code class="docutils literal notranslate"><span class="pre">size</span></code> of
+the MPI communicator associated with <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> class be
+a factor of the first grid dimension (<code class="docutils literal notranslate"><span class="pre">Ns[0]</span> <span class="pre">%</span> <span class="pre">size</span> <span class="pre">==</span> <span class="pre">0</span></code>).</p>
+</div>
+<p><strong>Inheritance Diagram:</strong></p>
+<blockquote>
+<div><div class="graphviz"><img src="../../_images/graphviz-1efbfcb88e54f4338f96370928765d4165f13c77.png" alt="digraph &quot;sphinx-ext-graphviz&quot; {
+    rankdir=&quot;LR&quot;; node [fontsize=&quot;10&quot;];
+    Unitary[label=&quot;quop_mpi.Unitary&quot;, shape=&quot;rectangle&quot;];
+    unitary[label=&quot;quop_mpi.propagator.momentum.unitary&quot;,
+    shape=&quot;rectangle&quot;];
+
+    Unitary -&gt; unitary;
+}" class="graphviz" /></div>
+</div></blockquote>
+<p>See <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Ns</strong><span class="classifier">list[int]</span></dt><dd><p>the number of grid points in each dimension of the Cartesian grid</p>
+</dd>
+<dt><strong>minsq</strong><span class="classifier">list[float]</span></dt><dd><p>the minimum of each Cartesian coordinate in position space</p>
+</dd>
+<dt><strong>minsk</strong><span class="classifier">list[float]</span></dt><dd><p>the minimum of each Cartesian coordinate in momentum space</p>
+</dd>
+<dt><strong>deltasq</strong><span class="classifier">list[float]</span></dt><dd><p>the step-size in each Cartesian coordinate in position space</p>
+</dd>
+<dt><strong>deltask</strong><span class="classifier">list[float]</span></dt><dd><p>the step-size in each Cartesian coordinate in momentum space</p>
+</dd>
+<dt><strong>*args and **kwargs:</strong></dt><dd><p>passed to the initialisation method of <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Attributes<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>unitary_type</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">'momentum'</span></code></p>
+</dd>
+<dt><strong>planner</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p>
+</dd>
+<dt><strong>unitary_n_params</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">len(Ns)</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.propagator.momentum.unitary.assign_backend">
+<span class="sig-name descname"><span class="pre">assign_backend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">backend</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.momentum.unitary.assign_backend" title="Link to this definition"></a></dt>
+<dd><p>Assign the Fortran backend for momentum propagation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.propagator.momentum.unitary.propagate">
+<span class="sig-name descname"><span class="pre">propagate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.momentum.unitary.propagate" title="Link to this definition"></a></dt>
+<dd><p>Apply momentum-space evolution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>t</strong><span class="classifier">ndarray</span></dt><dd><p>Evolution times for each dimension</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="operators">
+<h2>Operators<a class="headerlink" href="#operators" title="Link to this heading"></a></h2>
+<p>Pre-defined operator functions for momentum propagators.</p>
+<p id="module-quop_mpi.propagator.momentum.operator">Predefined <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Functions</span></a> for
+<a class="reference internal" href="#quop_mpi.propagator.momentum.unitary" title="quop_mpi.propagator.momentum.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.momentum.unitary</span></code></a>.</p>
+<p>The momentum propagator implements kinetic energy evolution for
+continuous-variable quantum optimization (QOWE - Quantum Optimization
+with Wavepacket Evolution).</p>
+<p><strong>Return Format</strong></p>
+<p>The Operator Function must return:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>momentums<span class="classifier">ndarray[complex128, shape=(max(Ns), n_dims)]</span></dt><dd><p>A 2-D complex array where <code class="docutils literal notranslate"><span class="pre">momentums[:N_i,</span> <span class="pre">i]</span></code> contains the
+squared momentum values for the <code class="docutils literal notranslate"><span class="pre">i</span></code>-th dimension. The first
+dimension is <code class="docutils literal notranslate"><span class="pre">max(Ns)</span></code> (padded with zeros for smaller grids),
+and the second dimension corresponds to the number of grid dimensions.</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>The momentum values are computed from the grid parameters
+(<code class="docutils literal notranslate"><span class="pre">minsk</span></code>, <code class="docutils literal notranslate"><span class="pre">deltask</span></code>) specified when constructing the unitary.</p>
+<p><strong>Propagation Method</strong></p>
+<p>The momentum propagator computes <span class="math notranslate nohighlight">\(e^{-itT}|\psi\rangle\)</span> where
+<span class="math notranslate nohighlight">\(T\)</span> is the kinetic energy operator, using <strong>multi-dimensional FFT</strong>:</p>
+<ol class="arabic simple">
+<li><p>Forward multi-dimensional FFT transforms the state from position to momentum space</p></li>
+<li><p>Multiply by <span class="math notranslate nohighlight">\(e^{-it(k_1^2 + k_2^2 + \cdots)}\)</span> (kinetic phase)</p></li>
+<li><p>Inverse multi-dimensional FFT transforms back to position space</p></li>
+</ol>
+<p>The implementation uses FFTW with MPI for parallel multi-dimensional transforms.
+Grid parameters (<code class="docutils literal notranslate"><span class="pre">Ns</span></code>, <code class="docutils literal notranslate"><span class="pre">minsq</span></code>, <code class="docutils literal notranslate"><span class="pre">deltasq</span></code>, etc.)
+are specified when constructing the unitary.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.momentum.operator.magnitude_squared">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.momentum.operator.</span></span><span class="sig-name descname"><span class="pre">magnitude_squared</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">minsk</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deltask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.momentum.operator.magnitude_squared" title="Link to this definition"></a></dt>
+<dd><p>Generate the <a class="reference internal" href="../../theoretical_background.html#qmoa"><span class="std std-ref">QMOA</span></a> <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a> <a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a>.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for
+<a class="reference internal" href="#quop_mpi.propagator.momentum.unitary" title="quop_mpi.propagator.momentum.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.momentum.unitary</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Ns</strong><span class="classifier">list[int]</span></dt><dd><p>the number of grid points in each dimension of the Cartesian grid in
+position and momentum space,
+<a class="reference internal" href="#quop_mpi.propagator.momentum.unitary" title="quop_mpi.propagator.momentum.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.momentum.unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>minsk</strong><span class="classifier">list[float]</span></dt><dd><p>the minimum of each Cartesian coordinate in momentum space,
+<a class="reference internal" href="#quop_mpi.propagator.momentum.unitary" title="quop_mpi.propagator.momentum.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.momentum.unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>deltask</strong><span class="classifier">list[float]</span></dt><dd><p>the step-size in each Cartesian coordinate in momentum space,
+<a class="reference internal" href="#quop_mpi.propagator.momentum.unitary" title="quop_mpi.propagator.momentum.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.momentum.unitary</span></code></a> attribute</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>np.ndarray[np.complex128]</dt><dd><p>a 1-D complex array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the QOWE diagonal
+momentum-space operator with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="composite.html" class="btn btn-neutral float-left" title="Composite" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../state.html" class="btn btn-neutral float-right" title="State" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

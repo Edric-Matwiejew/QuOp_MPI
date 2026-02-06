@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sparse &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script>window.MathJax = {"tex": {"macros": {"bm": ["{\\boldsymbol #1}", 1], "Bar": ["{\\bar #1}", 1], "dag": ["\\dagger"], "QWOA{}": ["QWOA"]}}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Composite" href="composite.html" />
+    <link rel="prev" title="Diagonal" href="diagonal.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index.html#propagators">Propagators</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="index.html">Propagators</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="circulant.html">Circulant</a></li>
+<li class="toctree-l4"><a class="reference internal" href="diagonal.html">Diagonal</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Sparse</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite.html">Composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="momentum.html">Momentum</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#supporting-modules">Supporting Modules</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Overview</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Propagators</a></li>
+      <li class="breadcrumb-item active">Sparse</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/propagators/sparse.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sparse">
+<span id="api-propagators-sparse"></span><h1>Sparse<a class="headerlink" href="#sparse" title="Link to this heading"></a></h1>
+<p>Propagators for general sparse matrix operators. Used in QAOA and for custom Hamiltonians that don’t fit the circulant or diagonal structure.</p>
+<section id="module-quop_mpi.propagator.sparse">
+<span id="propagator-class"></span><h2>Propagator Class<a class="headerlink" href="#module-quop_mpi.propagator.sparse" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="quop_mpi.propagator.sparse.unitary">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.sparse.</span></span><span class="sig-name descname"><span class="pre">unitary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.sparse.unitary" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a></p>
+<p>Compute the action of a <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a> with a sparse
+<a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a> or a sequence of mixing-unitaries with sparse
+operators (see the <code class="docutils literal notranslate"><span class="pre">unitary_n_params</span></code> attribute below).</p>
+<p><strong>Inheritance Diagram:</strong></p>
+<blockquote>
+<div><div class="graphviz"><img src="../../_images/graphviz-765b18b873261b8a657da2e791a55e2ae4fd5d94.png" alt="digraph &quot;sphinx-ext-graphviz&quot; {
+    rankdir=&quot;LR&quot;;
+    node [fontsize=&quot;10&quot;];
+    Unitary[label=&quot;quop_mpi.Unitary&quot;, shape=&quot;rectangle&quot;];
+    unitary[label=&quot;quop_mpi.propagator.sparse.unitary&quot;, shape=&quot;rectangle&quot;];
+
+    Unitary -&gt; unitary;
+}" class="graphviz" /></div>
+</div></blockquote>
+<p>See <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>unitary_type</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">'sparse'</span></code></p>
+</dd>
+<dt><strong>planner</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p>
+</dd>
+<dt><strong>unitary_n_params</strong></dt><dd><p>Set on initialisation to <code class="docutils literal notranslate"><span class="pre">1</span></code> or more. If <code class="docutils literal notranslate"><span class="pre">unitary_n_parameters</span> <span class="pre">&gt;</span> <span class="pre">1</span></code>,
+the <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> must return a <code class="docutils literal notranslate"><span class="pre">list[csr_matrix]</span></code> of
+length <code class="docutils literal notranslate"><span class="pre">unitary_n_parameters</span></code> containing <code class="docutils literal notranslate"><span class="pre">csr_matrix</span></code> partitions of
+of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> rows.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.propagator.sparse.unitary.propagate">
+<span class="sig-name descname"><span class="pre">propagate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ts</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.sparse.unitary.propagate" title="Link to this definition"></a></dt>
+<dd><p>Simulation of the action of a :term`unitary`.</p>
+<p>When implemented, <code class="docutils literal notranslate"><span class="pre">propagate</span></code> contains a call to a method (typically a
+contained in a complied Python extension module) that takes the class
+attributes <code class="docutils literal notranslate"><span class="pre">initial_state</span></code>, <code class="docutils literal notranslate"><span class="pre">final_state</span></code> and <code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code>, together
+with attributes describing the parallel partitioning scheme and
+<a class="reference internal" href="../../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> <code class="docutils literal notranslate"><span class="pre">x</span></code>, as input. The action of the unitary
+is computed in MPI parallel, with the computed result written to
+<code class="docutils literal notranslate"><span class="pre">final_state</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not implemented by the base <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">ndarray[float64]</span></dt><dd><p>a 1-D real array of <code class="docutils literal notranslate"><span class="pre">n_params</span></code> <a class="reference internal" href="../../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">propagate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+
+    <span class="n">external_propagator</span><span class="p">(</span>
+        <span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">partition_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_state</span><span class="p">,</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MPI_COMM</span> <span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="operators">
+<h2>Operators<a class="headerlink" href="#operators" title="Link to this heading"></a></h2>
+<p>Pre-defined operator functions for sparse propagators.</p>
+<p id="module-quop_mpi.propagator.sparse.operator">Predefined <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Functions</span></a> for
+<a class="reference internal" href="#quop_mpi.propagator.sparse.unitary" title="quop_mpi.propagator.sparse.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.sparse.unitary</span></code></a>.</p>
+<p>Operator Functions for <code class="docutils literal notranslate"><span class="pre">unitary</span></code>  instances of type <code class="docutils literal notranslate"><span class="pre">'sparse'</span></code>  return CSR
+partitions of one or more matrices. More than one CSR partition defines a
+sequence of <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitaries</span></a> with independent
+<a class="reference internal" href="../../glossary.html#term-unitary-parameter"><span class="xref std std-term">unitary parameters</span></a>.</p>
+<p><strong>Partitioned CSR Matrix Format</strong></p>
+<dl class="glossary">
+<dt id="term-lb">lb<a class="headerlink" href="#term-lb" title="Link to this term"></a></dt><dd><p>lower index of the <a class="reference internal" href="../../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> and <a class="reference internal" href="../../glossary.html#term-observables"><span class="xref std std-term">observables</span></a> partition, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt id="term-ub">ub<a class="headerlink" href="#term-ub" title="Link to this term"></a></dt><dd><p>upper index of the system state and observables partition, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt id="term-W_col_index">W_col_index<a class="headerlink" href="#term-W_col_index" title="Link to this term"></a></dt><dd><p>a 1-D integer array containing non-zero column indexes for rows <code class="docutils literal notranslate"><span class="pre">lb</span></code> 
+to <code class="docutils literal notranslate"><span class="pre">ub</span></code> , grouped by ascending row index</p>
+</dd>
+<dt id="term-W_values">W_values<a class="headerlink" href="#term-W_values" title="Link to this term"></a></dt><dd><p>a 1-D real array containing non-zero values for rows <code class="docutils literal notranslate"><span class="pre">lb</span></code>  to <code class="docutils literal notranslate"><span class="pre">ub</span></code> ,
+grouped by ascending row index in the same order as <code class="docutils literal notranslate"><span class="pre">W_col_index</span></code>.</p>
+<p>For <strong>unit-valued matrices</strong> (where all non-zero entries are 1.0), this
+may be <code class="docutils literal notranslate"><span class="pre">None</span></code>. When <code class="docutils literal notranslate"><span class="pre">W_values</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>, the propagator
+skips value storage and uses an optimized code path, reducing memory
+usage and improving performance. This is automatically detected for
+adjacency matrices such as those used by the hypercube mixer.</p>
+</dd>
+<dt id="term-W_row_start">W_row_start<a class="headerlink" href="#term-W_row_start" title="Link to this term"></a></dt><dd><p>a 1-D integer array of length <code class="docutils literal notranslate"><span class="pre">ub</span> <span class="pre">-</span> <span class="pre">lb</span> <span class="pre">+</span> <span class="pre">1</span></code> , a cumulative sum of the
+number of non-zero elements in each row such that
+<code class="docutils literal notranslate"><span class="pre">W_row_start[row_index</span> <span class="pre">+</span> <span class="pre">1]</span> <span class="pre">-</span> <span class="pre">W_row_start[row_index]</span></code>  is equal to the
+number of non-zero elements in the row with index <code class="docutils literal notranslate"><span class="pre">row_index</span></code>  and
+<code class="docutils literal notranslate"><span class="pre">W_rows_start[row]</span> <span class="pre">-</span> <span class="pre">local_i_offset</span></code>  gives the local starting index
+for the non-zero column indexes and values in <code class="docutils literal notranslate"><span class="pre">W_col_index</span></code>  and
+<code class="docutils literal notranslate"><span class="pre">W_values</span></code>  for the row with index <code class="docutils literal notranslate"><span class="pre">row_index</span></code></p>
+</dd>
+</dl>
+<p>These are returned by the Operator Function as 
+<code class="docutils literal notranslate"><span class="pre">list[list[W_row_start],</span> <span class="pre">list[W_col_indexes],</span> <span class="pre">list[W_values]]</span></code>.</p>
+<p><strong>Propagation Method</strong></p>
+<p>The sparse propagator uses <strong>Chebyshev polynomial expansion</strong> to compute the
+matrix exponential <span class="math notranslate nohighlight">\(e^{-itH}\)</span>. This method:</p>
+<ul class="simple">
+<li><p>Automatically estimates the spectral radius of the operator</p></li>
+<li><p>Expands the matrix exponential as a sum of Chebyshev polynomials</p></li>
+<li><p>Is numerically stable and efficient for sparse Hermitian matrices</p></li>
+</ul>
+<p>This replaces the previous scaling-and-squaring approach.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.sparse.operator.hypercube">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.sparse.operator.</span></span><span class="sig-name descname"><span class="pre">hypercube</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">system_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ub</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.int64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.int64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.sparse.operator.hypercube" title="Link to this definition"></a></dt>
+<dd><p>Generate a hypercube (QAOA) sparse <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a>
+<a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a>.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for
+<a class="reference internal" href="#quop_mpi.propagator.sparse.unitary" title="quop_mpi.propagator.sparse.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.sparse.unitary</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>size of the simulated <a class="reference internal" href="../../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a>, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>lb</strong><span class="classifier">int</span></dt><dd><p>lower index of the <a class="reference internal" href="../../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partition,
+<a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>ub</strong><span class="classifier">int</span></dt><dd><p>upper index of the system state partition, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a>
+attribute</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>list[list[np.ndarray[np.int64]], list[np.ndarray[np.int64], list[np.ndarray[np.float64]]]]</dt><dd><p>a CSR partition of the hypercube (QAOA) mixing operator</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>RuntimeError</dt><dd><p>if <code class="docutils literal notranslate"><span class="pre">system_size</span> <span class="pre">%</span> <span class="pre">2</span> <span class="pre">!=</span> <span class="pre">0</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.sparse.operator.serial">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.sparse.operator.</span></span><span class="sig-name descname"><span class="pre">serial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variational_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.int64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.int64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.sparse.operator.serial" title="Link to this definition"></a></dt>
+<dd><p>Generate an <a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a> for a sparse <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a> using a
+serial Python function.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for
+<a class="reference internal" href="#quop_mpi.propagator.sparse.unitary" title="quop_mpi.propagator.sparse.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.sparse.unitary</span></code></a>. The <code class="docutils literal notranslate"><span class="pre">function</span></code> argument must
+be defined via a corresponding <a class="reference internal" href="../../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> on initialisation of the
+<code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance. Additional positional and keyword arguments in the
+<code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are passed the <code class="docutils literal notranslate"><span class="pre">function</span></code>. The signature for a
+<code class="docutils literal notranslate"><span class="pre">function</span></code> generating an operator with one or more 
+<a class="reference internal" href="../../glossary.html#term-operator-parameter"><span class="xref std std-term">operator parameters</span></a> is,</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">function</span><span class="p">(</span><span class="n">variational_parameters</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span>
+<span class="nb">list</span><span class="p">[</span><span class="n">csr_matrix</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code> may be excluded if
+<code class="docutils literal notranslate"><span class="pre">unitary.operator_n_params</span> <span class="pre">=</span> <span class="pre">0</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>describes the parallel partitioning of the <a class="reference internal" href="../../glossary.html#term-observables"><span class="xref std std-term">observables</span></a> and
+<a class="reference internal" href="../../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a>, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>variational_parameters</strong><span class="classifier">np.ndarray[np.float64]</span></dt><dd><p>a 1-D real array of operator parameters, passed to <code class="docutils literal notranslate"><span class="pre">function</span></code> if
+<code class="docutils literal notranslate"><span class="pre">len(variational_parameters)</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>function</strong><span class="classifier">Callable</span></dt><dd><p>function returning a list of scipy CSR matrices</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>list[list[np.ndarray[np.int64]], list[np.ndarray[np.int64],</dt><dd></dd>
+<dt>list[np.ndarray[np.float64]]]]</dt><dd><p>a CSR matrix partition</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>TypeError</dt><dd><p>if <code class="docutils literal notranslate"><span class="pre">function</span></code> does not return a <code class="docutils literal notranslate"><span class="pre">list</span></code> of scipy CSR matrices</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="diagonal.html" class="btn btn-neutral float-left" title="Diagonal" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="composite.html" class="btn btn-neutral float-right" title="Composite" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

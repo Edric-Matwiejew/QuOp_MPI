@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unitary &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Algorithms" href="algorithms/index.html" />
+    <link rel="prev" title="Ansatz" href="ansatz.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Overview</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#core-classes">Core Classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Unitary</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#class-reference">Class Reference</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#propagators">Propagators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#supporting-modules">Supporting Modules</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Overview</a></li>
+      <li class="breadcrumb-item active">Unitary</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/unitary.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="unitary">
+<span id="api-unitary"></span><h1>Unitary<a class="headerlink" href="#unitary" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a> class is the base class for all unitary operators in QuOp_MPI. Custom propagators should inherit from this class.</p>
+<section id="class-reference">
+<h2>Class Reference<a class="headerlink" href="#class-reference" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="quop_mpi.Unitary">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quop_mpi.</span></span><span class="sig-name descname"><span class="pre">Unitary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">operator_function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operator_n_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operator_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameter_function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unitary_n_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Unitary" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Bindable</span></code></p>
+<p>Base class for a <code class="docutils literal notranslate"><span class="pre">unitary</span></code>.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">unitary</span></code> is derived from the <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class and implements
+simulation of a specfic <a class="reference internal" href="../glossary.html#term-unitary"><span class="xref std std-term">unitary</span></a> through definition of the following
+methods:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#quop_mpi.Unitary.propagate" title="quop_mpi.Unitary.propagate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">propagate()</span></code></a></p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Unitary.plan" title="quop_mpi.Unitary.plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plan()</span></code></a></p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Unitary.copy_plan" title="quop_mpi.Unitary.copy_plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">copy_plan()</span></code></a></p></li>
+<li><p><a class="reference internal" href="#quop_mpi.Unitary.destroy" title="quop_mpi.Unitary.destroy"><code class="xref py py-meth docutils literal notranslate"><span class="pre">destroy()</span></code></a></p></li>
+</ul>
+<p>A list of <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances passed to
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_unitaries()</span></code></a> defines the <a class="reference internal" href="../glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a> of
+a <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a>. After initialisation, <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances are managed by the
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> class and calls to <code class="docutils literal notranslate"><span class="pre">unitary</span></code> methods are not made
+explicitly.</p>
+<p>See <code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.propagator</span></code> for predefined <code class="docutils literal notranslate"><span class="pre">unitary</span></code> subclasses.</p>
+<p>Associated QuOp Functions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a></p></li>
+<li><p><a class="reference internal" href="../quop_functions.html#term-Parameter-Function"><span class="xref std std-term">Parameter Function</span></a></p></li>
+</ul>
+<p>The following attributes are common to all <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>final_state</strong></dt><dd><p>The <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> after the action of the unitary.</p>
+</dd>
+<dt><strong>initial_parameters</strong></dt><dd><p>Initial <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> returned from the user-defined
+<a class="reference internal" href="../quop_functions.html#term-Parameter-Function"><span class="xref std std-term">Parameter Function</span></a>.</p>
+</dd>
+<dt><strong>initial_state</strong></dt><dd><p>The <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> of the quantum system.</p>
+</dd>
+<dt><strong>n_params</strong></dt><dd><p>The total number of <a class="reference internal" href="../glossary.html#term-unitary-parameter"><span class="xref std std-term">unitary</span></a> and
+<a class="reference internal" href="../glossary.html#term-operator-parameter"><span class="xref std std-term">operator</span></a> parameterising the
+<a class="reference internal" href="../glossary.html#term-unitary"><span class="xref std std-term">unitary</span></a>.</p>
+</dd>
+<dt><strong>operator_function</strong></dt><dd><p>The user-defined <a class="reference internal" href="../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a>.</p>
+</dd>
+<dt><strong>operator_dict</strong></dt><dd><p>A <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> of additional position and keyword arguments for
+the <a class="reference internal" href="../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a>.</p>
+</dd>
+<dt><strong>operator</strong></dt><dd><p>The <a class="reference internal" href="../glossary.html#term-operator"><span class="xref std std-term">operator</span></a> object returned by the <a class="reference internal" href="../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a>.</p>
+</dd>
+<dt><strong>operator_n_params</strong></dt><dd><p>Number of variational <a class="reference internal" href="../glossary.html#term-operator-parameter"><span class="xref std std-term">operator parameters</span></a>.</p>
+</dd>
+<dt><strong>parameter_function</strong></dt><dd><p>The user-defined <a class="reference internal" href="../quop_functions.html#term-Parameter-Function"><span class="xref std std-term">Parameter Function</span></a>.</p>
+</dd>
+<dt><strong>param_dict</strong></dt><dd><p>A <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> of additional position and keyword arguments for
+the <a class="reference internal" href="../quop_functions.html#term-Parameter-Function"><span class="xref std std-term">Parameter Function</span></a>.</p>
+</dd>
+<dt><strong>planner</strong></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, the parallel partitioning scheme returned by
+<a class="reference internal" href="#quop_mpi.Unitary.plan" title="quop_mpi.Unitary.plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plan()</span></code></a> takes precedence over non-planner <code class="docutils literal notranslate"><span class="pre">unitaries</span></code>
+and <code class="docutils literal notranslate"><span class="pre">unitaries</span></code> that appear later in the <a class="reference internal" href="../glossary.html#term-ansatz-unitary"><span class="xref std std-term">ansatz unitary</span></a> list
+supplied to <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_unitaries" title="quop_mpi.Ansatz.set_unitaries"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_unitaries()</span></code></a>.</p>
+</dd>
+<dt><strong>seed</strong></dt><dd><p>Integer for seeding random number generation, shared with
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>.</p>
+</dd>
+<dt><strong>system_size</strong></dt><dd><p>The size of the <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">simulated quantum system</span></a>, shared with
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>.</p>
+</dd>
+<dt><strong>unitary_n_params</strong></dt><dd><p>The number of <a class="reference internal" href="../glossary.html#term-unitary-parameter"><span class="xref std std-term">unitary parameters</span></a>.</p>
+</dd>
+<dt><strong>unitary_type</strong></dt><dd><p>A string labeling the <code class="docutils literal notranslate"><span class="pre">unitary</span></code> type (e.g. “diagonal” or “sparse”).</p>
+</dd>
+<dt><strong>variational_parameters</strong></dt><dd><p><a class="reference internal" href="../glossary.html#term-operator-parameter"><span class="xref std std-term">Operator variational parameters</span></a>. If present
+as an argument of the <a class="reference internal" href="../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a>, a real array of size
+<code class="docutils literal notranslate"><span class="pre">operator_n_params</span></code> is passed to the <a class="reference internal" href="../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a>.</p>
+</dd>
+<dt><strong>MPI_COMM</strong></dt><dd><p>MPI Intracommunicator, shared with <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>.</p>
+</dd>
+<dt><strong>alloc_local</strong></dt><dd><p>The size of the array storing the :term`operator` if the operator is an
+array (equal to <code class="docutils literal notranslate"><span class="pre">local_i</span></code> otherwise). The second return value of
+<a class="reference internal" href="#quop_mpi.Unitary.plan" title="quop_mpi.Unitary.plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plan()</span></code></a>.</p>
+</dd>
+<dt><strong>lb</strong></dt><dd><p>The lower global index of the local <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partition.</p>
+</dd>
+<dt><strong>ub</strong></dt><dd><p>The upper global index of the local <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partition.</p>
+</dd>
+<dt><strong>local_i</strong></dt><dd><p>The size of the local <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partition. The first return
+value of <a class="reference internal" href="#quop_mpi.Unitary.plan" title="quop_mpi.Unitary.plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plan()</span></code></a></p>
+</dd>
+<dt><strong>local_i_offset</strong></dt><dd><p>The global index offset of the local <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partition.</p>
+</dd>
+<dt><strong>partition_table</strong></dt><dd><p>1-D integer array describing the global partitioning scheme such that
+for a given MPI rank <code class="docutils literal notranslate"><span class="pre">partition_table[rank</span> <span class="pre">+</span> <span class="pre">1]</span> <span class="pre">-</span> <span class="pre">partition_table[rank]</span>
+<span class="pre">=</span> <span class="pre">local_i</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quop_mpi.Unitary.comm_size_constraints">
+<span class="sig-name descname"><span class="pre">comm_size_constraints</span></span><a class="headerlink" href="#quop_mpi.Unitary.comm_size_constraints" title="Link to this definition"></a></dt>
+<dd><p>Constraints on valid MPI communicator sizes for this unitary.
+A list of 1-D integer arrays specifying divisibility requirements.
+Used by <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz()</span></code></a> to determine compatible parallelization.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Unitary.copy_plan">
+<span class="sig-name descname"><span class="pre">copy_plan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ex_unitary</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><span class="pre">Unitary</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Unitary.copy_plan" title="Link to this definition"></a></dt>
+<dd><p>Perform any setup required by the propagation method called in
+<a class="reference internal" href="#quop_mpi.Unitary.propagate" title="quop_mpi.Unitary.propagate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">propagate()</span></code></a>.</p>
+<p>When implemented, <code class="docutils literal notranslate"><span class="pre">copy_plan</span></code> performs the same internal operations as
+<a class="reference internal" href="#quop_mpi.Unitary.plan" title="quop_mpi.Unitary.plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plan()</span></code></a> using the <code class="docutils literal notranslate"><span class="pre">local_i</span></code> and <code class="docutils literal notranslate"><span class="pre">alloc_local</span></code>
+attributes of <code class="docutils literal notranslate"><span class="pre">ex_unitary</span></code>. Does <strong>not</strong> return <code class="docutils literal notranslate"><span class="pre">[local_i,</span>
+<span class="pre">alloc_local]</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not implemented by the base <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>ex_unitary</strong><span class="classifier">unitary</span></dt><dd><p>a <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance with computed <code class="docutils literal notranslate"><span class="pre">local_i</span></code> and <code class="docutils literal notranslate"><span class="pre">alloc_local</span></code>
+attributes</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Unitary.destroy">
+<span class="sig-name descname"><span class="pre">destroy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Unitary.destroy" title="Link to this definition"></a></dt>
+<dd><p>Free memory allocated by Python extension modules in
+<a class="reference internal" href="#quop_mpi.Unitary.plan" title="quop_mpi.Unitary.plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plan()</span></code></a> or <a class="reference internal" href="#quop_mpi.Unitary.copy_plan" title="quop_mpi.Unitary.copy_plan"><code class="xref py py-meth docutils literal notranslate"><span class="pre">copy_plan()</span></code></a>. collector.</p>
+<p>Memory allocated by compiled Python extension modules is typically not
+managed by the Python garbage collector. These allocations must be freed
+via relevant methods in the extension module to prevent the occurrence
+of <a class="reference external" href="https://en.wikipedia.org/wiki/Memory_leak">memory leaks</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not implemented by the base <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Unitary.plan">
+<span class="sig-name descname"><span class="pre">plan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">system_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">mpi4py.MPI.Intracomm</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Unitary.plan" title="Link to this definition"></a></dt>
+<dd><p>Plan the partitioning scheme used by an <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>
+instance and performs any other tasks required by
+<a class="reference internal" href="#quop_mpi.Unitary.propagate" title="quop_mpi.Unitary.propagate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">propagate()</span></code></a>.</p>
+<p>An implemented <code class="docutils literal notranslate"><span class="pre">plan</span></code> returns (<code class="docutils literal notranslate"><span class="pre">local_i</span></code>, <code class="docutils literal notranslate"><span class="pre">alloc_local</span></code>). Data
+structures and allocation required by the propagation method called in
+<a class="reference internal" href="#quop_mpi.Unitary.propagate" title="quop_mpi.Unitary.propagate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">propagate()</span></code></a> are assigned to attributes of the <code class="docutils literal notranslate"><span class="pre">Unitary</span></code>
+instance.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">alloc_local</span></code> return value specifies the size of the local
+<a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> arrays <code class="docutils literal notranslate"><span class="pre">initial_state</span></code> and <code class="docutils literal notranslate"><span class="pre">final_state</span></code>. In
+most cases <code class="docutils literal notranslate"><span class="pre">alloc_local</span> <span class="pre">==</span> <span class="pre">local_i</span></code>, however <code class="docutils literal notranslate"><span class="pre">alloc_local</span> <span class="pre">&gt;</span> <span class="pre">local_i</span></code>
+may be required by particular external propagation methods (e.g. the
+parallel FFTW).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not implemented by the base <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>size of the simulated quantum <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system</span></a>.</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator over which the <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a>,
+<a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> and <a class="reference internal" href="../glossary.html#term-final-state"><span class="xref std std-term">final state</span></a> are partitioned.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>(int, int)</dt><dd><p>number of elements in a row-wise partitioning of the system state
+and size to allocate for the <code class="docutils literal notranslate"><span class="pre">initial_state</span></code> and <code class="docutils literal notranslate"><span class="pre">final_state</span></code>
+arrays</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">plan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">system_size</span><span class="p">,</span> <span class="n">MPI_COMM</span><span class="p">):</span>
+
+    <span class="n">local_i</span> <span class="o">=</span> <span class="n">system_size</span>  <span class="o">//</span> <span class="n">MPI_COMM</span><span class="o">.</span><span class="n">size</span>
+
+    <span class="n">local_i</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">system_size</span> <span class="o">-</span> <span class="n">local_i</span> <span class="o">*</span> <span class="n">MPI_COMM</span><span class="o">.</span><span class="n">rank</span> <span class="k">if</span> <span class="n">MPI_COMM</span><span class="o">.</span><span class="n">rank</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="k">else</span> <span class="n">local_i</span>
+    <span class="p">)</span>
+
+    <span class="n">alloc_local</span> <span class="o">=</span> <span class="n">local_i</span>
+
+    <span class="k">return</span> <span class="n">local_i</span><span class="p">,</span> <span class="n">alloc_local</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.Unitary.propagate">
+<span class="sig-name descname"><span class="pre">propagate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.Unitary.propagate" title="Link to this definition"></a></dt>
+<dd><p>Simulation of the action of a :term`unitary`.</p>
+<p>When implemented, <code class="docutils literal notranslate"><span class="pre">propagate</span></code> contains a call to a method (typically a
+contained in a complied Python extension module) that takes the class
+attributes <code class="docutils literal notranslate"><span class="pre">initial_state</span></code>, <code class="docutils literal notranslate"><span class="pre">final_state</span></code> and <code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code>, together
+with attributes describing the parallel partitioning scheme and
+<a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> <code class="docutils literal notranslate"><span class="pre">x</span></code>, as input. The action of the unitary
+is computed in MPI parallel, with the computed result written to
+<code class="docutils literal notranslate"><span class="pre">final_state</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not implemented by the base <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">ndarray[float64]</span></dt><dd><p>a 1-D real array of <code class="docutils literal notranslate"><span class="pre">n_params</span></code> <a class="reference internal" href="../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">propagate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+
+    <span class="n">external_propagator</span><span class="p">(</span>
+        <span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">partition_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_state</span><span class="p">,</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MPI_COMM</span> <span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="ansatz.html" class="btn btn-neutral float-left" title="Ansatz" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="algorithms/index.html" class="btn btn-neutral float-right" title="Algorithms" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

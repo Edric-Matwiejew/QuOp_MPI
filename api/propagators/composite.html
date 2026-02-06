@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Composite &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script>window.MathJax = {"tex": {"macros": {"bm": ["{\\boldsymbol #1}", 1], "Bar": ["{\\bar #1}", 1], "dag": ["\\dagger"], "QWOA{}": ["QWOA"]}}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Momentum" href="momentum.html" />
+    <link rel="prev" title="Sparse" href="sparse.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index.html#propagators">Propagators</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="index.html">Propagators</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="circulant.html">Circulant</a></li>
+<li class="toctree-l4"><a class="reference internal" href="diagonal.html">Diagonal</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sparse.html">Sparse</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="momentum.html">Momentum</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#supporting-modules">Supporting Modules</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Overview</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Propagators</a></li>
+      <li class="breadcrumb-item active">Composite</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/propagators/composite.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="composite">
+<span id="api-propagators-composite"></span><h1>Composite<a class="headerlink" href="#composite" title="Link to this heading"></a></h1>
+<p>Propagators for operators that are Cartesian sums of circulant operators, where each component mixes over a subregister. Used for optimisation of discretised continuous multivariable functions and combinatorial problems with decision variables of arity three or higher.</p>
+<section id="module-quop_mpi.propagator.composite">
+<span id="propagator-class"></span><h2>Propagator Class<a class="headerlink" href="#module-quop_mpi.propagator.composite" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="quop_mpi.propagator.composite.unitary">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.composite.</span></span><span class="sig-name descname"><span class="pre">unitary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Ns</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.composite.unitary" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.propagator.composite.unitary.propagate">
+<span class="sig-name descname"><span class="pre">propagate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.composite.unitary.propagate" title="Link to this definition"></a></dt>
+<dd><p>Simulation of the action of a :term`unitary`.</p>
+<p>When implemented, <code class="docutils literal notranslate"><span class="pre">propagate</span></code> contains a call to a method (typically a
+contained in a complied Python extension module) that takes the class
+attributes <code class="docutils literal notranslate"><span class="pre">initial_state</span></code>, <code class="docutils literal notranslate"><span class="pre">final_state</span></code> and <code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code>, together
+with attributes describing the parallel partitioning scheme and
+<a class="reference internal" href="../../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> <code class="docutils literal notranslate"><span class="pre">x</span></code>, as input. The action of the unitary
+is computed in MPI parallel, with the computed result written to
+<code class="docutils literal notranslate"><span class="pre">final_state</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not implemented by the base <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">ndarray[float64]</span></dt><dd><p>a 1-D real array of <code class="docutils literal notranslate"><span class="pre">n_params</span></code> <a class="reference internal" href="../../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">propagate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+
+    <span class="n">external_propagator</span><span class="p">(</span>
+        <span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">partition_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_state</span><span class="p">,</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MPI_COMM</span> <span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="operators">
+<h2>Operators<a class="headerlink" href="#operators" title="Link to this heading"></a></h2>
+<p>Pre-defined operator functions for composite propagators.</p>
+<p id="module-quop_mpi.propagator.composite.operator">Predefined <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Functions</span></a> for
+<a class="reference internal" href="#quop_mpi.propagator.composite.unitary" title="quop_mpi.propagator.composite.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.composite.unitary</span></code></a>.</p>
+<p>The composite propagator handles operators that are Cartesian sums of
+circulant operators acting on subregisters. This is used for multivariable
+optimization problems where the mixing operator decomposes as:</p>
+<div class="math notranslate nohighlight">
+\[H = H_1 \otimes I \otimes \cdots + I \otimes H_2 \otimes \cdots + \cdots\]</div>
+<p>where each <span class="math notranslate nohighlight">\(H_i\)</span> is a circulant matrix acting on a subregister.</p>
+<p><strong>Return Format</strong></p>
+<p>The Operator Function must return:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>eigenvalues<span class="classifier">ndarray[float64, shape=(max(Ns), n_dims)]</span></dt><dd><p>A 2-D real array where <code class="docutils literal notranslate"><span class="pre">eigenvalues[:N_i,</span> <span class="pre">i]</span></code> contains the
+eigenvalues of the <code class="docutils literal notranslate"><span class="pre">i</span></code>-th circulant suboperator. The first
+dimension is <code class="docutils literal notranslate"><span class="pre">max(Ns)</span></code> (padded with zeros for smaller grids),
+and the second dimension corresponds to the number of grid dimensions.</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>Propagation Method</strong></p>
+<p>The composite propagator exploits the Cartesian sum structure using
+<strong>multi-dimensional FFT</strong>:</p>
+<ol class="arabic simple">
+<li><p>Forward multi-dimensional FFT transforms the state to the joint eigenbasis</p></li>
+<li><p>Multiply by <span class="math notranslate nohighlight">\(e^{-it(\lambda^{(1)}_{k_1} + \lambda^{(2)}_{k_2} + \cdots)}\)</span>
+where <span class="math notranslate nohighlight">\(\lambda^{(d)}_{k_d}\)</span> are eigenvalues for each dimension</p></li>
+<li><p>Inverse multi-dimensional FFT transforms back to the computational basis</p></li>
+</ol>
+<p>This avoids constructing the full <span class="math notranslate nohighlight">\(\prod_i N_i\)</span> sized operator by
+exploiting the separable structure of Cartesian sums. The implementation
+uses FFTW with MPI for parallel multi-dimensional transforms.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.composite.operator.ith">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.composite.operator.</span></span><span class="sig-name descname"><span class="pre">ith</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Cs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.composite.operator.ith" title="Link to this definition"></a></dt>
+<dd><p>Generate the eigenvalues of a <a class="reference internal" href="../../theoretical_background.html#qmoa"><span class="std std-ref">QMOA</span></a> <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a> 
+<a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a>.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for
+<a class="reference internal" href="#quop_mpi.propagator.composite.unitary" title="quop_mpi.propagator.composite.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.composite.unitary</span></code></a>. The <code class="docutils literal notranslate"><span class="pre">Cs</span></code> keyword argument
+may be defined via a corresponding <a class="reference internal" href="../../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> on initialisation of
+the receiving <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Ns</strong><span class="classifier">list[int]</span></dt><dd><p>the number of grid points in each dimension of the Cartesian grid,
+<a class="reference internal" href="#quop_mpi.propagator.composite.unitary" title="quop_mpi.propagator.composite.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.composite.unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>Cs</strong><span class="classifier">list[int], optional</span></dt><dd><p>specifies the i-th index of the circulant operators associated with
+each dimension of the Cartesian grid, complete graphs by default</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[complex128]</dt><dd><p>a 2-D complex array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> eigenvalues of the QMOA
+mixing unitary with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.propagate.circulant.operator.graph()</span></code></dt><dd><p>Generate the eigenvalues of the i-th symmetric circulant graph with edge weights <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sparse.html" class="btn btn-neutral float-left" title="Sparse" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="momentum.html" class="btn btn-neutral float-right" title="Momentum" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

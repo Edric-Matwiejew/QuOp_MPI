@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>State &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Observable" href="observable.html" />
+    <link rel="prev" title="Momentum" href="propagators/momentum.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#propagators">Propagators</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#supporting-modules">Supporting Modules</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">State</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#module-quop_mpi.state">Module Reference</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="observable.html">Observable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="param.html">Param</a></li>
+<li class="toctree-l3"><a class="reference internal" href="meta.html">Meta</a></li>
+<li class="toctree-l3"><a class="reference internal" href="toolkit.html">Toolkit</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Overview</a></li>
+      <li class="breadcrumb-item active">State</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/state.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="state">
+<span id="api-state"></span><h1>State<a class="headerlink" href="#state" title="Link to this heading"></a></h1>
+<p>Functions for preparing initial quantum states.</p>
+<section id="module-quop_mpi.state">
+<span id="module-reference"></span><h2>Module Reference<a class="headerlink" href="#module-quop_mpi.state" title="Link to this heading"></a></h2>
+<p>Predefined <a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State Functions</span></a> .</p>
+<p>See <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_initial_state" title="quop_mpi.Ansatz.set_initial_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_initial_state()</span></code></a>.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.state.array">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.state.</span></span><span class="sig-name descname"><span class="pre">array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i_offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.state.array" title="Link to this definition"></a></dt>
+<dd><p>Define the <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> using a Numpy array.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">normalize</span></code> argument can be
+specified by passing a <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> to
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_initial_state" title="quop_mpi.Ansatz.set_initial_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_initial_state()</span></code></a> .</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>local_i</strong><span class="classifier">int</span></dt><dd><p>size of the local <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partitions,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>local_i_offset</strong><span class="classifier">int</span></dt><dd><p>global index offset of the local system state partitions,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator of the <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>state</strong><span class="classifier">ndarray[complex128]</span></dt><dd><p>A 1-D array of <a class="reference internal" href="../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a> initial state values</p>
+</dd>
+<dt><strong>normalize</strong><span class="classifier">bool, optional</span></dt><dd><p>wether to normalize <code class="docutils literal notranslate"><span class="pre">state</span></code>, by default True</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[complex128]</dt><dd><p>1-D complex array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> values with
+global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.state.basis">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.state.</span></span><span class="sig-name descname"><span class="pre">basis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">local_i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i_offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">basis_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.state.basis" title="Link to this definition"></a></dt>
+<dd><p>Generate an equal superposition over a subset of basis states.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">basis_states</span></code> argument can be
+specified by passing a <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> to
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_initial_state" title="quop_mpi.Ansatz.set_initial_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_initial_state()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>local_i</strong><span class="classifier">int</span></dt><dd><p>size of the local <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partitions,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>local_i_offset</strong><span class="classifier">int</span></dt><dd><p>global index offset of the local system state partitions,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>basis_states</strong><span class="classifier">list[int], optional</span></dt><dd><p>global indexes specifying an equal superposition over a subset of
+states, by default [0]</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[complex128]</dt><dd><p>1-D complex array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> values with
+global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> )</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.state.equal">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.state.</span></span><span class="sig-name descname"><span class="pre">equal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">system_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.state.equal" title="Link to this definition"></a></dt>
+<dd><p>Generate an equal superposition over all <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system states</span></a>.</p>
+<p>The default <a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State Function</span></a> of the <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>
+class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>size of the simulated <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a>, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>local_i</strong><span class="classifier">int</span></dt><dd><p>size of the local <a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partitions,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[complex128]</dt><dd><p>1-D complex array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> values with
+global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.state.position_grid">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.state.</span></span><span class="sig-name descname"><span class="pre">position_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">alloc_local</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i_offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deltas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.state.position_grid" title="Link to this definition"></a></dt>
+<dd><p>Generate an <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> discrete Cartesian coordinates.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. Arguments <code class="docutils literal notranslate"><span class="pre">Ns</span></code>, <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, <code class="docutils literal notranslate"><span class="pre">mins</span></code> and
+<code class="docutils literal notranslate"><span class="pre">function</span></code> must be passed to <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a> in a
+<a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">function</span></code> argument must take an <code class="docutils literal notranslate"><span class="pre">len(Ns)</span></code> -dimensional coordinate
+and return the complex amplitude of the initial state at that coordinate.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">function</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>, <code class="docutils literal notranslate"><span class="pre">position_grid</span></code> generates a squeezed
+Gaussian state with its mean situated at a randomly generated coordinate
+that has a distance of at least <code class="docutils literal notranslate"><span class="pre">length</span> <span class="pre">*</span> <span class="pre">0.125</span></code> from the boundaries of
+the grid (where <code class="docutils literal notranslate"><span class="pre">length</span></code> is the length in each coordinate).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>alloc_local</strong><span class="classifier">int</span></dt><dd><p>size of the array containing the local partition of the system,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>local_i</strong><span class="classifier">int</span></dt><dd><p>number of initial state values in local partition of the
+<a class="reference internal" href="../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a>, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>local_i_offset</strong><span class="classifier">int</span></dt><dd><p>global index offset of the local system state partition,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>Ns</strong><span class="classifier">list[int]</span></dt><dd><p>number of grid points in each dimension of the Cartesian grid</p>
+</dd>
+<dt><strong>deltas</strong><span class="classifier">list[float]</span></dt><dd><p>step size in each coordinate</p>
+</dd>
+<dt><strong>mins</strong><span class="classifier">list[float]</span></dt><dd><p>minimum value in each coordinate</p>
+</dd>
+<dt><strong>function</strong><span class="classifier">Callable</span></dt><dd><p>a Python function returning the value of the initial state at each grid
+point</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[complex128]</dt><dd><p>1-D complex array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> values with
+global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.state.serial">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.state.</span></span><span class="sig-name descname"><span class="pre">serial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.complex128</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.state.serial" title="Link to this definition"></a></dt>
+<dd><p>Generate the <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> using a serial Python function.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Initial-State-Function"><span class="xref std std-term">Initial State Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">function</span></code> argument must be
+specified by passing a <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> to
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_initial_state" title="quop_mpi.Ansatz.set_initial_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_initial_state()</span></code></a>. Additional positional and keyword
+arguments in the <code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are passed to <code class="docutils literal notranslate"><span class="pre">function</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>1-D array describing the global partitioning scheme,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator of the <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>function</strong><span class="classifier">Callable</span></dt><dd><p>a Python function returning a 1-D complex array of <a class="reference internal" href="../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a>
+initial state values</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[complex128]</dt><dd><p>1-D complex array of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> <a class="reference internal" href="../glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> values with
+global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="propagators/momentum.html" class="btn btn-neutral float-left" title="Momentum" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="observable.html" class="btn btn-neutral float-right" title="Observable" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

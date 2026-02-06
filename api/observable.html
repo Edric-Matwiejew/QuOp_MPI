@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Observable &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Param" href="param.html" />
+    <link rel="prev" title="State" href="state.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#propagators">Propagators</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#supporting-modules">Supporting Modules</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="state.html">State</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Observable</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#module-quop_mpi.observable">Module Reference</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#random-observables">Random Observables</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="param.html">Param</a></li>
+<li class="toctree-l3"><a class="reference internal" href="meta.html">Meta</a></li>
+<li class="toctree-l3"><a class="reference internal" href="toolkit.html">Toolkit</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Overview</a></li>
+      <li class="breadcrumb-item active">Observable</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/observable.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="observable">
+<span id="api-observable"></span><h1>Observable<a class="headerlink" href="#observable" title="Link to this heading"></a></h1>
+<p>Functions for defining observables (cost functions) used to compute expectation values.</p>
+<section id="module-quop_mpi.observable">
+<span id="module-reference"></span><h2>Module Reference<a class="headerlink" href="#module-quop_mpi.observable" title="Link to this heading"></a></h2>
+<p>Predefined <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observable Functions</span></a>.</p>
+<p>See also: <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a>.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.observable.array">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.observable.</span></span><span class="sig-name descname"><span class="pre">array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.observable.array" title="Link to this definition"></a></dt>
+<dd><p>Define <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a> with a NumPy ndarray.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">array</span></code> argument must be passed to
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a> in a <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> .</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>1-D array describing the global partitioning scheme, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>array</strong><span class="classifier">Union[list[float], ndarray[float]]</span></dt><dd><p>a 1-D real array containing <a class="reference internal" href="../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a> observable values</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> observable values with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz()</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.observable.csv">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.observable.</span></span><span class="sig-name descname"><span class="pre">csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.observable.csv" title="Link to this definition"></a></dt>
+<dd><p>Load <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a> from a <code class="docutils literal notranslate"><span class="pre">*.csv</span></code> using <a class="reference external" href="https://pandas.pydata.org/">pandas</a>.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">filename</span></code> argument must be passed to
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a> in a <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a>. Additional
+keyword arguments in the <code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are passed to the <a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html">pandas.read_csv</a> method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>1-D array describing the global partitioning scheme,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>filename</strong><span class="classifier">str</span></dt><dd><p>path to a <code class="docutils literal notranslate"><span class="pre">*csv</span></code> file</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> observable values with global index offset
+<code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz()</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.observable.hdf5">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.observable.</span></span><span class="sig-name descname"><span class="pre">hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.observable.hdf5" title="Link to this definition"></a></dt>
+<dd><p>Load <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a> from a <code class="docutils literal notranslate"><span class="pre">*.h5</span></code> file using <a class="reference external" href="https://docs.h5py.org/en/latest/index.html">HDF5 for Python</a>.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">filename</span></code> and <code class="docutils literal notranslate"><span class="pre">dataset_name</span></code>
+arguments must be passed to <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a> in a
+<a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a>. Additional positional and keyword arguments in the
+<code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are passed to the <a class="reference external" href="https://docs.h5py.org/en/latest/high/file.html">h5py.File</a> method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>1-D array describing the global partitioning scheme,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>filename</strong><span class="classifier">str</span></dt><dd><p>path to a <code class="docutils literal notranslate"><span class="pre">*.h5</span></code> file</p>
+</dd>
+<dt><strong>dataset_name</strong><span class="classifier">str</span></dt><dd><p>path to the dataset in <code class="docutils literal notranslate"><span class="pre">filename</span></code> containing an ndarray[float64] of
+<a class="reference internal" href="../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a> observables.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> observable values with global index offset
+<code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz()</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.observable.serial">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.observable.</span></span><span class="sig-name descname"><span class="pre">serial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.observable.serial" title="Link to this definition"></a></dt>
+<dd><p>Generate <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a> using a serial python function.</p>
+<dl class="simple">
+<dt>An <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">function</span></code> argument must be passed to</dt><dd><p><a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a> in a <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a>. Additional</p>
+</dd>
+<dt>positional and keyword arguments in the <code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are passed to</dt><dd><p><code class="docutils literal notranslate"><span class="pre">function</span></code>.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><dl class="simple">
+<dt>1-D array describing the global partitioning scheme,</dt><dd><p><a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+</dl>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>function</strong><span class="classifier">Callable</span></dt><dd><dl class="simple">
+<dt>Python function returning a 1-D real array of <a class="reference internal" href="../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a></dt><dd><p>observable values</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> observable values with global index offset
+<code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz()</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="random-observables">
+<h2>Random Observables<a class="headerlink" href="#random-observables" title="Link to this heading"></a></h2>
+<p>Functions for generating random observables, useful for testing.</p>
+<span class="target" id="module-quop_mpi.observable.rand"></span><dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.observable.rand.uniform">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.observable.rand.</span></span><span class="sig-name descname"><span class="pre">uniform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">system_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">low</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.observable.rand.uniform" title="Link to this definition"></a></dt>
+<dd><p>Generate random <a class="reference internal" href="../glossary.html#term-observables"><span class="xref std std-term">observables</span></a> from a uniform distribution.</p>
+<p>An <a class="reference internal" href="../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. The <code class="docutils literal notranslate"><span class="pre">low</span></code> and <code class="docutils literal notranslate"><span class="pre">high</span></code> arguments can be
+passed to <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a> in a <a class="reference internal" href="../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>the <a class="reference internal" href="../glossary.html#term-system-size"><span class="xref std std-term">size</span></a> of the simulated <a class="reference internal" href="../glossary.html#term-QVA"><span class="xref std std-term">system</span></a>,
+class:<cite>quop_mpi.Ansatz</cite> attribute</p>
+</dd>
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>1-D array describing the global partitioning scheme,
+<a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>seed</strong><span class="classifier">int</span></dt><dd><p>sets the seed of the random number generator, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>
+attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI intracommunicator, <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>low</strong><span class="classifier">float, optional</span></dt><dd><p>lower bound of the generated observable values (inclusive), by default <code class="docutils literal notranslate"><span class="pre">0</span></code></p>
+</dd>
+<dt><strong>high</strong><span class="classifier">float, optional</span></dt><dd><p>upper bound of the genereated observable values (exclusive), by default <code class="docutils literal notranslate"><span class="pre">1</span></code></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>np.ndarray[float64]</dt><dd><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> observable values with global index offset
+<code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> (see <a class="reference internal" href="ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz()</span></code></a>)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="state.html" class="btn btn-neutral float-left" title="State" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="param.html" class="btn btn-neutral float-right" title="Param" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

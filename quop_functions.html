@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuOp Functions &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/documentation_options.js?v=e0a75244"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Developing for QuOp_MPI" href="developing_for_quop.html" />
+    <link rel="prev" title="Toolkit" href="api/toolkit.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">Overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">QuOp Functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#bindable-attributes">Bindable Attributes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ansatz-bindable-attributes">Ansatz Bindable Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#unitary-bindable-attributes">Unitary Bindable Attributes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">QuOp Functions</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/quop_functions.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="quop-functions">
+<h1>QuOp Functions<a class="headerlink" href="#quop-functions" title="Link to this heading"></a></h1>
+<dl class="glossary">
+<dt id="term-QuOp-Function">QuOp Function<a class="headerlink" href="#term-QuOp-Function" title="Link to this term"></a></dt><dd><p>QuOp Functions define the various aspects of a <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> or modify the
+simulation methods used by the <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> class.</p>
+<p><strong>Implementation patterns</strong></p>
+<p>QuOp Functions can be implemented in three ways, depending on whether
+you need to maintain state between calls:</p>
+<ol class="arabic">
+<li><p><strong>Plain function</strong> — simplest, for stateless computations:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">my_observables</span><span class="p">(</span><span class="n">local_i</span><span class="p">,</span> <span class="n">local_i_offset</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute observables from scratch each time.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">local_i</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">local_i</span><span class="p">):</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">compute_cost</span><span class="p">(</span><span class="n">local_i_offset</span> <span class="o">+</span> <span class="n">j</span><span class="p">)</span> <span class="o">*</span> <span class="n">scale</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+<span class="c1"># Usage:</span>
+<span class="n">ansatz</span><span class="o">.</span><span class="n">set_observables</span><span class="p">(</span><span class="n">my_observables</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">2.0</span><span class="p">]})</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Factory function (closure)</strong> — for caching or stateful behaviour:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">create_my_function</span><span class="p">(</span><span class="n">config_param</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory returning a stateful QuOp Function.&quot;&quot;&quot;</span>
+    <span class="n">_cache</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># state persists across calls</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">my_function</span><span class="p">(</span><span class="n">local_i</span><span class="p">,</span> <span class="n">local_i_offset</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># config_param captured from enclosing scope</span>
+        <span class="c1"># _cache persists between calls (e.g., for expensive one-time setup)</span>
+        <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_cache</span><span class="p">:</span>
+            <span class="n">_cache</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">expensive_computation</span><span class="p">()</span>
+        <span class="c1"># ... use _cache[&quot;data&quot;] ...</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">return</span> <span class="n">my_function</span>
+
+<span class="c1"># Usage:</span>
+<span class="n">ansatz</span><span class="o">.</span><span class="n">set_observables</span><span class="p">(</span><span class="n">create_my_function</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">obs_dict</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Callable class</strong> — for complex state or easier debugging:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MyFunction</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config_param</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config_param</span> <span class="o">=</span> <span class="n">config_param</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># state as instance attributes</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_i</span><span class="p">,</span> <span class="n">local_i_offset</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="o">=</span> <span class="n">expensive_computation</span><span class="p">()</span>
+        <span class="c1"># ... implementation ...</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+<span class="c1"># Usage:</span>
+<span class="n">ansatz</span><span class="o">.</span><span class="n">set_observables</span><span class="p">(</span><span class="n">MyFunction</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span> <span class="n">obs_dict</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Use plain functions when no state is needed. Use the factory/closure
+pattern when you need to cache expensive computations (e.g., computing
+global statistics via MPI) or carry configuration. Use callable classes
+when you need subclassing, multiple methods, or easier state inspection
+for debugging.</p>
+</dd>
+<dt id="term-FunctionDict">FunctionDict<a class="headerlink" href="#term-FunctionDict" title="Link to this term"></a></dt><dd><p>Prior to <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation, positional arguments of a QuOp Function
+are bound to the attributes of the receiving class if a match is found.
+Additional positional and keyword arguments are specified via a FunctionDict:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">function_dict</span> <span class="p">:</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span><span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span><span class="n">Dict</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">&quot;args&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;kwargs&quot;</span></code> elements of a FunctionDict are both
+optional. If present, these are passed to a bound QuOp Function as:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">bound_quop_function</span><span class="p">(</span><span class="o">*</span><span class="n">function_dict</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">],</span> <span class="o">**</span><span class="n">function_dict</span><span class="p">[</span><span class="s2">&quot;kwargs&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<section id="bindable-attributes">
+<h2>Bindable Attributes<a class="headerlink" href="#bindable-attributes" title="Link to this heading"></a></h2>
+<p>When defining a QuOp Function, positional parameters are automatically bound
+to class attributes <strong>by matching the parameter name to the attribute name</strong>.
+This is the key mechanism: if your function has a parameter named <code class="docutils literal notranslate"><span class="pre">local_i</span></code>,
+it will automatically receive the value of that attribute.</p>
+<p><strong>Binding sources differ by function type</strong>:</p>
+<ul class="simple">
+<li><p><strong>Ansatz-level functions</strong> (Observables, Initial State, Parameter Map,
+Sampling, Objective): bind to <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attributes</p></li>
+<li><p><strong>Unitary-level functions</strong> (Operator, Parameter): bind to
+<a class="reference internal" href="api/unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attributes</p></li>
+</ul>
+<p>Many attributes (like <code class="docutils literal notranslate"><span class="pre">local_i</span></code>, <code class="docutils literal notranslate"><span class="pre">system_size</span></code>, <code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code>) are shared
+between Ansatz and Unitary, so they work in both contexts. However, some
+attributes are specific to each class.</p>
+<section id="ansatz-bindable-attributes">
+<h3>Ansatz Bindable Attributes<a class="headerlink" href="#ansatz-bindable-attributes" title="Link to this heading"></a></h3>
+<p>These attributes are available for Observables, Initial State, Parameter Map,
+Sampling, and Objective Functions:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">system_size</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Total number of quantum basis states</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Number of elements in this MPI rank’s partition</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Global index offset for this rank’s partition</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">partition_table</span></code></p></td>
+<td><p>ndarray[int]</p></td>
+<td><p>Array where <code class="docutils literal notranslate"><span class="pre">partition_table[rank+1]</span> <span class="pre">-</span> <span class="pre">partition_table[rank]</span> <span class="pre">=</span> <span class="pre">local_i</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">observables</span></code></p></td>
+<td><p>ndarray[float64]</p></td>
+<td><p>Local partition of observable values (available after setup)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ansatz_initial_state</span></code></p></td>
+<td><p>ndarray[complex128]</p></td>
+<td><p>Local partition of the initial state vector</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">final_state</span></code></p></td>
+<td><p>ndarray[complex128]</p></td>
+<td><p>Local partition of current/final state vector</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code></p></td>
+<td><p>ndarray[float64]</p></td>
+<td><p>Current variational parameter values</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ansatz_depth</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Number of ansatz iterations (layers)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">total_params</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Number of variational parameters per ansatz iteration</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code></p></td>
+<td><p>MPI.Intracomm</p></td>
+<td><p>MPI subcommunicator for this Ansatz instance</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">expectation</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Last computed objective function value</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">seed</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Random seed for parameter generation</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Important</strong>: Parameter names in your function signature must exactly match
+the attribute names above to be bound. Parameters that don’t match will need
+to be provided via <code class="docutils literal notranslate"><span class="pre">FunctionDict[&quot;args&quot;]</span></code>.</p>
+<p><strong>Naming convention for custom parameters</strong>: To avoid unintended binding, we
+recommend prefixing your custom parameter names with an underscore:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">my_observables</span><span class="p">(</span>
+    <span class="n">local_i</span><span class="p">,</span>           <span class="c1"># bound from Ansatz</span>
+    <span class="n">local_i_offset</span><span class="p">,</span>    <span class="c1"># bound from Ansatz</span>
+    <span class="n">_n_customers</span><span class="p">,</span>      <span class="c1"># custom - passed via FunctionDict[&quot;args&quot;]</span>
+    <span class="n">_penalty_weight</span><span class="p">,</span>   <span class="c1"># custom - passed via FunctionDict[&quot;args&quot;]</span>
+<span class="p">):</span>
+    <span class="o">...</span>
+
+<span class="c1"># Usage:</span>
+<span class="n">ansatz</span><span class="o">.</span><span class="n">set_observables</span><span class="p">(</span><span class="n">my_observables</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]})</span>
+</pre></div>
+</div>
+<p>This prevents accidental collisions with current or future Ansatz attributes
+(e.g., <code class="docutils literal notranslate"><span class="pre">seed</span></code>, <code class="docutils literal notranslate"><span class="pre">expectation</span></code>).</p>
+<p><strong>Runtime discovery</strong>: Use these methods to discover available bindings:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ansatz.print_bindable_attributes()</span></code> — show Ansatz attributes only</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ansatz.print_all_bindable_attributes()</span></code> — show Ansatz AND all Unitary attributes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unitary.print_bindable_attributes()</span></code> — show attributes for a specific Unitary</p></li>
+</ul>
+<p>For programmatic access, use <code class="docutils literal notranslate"><span class="pre">get_bindable_attributes()</span></code> which returns a dictionary.</p>
+<p><strong>Extensibility</strong>: Subclasses (algorithms, propagators) can extend the available
+bindable attributes by defining their own <code class="docutils literal notranslate"><span class="pre">BINDABLE_ATTRIBUTES</span></code> class variable.
+The discovery methods automatically collect attributes from the entire class
+hierarchy.</p>
+</section>
+<section id="unitary-bindable-attributes">
+<h3>Unitary Bindable Attributes<a class="headerlink" href="#unitary-bindable-attributes" title="Link to this heading"></a></h3>
+<p>These attributes are available for Operator and Parameter Functions. They are
+bound from the <a class="reference internal" href="api/unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> instance:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">system_size</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Total number of quantum basis states (shared with Ansatz)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Number of elements in this MPI rank’s partition (shared)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Global index offset for this rank’s partition (shared)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">partition_table</span></code></p></td>
+<td><p>ndarray[int]</p></td>
+<td><p>Array describing global partitioning (shared)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code></p></td>
+<td><p>MPI.Intracomm</p></td>
+<td><p>MPI subcommunicator (shared)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">seed</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Random seed for parameter generation (shared)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">alloc_local</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Size of the operator array (equals <code class="docutils literal notranslate"><span class="pre">local_i</span></code> for non-array operators)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">lb</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Lower global index of the local partition</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ub</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Upper global index of the local partition</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_params</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Total parameters for this Unitary (operator + unitary params)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">operator_n_params</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Number of operator variational parameters</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">unitary_n_params</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Number of unitary variational parameters</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code></p></td>
+<td><p>ndarray[float64]</p></td>
+<td><p>Operator variational parameters (only for parameterised operators)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">initial_state</span></code></p></td>
+<td><p>ndarray[complex128]</p></td>
+<td><p>Local partition of input state to this unitary</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">final_state</span></code></p></td>
+<td><p>ndarray[complex128]</p></td>
+<td><p>Local partition of output state from this unitary</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Attributes marked “(shared)” have the same values in both Ansatz and
+Unitary contexts. Unitary-specific attributes like <code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code>
+are only meaningful for Operator Functions that define parameterised operators.</p>
+</div>
+<dl class="glossary">
+<dt id="term-Observables-Function">Observables Function<a class="headerlink" href="#term-Observables-Function" title="Link to this term"></a></dt><dd><p>Returns a 1-D  real array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the
+<a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a> with global offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code>. Passed to the
+<a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz.set_observables" title="quop_mpi.Ansatz.set_observables"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_observables()</span></code></a> method and bound to the
+attributes of the <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> class.</p>
+<p>Predefined Observables Functions are included in the
+<a class="reference internal" href="api/observable.html#module-quop_mpi.observable" title="quop_mpi.observable"><code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.observable</span></code></a> module.</p>
+<p><strong>Commonly used parameters</strong>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> — number of observables this rank must compute</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> — starting global index for this rank</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">system_size</span></code> — total number of basis states</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">partition_table</span></code> — for advanced partitioning schemes</p></li>
+</ul>
+<p><strong>Typical structure:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">observables_function</span><span class="p">(</span>
+    <span class="n">local_i</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">local_i_offset</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]:</span>
+
+    <span class="o">...</span>
+
+    <span class="k">return</span> <span class="n">observables</span>
+</pre></div>
+</div>
+</dd>
+<dt id="term-Initial-State-Function">Initial State Function<a class="headerlink" href="#term-Initial-State-Function" title="Link to this term"></a></dt><dd><p>Returns a 1-D complex array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the
+<a class="reference internal" href="glossary.html#term-initial-state"><span class="xref std std-term">initial state</span></a> with global offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code>. Passed to
+the <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz.set_initial_state" title="quop_mpi.Ansatz.set_initial_state"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_initial_state()</span></code></a> method and bound to the
+attributes of the <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> class.</p>
+<p>Predefined Initial State Functions are included in the
+<a class="reference internal" href="api/state.html#module-quop_mpi.state" title="quop_mpi.state"><code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.state</span></code></a> module.</p>
+<p><strong>Commonly used parameters</strong>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> — number of state elements this rank must compute</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> — starting global index for this rank</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">system_size</span></code> — total number of basis states</p></li>
+</ul>
+<p><strong>Typical structure:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">initial_state_function</span><span class="p">(</span>
+    <span class="n">local_i</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">local_i_offset</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">system_size</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">]:</span>
+
+    <span class="o">...</span>
+
+    <span class="k">return</span> <span class="n">initial_state</span>
+</pre></div>
+</div>
+</dd>
+<dt id="term-Parameter-Map-Function">Parameter Map Function<a class="headerlink" href="#term-Parameter-Map-Function" title="Link to this term"></a></dt><dd><p>Defines a mapping from a reduced “free” parameter vector to the full
+variational-parameter vector used by a <a class="reference internal" href="glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a>.  This allows you to
+optimise over a smaller parameter space while the mapping function
+reconstructs the complete vector internally.</p>
+<p>Passed to <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz.set_parameter_map" title="quop_mpi.Ansatz.set_parameter_map"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_parameter_map()</span></code></a> together with the
+number of free parameters and an optional <a class="reference internal" href="#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a>.</p>
+<p><strong>Method signature:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ansatz</span><span class="o">.</span><span class="n">set_parameter_map</span><span class="p">(</span>
+    <span class="n">n_free_params</span><span class="p">,</span>   <span class="c1"># int: dimensionality of the optimisation problem</span>
+    <span class="n">mapping_fn</span><span class="p">,</span>      <span class="c1"># callable: your mapping function</span>
+    <span class="n">mapping_dict</span>     <span class="c1"># optional FunctionDict for extra arguments</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Parameters:</strong></p>
+<p>The first positional parameter always receives the free parameter vector
+from the optimiser. Additional parameters depend on your mapping logic:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ansatz_depth</span></code> — number of ansatz iterations (for computing output size)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">total_params</span></code> — parameters per iteration (for computing output size)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">observables</span></code> — for normalising parameters by observable statistics</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code> — for computing global statistics across ranks</p></li>
+</ul>
+<p><strong>Typical structure:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">mapping_fn</span><span class="p">(</span>
+    <span class="n">free_vec</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">ansatz_depth</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">total_params</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Map free_vec to full parameter vector of shape</span>
+<span class="sd">    (ansatz_depth * total_params,).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">full_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">ansatz_depth</span> <span class="o">*</span> <span class="n">total_params</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="c1"># ... your mapping logic ...</span>
+    <span class="k">return</span> <span class="n">full_vec</span>
+</pre></div>
+</div>
+<p><strong>Factory pattern example:</strong></p>
+<p>For Parameter Map Functions, the factory pattern conveniently returns
+both <code class="docutils literal notranslate"><span class="pre">n_free_params</span></code> and the mapping function together:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">create_linear_schedule</span><span class="p">(</span><span class="n">scale</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory returning (n_free_params, mapping_fn).&quot;&quot;&quot;</span>
+    <span class="n">n_free_params</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">mapping_fn</span><span class="p">(</span><span class="n">free_vec</span><span class="p">,</span> <span class="n">ansatz_depth</span><span class="p">,</span> <span class="n">observables</span><span class="p">,</span> <span class="n">MPI_COMM</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s2">&quot;sigma&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_cache</span><span class="p">:</span>
+            <span class="n">_cache</span><span class="p">[</span><span class="s2">&quot;sigma&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">compute_global_std</span><span class="p">(</span><span class="n">observables</span><span class="p">,</span> <span class="n">MPI_COMM</span><span class="p">)</span>
+        <span class="c1"># ... build full_vec from free_vec ...</span>
+        <span class="k">return</span> <span class="n">full_vec</span>
+
+    <span class="k">return</span> <span class="n">n_free_params</span><span class="p">,</span> <span class="n">mapping_fn</span>
+
+<span class="c1"># Usage:</span>
+<span class="n">n_free</span><span class="p">,</span> <span class="n">param_map</span> <span class="o">=</span> <span class="n">create_linear_schedule</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="n">ansatz</span><span class="o">.</span><span class="n">set_parameter_map</span><span class="p">(</span><span class="n">n_free</span><span class="p">,</span> <span class="n">param_map</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="#term-QuOp-Function"><span class="xref std std-term">QuOp Function</span></a> for the general implementation patterns
+(factory/closure vs callable class).</p>
+</dd>
+<dt id="term-Sampling-Function">Sampling Function<a class="headerlink" href="#term-Sampling-Function" title="Link to this term"></a></dt><dd><p>Returns an <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> value computed from batches of
+<a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a> values that are sampled based on the probability
+distribution of the wavefunction state vector during simulation together
+with a boolean that specifies whether the <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a>
+value should be passed to the <a class="reference internal" href="glossary.html#term-optimiser"><span class="xref std std-term">optimiser</span></a> or more sample batches
+taken. Passed to <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_sampling()</span></code>.</p>
+<p>See <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> for a selected list of available attributes,</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> class computes the expectation value
+exactly by default.</p>
+</div>
+<p><strong>Typical Structure</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">sampling_function</span><span class="p">(</span>
+    <span class="n">samples</span> <span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ndarray</span><span class="p">[</span><span class="n">float64</span><span class="p">]],</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
+
+    <span class="o">...</span>
+
+    <span class="k">return</span> <span class="n">objective_function_value</span><span class="p">,</span> <span class="n">value_accepted</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">samples</span></code> argument is a list of 1-D real arrays containing
+<code class="docutils literal notranslate"><span class="pre">sample_block_size</span></code> <a class="reference internal" href="glossary.html#term-observables"><span class="xref std std-term">observables</span></a> values. If
+<code class="docutils literal notranslate"><span class="pre">value_accepted</span></code> is not <code class="docutils literal notranslate"><span class="pre">True</span></code>, an additional sample block is
+appended to <code class="docutils literal notranslate"><span class="pre">samples</span></code>.</p>
+</dd>
+<dt id="term-Jacobian-Function">Jacobian Function<a class="headerlink" href="#term-Jacobian-Function" title="Link to this term"></a></dt><dd><p>Enables distributed parallel computation of the <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective
+function</span></a> gradient. Returns the partial derivative of the
+<a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a> with respect to the variational parameter
+with index <code class="docutils literal notranslate"><span class="pre">var</span></code>. Used to compute the <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a>
+gradient is parallel if using a gradient-informed <a class="reference internal" href="glossary.html#term-optimiser"><span class="xref std std-term">optimiser</span></a>.
+Passed to <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_parallel_jacobian()</span></code>.</p>
+<p>The <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> supports numerical approximation of the
+gradient using the forward and central finite difference methods
+(specified via <code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_parallel_jacobian()</span></code>).  See
+<a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> for a list of available attributes.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> class computes the <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective
+function</span></a> gradient sequentially by default.</p></li>
+<li><p>The default optimisation method of the <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>
+class, the BFGS algorithm, is gradient informed.</p></li>
+</ul>
+</div>
+<p><strong>Typical Structure</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">jacobian_function</span><span class="p">(</span>
+    <span class="n">variational_parameters</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">],</span>
+    <span class="n">evaluate</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+
+<span class="o">...</span>
+
+    <span class="k">return</span> <span class="n">partial_derivative_value</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">evaluate</span></code> argument is bound to the
+<a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz.evaluate" title="quop_mpi.Ansatz.evaluate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.evaluate()</span></code></a> method which implements lazy
+computation of the <a class="reference internal" href="glossary.html#term-objective-function"><span class="xref std std-term">objective function</span></a>. This is the recommended
+method for use in numerical approximation of the gradient by
+finite-difference methods.</p>
+</dd>
+<dt id="term-Operator-Function">Operator Function<a class="headerlink" href="#term-Operator-Function" title="Link to this term"></a></dt><dd><p>Returns an <a class="reference internal" href="glossary.html#term-operator"><span class="xref std std-term">operator</span></a> object that is compatible with the propagation method of
+a specific <code class="xref py py-class docutils literal notranslate"><span class="pre">unitary</span></code> class. See <a class="reference internal" href="api/unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Operator Functions bind to <strong>Unitary</strong> attributes, not Ansatz
+attributes. See the “Unitary Bindable Attributes” table above.</p>
+</div>
+<p>Predefined Operator Functions are included with each <code class="docutils literal notranslate"><span class="pre">unitary</span></code> class
+in the <code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.propagator</span></code> module under
+<code class="docutils literal notranslate"><span class="pre">quop_mpi.propagator.&lt;unitary&gt;.operator</span></code>.</p>
+<p><strong>Commonly used parameters</strong> (bound from Unitary):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">local_i</span></code> — partition size for this rank</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code> — global index offset</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">system_size</span></code> — total number of basis states</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code> — only if the operator is parameterised</p></li>
+</ul>
+<p><strong>Typical Structure</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">operator_function</span><span class="p">(</span>
+    <span class="n">local_i</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">local_i_offset</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+
+    <span class="o">...</span>
+
+    <span class="k">return</span> <span class="n">operator</span>
+</pre></div>
+</div>
+<p>Operator Functions with one or more <a class="reference internal" href="glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a>
+require the <code class="docutils literal notranslate"><span class="pre">variational_parameters</span></code> positional argument. Operator
+Functions with no <a class="reference internal" href="glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> do not.</p>
+</dd>
+<dt id="term-Parameter-Function">Parameter Function<a class="headerlink" href="#term-Parameter-Function" title="Link to this term"></a></dt><dd><p>Returns initial values for the <a class="reference internal" href="glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> associated
+with an instance of the <a class="reference internal" href="api/unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> class.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Parameter Functions bind to <strong>Unitary</strong> attributes, not Ansatz
+attributes. See the “Unitary Bindable Attributes” table above.</p>
+</div>
+<p>Predefined Parameter Functions are included in the <a class="reference internal" href="api/param.html#module-quop_mpi.param" title="quop_mpi.param"><code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.param</span></code></a>
+module.</p>
+<p><strong>Commonly used parameters</strong> (bound from Unitary):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">n_params</span></code> — number of parameters to generate</p></li>
+</ul>
+<p><strong>Typical Structure</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">param_function</span><span class="p">(</span>
+   <span class="n">n_params</span> <span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+   <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+   <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+
+    <span class="o">...</span>
+
+    <span class="k">return</span> <span class="n">variational_parameters</span>
+</pre></div>
+</div>
+</dd>
+<dt id="term-Objective-Function">Objective Function<a class="headerlink" href="#term-Objective-Function" title="Link to this term"></a></dt><dd><p>Called after state-evolution during parameter optimisation. Returns a
+scalar value for minimisation.
+Passed to <a class="reference internal" href="api/ansatz.html#quop_mpi.Ansatz.set_objective" title="quop_mpi.Ansatz.set_objective"><code class="xref py py-meth docutils literal notranslate"><span class="pre">quop_mpi.Ansatz.set_objective()</span></code></a>.</p>
+<p><strong>Commonly used parameters</strong>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">local_probabilities</span></code> — probability amplitudes for this rank’s partition</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">observables</span></code> — observable values for this rank’s partition</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code> — MPI subcommunicator (for global reductions, e.g., CVaR)</p></li>
+</ul>
+<p><strong>Typical Structure</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">objective_function</span><span class="p">(</span>
+   <span class="n">local_probabilities</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span>
+   <span class="n">observables</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">],</span>
+   <span class="n">MPI_COMM</span><span class="p">:</span> <span class="n">MPI</span><span class="o">.</span><span class="n">Intracomm</span><span class="p">,</span>
+   <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+   <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+
+    <span class="o">...</span>
+
+    <span class="k">return</span> <span class="n">objective_function_value</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api/toolkit.html" class="btn btn-neutral float-left" title="Toolkit" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="developing_for_quop.html" class="btn btn-neutral float-right" title="Developing for QuOp_MPI" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

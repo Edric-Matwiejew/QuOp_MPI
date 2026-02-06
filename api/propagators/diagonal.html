@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagonal &mdash; QuOp_MPI 1.5.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/documentation_options.js?v=e0a75244"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script>window.MathJax = {"tex": {"macros": {"bm": ["{\\boldsymbol #1}", 1], "Bar": ["{\\bar #1}", 1], "dag": ["\\dagger"], "QWOA{}": ["QWOA"]}}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Sparse" href="sparse.html" />
+    <link rel="prev" title="Circulant" href="circulant.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QuOp_MPI
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../readme_link.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../theoretical_background.html">Theoretical Background</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../package_overview.html">Package Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Overview</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../index.html#core-classes">Core Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index.html#propagators">Propagators</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="index.html">Propagators</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="circulant.html">Circulant</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Diagonal</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sparse.html">Sparse</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite.html">Composite</a></li>
+<li class="toctree-l4"><a class="reference internal" href="momentum.html">Momentum</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#supporting-modules">Supporting Modules</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quop_functions.html">QuOp Functions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../developing_for_quop.html">Developing for QuOp_MPI</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../cite.html">Citing QuOp_MPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../bibliography.html">Bibliography</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QuOp_MPI</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Overview</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Propagators</a></li>
+      <li class="breadcrumb-item active">Diagonal</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/Edric-Matwiejew/QuOp_MPI/blob/main/docs/source/api/propagators/diagonal.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="diagonal">
+<span id="api-propagators-diagonal"></span><h1>Diagonal<a class="headerlink" href="#diagonal" title="Link to this heading"></a></h1>
+<p>Propagators for diagonal operators in the computational basis. These are commonly used for phase/cost operators.</p>
+<section id="module-quop_mpi.propagator.diagonal">
+<span id="propagator-class"></span><h2>Propagator Class<a class="headerlink" href="#module-quop_mpi.propagator.diagonal" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.unitary">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.</span></span><span class="sig-name descname"><span class="pre">unitary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.diagonal.unitary" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unitary</span></code></a></p>
+<p>Compute the action of a <a class="reference internal" href="../../glossary.html#term-Mixing-Unitary"><span class="xref std std-term">mixing unitary</span></a> with a phase_shift
+<a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a> or a sequence of mixing-unitaries with phase_shift
+operators (see the <code class="docutils literal notranslate"><span class="pre">unitary_n_params</span></code> attribute below).</p>
+<p><strong>Inheritance Diagram:</strong></p>
+<blockquote>
+<div><div class="graphviz"><img src="../../_images/graphviz-3af646ebec07acc4ed11f306684da72c54e56fe4.png" alt="digraph &quot;sphinx-ext-graphviz&quot; {
+    rankdir=&quot;LR&quot;;
+    node [fontsize=&quot;10&quot;];
+    Unitary[label=&quot;quop_mpi.Unitary&quot;, shape=&quot;rectangle&quot;];
+    unitary[label=&quot;quop_mpi.propagator.phase_shift.unitary&quot;, shape=&quot;rectangle&quot;];
+
+    Unitary -&gt; unitary;
+}" class="graphviz" /></div>
+</div></blockquote>
+<p>See <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>unitary_type</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">'phase_shift'</span></code></p>
+</dd>
+<dt><strong>planner</strong></dt><dd><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p>
+</dd>
+<dt><strong>unitary_n_params</strong></dt><dd><p>Set on initialisation to <code class="docutils literal notranslate"><span class="pre">1</span></code> or more. If <code class="docutils literal notranslate"><span class="pre">unitary_n_parameters</span> <span class="pre">&gt;</span> <span class="pre">1</span></code>,
+the <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> must return a <code class="docutils literal notranslate"><span class="pre">list[csr_matrix]</span></code> of
+length <code class="docutils literal notranslate"><span class="pre">unitary_n_parameters</span></code> containing <code class="docutils literal notranslate"><span class="pre">csr_matrix</span></code> partitions of
+of <code class="docutils literal notranslate"><span class="pre">local_i</span></code> rows.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.unitary.propagate">
+<span class="sig-name descname"><span class="pre">propagate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gammas</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#quop_mpi.propagator.diagonal.unitary.propagate" title="Link to this definition"></a></dt>
+<dd><p>Simulation of the action of a :term`unitary`.</p>
+<p>When implemented, <code class="docutils literal notranslate"><span class="pre">propagate</span></code> contains a call to a method (typically a
+contained in a complied Python extension module) that takes the class
+attributes <code class="docutils literal notranslate"><span class="pre">initial_state</span></code>, <code class="docutils literal notranslate"><span class="pre">final_state</span></code> and <code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code>, together
+with attributes describing the parallel partitioning scheme and
+<a class="reference internal" href="../../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a> <code class="docutils literal notranslate"><span class="pre">x</span></code>, as input. The action of the unitary
+is computed in MPI parallel, with the computed result written to
+<code class="docutils literal notranslate"><span class="pre">final_state</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Not implemented by the base <code class="docutils literal notranslate"><span class="pre">Unitary</span></code> class.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">ndarray[float64]</span></dt><dd><p>a 1-D real array of <code class="docutils literal notranslate"><span class="pre">n_params</span></code> <a class="reference internal" href="../../glossary.html#term-variational-parameters"><span class="xref std std-term">variational parameters</span></a></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">propagate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+
+    <span class="n">external_propagator</span><span class="p">(</span>
+        <span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">partition_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_state</span><span class="p">,</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">MPI_COMM</span> <span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="operators">
+<h2>Operators<a class="headerlink" href="#operators" title="Link to this heading"></a></h2>
+<p>Pre-defined operator functions for diagonal propagators.</p>
+<p id="module-quop_mpi.propagator.diagonal.operator">Predefined <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Functions</span></a> and related utility
+for <a class="reference internal" href="#quop_mpi.propagator.diagonal.unitary" title="quop_mpi.propagator.diagonal.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.diagonal.unitary</span></code></a>.</p>
+<p><strong>Return Format</strong></p>
+<p>An Operator Function for <code class="docutils literal notranslate"><span class="pre">'diagonal'</span></code> <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instances returns:</p>
+<blockquote>
+<div><dl>
+<dt>diagonal<span class="classifier">ndarray[float64] or list[ndarray[float64]]</span></dt><dd><p>A 1-D real array of size <code class="docutils literal notranslate"><span class="pre">local_i</span></code> containing the diagonal
+elements of the operator for global indices <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code>
+to <code class="docutils literal notranslate"><span class="pre">local_i_offset</span> <span class="pre">+</span> <span class="pre">local_i</span> <span class="pre">-</span> <span class="pre">1</span></code>.</p>
+<p>Alternatively, a list of such arrays for multiple diagonal operators
+(requires <code class="docutils literal notranslate"><span class="pre">unitary_n_params</span></code> to match the list length).</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>If the Operator function returns <code class="docutils literal notranslate"><span class="pre">list[ndarray[float64]]</span></code>, the <code class="docutils literal notranslate"><span class="pre">unitary</span></code>
+instance must be initialised with <code class="docutils literal notranslate"><span class="pre">unitary_n_parameters</span></code> equal to the length
+of returned list. The resulting <code class="docutils literal notranslate"><span class="pre">unitary</span></code> is then equivalent to a sequence of
+<a class="reference internal" href="../../glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitaries</span></a> with independently
+parameterised <a class="reference internal" href="../../glossary.html#term-unitary-parameter"><span class="xref std std-term">unitary parameters</span></a>.</p>
+<p><strong>Propagation Method</strong></p>
+<p>The diagonal propagator computes <span class="math notranslate nohighlight">\(e^{-itH}|\psi\rangle\)</span> via direct
+element-wise multiplication:</p>
+<div class="math notranslate nohighlight">
+\[|\psi'\rangle_k = e^{-it H_{kk}} |\psi\rangle_k\]</div>
+<p>where <span class="math notranslate nohighlight">\(H_{kk}\)</span> are the diagonal elements. This is the most efficient
+propagation method as it requires only <span class="math notranslate nohighlight">\(O(N)\)</span> operations with no
+communication between MPI ranks.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.operator.array">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.operator.</span></span><span class="sig-name descname"><span class="pre">array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.diagonal.operator.array" title="Link to this definition"></a></dt>
+<dd><p>Define the diagonal of the <a class="reference internal" href="../../glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> using a Numpy
+array.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for the
+<code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagate.diagonal.unitary</span></code> class.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For memory efficiency, <code class="docutils literal notranslate"><span class="pre">array</span></code> can be present as an <code class="docutils literal notranslate"><span class="pre">ndarray[float64]</span></code> at 
+<code class="docutils literal notranslate"><span class="pre">MPI_COMM.rank</span> <span class="pre">==</span> <span class="pre">0</span></code> only and <code class="docutils literal notranslate"><span class="pre">None</span></code> at all other ranks in <code class="docutils literal notranslate"><span class="pre">MPI_COMM</span></code>.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>describes the parallel partitioning scheme, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>
+attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>array</strong><span class="classifier">np.ndarray[np.float64]</span></dt><dd><p>a 1-D real array of size <a class="reference internal" href="../../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p>a 1-D real array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the operator
+diagonal with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.operator.cartesian">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.operator.</span></span><span class="sig-name descname"><span class="pre">cartesian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">system_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i_offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deltas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.diagonal.operator.cartesian" title="Link to this definition"></a></dt>
+<dd><p>TODO:UPDATE Generate the diagonal of a <a class="reference internal" href="../../glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> <a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a>
+using a Python function defined in discrete Cartesian coordinates.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. Depending on wether <a class="reference internal" href="../../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation
+is defined using the <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> class directly or with a predefined
+<code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> subclass from the <code class="docutils literal notranslate"><span class="pre">algorithm</span></code> submodule, the following
+arguments must be defined in a corresponding <a class="reference internal" href="../../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> on
+initialisation of the <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>: <code class="docutils literal notranslate"><span class="pre">Ns</span></code>, <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, <code class="docutils literal notranslate"><span class="pre">mins</span></code> and <code class="docutils literal notranslate"><span class="pre">function</span></code></p></li>
+<li><p>algorithms in <code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.algorithm.combinatorial</span></code>: <code class="docutils literal notranslate"><span class="pre">Ns</span></code>, <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, <code class="docutils literal notranslate"><span class="pre">mins</span></code> and <code class="docutils literal notranslate"><span class="pre">function</span></code></p></li>
+<li><p><a class="reference internal" href="../algorithms/multivariable.html#quop_mpi.algorithm.multivariable.qmoa" title="quop_mpi.algorithm.multivariable.qmoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.algorithm.multivariable.qmoa</span></code></a>: <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, <code class="docutils literal notranslate"><span class="pre">mins</span></code> and <code class="docutils literal notranslate"><span class="pre">function</span></code></p></li>
+<li><p><a class="reference internal" href="../algorithms/multivariable.html#quop_mpi.algorithm.multivariable.qowe" title="quop_mpi.algorithm.multivariable.qowe"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.algorithm.multivariable.qowe</span></code></a>: <code class="docutils literal notranslate"><span class="pre">function</span></code></p></li>
+</ul>
+</div></blockquote>
+<p>Additional positional and keyword arguments in the <code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are
+passed to <code class="docutils literal notranslate"><span class="pre">function</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">function</span></code> argument must conform to the signature,</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">function</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ndarray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">x</span></code> is a 1-D array containing a <code class="docutils literal notranslate"><span class="pre">len(Ns)</span></code> -dimensional grid
+point.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>size of the simulated QVA</p>
+</dd>
+<dt><strong>local_i</strong><span class="classifier">int</span></dt><dd><p>size of the local <a class="reference internal" href="../../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partition,
+<a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>local_i_offset</strong><span class="classifier">int</span></dt><dd><p>global index offset of the local system state partition,
+<a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>Ns</strong><span class="classifier">list[int]</span></dt><dd><p>the number of qubits assigned to each dimension of the cartesian grid
+such that there is <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">**</span> <span class="pre">Ns[d]</span></code> grid points per dimension <code class="docutils literal notranslate"><span class="pre">d</span></code></p>
+</dd>
+<dt><strong>deltas</strong><span class="classifier">list[float]</span></dt><dd><p>step size in each Cartesian coordinate</p>
+</dd>
+<dt><strong>mins</strong><span class="classifier">list[float]</span></dt><dd><p>lower bound of each Cartesian coordinate</p>
+</dd>
+<dt><strong>function</strong><span class="classifier">Callable</span></dt><dd><p>a Python function that takes a list of <code class="docutils literal notranslate"><span class="pre">len(Ns)</span></code> real coordinate
+values and returns a <code class="docutils literal notranslate"><span class="pre">float</span></code></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p>a 1-D real array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the operator
+diagonal with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#quop_mpi.propagator.diagonal.operator.setup_cartesian" title="quop_mpi.propagator.diagonal.operator.setup_cartesian"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup_cartesian</span></code></a></dt><dd><p>compute <code class="docutils literal notranslate"><span class="pre">deltas</span></code> and <code class="docutils literal notranslate"><span class="pre">mins</span></code></p>
+</dd>
+<dt><a class="reference internal" href="#quop_mpi.propagator.diagonal.operator.cartesian_scaled" title="quop_mpi.propagator.diagonal.operator.cartesian_scaled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cartesian_scaled</span></code></a></dt><dd><p>alternative to <code class="docutils literal notranslate"><span class="pre">cartesian</span></code>, scales <code class="docutils literal notranslate"><span class="pre">function</span></code> between <code class="docutils literal notranslate"><span class="pre">0</span></code> and an upper bound.</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.operator.cartesian_scaled">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.operator.</span></span><span class="sig-name descname"><span class="pre">cartesian_scaled</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">system_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_i_offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deltas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coeff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.diagonal.operator.cartesian_scaled" title="Link to this definition"></a></dt>
+<dd><p>Generate the diagonal of a <a class="reference internal" href="../../glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> <a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a>
+using a Python function defined in discrete Cartesian coordinates with the
+function scaled between <code class="docutils literal notranslate"><span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">coeff</span></code>.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Observables-Function"><span class="xref std std-term">Observables Function</span></a>. Depending on wether <a class="reference internal" href="../../glossary.html#term-QVA"><span class="xref std std-term">QVA</span></a> simulation
+is defined using the <code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> class directly or with a predefined
+<code class="docutils literal notranslate"><span class="pre">Ansatz</span></code> subclass from the <code class="docutils literal notranslate"><span class="pre">algorithm</span></code> submodule, the following
+arguments must be defined in a corresponding <a class="reference internal" href="../../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> on
+initialisation of the <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>: <code class="docutils literal notranslate"><span class="pre">Ns</span></code>, <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, <code class="docutils literal notranslate"><span class="pre">mins</span></code>, <code class="docutils literal notranslate"><span class="pre">function</span></code> and <code class="docutils literal notranslate"><span class="pre">coeff</span></code></p></li>
+<li><p>algorithms in <code class="xref py py-mod docutils literal notranslate"><span class="pre">quop_mpi.algorithm.combinatorial</span></code>: <code class="docutils literal notranslate"><span class="pre">Ns</span></code>, <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, <code class="docutils literal notranslate"><span class="pre">mins</span></code>, <code class="docutils literal notranslate"><span class="pre">function</span></code> and <code class="docutils literal notranslate"><span class="pre">coeff</span></code></p></li>
+<li><p><a class="reference internal" href="../algorithms/multivariable.html#quop_mpi.algorithm.multivariable.qmoa" title="quop_mpi.algorithm.multivariable.qmoa"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.algorithm.multivariable.qmoa</span></code></a>: <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, <code class="docutils literal notranslate"><span class="pre">mins</span></code>, <code class="docutils literal notranslate"><span class="pre">function</span></code> and <code class="docutils literal notranslate"><span class="pre">coeff</span></code></p></li>
+<li><p><a class="reference internal" href="../algorithms/multivariable.html#quop_mpi.algorithm.multivariable.qowe" title="quop_mpi.algorithm.multivariable.qowe"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.algorithm.multivariable.qowe</span></code></a>: <code class="docutils literal notranslate"><span class="pre">function</span></code> and <code class="docutils literal notranslate"><span class="pre">coeff</span></code></p></li>
+</ul>
+</div></blockquote>
+<p>Additional positional and keyword arguments in the <code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are
+passed to <code class="docutils literal notranslate"><span class="pre">function</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">function</span></code> argument must conform to the signature,</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">function</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">ndarray</span><span class="p">[</span><span class="n">float64</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">x</span></code> is a 1-D array containing a <code class="docutils literal notranslate"><span class="pre">len(Ns)</span></code> -dimensional grid
+point.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>system_size</strong><span class="classifier">int</span></dt><dd><p>size of the simulated QVA</p>
+</dd>
+<dt><strong>local_i</strong><span class="classifier">int</span></dt><dd><p>size of the local <a class="reference internal" href="../../glossary.html#term-system-state"><span class="xref std std-term">system state</span></a> partition,
+<a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>local_i_offset</strong><span class="classifier">int</span></dt><dd><p>global index offset of the local system state partition,
+<a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>Ns</strong><span class="classifier">list[int]</span></dt><dd><p>the number of qubits assigned to each dimension of the cartesian grid
+such that there is <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">**</span> <span class="pre">Ns[d]</span></code> grid points per dimension <code class="docutils literal notranslate"><span class="pre">d</span></code></p>
+</dd>
+<dt><strong>deltas</strong><span class="classifier">list[float]</span></dt><dd><p>step size in each Cartesian coordinate</p>
+</dd>
+<dt><strong>mins</strong><span class="classifier">list[float]</span></dt><dd><p>lower bound of each Cartesian coordinate</p>
+</dd>
+<dt><strong>function</strong><span class="classifier">Callable</span></dt><dd><p>a Python function that takes a list of <code class="docutils literal notranslate"><span class="pre">len(Ns)</span></code> real coordinate
+values and returns a <code class="docutils literal notranslate"><span class="pre">float</span></code></p>
+</dd>
+<dt><strong>coeff</strong><span class="classifier">float</span></dt><dd><p>a positive real number, the upper bound of the scaling range</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p>a 1-D real array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the operator
+diagonal with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#quop_mpi.propagator.diagonal.operator.setup_cartesian" title="quop_mpi.propagator.diagonal.operator.setup_cartesian"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup_cartesian</span></code></a></dt><dd><p>compute <code class="docutils literal notranslate"><span class="pre">deltas</span></code> and <code class="docutils literal notranslate"><span class="pre">mins</span></code></p>
+</dd>
+<dt><a class="reference internal" href="#quop_mpi.propagator.diagonal.operator.cartesian_scaled" title="quop_mpi.propagator.diagonal.operator.cartesian_scaled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cartesian_scaled</span></code></a></dt><dd><p>alternative to <code class="docutils literal notranslate"><span class="pre">cartesian_scaled</span></code>,  does not scale <code class="docutils literal notranslate"><span class="pre">function</span></code></p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.operator.csv">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.operator.</span></span><span class="sig-name descname"><span class="pre">csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.diagonal.operator.csv" title="Link to this definition"></a></dt>
+<dd><p>Load the diagonal of a <a class="reference internal" href="../../glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> using 
+<a class="reference external" href="https://pandas.pydata.org/">pandas</a>.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for the
+<code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagate.diagonal.unitary</span></code> class. The <code class="docutils literal notranslate"><span class="pre">filename</span></code> argument must
+be defined in a corresponding <a class="reference internal" href="../../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> on initialisation of the
+<code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance. Additional keyword arguments in the <code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code>
+are passed to the 
+<a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html">pandas.read_csv</a>
+method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>describes the parallel partitioning scheme, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>
+attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>filename</strong><span class="classifier">Callable</span></dt><dd><p>path to a <code class="docutils literal notranslate"><span class="pre">*.csv</span></code> file</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64]</dt><dd><p>a 1-D real array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the operator
+diagonal with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.operator.hdf5">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.operator.</span></span><span class="sig-name descname"><span class="pre">hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.diagonal.operator.hdf5" title="Link to this definition"></a></dt>
+<dd><p>Load the diagonal of a <a class="reference internal" href="../../glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitary</span></a> using 
+<a class="reference external" href="https://docs.h5py.org/en/latest/index.html">HDF5 for Python</a>.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for the
+<code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagate.diagonal.unitary</span></code> class. The <code class="docutils literal notranslate"><span class="pre">filename</span></code> and
+<code class="docutils literal notranslate"><span class="pre">dataset_name</span></code> arguments must be defined in a corresponding
+<a class="reference internal" href="../../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> on initialisation of the <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance.
+Additional positional and keyword arguments in the <code class="docutils literal notranslate"><span class="pre">FunctionDict</span></code> are
+passed to the <a class="reference external" href="https://docs.h5py.org/en/latest/high/file.html">h5py.File</a>
+method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">int</span></dt><dd><p>describes the parallel partitioning scheme, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a>
+attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>filename</strong><span class="classifier">str</span></dt><dd><p>path to a <code class="docutils literal notranslate"><span class="pre">*.h5</span> <span class="pre">file</span></code></p>
+</dd>
+<dt><strong>dataset_name</strong><span class="classifier">str</span></dt><dd><p>path to the dataset containing a <code class="docutils literal notranslate"><span class="pre">ndarray[float64]</span></code> of size
+<a class="reference internal" href="../../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>np.ndarray[np.float64]</dt><dd><p>a 1-D real array containing <code class="docutils literal notranslate"><span class="pre">local_i</span></code> elements of the operator
+diagonal with global index offset <code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.operator.serial">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.operator.</span></span><span class="sig-name descname"><span class="pre">serial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">partition_table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MPI_COMM</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Intracomm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variational_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">np.ndarray</span><span class="p"><span class="pre">[</span></span><span class="pre">np.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.diagonal.operator.serial" title="Link to this definition"></a></dt>
+<dd><p>Generate the diagonal of the <a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a> for one or more sequential
+<a class="reference internal" href="../../glossary.html#term-Phase-Shift-Unitary"><span class="xref std std-term">phase-shift unitaries</span></a> using a serial Python
+function.</p>
+<p>An <a class="reference internal" href="../../quop_functions.html#term-Operator-Function"><span class="xref std std-term">Operator Function</span></a> for the
+<a class="reference internal" href="#quop_mpi.propagator.diagonal.unitary" title="quop_mpi.propagator.diagonal.unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.propagator.diagonal.unitary</span></code></a> class. The <code class="docutils literal notranslate"><span class="pre">function</span></code>
+argument must be defined in a corresponding <a class="reference internal" href="../../quop_functions.html#term-FunctionDict"><span class="xref std std-term">FunctionDict</span></a> on
+initialisation of the <code class="docutils literal notranslate"><span class="pre">unitary</span></code> instance. Additional positional and
+keyword arguments contained in the FunctionDict are passed to <code class="docutils literal notranslate"><span class="pre">function</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">function</span></code> argument must conform to the signature,</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">function</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span><span class="n">ndarray</span><span class="p">[</span><span class="n">float64</span><span class="p">]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="n">ndarray</span><span class="p">[</span><span class="n">float64</span><span class="p">]])</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>where the output is a 1-D real array of type <code class="docutils literal notranslate"><span class="pre">ndarray[float64]</span></code> 
+and length <a class="reference internal" href="../../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a>, or <code class="docutils literal notranslate"><span class="pre">list</span></code> containing one or more 1-D 
+real arrays of type <code class="docutils literal notranslate"><span class="pre">ndarray[float64]</span></code> and length <code class="docutils literal notranslate"><span class="pre">system_size</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>partition_table</strong><span class="classifier">list[int]</span></dt><dd><p>describes the parallel partitioning scheme, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>MPI_COMM</strong><span class="classifier">Intracomm</span></dt><dd><p>MPI communicator, <a class="reference internal" href="../ansatz.html#quop_mpi.Ansatz" title="quop_mpi.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Ansatz</span></code></a> attribute</p>
+</dd>
+<dt><strong>variational_parameters</strong><span class="classifier">ndarray[float64]</span></dt><dd><p><a class="reference internal" href="../../glossary.html#term-operator-parameter"><span class="xref std std-term">operator parameters</span></a>, passed to <code class="docutils literal notranslate"><span class="pre">function</span></code> if
+<code class="docutils literal notranslate"><span class="pre">unitary.operator_n_params</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>, <a class="reference internal" href="../unitary.html#quop_mpi.Unitary" title="quop_mpi.Unitary"><code class="xref py py-class docutils literal notranslate"><span class="pre">quop_mpi.Unitary</span></code></a> attribute</p>
+</dd>
+<dt><strong>function</strong><span class="classifier">Callable</span></dt><dd><p>returns one or more <code class="docutils literal notranslate"><span class="pre">ndarray[float64]</span></code> of size <a class="reference internal" href="../../glossary.html#term-system-size"><span class="xref std std-term">system size</span></a>
+corresponding to the diagonal of the operator of one or more phase-shift
+unitaries</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ndarray[float64] or list[ndarray[float64]]</dt><dd><p>a 1-d real array or list of 1-D real arrays containing a <code class="docutils literal notranslate"><span class="pre">local_i</span></code>
+elements of the <a class="reference internal" href="../../glossary.html#term-operator"><span class="xref std std-term">operator</span></a> diagonal with global index offset
+<code class="docutils literal notranslate"><span class="pre">local_i_offset</span></code></p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quop_mpi.propagator.diagonal.operator.setup_cartesian">
+<span class="sig-prename descclassname"><span class="pre">quop_mpi.propagator.diagonal.operator.</span></span><span class="sig-name descname"><span class="pre">setup_cartesian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#quop_mpi.propagator.diagonal.operator.setup_cartesian" title="Link to this definition"></a></dt>
+<dd><p>Compute the step-size and minimum coordinate values in each dimension of
+a Cartesian grid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Ns</strong><span class="classifier">list[int]</span></dt><dd><p>the number of qubits assigned to each dimension of the Cartesian grid
+such that there is <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">**</span> <span class="pre">Ns[d]</span></code> grid points per dimension <code class="docutils literal notranslate"><span class="pre">d</span></code></p>
+</dd>
+<dt><strong>bounds</strong><span class="classifier">list[list[float]]</span></dt><dd><p>the lower and upper bounds of each dimension where 
+<code class="docutils literal notranslate"><span class="pre">len(Ns)</span> <span class="pre">==</span> <span class="pre">len(bounds)</span></code></p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>list[list[float]]</dt><dd><p>the step-size, <code class="docutils literal notranslate"><span class="pre">deltas</span></code>, and the minimum, <code class="docutils literal notranslate"><span class="pre">mins</span></code>, in each Cartesian
+coordinate</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#quop_mpi.propagator.diagonal.operator.cartesian" title="quop_mpi.propagator.diagonal.operator.cartesian"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cartesian</span></code></a></dt><dd></dd>
+<dt><a class="reference internal" href="#quop_mpi.propagator.diagonal.operator.cartesian_scaled" title="quop_mpi.propagator.diagonal.operator.cartesian_scaled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cartesian_scaled</span></code></a></dt><dd></dd>
+</dl>
+</div>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="circulant.html" class="btn btn-neutral float-left" title="Circulant" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sparse.html" class="btn btn-neutral float-right" title="Sparse" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021-2026, Edric Matwiejew.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
