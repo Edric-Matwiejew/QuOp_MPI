@@ -221,6 +221,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self._need_bind_param_map = False  # postpone binding until SUBCOMM exists
         self._n_free_params = None  # set when param map is configured
 
+        self.optimiser_log = None # fields from the optimiser result to log
+
         atexit.register(self.__exit)
 
     def set_parameter_map(
