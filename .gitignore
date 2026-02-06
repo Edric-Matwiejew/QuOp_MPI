@@ -25,3 +25,4 @@ trace_*.txt
 *.tex
 *.aux
 *.md
+dev
