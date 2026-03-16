@@ -129,7 +129,7 @@ def make_algorithm(name, size_args):
             )
             raise ValueError(msg)
         system_size = size_args[0]
-        alg = qaoa(system_size)
+        alg = QAOA(system_size)
         return alg, system_size
 
     if name == "qwoa":
@@ -143,14 +143,14 @@ def make_algorithm(name, size_args):
             )
             raise ValueError(msg)
         system_size = size_args[0]
-        alg = qwoa(system_size)
+        alg = QWOA(system_size)
         return alg, system_size
 
     if name == "qmoa":
         from quop_mpi.algorithm.multivariable import QMOA
 
         ns = list(size_args)
-        alg = qmoa(ns)
+        alg = QMOA(ns)
         system_size = 1
         for dim in qmoa_tensor_dims(ns):
             system_size *= dim
