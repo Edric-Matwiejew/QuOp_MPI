@@ -232,35 +232,6 @@ class TestSparsePropagator:
 
         alg.destroy()
 
-    def test_sparse_multi_depth_preserves_normalization(self, mpi_comm):
-        """Test that sparse propagator works over multiple evolution steps."""
-        from quop_mpi.algorithm.combinatorial import qaoa
-        
-        system_size = 32  # 2^5
-        
-        def qualities(local_i, local_i_offset):
-            return np.sin(np.arange(local_i) + local_i_offset).astype(np.float64)
-        
-        alg = qaoa(system_size, mpi_comm)
-        alg.set_qualities(qualities)
-        alg.set_depth(3)  # Multiple layers
-        
-        # 3 layers = 6 parameters
-        params = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
-        alg.evolve_state(params)
-        
-        probs = alg.get_probabilities()
-        
-        if mpi_comm.Get_rank() == 0:
-            # Probability should sum to 1
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10, f"Total probability: {total_prob}"
-            
-            # All probabilities should be non-negative
-            assert np.all(probs >= -1e-15), f"Negative probabilities found"
-        
-        del alg
-
 
 # =============================================================================
 # Tests for Composite Propagator

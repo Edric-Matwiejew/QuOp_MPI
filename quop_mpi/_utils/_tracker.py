@@ -490,19 +490,12 @@ class JobTracker:
     def __init__(
         self,
         repeats,
-<<<<<<< HEAD
-        depths=None,
-        time_limit=None,
-        MPI_COMM=None,
-=======
         max_depths,
         time_limit,
         MPI_COMM,  # noqa: N803
->>>>>>> quop_quisa/main
         force_resume=None,
         suspend_path=None,
         seed=0,
-        max_depths=None,
     ):
         """
         Track progression of a benchmark-like job.
@@ -535,16 +528,7 @@ class JobTracker:
         self.MPI_COMM = MPI_COMM
         self.seed = seed
 
-        if depths is None and max_depths is not None:
-            self.depths = list(range(1, max_depths + 1))
-        elif depths is not None:
-            if isinstance(depths, int):
-                self.depths = list(range(1, depths + 1))
-            else:
-                self.depths = list(depths)
-        else:
-            raise ValueError("Either 'depths' or 'max_depths' must be provided")
-
+        self.depths = range(1, max_depths + 1)
         self.repeats = range(1, repeats + 1)
         self.time_limit = time_limit
         self.suspend_path = suspend_path
@@ -553,10 +537,10 @@ class JobTracker:
         self.__set_with_environment_variable(force_resume, "force_resume", "QUOP_FORCE_RESUME", int)
 
         self.__set_with_environment_variable(
-            depths,
+            max_depths,
             "depths",
             "QUOP_MAX_DEPTH",
-            lambda maxdepth: list(range(1, int(maxdepth) + 1)),
+            lambda maxdepth: range(1, int(maxdepth) + 1),
         )
         self.__set_with_environment_variable(
             repeats,

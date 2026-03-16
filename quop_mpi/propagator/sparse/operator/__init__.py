@@ -25,16 +25,6 @@ sequence of :term:`mixing unitaries <mixing unitary>` with independent
     W_values : ndarray[float] or None
         a 1-D real array containing non-zero values for rows :literal:`lb`  to :literal:`ub` ,
         grouped by ascending row index in the same order as :literal:`W_col_index`.
-<<<<<<< HEAD
-        
-        For **unit-valued matrices** (where all non-zero entries are 1.0), this
-        may be :literal:`None`. When :literal:`W_values` is :literal:`None`, the propagator
-        skips value storage and uses an optimized code path, reducing memory
-        usage and improving performance. This is automatically detected for
-        adjacency matrices such as those used by the hypercube mixer.
-
-    W_row_start : ndarray[int] 
-=======
 
         For **unit-valued matrices** (where all non-zero entries are 1.0), this
         may be :literal:`None`. When :literal:`W_values` is :literal:`None`, the propagator
@@ -43,7 +33,6 @@ sequence of :term:`mixing unitaries <mixing unitary>` with independent
         adjacency matrices such as those used by the hypercube mixer.
 
     W_row_start : ndarray[int]
->>>>>>> quop_quisa/main
         a 1-D integer array of length :literal:`ub - lb + 1` , a cumulative sum of the
         number of non-zero elements in each row such that
         :literal:`W_row_start[row_index + 1] - W_row_start[row_index]`  is equal to the

@@ -26,25 +26,6 @@ add_library(expm OBJECT ${SPARSE_PROPAGATORS_SRC}/expm.f90)
 target_link_libraries(expm PUBLIC MPI::MPI_Fortran)
 add_dependencies(expm one_norms sparse)
 
-<<<<<<< HEAD
-add_library(chebyshev OBJECT chebyshev.f90)
-target_link_libraries(chebyshev PUBLIC MPI::MPI_Fortran)
-add_dependencies(chebyshev sparse)
-
-add_library(mpi_sparse OBJECT mpi_sparse.f90)
-target_link_libraries(mpi_sparse PUBLIC MPI::MPI_Fortran)
-add_dependencies(mpi_sparse expm chebyshev one_norms sparse)
-
-set(depends mpi_sparse expm chebyshev one_norms sparse mpi_context)
-set(definitions context=mpi_backend context_type=mpi_context propagator=mpi_sparse propagator_type=sparse_propagator propagator_wrapper=sparse_propagator_wrapper)
-
-add_f2py_library(
-MODULE_NAME mpi_sparse_propagator
-DEPENDS "${depends}"
-DEFINITIONS "${definitions}" 
-SRC ${PROPAGATOR_WRAPPER}
-INSTALL_SUBDIR mpi
-=======
 quop_preprocess_fortran_source(
   _mpi_chebyshev_src
   NAME
@@ -93,5 +74,4 @@ add_f2py_library(
   ${PROPAGATOR_WRAPPER}
   INSTALL_SUBDIR
   mpi
->>>>>>> quop_quisa/main
 )

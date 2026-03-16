@@ -64,13 +64,7 @@ def hypercube(
 
     n_qubits = np.log2(system_size)
 
-<<<<<<< HEAD
-    W_row_starts, W_col_indexes = csr_generators.hypercube(
-        n_qubits, lb + 1, ub 
-    )
-=======
     W_row_starts, W_col_indexes = csr_generators.hypercube(n_qubits, lb + 1, ub)  # noqa: N806
->>>>>>> quop_quisa/main
 
     # Hypercube is always unit-valued, so we return None for values
     return [W_row_starts], [W_col_indexes], None
@@ -154,11 +148,7 @@ def serial(
         col_indexes = None
         values = None
 
-<<<<<<< HEAD
-    W_row_starts, W_col_indexes, W_values, is_unit_valued = __scatter_sparse(
-=======
     W_row_starts, W_col_indexes, W_values, is_unit_valued = __scatter_sparse(  # noqa: N806
->>>>>>> quop_quisa/main
         row_starts, col_indexes, values, partition_table, MPI_COMM
     )
     return W_row_starts, W_col_indexes, W_values, is_unit_valued

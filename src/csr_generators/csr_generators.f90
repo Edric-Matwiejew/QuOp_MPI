@@ -11,51 +11,6 @@ module csr_generators
 
 contains
 
-<<<<<<< HEAD
-        subroutine hypercube(   N, &
-                                lb, &
-                                ub, &
-                                row_starts, &
-                                col_indexes)
-        
-        
-            integer(dp), intent(in) :: N
-            integer(dp), intent(in) :: lb
-            integer(dp), intent(in) :: ub
-            integer(dp), target, dimension(ub - lb + 2), intent(out) :: row_starts
-            integer(dp), target, dimension(N*(lb - 1) + 1 : N*ub), intent(out) :: col_indexes
-        
-            integer(dp) :: local_rows
-            integer(dp) :: columns
-        
-            integer(dp), dimension(N) :: powers, binary
-        
-            integer(dp) :: dec
-        
-            integer(dp) :: i, j, k, temp
-        
-            powers = [(2**i, i = 0, N - 1)]
-        
-            local_rows = ub - lb + 1
-            columns = 2**N
-        
-            !$omp parallel do private(binary, dec, i, j, k, temp)
-            do j = lb - 1, ub - 1
-                binary = mod(j/powers,2)
-                do i = 1, N
-                    if (binary(i) == 0) then
-                        binary(i) = 1
-                    elseif (binary(i) == 1) then
-                        binary(i) = 0
-                    endif
-                    dec = sum(binary*powers)
-                    if (binary(i) == 0) then
-                        binary(i) = 1
-                    elseif (binary(i) == 1) then
-                        binary(i) = 0
-                    endif
-                    if (N*j+i < 1) then
-=======
     subroutine hypercube(N, &
                          lb, &
                          ub, &
@@ -98,7 +53,6 @@ contains
                     binary(i) = 0
                 end if
                 if (N * j + i < 1) then
->>>>>>> quop_quisa/main
                     exit
                 end if
                 col_indexes(N * j + i) = dec + 1
@@ -114,16 +68,8 @@ contains
                 col_indexes(k + 1) = temp
             end do
 
-<<<<<<< HEAD
-            do i = 1, local_rows
-                row_starts(i + 1) = row_starts(i + 1) + row_starts(i)
-            enddo
-        
-        end subroutine hypercube
-=======
         end do
         !$omp end parallel do
->>>>>>> quop_quisa/main
 
         row_starts(1) = (lb - 1) * N + 1
         row_starts(2:local_rows + 1) = N

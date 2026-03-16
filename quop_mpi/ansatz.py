@@ -248,14 +248,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self._need_bind_param_map = False  # postpone binding until SUBCOMM exists
         self._n_free_params = None  # set when param map is configured
 
-<<<<<<< HEAD:quop_mpi/Ansatz.py
-        self.optimiser_log = None # fields from the optimiser result to log
-
-        atexit.register(self.__exit)
-=======
         # -- Scope-nesting validation stack ----------------------
         self._scope_stack: list[tuple[int, str]] = []
->>>>>>> quop_quisa/main:quop_mpi/ansatz.py
 
     # -- Layout property (canonical partitioning source of truth) ----
 
@@ -634,10 +628,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         "local_i_offset": "Global index offset for this rank's partition",
         "partition_table": "Array describing global partitioning scheme",
         # Observables and state
-        "observables": "Local partition of observable values",
+        "observables": "Local partition of observable values (after setup)",
         "ansatz_initial_state": "Local partition of initial state vector",
         "final_state": "Local partition of current/final state vector",
-        "local_probabilities": "Local partition of state probabilities",
         # Variational parameters
         "variational_parameters": "Current variational parameter values",
         "ansatz_depth": "Number of ansatz iterations (layers)",

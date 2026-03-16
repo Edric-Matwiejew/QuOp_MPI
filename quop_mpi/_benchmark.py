@@ -126,14 +126,9 @@ class Benchmark:
         ansatz_depth_temp = deepcopy(self.ansatz_depth)
         self.benchmarking = True
         suspend_path = "suspend" if suspend_path is None else suspend_path
-<<<<<<< HEAD
-        depths_list = list(ansatz_depths)
-        self.tracker = job_tracker(
-=======
         self.tracker = JobTracker(
->>>>>>> quop_quisa/main
             repeats,
-            depths_list,
+            list(ansatz_depths)[-1],
             time_limit,
             self.MPI_COMM_WORLD,
             seed=self.seed,
@@ -175,43 +170,12 @@ class Benchmark:
                         )
                 else:
                     # Unmapped case
-<<<<<<< HEAD
-                    expected_params = depth * self.total_params
-                    if (not param_persist) or (depth == depths_list[0]):
-                        if initial_parameters is not None:
-                            if len(initial_parameters) != expected_params:
-                                raise ValueError(
-                                    f"initial_parameters has length {len(initial_parameters)}, "
-                                    f"but depth {depth} requires {expected_params} parameters "
-                                    f"({depth} * {self.total_params}). When using multiple depths "
-                                    f"without param_persist, either omit initial_parameters or "
-                                    f"ensure it matches the first depth's requirements."
-                                )
-                            self.variational_parameters = np.asarray(
-                                initial_parameters, dtype=np.float64
-                            )
-                        else:
-                            self.variational_parameters = self._Ansatz__gen_initial_params(
-                                depth
-                            )
-=======
                     if (not param_persist) or (depth == 1):
                         self.variational_parameters = self._Ansatz__gen_initial_params(depth)
->>>>>>> quop_quisa/main
                     else:
                         # Persist full-vector between repeats/depths
-                        # Find the previous depth in the depths list
-                        current_depth_idx = depths_list.index(depth)
-                        if current_depth_idx > 0:
-                            prev_depth = depths_list[current_depth_idx - 1]
-                        else:
-                            prev_depth = None
-
                         if self.subcomms.SUBCOMM.Get_rank() == 0:
-                            if prev_depth is not None:
-                                n_previous = len(self.tracker.results_dict[prev_depth])
-                            else:
-                                n_previous = 0
+                            n_previous = len(self.tracker.results_dict[depth - 1])
                         else:
                             n_previous = None
                         n_previous = self.subcomms.SUBCOMM.bcast(n_previous, root=0)
@@ -224,23 +188,11 @@ class Benchmark:
                                 ) or (previous_params is None):
                                     funs = [
                                         result["fun"]
-<<<<<<< HEAD
-                                        for result in self.tracker.results_dict[
-                                            prev_depth
-                                        ]
-                                    ]
-                                    xs = [
-                                        result["variational_parameters"]
-                                        for result in self.tracker.results_dict[
-                                            prev_depth
-                                        ]
-=======
                                         for result in self.tracker.results_dict[depth - 1]
                                     ]
                                     xs = [
                                         result["variational_parameters"]
                                         for result in self.tracker.results_dict[depth - 1]
->>>>>>> quop_quisa/main
                                     ]
                                     previous_params = xs[np.argmin(funs)]
                             else:
@@ -301,4 +253,3 @@ class Benchmark:
 
         self.benchmarking = False
         self.ansatz_depth = ansatz_depth_temp
-        self.set_depth(ansatz_depth_temp)

@@ -9,11 +9,7 @@ An Operator Function for :literal:`'diagonal'` :literal:`unitary` instances retu
         A 1-D real array of size :literal:`local_i` containing the diagonal
         elements of the operator for global indices :literal:`local_i_offset`
         to :literal:`local_i_offset + local_i - 1`.
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> quop_quisa/main
         Alternatively, a list of such arrays for multiple diagonal operators
         (requires :literal:`unitary_n_params` to match the list length).
 
@@ -24,23 +20,6 @@ of returned list. The resulting :literal:`unitary` is then equivalent to a seque
 parameterised :term:`unitary parameters<unitary parameter>`.
 
 **Propagation Method**
-<<<<<<< HEAD
-
-The diagonal propagator computes :math:`e^{-itH}|\\psi\\rangle` via direct
-element-wise multiplication:
-
-.. math::
-
-    |\\psi'\\rangle_k = e^{-it H_{kk}} |\\psi\\rangle_k
-
-where :math:`H_{kk}` are the diagonal elements. This is the most efficient
-propagation method as it requires only :math:`O(N)` operations with no
-communication between MPI ranks.
-"""
-from .standard import serial, csv, hdf5, array, setup_cartesian, cartesian, cartesian_scaled, observables
-from . import rand
-=======
->>>>>>> quop_quisa/main
 
 The diagonal propagator computes :math:`e^{-itH}|\\psi\\rangle` via direct
 element-wise multiplication:

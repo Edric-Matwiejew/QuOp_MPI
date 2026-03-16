@@ -59,32 +59,8 @@ class Unitary(UnitaryBase):
         self.propagator_module = backend.sparse_propagator
 
         self.propagators = []
-<<<<<<< HEAD
-        for i in range(self.unitary_n_params):
-            self.propagators.append(
-                propagator(self.propagator_module.sparse_propagator_wrapper)
-            )
-
-    def plan(self, system_size, MPI_COMM):
-
-        size = MPI_COMM.Get_size()
-        rank = MPI_COMM.Get_rank()
-
-        local_i = int(
-            system_size // size + np.ceil((system_size % size) // (rank + 1) / size)
-        )
-
-        return local_i, local_i
-
-    def copy_plan(self, ex_unitary):
-        pass
-
-    def gen_operator(self, *args):
-        import sys
-=======
         for _ in range(self.unitary_n_params):
             self.propagators.append(Propagator(self.propagator_module.sparse_propagator_wrapper))
->>>>>>> quop_quisa/main
 
     def gen_operator(self, *args: Any) -> None:  # noqa: ANN401
         """Generate the sparse operator and plan the propagators."""
@@ -96,13 +72,9 @@ class Unitary(UnitaryBase):
 
         # Unpack operator result - may have 3 or 4 elements depending on source
         if len(self.operator) == 4:
-<<<<<<< HEAD
-            self.W_row_starts, self.W_col_indexes, self.W_values, self.is_unit_valued = self.operator
-=======
             self.W_row_starts, self.W_col_indexes, self.W_values, self.is_unit_valued = (
                 self.operator
             )
->>>>>>> quop_quisa/main
         else:
             self.W_row_starts, self.W_col_indexes, self.W_values = self.operator
             # Detect unit-valued from None values

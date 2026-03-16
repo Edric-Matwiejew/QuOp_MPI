@@ -147,15 +147,11 @@ case $TEST_TYPE in
         echo "========================================"
         echo "Running integration tests (4 MPI processes)..."
         echo "========================================"
-<<<<<<< HEAD
-        OMP_NUM_THREADS=1 python tests/integration/run_integration_tests.py 4
-=======
         if [[ $IS_CRAY -eq 1 ]]; then
             OMP_NUM_THREADS=1 python tests/integration/run_integration_tests.py 4 srun
         else
             OMP_NUM_THREADS=1 python tests/integration/run_integration_tests.py 4 mpiexec
         fi
->>>>>>> quop_quisa/main
         ;;
     *)
         echo "Unknown test type: $TEST_TYPE"

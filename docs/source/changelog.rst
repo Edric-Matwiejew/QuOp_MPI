@@ -4,8 +4,6 @@
 Changelog
 =========
 
-<<<<<<< HEAD
-=======
 Version 1.6.0 (Unreleased)
 ==========================
 
@@ -58,7 +56,6 @@ Fixed
 - ``CMAKE_ARGS`` parsing fixed for environment-driven configuration
 - hipfort module compatibility verification added to wavefront builds
 
->>>>>>> quop_quisa/main
 Version 1.5.0 (2026-01-28)
 ==========================
 

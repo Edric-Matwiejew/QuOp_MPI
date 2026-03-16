@@ -344,21 +344,11 @@ class TestScatterSparse:
             col_indexes = None
             values = None
 
-<<<<<<< HEAD
-        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
-=======
         w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
->>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
         # Verify we got one term back
-<<<<<<< HEAD
-        assert len(W_row_starts) == 1
-        assert len(W_col_indexes) == 1
-        assert len(W_values) == 1
-        assert is_unit_valued == False  # We passed explicit values
-=======
         print(
             f"Rank {rank}: is_unit_valued={is_unit_valued}, "
             f"w_row_starts={w_row_starts}, w_col_indexes={w_col_indexes}, w_values={w_values}"
@@ -367,7 +357,6 @@ class TestScatterSparse:
         assert len(w_col_indexes) == 1
         assert len(w_values) == 1
         assert not is_unit_valued  # We passed explicit values
->>>>>>> quop_quisa/main
 
         local_i = partition_table[rank + 1] - partition_table[rank]
 
@@ -404,11 +393,7 @@ class TestScatterSparse:
 
         original_data = mpi_comm.bcast(original_data, root=0)
 
-<<<<<<< HEAD
-        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
-=======
         w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
->>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
@@ -448,11 +433,7 @@ class TestScatterSparse:
             col_indexes = None
             values = None
 
-<<<<<<< HEAD
-        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
-=======
         w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
->>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
@@ -491,11 +472,7 @@ class TestScatterSparse:
             values = None
 
         # Should not raise even with empty rows
-<<<<<<< HEAD
-        W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
-=======
         w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
->>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 

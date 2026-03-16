@@ -28,24 +28,14 @@ def __scatter_1d_array(array, partition_table, MPI_COMM, dtype):  # noqa: N803
     return operator
 
 
-<<<<<<< HEAD
-def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM):
-    """Scatter sparse CSR matrix data to all ranks.
-    
-=======
 def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM):  # noqa: N803
     """Scatter sparse CSR matrix data to all ranks.
 
->>>>>>> quop_quisa/main
     Parameters
     ----------
     row_starts : list[ndarray] or None
         List of row_starts arrays (one per matrix term), only on rank 0
-<<<<<<< HEAD
-    col_indexes : list[ndarray] or None  
-=======
     col_indexes : list[ndarray] or None
->>>>>>> quop_quisa/main
         List of col_indexes arrays, only on rank 0
     values : list[ndarray] or None
         List of values arrays, only on rank 0. If None or contains None,
@@ -54,11 +44,7 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
         Partition table for distribution
     MPI_COMM : MPI.Comm
         MPI communicator
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> quop_quisa/main
     Returns
     -------
     tuple
@@ -74,27 +60,15 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
         if values is None:
             is_unit_valued = True
         else:
-<<<<<<< HEAD
-            is_unit_valued = all(
-                v is None or np.allclose(v, 1.0) for v in values
-            )
-=======
             is_unit_valued = all(v is None or np.allclose(v, 1.0) for v in values)
->>>>>>> quop_quisa/main
         is_unit_valued = MPI_COMM.bcast(is_unit_valued, 0)
     else:
         n_terms = MPI_COMM.bcast(None, 0)
         is_unit_valued = MPI_COMM.bcast(None, 0)
 
-<<<<<<< HEAD
-    W_row_starts = []
-    W_col_indexes = []
-    W_values = [] if not is_unit_valued else None
-=======
     W_row_starts = []  # noqa: N806
     W_col_indexes = []  # noqa: N806
     W_values = [] if not is_unit_valued else None  # noqa: N806
->>>>>>> quop_quisa/main
 
     for i in range(n_terms):
 
@@ -125,46 +99,11 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
             disps[j] = disps[j - 1] + counts[j - 1]
 
         if rank == 0:
-<<<<<<< HEAD
-            send_indexes = [col_indexes[i].astype(np.int64), counts, disps, MPI.LONG]
-=======
             send_indexes = [col_indexes[i].astype(np.int64), counts, disps, _MPI_INT64]
->>>>>>> quop_quisa/main
         else:
             send_indexes = None
 
         MPI_COMM.Scatterv(send_indexes, W_col_indexes[-1], 0)
-<<<<<<< HEAD
-        
-        # Only scatter values if not unit-valued
-        if not is_unit_valued:
-            if rank == 0:
-                send_values = [
-                    values[i].astype(np.complex128),
-                    counts,
-                    disps,
-                    MPI.DOUBLE_COMPLEX,
-                ]
-            else:
-                send_values = None
-            MPI_COMM.Scatterv(send_values, W_values[-1], 0)
-
-    return W_row_starts, W_col_indexes, W_values, is_unit_valued
-
-
-def shrink_communicator(newsize, colours, COMM, COMM_OPT, COMM_JAC, jac_ranks):
-
-    if jac_ranks is not None:
-        if COMM.Get_rank() in jac_ranks:
-            MPI.Comm.Free(COMM_JAC)
-
-    if colours[COMM.Get_rank()] != -1:
-
-        subcolours = []
-        for i in range(COMM_OPT.Get_size()):
-            if i < newsize:
-                subcolours.append(0)
-=======
 
         # Only scatter values if not unit-valued
         if not is_unit_valued:
@@ -181,7 +120,6 @@ def shrink_communicator(newsize, colours, COMM, COMM_OPT, COMM_JAC, jac_ranks):
                     disps,
                     MPI.DOUBLE_COMPLEX,
                 ]
->>>>>>> quop_quisa/main
             else:
                 send_values = None
             MPI_COMM.Scatterv(send_values, W_values[-1], 0)
