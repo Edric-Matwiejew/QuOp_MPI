@@ -119,7 +119,7 @@ def problem_tag(algorithm, system_size, size_spec_value):
 def make_algorithm(name, size_args):
     """Instantiate the algorithm and return (alg, system_size)."""
     if name == "qaoa":
-        from quop_mpi.algorithm.combinatorial import QAOA as qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         if len(size_args) != 1:
             msg = (
@@ -133,7 +133,7 @@ def make_algorithm(name, size_args):
         return alg, system_size
 
     if name == "qwoa":
-        from quop_mpi.algorithm.combinatorial import QWOA as qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         if len(size_args) != 1:
             msg = (
@@ -147,7 +147,7 @@ def make_algorithm(name, size_args):
         return alg, system_size
 
     if name == "qmoa":
-        from quop_mpi.algorithm.multivariable import QMOA as qmoa
+        from quop_mpi.algorithm.multivariable import QMOA
 
         ns = list(size_args)
         alg = qmoa(ns)

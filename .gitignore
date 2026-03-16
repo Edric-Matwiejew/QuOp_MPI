@@ -39,3 +39,5 @@ pawsey_env.sh
 build_wavefront_ubuntu.sh
 hipfft-*
 _skbuild
+.venv*
+.cache

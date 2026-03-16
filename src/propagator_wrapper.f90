@@ -9,7 +9,6 @@ module propagator_wrapper
     implicit none
 
     public
-    private :: negotiate_trampoline
 
 contains
 
@@ -82,7 +81,7 @@ contains
     ! bind(C) trampoline conforming to negotiate_callback_iface.
     ! Called by comm_info_module::negotiate() via c_funptr dispatch.
     ! ----------------------------------------------------------------
-    subroutine negotiate_trampoline(prop_ptr, ci_ptr, error_code) bind(C)
+    subroutine negotiate_trampoline(prop_ptr, ci_ptr, error_code) bind(C, name='propagator_wrapper_negotiate_trampoline')
         type(c_ptr), value, intent(in) :: prop_ptr
         type(c_ptr), value, intent(in) :: ci_ptr
         integer(int32), intent(out) :: error_code

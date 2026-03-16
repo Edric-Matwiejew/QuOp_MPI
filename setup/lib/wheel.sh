@@ -74,6 +74,7 @@ collect_auditwheel_excludes() {
         libmpi
         libmpich
         libamdhip
+        libhipfort
         libhipfft
         libhsa
         libroc
