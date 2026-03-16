@@ -2,14 +2,18 @@
 propagation via FFT.
 """
 
-from importlib import import_module
+from __future__ import annotations
+
+from types import ModuleType
+from typing import Any
+
 import numpy as np
-from ... import config
-from ...Unitary import Unitary
-from ..._lib.propagator import propagator
+
+from ..._lib.propagator import Propagator
+from ...unitary import UnitaryBase
 
 
-class unitary(Unitary):
+class Unitary(UnitaryBase):
     """Implements the :ref:`QOWE <QOWE>` :term:`mixing unitary`.
 
     This propagator uses Fourier transforms to evolve the quantum state
@@ -18,7 +22,7 @@ class unitary(Unitary):
     .. warning::
 
         ``unitary`` instances of type ``'momentum`` require that the ``size`` of
-        the MPI communicator associated with :class:`quop_mpi.Ansatz` class be
+        the MPI communicator associated with :class:`quop_mpi.ansatz` class be
         a factor of the first grid dimension (``Ns[0] % size == 0``).
 
     **Inheritance Diagram:**
@@ -27,14 +31,14 @@ class unitary(Unitary):
 
             digraph "sphinx-ext-graphviz" {
                 rankdir="LR"; node [fontsize="10"];
-                Unitary[label="quop_mpi.Unitary", shape="rectangle"];
+                Unitary[label="quop_mpi.unitary", shape="rectangle"];
                 unitary[label="quop_mpi.propagator.momentum.unitary",
                 shape="rectangle"];
 
                 Unitary -> unitary;
             }
 
-    See :class:`quop_mpi.Unitary`.
+    See :class:`quop_mpi.unitary`.
 
     Attributes
     ----------
@@ -58,19 +62,20 @@ class unitary(Unitary):
     deltask : list[float]
         the step-size in each Cartesian coordinate in momentum space
     *args and **kwargs:
-        passed to the initialisation method of :class:`quop_mpi.Unitary`
+        passed to the initialisation method of :class:`quop_mpi.unitary`
     """
 
     def __init__(
         self,
-        Ns: list[int],
+        Ns: list[int],  # noqa: N803
         minsq: list[float],
         minsk: list[float],
         deltasq: list[float],
         deltask: list[float],
-        *args,
-        **kwargs,
-    ):
+        *args: Any,  # noqa: ANN401
+        **kwargs: Any,  # noqa: ANN401
+    ) -> None:
+        """Initialise the momentum unitary propagator."""
         self.Ns = np.array(Ns, dtype=np.int32)
         self.minsq = np.array(minsq, dtype=np.float64)
         self.minsk = np.array(minsk, dtype=np.float64)
@@ -84,48 +89,19 @@ class unitary(Unitary):
         self.comm_size_constraints = [np.array(Ns, dtype=np.int32)]
         self.planner = True
 
-    def assign_backend(self, backend):
+    def assign_backend(self, backend: ModuleType) -> None:
         """Assign the Fortran backend for momentum propagation."""
         self.propagator_module = backend.momentum_propagator
-        self.propagators = [
-            propagator(self.propagator_module.momentum_propagator_wrapper)
-        ]
+        self.propagators = [Propagator(self.propagator_module.momentum_propagator_wrapper)]
 
-    def plan(self, system_size, MPI_COMM):
-        """Compute local partition size for this rank.
-
-        Parameters
-        ----------
-        system_size : int
-            Total size of the system state
-        MPI_COMM : Intracomm
-            MPI communicator
-
-        Returns
-        -------
-        tuple[int, int]
-            (local_i, alloc_local) - local partition size and allocation size
-        """
-        size = MPI_COMM.Get_size()
-        rank = MPI_COMM.Get_rank()
-
-        local_i = int(
-            system_size // size + np.ceil((system_size % size) // (rank + 1) / size)
-        )
-
-        return local_i, local_i
-
-    def copy_plan(self, ex_unitary):
-        """Copy planning information from another unitary."""
-        pass
-
-    def gen_operator(self, *args):
+    def gen_operator(self, *args: Any) -> None:  # noqa: ANN401
         """Generate the momentum-space operator.
 
         Sets up the FFTW plans and computes the phase factors and
         momentum-space eigenvalues needed for propagation.
         """
         self.propagators[0].plan(self.context)
+        self.planned = True  # Mark as planned so destroy() is called during cleanup
         super().gen_operator(*args)
 
         # Pass grid parameters to the Fortran propagator
@@ -135,7 +111,7 @@ class unitary(Unitary):
             [self.Ns, self.minsq, self.minsk, self.deltasq, self.deltask]
         )
 
-    def propagate(self, t):
+    def propagate(self, t: np.ndarray) -> None:
         """Apply momentum-space evolution.
 
         Parameters
@@ -145,6 +121,6 @@ class unitary(Unitary):
         """
         self.propagators[0].propagate(t)
 
-    def destroy(self):
+    def destroy(self) -> None:
         """Clean up FFTW plans and deallocate memory."""
         self.propagators[0].destroy()

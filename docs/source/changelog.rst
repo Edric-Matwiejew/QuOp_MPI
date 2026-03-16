@@ -4,6 +4,61 @@
 Changelog
 =========
 
+<<<<<<< HEAD
+=======
+Version 1.6.0 (Unreleased)
+==========================
+
+Added
+-----
+
+- Wavefront backend support across sparse, circulant, momentum, and composite propagators for GPU/CPU workflows
+- Robust GPU topology discovery and rank-to-device assignment via PCI bus IDs with NUMA-aware fallback mapping
+- SHAFFT-based wavefront FFT handling with layout negotiation support
+- Development standards documentation for Python, Fortran, and extension-module conventions
+- Curated ASX ticker candidate dataset for the portfolio rebalancing example
+- Profile-based installer (``setup/install.sh``) with site profiles replacing the Spack-driven setup
+- Unified benchmark submission script with single (intra) - and multi-node configurations
+- ``run_tests.sh`` test runner covering unit, MPI, parallel-Jacobian and integration tests
+- Integration test suite that runs example scripts and validates results against expected bounds
+- Test documentation in the README
+
+Changed
+-------
+
+- Migrated build system to scikit-build-core
+- ``config.toml`` is now the single source of truth for site-specific module lists and environment settings
+- Setup installer libraries split into sourced modules with shared helpers in ``common.sh``
+- Linux wavefront wheels are now repaired with auditwheel/patchelf to include shared library dependencies 
+- SHAFFT dependency caching and library install paths improved
+- CMake minimum version raised; Fortran preprocessing uses ``Fortran_PREPROCESS`` property (fixes Ninja builds)
+- Communicator/layout lifecycle refactor (including ``NODECOMM`` creation) with consistent backend-aware negotiation behavior
+- ``quop_mpi_layout_t`` is now encapsulated behind explicit getter/setter APIs in wrappers and tests
+- Native context and propagator paths now return explicit status codes with end-to-end wrapper plumbing
+- Deterministic lifecycle management for Python wrappers and ``Ansatz`` cleanup replaces finalizer-driven teardown
+- Build and dependency configuration updated for wavefront workflows (including optional hipfort auto-build and GPU-aware MPI controls)
+- Canonical API naming now uses ``QAOA``/``QWOA``/``QMOA``/``QOWE``, ``Swarm``, and ``<propagator>.Unitary`` with deprecation warnings for legacy lowercase aliases
+- ``UnitaryBase`` is now the canonical base class export (``quop_mpi.UnitaryBase``), with ``quop_mpi.Unitary`` retained as a deprecated alias
+- Canonical module imports are now lowercase (``quop_mpi.ansatz`` and ``quop_mpi.unitary``); legacy CamelCase submodules were removed
+- Public Python API now includes comprehensive type annotations across core classes and propagators
+- Portfolio rebalancing example flow updated for deterministic ticker selection and simplified usage
+
+Fixed
+-----
+
+- Deadlocks and synchronization issues in communicator teardown, transfer paths, and GPU-enabled test execution
+- Sparse CSR redistribution bug for non-contiguous GPU ranks within ``NODECOMM``
+- Single-rank and small-system edge cases in FFT/planning and backend-specific execution paths
+- Context scalar getter behavior so reductions are consistently returned on all active ``SUBCOMM`` ranks
+- ``Swarm.execute_swarm`` now applies tracker-assigned seeds to each ``Ansatz`` instance before execution
+- NLopt wrapper defaults no longer use mutable arguments (``constraints``/``bounds`` helpers), preventing cross-call state leakage
+- Portfolio rebalancing live-data fetch now handles partial Yahoo responses more robustly and falls back cleanly to bundled sample data
+- Bash 3 compatibility for setup scripts (guarded empty expansions under ``set -u``)
+- F2PY wrapper module dependencies and build targets corrected for parallel builds
+- ``CMAKE_ARGS`` parsing fixed for environment-driven configuration
+- hipfort module compatibility verification added to wavefront builds
+
+>>>>>>> quop_quisa/main
 Version 1.5.0 (2026-01-28)
 ==========================
 

@@ -1,7 +1,8 @@
+import io
 import os
 import sys
 import time
-import io
+
 from mpi4py import MPI
 
 _PACKAGE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))

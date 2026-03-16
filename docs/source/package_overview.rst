@@ -22,7 +22,7 @@ For the optimisation of continuous multivariable functions:
 User-Defined Algorithms
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-Novel QVAs may be designed by working directly with the :class:`~quop_mpi.Ansatz` class and :mod:`~quop_mpi.propagator` submodules. See,
+Novel QVAs may be designed by working directly with the :class:`~quop_mpi.ansatz` class and :mod:`~quop_mpi.propagator` submodules. See,
 
 * :ref:`Maxcut with the Ex-QAOA <maxcut>` (also :ref:`Ex-QAOA`).
 * :ref:`Portfolio optimisation with the QAOAz <portfolio>` (also :ref:`QAOAz`).
@@ -30,7 +30,7 @@ Novel QVAs may be designed by working directly with the :class:`~quop_mpi.Ansatz
 Adaptive Operator and Optimisation Schemes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The QuOp_MPI :class:`~quop_mpi.Ansatz` and :class:`~quop_mpi.Unitary` classes are configured via :term:`QuOp Functions <QuOp Function>`. These allow the implementation of arbitrarily parameterised operators and adaptive optimisation schemes. QuOp_MPI includes default QuOp Functions that support the interfacing of user-defined serial Python functions with its :ref:`parallelisation scheme for QVA simulation <parallel-QVA>`. Users may also define MPI-compatible custom QuOp Functions with minimal parallel programming experience.
+The QuOp_MPI :class:`~quop_mpi.ansatz` and :class:`~quop_mpi.unitary` classes are configured via :term:`QuOp Functions <QuOp Function>`. These allow the implementation of arbitrarily parameterised operators and adaptive optimisation schemes. QuOp_MPI includes default QuOp Functions that support the interfacing of user-defined serial Python functions with its :ref:`parallelisation scheme for QVA simulation <parallel-QVA>`. Users may also define MPI-compatible custom QuOp Functions with minimal parallel programming experience.
 
 Key Features
 ------------
@@ -40,9 +40,9 @@ Toolkit Module
 
 The :mod:`~quop_mpi.toolkit` module provides convenience functions for constructing quantum operators:
 
-* **Pauli operators**: :func:`~quop_mpi.toolkit.I`, :func:`~quop_mpi.toolkit.X`, :func:`~quop_mpi.toolkit.Y`, :func:`~quop_mpi.toolkit.Z` — single-qubit Pauli matrices acting on specified qubits in an n-qubit system
-* **Kronecker products**: :func:`~quop_mpi.toolkit.kron`, :func:`~quop_mpi.toolkit.kron_power` — utilities for constructing tensor products
-* **String operators**: :func:`~quop_mpi.toolkit.string` — for building operators from string representations
+* **Pauli operators**: :func:`~quop_mpi.toolkit.I`, :func:`~quop_mpi.toolkit.X`, :func:`~quop_mpi.toolkit.Y`, :func:`~quop_mpi.toolkit.Z` -- single-qubit Pauli matrices acting on specified qubits in an n-qubit system
+* **Kronecker products**: :func:`~quop_mpi.toolkit.kron`, :func:`~quop_mpi.toolkit.kron_power` -- utilities for constructing tensor products
+* **String operators**: :func:`~quop_mpi.toolkit.string` -- for building operators from string representations
 
 These are particularly useful for defining cost Hamiltonians in combinatorial optimisation problems (see the :ref:`maxcut example <maxcut>`).
 
@@ -54,12 +54,12 @@ QuOp_MPI provides predefined functions for common initial states and observable 
 * **Initial states** (:mod:`~quop_mpi.state`): ``equal`` (uniform superposition), ``basis`` (computational basis state), ``serial`` (user-defined function), ``array`` (from NumPy array), ``position_grid`` (for multivariable problems)
 * **Observables** (:mod:`~quop_mpi.observable`): ``serial`` (user-defined function), ``csv`` (from CSV file), ``hdf5`` (from HDF5 file), ``array`` (from NumPy array), ``rand`` (random observables for testing)
 
-See :meth:`~quop_mpi.Ansatz.set_initial_state` and :meth:`~quop_mpi.Ansatz.set_observables`.
+See :meth:`~quop_mpi.ansatz.set_initial_state` and :meth:`~quop_mpi.ansatz.set_observables`.
 
 Parameter Mapping
 ^^^^^^^^^^^^^^^^^
 
-The :meth:`~quop_mpi.Ansatz.set_parameter_map` method enables flexible control over variational parameters, allowing:
+The :meth:`~quop_mpi.ansatz.set_parameter_map` method enables flexible control over variational parameters, allowing:
 
 * Reduction of the number of free parameters (e.g., parameter sharing across ansatz layers)
 * Custom mappings from a reduced parameter space to the full variational parameter vector
@@ -73,12 +73,12 @@ QuOp_MPI supports classical optimisers from both SciPy and NLopt:
 * **SciPy**: All methods from ``scipy.optimize.minimize`` (default: L-BFGS-B)
 * **NLopt**: Gradient-based and derivative-free methods (requires ``pip install 'quop_mpi[nlopt]'``)
 
-Configure via :meth:`~quop_mpi.Ansatz.set_optimiser`.
+Configure via :meth:`~quop_mpi.ansatz.set_optimiser`.
 
 Custom Objective Functions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-While QuOp_MPI defaults to minimising the expectation value of the observables, custom objective functions can be defined via :meth:`~quop_mpi.Ansatz.set_objective`. This enables:
+While QuOp_MPI defaults to minimising the expectation value of the observables, custom objective functions can be defined via :meth:`~quop_mpi.ansatz.set_objective`. This enables:
 
 * Alternative figures of merit (e.g., CVaR, Gibbs objective)
 * Multi-objective optimisation schemes
@@ -87,16 +87,16 @@ While QuOp_MPI defaults to minimising the expectation value of the observables, 
 Sampling Simulation
 ^^^^^^^^^^^^^^^^^^^
 
-The :meth:`~quop_mpi.Ansatz.set_sampling` method enables simulation of quantum measurement, returning sampled basis states and their associated observable values rather than just the expectation value.
+The :meth:`~quop_mpi.ansatz.set_sampling` method enables simulation of quantum measurement, returning sampled basis states and their associated observable values rather than just the expectation value.
 
 Data I/O
 ^^^^^^^^
 
 QuOp_MPI provides comprehensive data persistence:
 
-* **HDF5 output**: Save final states, observables, and optimisation results via :meth:`~quop_mpi.Ansatz.save` (parallel HDF5 for large-scale simulations)
-* **CSV logging**: Record optimisation progress across multiple runs via :meth:`~quop_mpi.Ansatz.set_log`
-* **Benchmark data**: Automated saving during :meth:`~quop_mpi.Ansatz.benchmark` runs
+* **HDF5 output**: Save final states, observables, and optimisation results via :meth:`~quop_mpi.ansatz.save` (parallel HDF5 for large-scale simulations)
+* **CSV logging**: Record optimisation progress across multiple runs via :meth:`~quop_mpi.ansatz.set_log`
+* **Benchmark data**: Automated saving during :meth:`~quop_mpi.ansatz.benchmark` runs
 
 Parallelisation Schemes
 -----------------------
@@ -120,7 +120,7 @@ elements per rank and a global index offset of,
 
     \text{local_i_offset} = \sum_{i<\text{rank}} \text{local_i}.
 
-These distributed arrays are acted on by instances of the :class:`~quop_mpi.Unitary` class, which provides an interface to efficient Python extensions which compute the action of the QVA unitaries in MPI parallel. 
+These distributed arrays are acted on by instances of the :class:`~quop_mpi.unitary` class, which provides an interface to efficient Python extensions which compute the action of the QVA unitaries in MPI parallel. 
 
 
 .. _parallel-gradient:
@@ -128,7 +128,7 @@ These distributed arrays are acted on by instances of the :class:`~quop_mpi.Unit
 Gradient Evaluation
 ^^^^^^^^^^^^^^^^^^^
 
-For :term:`optimisation <optimiser>` methods that make use of gradient information, computation of the :term:`objective function` gradient may be carried out in MPI parallel by duplicating an :class:`~quop_mpi.Ansatz` over multiple MPI subcommunicators (see :meth:`~quop_mpi.Ansatz.set_parallel_jacobian`).
+For :term:`optimisation <optimiser>` methods that make use of gradient information, computation of the :term:`objective function` gradient may be carried out in MPI parallel by duplicating an :class:`~quop_mpi.ansatz` over multiple MPI subcommunicators (see :meth:`~quop_mpi.ansatz.set_parallel_jacobian`).
 
 .. _parallel-swarm:
 
@@ -140,7 +140,7 @@ Optimisation of QVA :term:`variational parameters` over a large search domain, o
 Parallel Overview
 -----------------
 
-The diagram below depicts a :class:`~quop_mpi.meta.swarm` of two :term:`QVA` simulation instances with parallel gradient evaluation (see :meth:`~quop_mpi.Ansatz.set_parallel_jacobian`). Each QVA simulation occurs over three MPI subcommunicators with two of the subcommunicators carrying out computation of the partial derivatives of the :term:`objective function` and the remaining managing :term:`optimisation <optimiser>` of the :term:`variational parameters` and evaluation of the objective function. The six :class:`~quop_mpi.Ansatz` subcommunicators call the :meth:`~quop_mpi.Unitary.propagate` method of :class:`~quop_mpi.Unitary` instances which compute the action of the QVA's :term:`phase-shift <phase-shift unitary>` and :term:`mixing <mixing unitary>` unitaries in MPI parallel.
+The diagram below depicts a :class:`~quop_mpi.meta.swarm` of two :term:`QVA` simulation instances with parallel gradient evaluation (see :meth:`~quop_mpi.ansatz.set_parallel_jacobian`). Each QVA simulation occurs over three MPI subcommunicators with two of the subcommunicators carrying out computation of the partial derivatives of the :term:`objective function` and the remaining managing :term:`optimisation <optimiser>` of the :term:`variational parameters` and evaluation of the objective function. The six :class:`~quop_mpi.ansatz` subcommunicators call the :meth:`~quop_mpi.unitary.propagate` method of :class:`~quop_mpi.unitary` instances which compute the action of the QVA's :term:`phase-shift <phase-shift unitary>` and :term:`mixing <mixing unitary>` unitaries in MPI parallel.
 
         .. graphviz::
 
@@ -207,16 +207,16 @@ For clusters with time-limited job-scheduling, QuOp_MPI supports automated job s
 
     Suspend/resume functionality is available for **multi-execution workflows only**:
     
-    * :meth:`~quop_mpi.Ansatz.benchmark` — systematic studies across ansatz depths and repeats
-    * :meth:`~quop_mpi.meta.swarm.execute_swarm` — parallel execution of multiple QVA instances
-    * :meth:`~quop_mpi.meta.swarm.benchmark_swarm` — benchmarking across swarm configurations
+    * :meth:`~quop_mpi.ansatz.benchmark` -- systematic studies across ansatz depths and repeats
+    * :meth:`~quop_mpi.meta.swarm.execute_swarm` -- parallel execution of multiple QVA instances
+    * :meth:`~quop_mpi.meta.swarm.benchmark_swarm` -- benchmarking across swarm configurations
     
-    A single :meth:`~quop_mpi.Ansatz.execute` call cannot be suspended and resumed, as it represents one atomic optimisation run.
+    A single :meth:`~quop_mpi.ansatz.execute` call cannot be suspended and resumed, as it represents one atomic optimisation run.
 
 Suspend and Resume
 ^^^^^^^^^^^^^^^^^^
 
-When a time limit is set, QuOp_MPI monitors execution time and suspends before the limit is reached, saving progress to a suspend file. On the next job submission, execution resumes from where it left off—completed iterations are skipped and only remaining work is performed.
+When a time limit is set, QuOp_MPI monitors execution time and suspends before the limit is reached, saving progress to a suspend file. On the next job submission, execution resumes from where it left off--completed iterations are skipped and only remaining work is performed.
 
 Example usage:
 

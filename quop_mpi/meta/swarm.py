@@ -1,26 +1,33 @@
+"""Swarm execution of parallel Ansatz instances over MPI subcommunicators."""
+
 from __future__ import annotations
+
 import inspect
+from functools import wraps
+from logging import warn
 from time import time
+from typing import TYPE_CHECKING
+
 import numpy as np
 from mpi4py import MPI
-from quop_mpi import Ansatz
-from functools import wraps
-from mpi4py import MPI
-from logging import warn
+
+from .._utils._comm_size import QuopMpiLayout
 from .._utils._filenames import ensure_path_and_extension
-from .._utils._mpi import subcomms, MPI_COMM_type
-from .._utils._tracker import swarm_tracker
+from .._utils._mpi import MPI_COMM_type
+from .._utils._tracker import SwarmTracker
 
-#### Type hints ######################
-from ..Unitary import Unitary
-from ..Ansatz import Ansatz as _Ansatz
-from typing import Callable, Union, Iterable
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Sequence
+    from typing import Any
 
-Ansatz = type(_Ansatz)
-######################################
+    from ..ansatz import Ansatz as _Ansatz
+    from ..unitary import UnitaryBase
+
+    Ansatz = type(_Ansatz)
 
 
-def is_list_of_lists(args):
+def is_list_of_lists(args: Sequence) -> bool:
+    """Return ``True`` if ``args`` is a non-empty list whose first element is a list of lists."""
     if len(args) > 0:
         return (
             all(isinstance(args[0][i], list) for i in range(len(args[0])))
@@ -31,26 +38,28 @@ def is_list_of_lists(args):
         return False
 
 
-def is_len_swarm(self, args):
-    return len(args[0]) == self.subcomms.get_n_subcomms()
+def is_len_swarm(self: Swarm, args: Sequence) -> bool:
+    """Return ``True`` if the length of ``args[0]`` equals the number of subcommunicators."""
+    return len(args[0]) == self.swarm_comms.get_n_subcomms()
 
 
-def parse_args_list_of_lists(self, args, kwargs):
+def parse_args_list_of_lists(self: Swarm, args: Sequence, kwargs: dict) -> tuple[list, dict]:
+    """Extract positional and keyword arguments for the active subcommunicator."""
     a = None
     k = None
     if not is_len_swarm(self, args):
         raise RuntimeError(
             (
                 f"Input list of argument lists of len={len(args[0])} "
-                f"does not equal the swarm size of {self.subcomms.get_n_subcomms()}"
+                f"does not equal the swarm size of {self.swarm_comms.get_n_subcomms()}"
             )
         )
-    last_arg = args[0][self.subcomms.get_subcomm_index()][-1]
+    last_arg = args[0][self.swarm_comms.get_subcomm_index()][-1]
     k = last_arg if isinstance(last_arg, dict) else {}
     a = (
-        args[0][self.subcomms.get_subcomm_index()][:-1]
+        args[0][self.swarm_comms.get_subcomm_index()][:-1]
         if len(k) != 0
-        else args[0][self.subcomms.get_subcomm_index()]
+        else args[0][self.swarm_comms.get_subcomm_index()]
     )
     if (len(kwargs) >= 0) and (len(k) == 0):
         k = kwargs
@@ -58,17 +67,18 @@ def parse_args_list_of_lists(self, args, kwargs):
         warn(
             (
                 f"Arguments list equal to swarm size "
-                f"{self.subcomms.get_n_subcomms()} identified with dictionary "
+                f"{self.swarm_comms.get_n_subcomms()} identified with dictionary "
                 f"in last position of sublists, taking keyword arguments from list."
             )
         )
     return a, k
 
 
-def iterate_subcomms_1(method):
+def iterate_subcomms_1(method: Callable) -> Callable:
+    """Decorate a method to dispatch arguments per subcommunicator."""
     @wraps(method)
-    def wrapped_method(self, *args, **kwargs):
-        if self.subcomms.in_subcomm():
+    def wrapped_method(self: Swarm, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        if self.swarm_comms.in_subcomm():
             if is_list_of_lists(args):
                 a, k = parse_args_list_of_lists(self, args, kwargs)
             else:
@@ -79,9 +89,10 @@ def iterate_subcomms_1(method):
     return wrapped_method
 
 
-def iterate_subcomms_2(name, self):
-    def wrapped_method(*args, **kwargs):
-        if self.subcomms.in_subcomm():
+def iterate_subcomms_2(name: str, self: Swarm) -> Callable:
+    """Return a wrapper that forwards calls to ``self.ansatz.<name>`` per subcommunicator."""
+    def wrapped_method(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        if self.swarm_comms.in_subcomm():
             if is_list_of_lists(args):
                 a, k = parse_args_list_of_lists(self, args, kwargs)
             else:
@@ -92,7 +103,7 @@ def iterate_subcomms_2(name, self):
     return wrapped_method
 
 
-class swarm:
+class Swarm:
     """Create and operate on a swarm of identical :literal:`Ansatz` instances.
 
     Each :literal:`Ansatz` instance is associated with an MPI subcommunicator
@@ -108,33 +119,41 @@ class swarm:
 
     Parameters
     ----------
-    nodes_per_subcomm : int
-        number of compute nodes associated with each :literal:`Ansatz`
-        subcommunicator, if :literal:`nodes_per_subcomm == 1` create
-        :literal:`maxcomm` subcommunicators per available compute node.
-    processes_per_node : int
-        number of MPI processes per compute node, must be the same for all nodes
-    maxcomm : int
-        target number of :literal:`Ansatz` subcommunicators
+    n_workers : int
+        Number of worker subcommunicators to create. Each worker gets an
+        independent Ansatz instance. Uses Fortran topology-aware splitting.
     MPI_COMM : Intracomm
         MPI communicator from which to create the :literal:`Ansatz`
         subcommunicators
     alg : Ansatz
-        an :literal:`Ansatz`, :class:`quop_mpi.Ansatz` or a predefined algorithm
+        an :literal:`Ansatz`, :class:`quop_mpi.ansatz` or a predefined algorithm
         (see :mod:`quop_mpi.algorithm`)
 
     """
 
     def __init__(
         self,
-        nodes_per_subcomm: int,
-        processes_per_node: int,
-        maxcomm: int,
-        MPI_COMM: MPI_COMM_type,
+        n_workers: int,
+        MPI_COMM: MPI_COMM_type,  # noqa: N803
         alg: "Ansatz",
-        *args,
-        **kwargs,
-    ):
+        *args: Any,  # noqa: ANN401
+        **kwargs: Any,  # noqa: ANN401
+    ) -> None:
+        """Initialise a Swarm instance.
+
+        Parameters
+        ----------
+        n_workers : int
+            Number of worker subcommunicators.
+        MPI_COMM : MPI_COMM_type
+            MPI communicator to split into subcommunicators.
+        alg : Ansatz
+            Ansatz class to instantiate per worker.
+        *args
+            Positional arguments forwarded to the Ansatz constructor.
+        **kwargs
+            Keyword arguments forwarded to the Ansatz constructor.
+        """
         self.filename = None
         self.label = None
         self.time = None
@@ -143,29 +162,46 @@ class swarm:
         self.results = None
         self.MPI_COMM = MPI_COMM
 
-        self.subcomms = subcomms(
-            nodes_per_subcomm, processes_per_node, maxcomm, MPI_COMM
-        )
+        self.swarm_comms = QuopMpiLayout.create_workers(
+            n_workers, MPI_COMM
+        )  # backend auto-detected
+
+        # Eagerly cache subcomm roots while all ranks participate
+        # collectively.  get_subcomm_roots() uses MPI_COMM.Allgather,
+        # so it must be called before control flow diverges.
+        self.swarm_comms.get_subcomm_roots()
+
         self.__set_ansatz(alg, *args, **kwargs)
 
     @iterate_subcomms_1
-    def __set_ansatz(self, alg, *args, **kwargs):
+    def __set_ansatz(self, alg: Ansatz, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
 
         self.alg = alg
-        self.ansatz = self.alg(*args, self.subcomms.SUBCOMM, **kwargs)
+        self.ansatz = self.alg(*args, self.swarm_comms.SUBCOMM, **kwargs)
 
-        swarm_methods = inspect.getmembers(swarm, predicate=inspect.isfunction)
+        swarm_methods = inspect.getmembers(Swarm, predicate=inspect.isfunction)
         swarm_method_names = [method[0] for method in swarm_methods]
         for alg_method in inspect.getmembers(self.alg, predicate=inspect.isfunction):
             if alg_method[0] not in swarm_method_names:
                 setattr(self, alg_method[0], iterate_subcomms_2(alg_method[0], self))
 
-    def set_unitaries(self, unitaries: Union[list[Unitary], list[list[Unitary]]]):
+    def destroy(self) -> None:
+        """Clean up Fortran resources and subcommunicators."""
+        if hasattr(self, "ansatz") and self.ansatz is not None:
+            self.ansatz.destroy()
+            self.ansatz = None
+
+        # Free subcommunicators and Fortran handles (layout owns all of them)
+        if self.swarm_comms is not None:
+            self.swarm_comms.free()
+            self.swarm_comms = None
+
+    def set_unitaries(self, unitaries: list[UnitaryBase] | list[list[UnitaryBase]]) -> None:
         """Set the unitaries of an :literal:`Ansatz` swarm.
 
         Parameters
         ----------
-        unitaries :list[Unitary] or list[list[Unitary]]
+        unitaries :list[UnitaryBase] or list[list[UnitaryBase]]
             a list of :literal:`unitary` instances (broadcast to all swarm instances)
             or a list of :literal:`unitary` instances for each :literal:`Ansatz` instance in
             the :literal:`swarm`
@@ -176,82 +212,80 @@ class swarm:
             if :literal:`unitaries`is a list of lists that is not equal to the
             :literal:`swarm` size
         """
-        if self.subcomms.in_subcomm():
+        if self.swarm_comms.in_subcomm():
             if not is_list_of_lists(unitaries):
                 self.ansatz.set_unitaries(unitaries)
             elif is_len_swarm(self, unitaries):
-                self.ansatz.set_unitaries(
-                    unitaries[0][self.subcomms.get_subcomm_index()]
-                )
+                self.ansatz.set_unitaries(unitaries[0][self.swarm_comms.get_subcomm_index()])
             else:
                 raise RuntimeError(
                     (
                         f"Input list of unitary lists of len={len(unitaries[0])} does "
-                        f"not equal the swam size of {self.subcomms.get_n_subcomms()}."
+                        f"not equal the swam size of {self.swarm_comms.get_n_subcomms()}."
                     )
                 )
 
-    def set_log(self, *args, **kwargs):
+    def set_log(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
         """Log simulation information.
 
         See Also
         --------
-        :meth:`~quop_mpi.Ansatz.set_log`
+        :meth:`~quop_mpi.ansatz.set_log`
 
         Parameters
         ----------
         args: list[Any] or list[list[Any]]
-            positional arguments for :meth:`quop_mpi.Ansatz.set_log`, or a list
+            positional arguments for :meth:`quop_mpi.ansatz.set_log`, or a list
             of positional arguments specifying unique input for
-            :meth:`quop_mpi.Ansatz.set_log` for each :literal:`Ansatz` instance.
+            :meth:`quop_mpi.ansatz.set_log` for each :literal:`Ansatz` instance.
         kwargs: dict
-            keyword arguments for :meth:`quop_mpi.Ansatz.set_log`, or keywords
+            keyword arguments for :meth:`quop_mpi.ansatz.set_log`, or keywords
             pointing to a list of positional arguments specifying unique input
-            for :meth:`quop_mpi.Ansatz.set_log` for each :literal:`Ansatz`
+            for :meth:`quop_mpi.ansatz.set_log` for each :literal:`Ansatz`
             instance.
         """
-        if self.subcomms.in_subcomm():
+        if self.swarm_comms.in_subcomm():
 
             if is_list_of_lists(args):
                 a, k = parse_args_list_of_lists(self, args, kwargs)
             else:
                 a = [
                     ensure_path_and_extension(
-                        args[0], "csv", modifier=self.subcomms.get_subcomm_index()
+                        args[0], "csv", modifier=self.swarm_comms.get_subcomm_index()
                     ),
-                    f"{args[1]}_{self.subcomms.get_subcomm_index()}",
+                    f"{args[1]}_{self.swarm_comms.get_subcomm_index()}",
                 ]
                 k = kwargs
 
             self.ansatz.set_log(*a, **k)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
         """Save simulation results.
 
         See Also
         --------
-        :meth:`~quop_mpi.Ansatz.save`
+        :meth:`~quop_mpi.ansatz.save`
 
         Parameters
         ----------
         args:
-            positional arguments for :meth:`quop_mpi.Ansatz.save`, or a list of
+            positional arguments for :meth:`quop_mpi.ansatz.save`, or a list of
             positional arguments specifying unique input for
-            :meth:`quop_mpi.Ansatz.save` for each :literal:`Ansatz` instance.
+            :meth:`quop_mpi.ansatz.save` for each :literal:`Ansatz` instance.
         kwargs:
-            keyword arguments for :meth:`quop_mpi.Ansatz.save`, or keywords
+            keyword arguments for :meth:`quop_mpi.ansatz.save`, or keywords
             pointing to a list of positional arguments specifying unique input
-            for :meth:`quop_mpi.Ansatz.save` for each :literal:`Ansatz`
+            for :meth:`quop_mpi.ansatz.save` for each :literal:`Ansatz`
             instance.
         """
-        if self.subcomms.in_subcomm():
+        if self.swarm_comms.in_subcomm():
 
             if is_list_of_lists(args):
                 a, k = parse_args_list_of_lists(self, args, kwargs)
             else:
                 a = [
                     ensure_path_and_extension(
-                        args[0], "h5", modifier=self.subcomms.get_subcomm_index()
+                        args[0], "h5", modifier=self.swarm_comms.get_subcomm_index()
                     ),
                     args[1],
                 ]
@@ -259,27 +293,27 @@ class swarm:
 
             self.ansatz.save(*a, **k)
 
-    def benchmark(self, *args, **kwargs):
+    def benchmark(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
         """Test :term:`QVA` performance as a function of :term:`Ansatz Depth`.
 
         See Also
         --------
-        :meth:`~quop_mpi.Ansatz.benchmark`
+        :meth:`~quop_mpi.ansatz.benchmark`
 
         Parameters
         ----------
         args: list[Ans] or list[list[Any]]
-            positional arguments for :meth:`quop_mpi.Ansatz.benchmark`, or a
+            positional arguments for :meth:`quop_mpi.ansatz.benchmark`, or a
             list of positional arguments specifying unique input for
-            :meth:`quop_mpi.Ansatz.benchmark` for each :literal:`Ansatz`
+            :meth:`quop_mpi.ansatz.benchmark` for each :literal:`Ansatz`
             instance.
         kwargs: dict
-            keyword arguments for :meth:`quop_mpi.Ansatz.benchmark`, or keywords
+            keyword arguments for :meth:`quop_mpi.ansatz.benchmark`, or keywords
             pointing to a list of positional arguments specifying unique input
-            for :meth:`quop_mpi.Ansatz.benchmark` for each :literal:`Ansatz`
+            for :meth:`quop_mpi.ansatz.benchmark` for each :literal:`Ansatz`
             instance.
         """
-        if self.subcomms.in_subcomm():
+        if self.swarm_comms.in_subcomm():
 
             if is_list_of_lists(args):
                 a, k = parse_args_list_of_lists(self, args, kwargs)
@@ -288,16 +322,16 @@ class swarm:
                 k = kwargs
                 if "filename" in k.keys():
                     k["filename"] = ensure_path_and_extension(
-                        k["filename"], "h5", modifier=self.subcomms.get_subcomm_index()
+                        k["filename"], "h5", modifier=self.swarm_comms.get_subcomm_index()
                     )
                 if "suspend_path" in k.keys():
                     k["suspend_path"] = (
-                        f"{k['suspend_path']}_{self.subcomms.get_subcomm_index()}"
+                        f"{k['suspend_path']}_{self.swarm_comms.get_subcomm_index()}"
                     )
                 if "label" in k.keys():
-                    k["label"] = f"{k['label']}_{self.subcomms.get_subcomm_index()}"
+                    k["label"] = f"{k['label']}_{self.swarm_comms.get_subcomm_index()}"
                 else:
-                    k["label"] = f"test_{self.subcomms.get_subcomm_index()}"
+                    k["label"] = f"test_{self.swarm_comms.get_subcomm_index()}"
 
             self.ansatz.benchmark(*a, **k)
 
@@ -310,16 +344,14 @@ class swarm:
         dict
             simulation result
         """
-        if self.subcomms.in_rootcomm():
+        if self.swarm_comms.in_rootcomm():
 
-            min_fun_rank = self.subcomms.ROOTCOMM.allreduce(
-                (self.ansatz.quop_result["fun"], self.subcomms.ROOTCOMM.Get_rank()),
+            min_fun_rank = self.swarm_comms.ROOTCOMM.allreduce(
+                (self.ansatz.quop_result["fun"], self.swarm_comms.ROOTCOMM.Get_rank()),
                 op=MPI.MINLOC,
             )[1]
 
-            result = self.subcomms.ROOTCOMM.bcast(
-                self.ansatz.quop_result, root=min_fun_rank
-            )
+            result = self.swarm_comms.ROOTCOMM.bcast(self.ansatz.quop_result, root=min_fun_rank)
             result["swarm_index"] = min_fun_rank
 
         else:
@@ -331,14 +363,14 @@ class swarm:
         self,
         param_lists: list[np.ndarray[np.float64]],
         basename: str,
-        log_path: str = None,
-        h5_path: str = None,
-        labels: Union[str, list[str]] = None,
+        log_path: str | None = None,
+        h5_path: str | None = None,
+        labels: str | list[str] | None = None,
         save_action: str = "a",
-        time_limit: float = None,
+        time_limit: float | None = None,
         verbose: bool = True,
-        suspend_path: str = None,
-    ):
+        suspend_path: str | None = None,
+    ) -> dict:
         """Parallel simulation of :term:`QVAs <QVA>` over a set of initial
         :term:`variational parameters`.
 
@@ -383,13 +415,11 @@ class swarm:
 
         suspend_path = basename if suspend_path is None else suspend_path
 
-        tracker = swarm_tracker(
-            tasks, time_limit, self.subcomms, suspend_path=suspend_path
-        )
+        tracker = SwarmTracker(tasks, time_limit, self.swarm_comms, suspend_path=suspend_path)
 
         if basename is not None and h5_path is None:
             h5path = ensure_path_and_extension(
-                f"{tracker.suspend_path[:-5]}_{self.subcomms.get_subcomm_index()}",
+                f"{tracker.suspend_path[:-5]}_{self.swarm_comms.get_subcomm_index()}",
                 "h5",
             )
         elif h5_path is not None:
@@ -397,7 +427,7 @@ class swarm:
 
         if basename is not None and log_path is None:
             logpath = ensure_path_and_extension(
-                f"{tracker.suspend_path[:-5]}_{self.subcomms.get_subcomm_index()}",
+                f"{tracker.suspend_path[:-5]}_{self.swarm_comms.get_subcomm_index()}",
                 "csv",
             )
         elif log_path is not None:
@@ -421,6 +451,8 @@ class swarm:
 
                 label, params = task
 
+                self.ansatz.set_seed(seed)
+
                 if logging and basename is not None:
                     self.set_log(logpath, label, action)
 
@@ -430,7 +462,7 @@ class swarm:
                 if basename is not None:
                     self.save(h5path, label, action)
 
-                if verbose and self.subcomms.SUBCOMM.Get_rank() == 0:
+                if verbose and self.swarm_comms.SUBCOMM.Get_rank() == 0:
                     print(f"Completed task: {label}", flush=True)
 
             else:
@@ -438,7 +470,7 @@ class swarm:
 
             tracker.update(result)
 
-        return self.subcomms.MPI_COMM.bcast(tracker.results_dict, root=0)
+        return self.swarm_comms.MPI_COMM.bcast(tracker.results_dict, root=0)
 
     def benchmark_swarm(
         self,
@@ -448,10 +480,10 @@ class swarm:
         param_persist: bool = True,
         verbose: bool = True,
         save_action: str = "a",
-        time_limit: float = None,
+        time_limit: float | None = None,
         logging: bool = True,
-        suspend_path: str = None,
-    ):
+        suspend_path: str | None = None,
+    ) -> list[dict]:
         """Test :term:`QVA` performance with increasing :term:`ansatz depth`
         with repeats at each depth computed in parallel over the
         :literal:`swarm`.
@@ -493,7 +525,7 @@ class swarm:
         list[dict]
             optimisation results ordered by ansatz depth
         """
-        self.set_seed(self.subcomms.get_subcomm_index())
+        self.set_seed(self.swarm_comms.get_subcomm_index())
 
         first = True
 
@@ -515,16 +547,14 @@ class swarm:
 
             labels = [f"repeat_{repeat}_depth_{depth}" for repeat in range(repeats)]
 
-            if self.subcomms.get_subcomm_index() == 0:
+            if self.swarm_comms.get_subcomm_index() == 0:
 
                 if (first or depth == 1) or (not param_persist):
-                    params_list = [
-                        self.ansatz.gen_initial_params(depth) for _ in range(repeats)
-                    ]
+                    params_list = [self.ansatz.gen_initial_params(depth) for _ in range(repeats)]
                     first = False
                 else:
                     params_list = [
-                        np.concatenate([optimal_x, self.ansatz.gen_initial_params(1)])
+                        np.concatenate([optimal_x, self.ansatz.gen_initial_params(1)])  # noqa: F821 — set in previous iteration
                         for _ in range(repeats)
                     ]
 
@@ -532,11 +562,11 @@ class swarm:
 
                 params_list = None
 
-            params_list = self.subcomms.MPI_COMM.bcast(params_list, root=0)
+            params_list = self.swarm_comms.MPI_COMM.bcast(params_list, root=0)
 
             start_time = time()
 
-            if verbose and self.subcomms.MPI_COMM.Get_rank() == 0:
+            if verbose and self.swarm_comms.MPI_COMM.Get_rank() == 0:
                 print(f"Starting {repeats} repeats at depth {depth}...", flush=True)
 
             results.append(
@@ -556,17 +586,14 @@ class swarm:
             if time_limit is not None:
                 time_limit -= time() - start_time
 
-            if self.subcomms.MPI_COMM.Get_rank() == 0:
+            if self.swarm_comms.MPI_COMM.Get_rank() == 0:
                 funs = [results[-1][key]["fun"] for key in results[-1].keys()]
-                xs = [
-                    results[-1][key]["variational parameters"]
-                    for key in results[-1].keys()
-                ]
+                xs = [results[-1][key]["variational parameters"] for key in results[-1].keys()]
                 optimal_x = xs[np.argmin(funs)]
             else:
                 optimal_x = None
 
-            optimal_x = self.subcomms.MPI_COMM.bcast(optimal_x, root=0)
+            optimal_x = self.swarm_comms.MPI_COMM.bcast(optimal_x, root=0)
 
             if verbose and results:
 
@@ -579,7 +606,7 @@ class swarm:
                     )
                 self.ansatz.quop_result = best_result
 
-                if self.subcomms.MPI_COMM.Get_rank() == 0:
+                if self.swarm_comms.MPI_COMM.Get_rank() == 0:
                     print(f"Optimial result at depth {depth}:")
                     self.print_result()
 

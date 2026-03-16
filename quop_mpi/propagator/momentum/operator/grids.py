@@ -1,10 +1,12 @@
+"""Momentum-space operator functions for multivariable mixing unitaries."""
+
 from __future__ import annotations
-from importlib import import_module
+
 import numpy as np
 
 
 def magnitude_squared(
-    Ns: list[int], minsk: list[float], deltask: list[float]
+    Ns: list[int], minsk: list[float], deltask: list[float]  # noqa: N803
 ) -> np.ndarray[np.complex128]:
     """Generate the :ref:`QMOA` :term:`mixing unitary` :term:`operator`.
 
@@ -23,7 +25,7 @@ def magnitude_squared(
     deltask : list[float]
         the step-size in each Cartesian coordinate in momentum space,
         :class:`quop_mpi.propagator.momentum.unitary` attribute
-     
+
     Returns
     -------
     np.ndarray[np.complex128]
@@ -33,7 +35,7 @@ def magnitude_squared(
     grid = np.empty(max(Ns), dtype=np.float64)
     momentums = np.zeros((max(Ns), len(Ns)), dtype=np.complex128)
 
-    for i, (N, mink, deltak) in enumerate(zip(Ns, minsk, deltask)):
+    for i, (N, mink, deltak) in enumerate(zip(Ns, minsk, deltask, strict=True)):  # noqa: N806
 
         grid[0] = mink
 

@@ -1,10 +1,14 @@
 """Predefined :term:`Operator Functions` for :class:`quop_mpi.propagator.composite.unitary`."""
+
 from __future__ import annotations
+
 from importlib import import_module
+
 import numpy as np
 
-def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:
-    """Generate the eigenvalues of a :ref:`QMOA` :term:`mixing unitary` 
+
+def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:  # noqa: N803
+    """Generate the eigenvalues of a :ref:`QMOA` :term:`mixing unitary`
     :term:`operator`.
 
     An :term:`Operator Function` for
@@ -14,8 +18,9 @@ def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:
 
     See Also
     --------
-    :meth:`quop_mpi.propagate.circulant.operator.graph`
-        Generate the eigenvalues of the i-th symmetric circulant graph with edge weights :literal:`1`.
+    :func:`quop_mpi.propagator.circulant.operator.graph`
+        Generate the eigenvalues of the i-th symmetric circulant graph
+        with edge weights :literal:`1`.
 
     Parameters
     ----------
@@ -24,7 +29,7 @@ def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:
         :class:`quop_mpi.propagator.composite.unitary` attribute
     Cs : list[int], optional
         specifies the i-th index of the circulant operators associated with
-        each dimension of the Cartesian grid, complete graphs by default 
+        each dimension of the Cartesian grid, complete graphs by default
 
     Returns
     -------
@@ -33,17 +38,15 @@ def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:
         mixing unitary with global index offset :literal:`local_i_offset`
     """
 
-    circulant_eigenvalues = import_module('quop_mpi.propagator.circulant.operator.eigenvalues')
+    circulant_eigenvalues = import_module("quop_mpi.propagator.circulant.operator.eigenvalues")
 
-    complete = [C >= N // 2 for C, N in zip(Cs, Ns)]
+    complete = [C >= N // 2 for C, N in zip(Cs, Ns, strict=True)]
 
     if all(complete):
-        return np.empty((len(Ns), 1), dtype = np.float64)
+        return np.empty((len(Ns), 1), dtype=np.float64)
 
-    eigenvalues = np.zeros((np.max(Ns), len(Ns)), dtype = np.float64)
+    eigenvalues = np.zeros((np.max(Ns), len(Ns)), dtype=np.float64)
 
-    for i, (N, C)  in enumerate(zip(Ns, Cs)):
-        eigenvalues[:N,i] = circulant_eigenvalues.graph(N, C)
+    for i, (N, C) in enumerate(zip(Ns, Cs, strict=True)):  # noqa: N806
+        eigenvalues[:N, i] = circulant_eigenvalues.graph(N, C)
     return np.asfortranarray(eigenvalues)
-
- 

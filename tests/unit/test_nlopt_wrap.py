@@ -5,8 +5,8 @@ This module tests the NLopt wrapper which provides a scipy-like interface
 to the NLopt optimization library.
 """
 
-import pytest
 import numpy as np
+import pytest
 from scipy.optimize import rosen, rosen_der
 
 # Skip all tests in this module if nlopt is not available
@@ -480,8 +480,9 @@ class TestNloptAlgorithmsRegistry:
 
     def test_nlopt_algorithms_keys_format(self):
         """All algorithm keys match expected format (G/L)(N/D)_*."""
-        from quop_mpi._optimization.nlopt_wrap import NLOPT_ALGORITHMS_KEYS
         import re
+
+        from quop_mpi._optimization.nlopt_wrap import NLOPT_ALGORITHMS_KEYS
 
         pattern = r"^[GL][ND]_"
         for key in NLOPT_ALGORITHMS_KEYS:

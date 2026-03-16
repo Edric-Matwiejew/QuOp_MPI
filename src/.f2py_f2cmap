@@ -1,4 +1,4 @@
-dict(integer=dict(dp="long",sp="int"), real=dict(sp="float",dp="double"), complex=dict(sp="complex_float",dp="complex_double"))
+dict(integer=dict(int64="long_long",int32="int"), real=dict(real32="float",real64="double"), complex=dict(real32="complex_float",real64="complex_double"))
 
 
 

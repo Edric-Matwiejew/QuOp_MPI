@@ -1,5 +1,9 @@
+"""Computational basis state construction utilities."""
+
 from __future__ import annotations
+
 import numpy as np
+
 from .kronecker import kron
 
 zero = np.array([1, 0])

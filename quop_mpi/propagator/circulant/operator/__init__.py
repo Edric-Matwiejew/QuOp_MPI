@@ -28,6 +28,7 @@ The circulant propagator computes :math:`e^{-itH}|\\psi\\rangle` using FFT:
 This is efficient because circulant matrices are diagonalized by the DFT.
 The implementation uses FFTW with MPI for parallel execution.
 """
+
 from .eigenvalues import complete, graph
 
 __all__ = ["complete", "graph"]

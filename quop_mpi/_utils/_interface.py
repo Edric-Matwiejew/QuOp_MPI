@@ -1,9 +1,8 @@
-from mpi4py import MPI
-from inspect import signature, Parameter
 from functools import partial
+from inspect import Parameter, signature
 
 
-class interface:
+class Interface:
     """
     This class takes a user-input function, instance of a class and
     list of class attributes. It binds the function's positional parameters
@@ -40,7 +39,7 @@ class interface:
     See Ansatz.get_bindable_attributes() for a complete list.
     """
 
-    def __init__(self, objs, function, function_name, MPI_COMM):
+    def __init__(self, objs, function, function_name, MPI_COMM):  # noqa: N803
 
         self.function_name = function_name
         self.rank = MPI_COMM.Get_rank()

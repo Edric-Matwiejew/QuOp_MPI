@@ -17,11 +17,12 @@ Key concerns:
 - No deadlocks when subcomm sizes don't evenly divide
 """
 
-import pytest
 import numpy as np
+import pytest
 from mpi4py import MPI
-from quop_mpi.algorithm.combinatorial import serial
 
+from quop_mpi import config
+from quop_mpi.algorithm.combinatorial import serial
 
 # =============================================================================
 # Helper Functions
@@ -31,6 +32,82 @@ from quop_mpi.algorithm.combinatorial import serial
 def make_qualities_function(system_size):
     """Create a qualities function that returns values 0 to system_size-1."""
     return lambda: np.arange(system_size, dtype=np.float64)
+
+
+# -- DEVCOMM size probing (wavefront only) ---------------------------
+
+_cached_devcomm_size = None
+
+
+def _probe_devcomm_size():
+    """Return the global DEVCOMM size on the wavefront backend.
+
+    Collective over ``MPI.COMM_WORLD``.  Creates a temporary single-worker
+    layout, negotiates it, reads ``DEVCOMM.Get_size()``, and tears it down.
+    The result is cached so the probe runs at most once per session.
+
+    Returns
+    -------
+    int
+        Number of GPU-capable ranks visible to ``MPI.COMM_WORLD``.
+    """
+    global _cached_devcomm_size
+    if _cached_devcomm_size is not None:
+        return _cached_devcomm_size
+
+    from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+
+    from quop_mpi._utils._comm_size import QuopMpiLayout
+
+    comm = MPI.COMM_WORLD
+    system_size = 64  # arbitrary; just needs to be > 0
+    backend_flag = 1  # wavefront
+
+    layout = QuopMpiLayout.create_workers(1, comm, backend_flag=backend_flag)
+
+    prop_ptrs = np.array([], dtype=np.int64)
+    cb_ptrs = np.array([], dtype=np.int64)
+    layout_ptr, status = _ciw.wrapper_negotiate(
+        layout.split_ptr,
+        layout.topo_ptr,
+        np.int64(system_size),
+        np.int32(backend_flag),
+        prop_ptrs,
+        cb_ptrs,
+    )
+    layout.set_layout_ptr(int(layout_ptr))
+    if status == -1:
+        layout.mark_excluded()
+
+    devcomm = layout.devcomm
+    local_size = devcomm.Get_size() if devcomm is not None else 0
+
+    # Allreduce so excluded ranks also learn the value
+    global_size = comm.allreduce(local_size, op=MPI.MAX)
+
+    layout.destroy()
+
+    _cached_devcomm_size = global_size
+    return global_size
+
+
+def skip_wavefront_parallel_jacobian(n_workers=2):
+    """Skip test if the wavefront backend lacks enough GPU ranks.
+
+    On the MPI backend this is a no-op.  On wavefront it probes the global
+    DEVCOMM size (number of GPU-capable ranks) and skips when that is less
+    than *n_workers*, because each subcommunicator needs at least one GPU
+    rank.
+    """
+    if config.backend != "wavefront":
+        return
+
+    devcomm_size = _probe_devcomm_size()
+    if devcomm_size < n_workers:
+        pytest.skip(
+            f"Parallel jacobian with n_workers={n_workers} requires at least "
+            f"{n_workers} GPU ranks, but only {devcomm_size} available"
+        )
 
 
 # =============================================================================
@@ -66,12 +143,11 @@ class TestSubcommunicatorCreation:
 
     def test_single_subcomm_no_jacobian(self, mpi_comm):
         """When only 1 subcomm, no jacobian parallelism is possible."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        size = mpi_comm.Get_size()
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
@@ -90,7 +166,7 @@ class TestSubcommunicatorCreation:
 
     def test_parallel_jacobian_creates_multiple_subcomms(self, mpi_comm):
         """set_parallel_jacobian should create multiple subcommunicators."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
 
@@ -98,17 +174,17 @@ class TestSubcommunicatorCreation:
         if size < 2:
             pytest.skip("Need at least 2 MPI processes for parallel jacobian")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
         # Request 2 subcommunicators (each with size/2 processes)
-        # nodes_per_subcomm=1, processes_per_node=size, maxcomm=2
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        # n_workers=2
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.setup()
 
@@ -119,32 +195,30 @@ class TestSubcommunicatorCreation:
 
         if mpi_comm.Get_rank() == 0:
             # Should have created 2 subcomms (or possibly fewer if size is small)
-            assert (
-                all_n_subcomms[0] >= 1
-            ), f"Should have at least 1 subcomm: {all_n_subcomms}"
+            assert all_n_subcomms[0] >= 1, f"Should have at least 1 subcomm: {all_n_subcomms}"
 
     def test_jaccomm_created_with_multiple_subcomms(self, mpi_comm):
         """JACCOMM should be created when multiple subcomms exist."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
 
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.setup()
 
-        in_jaccomm = alg.subcomms.in_jaccomm()
+        in_jaccomm = alg.subcomms.JACCOMM is not None
 
         # Gather to check
         all_in_jaccomm = mpi_comm.gather(in_jaccomm, root=0)
@@ -169,64 +243,64 @@ class TestJacobianMethods:
 
     def test_forward_difference_method_accepted(self, mpi_comm):
         """Forward difference method should be accepted."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
         # Should not raise
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         assert alg.jacobian_input == ["forward"]
 
     def test_central_difference_method_accepted(self, mpi_comm):
         """Central difference method should be accepted."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="central"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="central")
 
         assert alg.jacobian_input == ["central"]
 
     def test_custom_step_size(self, mpi_comm):
         """Custom step size h should be stored."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
         custom_h = 1e-6
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
         alg.set_parallel_jacobian(
-            nodes_per_subcomm=1,
-            processes_per_node=size,
-            maxcomm=2,
+            n_workers=2,
             method="forward",
             h=custom_h,
         )
@@ -245,21 +319,23 @@ class TestParallelJacobianExecution:
 
     def test_execute_with_parallel_jacobian_completes(self, mpi_comm):
         """Execute with parallel jacobian should complete without deadlock."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
+
+        alg.verbose_objective = True  # Print objective values during optimization for debugging
 
         # Use a simple optimizer with few iterations
         alg.set_optimiser(
@@ -282,21 +358,21 @@ class TestParallelJacobianExecution:
 
     def test_execute_with_parallel_jacobian_produces_result(self, mpi_comm):
         """Execute with parallel jacobian should produce optimization result."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -313,21 +389,21 @@ class TestParallelJacobianExecution:
 
     def test_multiple_executions_with_parallel_jacobian(self, mpi_comm):
         """Multiple executions with parallel jacobian should all complete."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -336,7 +412,7 @@ class TestParallelJacobianExecution:
         )
 
         # Execute multiple times
-        for i in range(3):
+        for _ in range(3):
             alg.execute()
             mpi_comm.barrier()
 
@@ -358,21 +434,21 @@ class TestParallelJacobianEdgeCases:
 
     def test_depth_greater_than_one(self, mpi_comm):
         """Parallel jacobian with depth > 1 should work correctly."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(3)  # More parameters to distribute
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -391,22 +467,22 @@ class TestParallelJacobianEdgeCases:
 
     def test_uneven_parameter_distribution(self, mpi_comm):
         """Test when parameters don't divide evenly among subcomms."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         # Depth 5 = 10 parameters, may not divide evenly
         alg.set_depth(5)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -425,22 +501,22 @@ class TestParallelJacobianEdgeCases:
 
     def test_small_system_with_parallel_jacobian(self, mpi_comm):
         """Test parallel jacobian with system size close to process count."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         # System size just slightly larger than nprocs
         system_size = max(8, size * 2)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -451,13 +527,12 @@ class TestParallelJacobianEdgeCases:
         try:
             alg.execute()
             completed = True
-        except Exception as e:
+        except Exception:
             completed = False
-            error_msg = str(e)
 
         mpi_comm.barrier()
 
-        all_completed = mpi_comm.gather(completed, root=0)
+        mpi_comm.gather(completed, root=0)
 
         if mpi_comm.Get_rank() == 0:
             # May fail due to system size constraints, but shouldn't deadlock
@@ -475,21 +550,21 @@ class TestVarMapDistribution:
 
     def test_var_map_created_during_execute(self, mpi_comm):
         """var_map should be created during execute when multiple subcomms exist."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(2)  # 4 parameters total
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -509,23 +584,23 @@ class TestVarMapDistribution:
 
     def test_var_map_covers_all_parameters(self, mpi_comm):
         """var_map should cover all variational parameters."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
         depth = 3
         n_params = depth * 2  # 2 params per depth for QWOA
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(depth)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -544,7 +619,6 @@ class TestVarMapDistribution:
 
             # Should have all parameters from 0 to n_params-1
             expected = set(range(n_params))
-            actual = set(all_params)
 
             # Note: subcomm 0 doesn't compute jacobian, so its var_map entry may be empty
             # The jacobian subcomms (1+) should cover all parameters
@@ -568,21 +642,21 @@ class TestJacobianSynchronization:
 
     def test_stop_flag_propagates_to_all_ranks(self, mpi_comm):
         """Stop flag should propagate to all ranks when optimization completes."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -597,27 +671,25 @@ class TestJacobianSynchronization:
 
         if mpi_comm.Get_rank() == 0:
             # All ranks that participated should have stop=True
-            assert all(
-                all_stop
-            ), f"All ranks should have stop=True after execute: {all_stop}"
+            assert all(all_stop), f"All ranks should have stop=True after execute: {all_stop}"
 
     def test_no_deadlock_with_early_termination(self, mpi_comm):
         """Optimization that terminates early should not deadlock."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         # Set very strict convergence criteria for early termination
         alg.set_optimiser(
@@ -653,11 +725,13 @@ class TestJacobianCorrectness:
 
     def test_parallel_jacobian_matches_serial_forward(self, mpi_comm):
         """Parallel forward-difference jacobian should match serial optimization."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
+
+        skip_wavefront_parallel_jacobian()
 
         system_size = 64
         depth = 2
@@ -680,10 +754,8 @@ class TestJacobianCorrectness:
         initial_params = np.random.uniform(-np.pi, np.pi, depth * 2)
 
         # Run WITHOUT parallel jacobian (scipy's default finite diff)
-        alg_serial = qwoa(system_size, mpi_comm)
-        alg_serial.set_qualities(
-            serial, {"args": [make_qualities_function(system_size)]}
-        )
+        alg_serial = QWOA(system_size, mpi_comm)
+        alg_serial.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg_serial.set_depth(depth)
         alg_serial.set_seed(seed)
         alg_serial.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
@@ -698,16 +770,12 @@ class TestJacobianCorrectness:
         mpi_comm.barrier()
 
         # Run WITH parallel jacobian (forward difference)
-        alg_parallel = qwoa(system_size, mpi_comm)
-        alg_parallel.set_qualities(
-            serial, {"args": [make_qualities_function(system_size)]}
-        )
+        alg_parallel = QWOA(system_size, mpi_comm)
+        alg_parallel.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg_parallel.set_depth(depth)
         alg_parallel.set_seed(seed)
 
-        alg_parallel.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg_parallel.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
         alg_parallel.execute(initial_params.copy())
@@ -720,20 +788,28 @@ class TestJacobianCorrectness:
             # Allow small tolerance due to different jacobian computation paths
             assert np.isclose(
                 serial_result_fun, parallel_result_fun, rtol=1e-3
-            ), f"Objective values differ: serial={serial_result_fun}, parallel={parallel_result_fun}"
+            ), (
+                f"Objective values differ: "
+                f"serial={serial_result_fun}, parallel={parallel_result_fun}"
+            )
 
             # Parameters should be close (may differ slightly due to different paths)
             assert np.allclose(
                 serial_result_x, parallel_result_x, rtol=1e-2, atol=1e-3
-            ), f"Optimal parameters differ:\nserial={serial_result_x}\nparallel={parallel_result_x}"
+            ), (
+                f"Optimal parameters differ:\n"
+                f"serial={serial_result_x}\nparallel={parallel_result_x}"
+            )
 
     def test_parallel_jacobian_matches_serial_central(self, mpi_comm):
         """Parallel central-difference jacobian should match serial optimization."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
+
+        skip_wavefront_parallel_jacobian()
 
         system_size = 64
         depth = 2
@@ -753,10 +829,8 @@ class TestJacobianCorrectness:
         initial_params = np.random.uniform(-np.pi, np.pi, depth * 2)
 
         # Run WITHOUT parallel jacobian
-        alg_serial = qwoa(system_size, mpi_comm)
-        alg_serial.set_qualities(
-            serial, {"args": [make_qualities_function(system_size)]}
-        )
+        alg_serial = QWOA(system_size, mpi_comm)
+        alg_serial.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg_serial.set_depth(depth)
         alg_serial.set_seed(seed)
         alg_serial.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
@@ -769,16 +843,12 @@ class TestJacobianCorrectness:
         mpi_comm.barrier()
 
         # Run WITH parallel jacobian (central difference - more accurate)
-        alg_parallel = qwoa(system_size, mpi_comm)
-        alg_parallel.set_qualities(
-            serial, {"args": [make_qualities_function(system_size)]}
-        )
+        alg_parallel = QWOA(system_size, mpi_comm)
+        alg_parallel.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg_parallel.set_depth(depth)
         alg_parallel.set_seed(seed)
 
-        alg_parallel.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="central"
-        )
+        alg_parallel.set_parallel_jacobian(n_workers=2, method="central")
 
         alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
         alg_parallel.execute(initial_params.copy())
@@ -789,15 +859,20 @@ class TestJacobianCorrectness:
             # Central difference should be more accurate, so results should be very close
             assert np.isclose(
                 serial_result_fun, parallel_result_fun, rtol=1e-3
-            ), f"Objective values differ: serial={serial_result_fun}, parallel={parallel_result_fun}"
+            ), (
+                f"Objective values differ: "
+                f"serial={serial_result_fun}, parallel={parallel_result_fun}"
+            )
 
     def test_parallel_jacobian_convergence_deeper_circuit(self, mpi_comm):
         """Parallel jacobian should work correctly with deeper circuits."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
+
+        skip_wavefront_parallel_jacobian()
 
         system_size = 64
         depth = 4  # More parameters = more work for jacobian
@@ -816,10 +891,8 @@ class TestJacobianCorrectness:
         initial_params = np.random.uniform(-np.pi, np.pi, depth * 2)
 
         # Run WITHOUT parallel jacobian
-        alg_serial = qwoa(system_size, mpi_comm)
-        alg_serial.set_qualities(
-            serial, {"args": [make_qualities_function(system_size)]}
-        )
+        alg_serial = QWOA(system_size, mpi_comm)
+        alg_serial.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg_serial.set_depth(depth)
         alg_serial.set_seed(seed)
         alg_serial.set_optimiser("scipy", bfgs_options, ["fun", "nfev"])
@@ -832,16 +905,12 @@ class TestJacobianCorrectness:
         mpi_comm.barrier()
 
         # Run WITH parallel jacobian
-        alg_parallel = qwoa(system_size, mpi_comm)
-        alg_parallel.set_qualities(
-            serial, {"args": [make_qualities_function(system_size)]}
-        )
+        alg_parallel = QWOA(system_size, mpi_comm)
+        alg_parallel.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg_parallel.set_depth(depth)
         alg_parallel.set_seed(seed)
 
-        alg_parallel.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg_parallel.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev"])
         alg_parallel.execute(initial_params.copy())
@@ -852,7 +921,10 @@ class TestJacobianCorrectness:
             # Both should find similar minima
             assert np.isclose(
                 serial_result_fun, parallel_result_fun, rtol=1e-2
-            ), f"Objective values differ for depth={depth}: serial={serial_result_fun}, parallel={parallel_result_fun}"
+            ), (
+                f"Objective values differ for depth={depth}: "
+                f"serial={serial_result_fun}, parallel={parallel_result_fun}"
+            )
 
     def test_parallel_jacobian_gradient_accuracy(self, mpi_comm):
         """Test that parallel jacobian computes accurate gradients.
@@ -860,12 +932,14 @@ class TestJacobianCorrectness:
         Compare gradients at a fixed point computed by parallel jacobian
         vs scipy's approx_fprime.
         """
-        from quop_mpi.algorithm.combinatorial import qwoa
-        from scipy.optimize import approx_fprime
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
+
+        skip_wavefront_parallel_jacobian()
 
         system_size = 64
         depth = 2
@@ -875,13 +949,11 @@ class TestJacobianCorrectness:
         test_params = np.random.uniform(-np.pi, np.pi, depth * 2)
 
         # Create algorithm and setup for gradient evaluation
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(depth)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         # Use just 1 iteration to get gradient at initial point
         alg.set_optimiser(
@@ -915,24 +987,24 @@ class TestParallelJacobianInputValidation:
 
     def test_invalid_method_string_raises_or_handled(self, mpi_comm):
         """Invalid method string should be handled gracefully."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
         # An invalid method should either raise during set_parallel_jacobian
         # or during execute - the key is it shouldn't silently fail
         alg.set_parallel_jacobian(
-            nodes_per_subcomm=1,
-            processes_per_node=size,
-            maxcomm=2,
+            n_workers=2,
             method="invalid_method",
         )
 
@@ -944,23 +1016,23 @@ class TestParallelJacobianInputValidation:
 
     def test_reconfiguration_overwrites_previous(self, mpi_comm):
         """Calling set_parallel_jacobian twice should overwrite previous config."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
         # First configuration
         alg.set_parallel_jacobian(
-            nodes_per_subcomm=1,
-            processes_per_node=size,
-            maxcomm=2,
+            n_workers=2,
             method="forward",
             h=1e-5,
         )
@@ -970,59 +1042,58 @@ class TestParallelJacobianInputValidation:
 
         # Reconfigure
         alg.set_parallel_jacobian(
-            nodes_per_subcomm=1,
-            processes_per_node=size,
-            maxcomm=4,
+            n_workers=4,
             method="central",
             h=1e-8,
         )
 
         assert alg.jacobian_input == ["central"]
         assert alg.h == 1e-8
-        assert alg.maxcomm == 4
+        assert alg.n_jacobian_workers == 4
 
     def test_default_step_size(self, mpi_comm):
         """When h is not specified, default should be sqrt(machine epsilon)."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
         # Don't specify h
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         expected_h = np.sqrt(np.finfo(float).eps)
         assert alg.h == expected_h, f"Expected h={expected_h}, got h={alg.h}"
 
     def test_maxcomm_larger_than_ranks(self, mpi_comm):
-        """maxcomm larger than available ranks should be handled gracefully."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        """n_workers larger than available ranks should be handled gracefully."""
         import warnings
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
         # Request more subcomms than ranks
         alg.set_parallel_jacobian(
-            nodes_per_subcomm=1,
-            processes_per_node=size,
-            maxcomm=100,  # Way more than available
+            n_workers=100,  # Way more than available
             method="forward",
         )
 
@@ -1038,7 +1109,7 @@ class TestParallelJacobianInputValidation:
             alg.execute()
 
             # Check that a RuntimeWarning about parallel jacobian fallback was issued
-            parallel_jac_warnings = [
+            _parallel_jac_warnings = [  # noqa: F841
                 warning
                 for warning in w
                 if issubclass(warning.category, RuntimeWarning)
@@ -1066,21 +1137,21 @@ class TestParallelJacobianWithQAOA:
 
     def test_qaoa_with_parallel_jacobian_completes(self, mpi_comm):
         """QAOA should work with parallel jacobian."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -1099,21 +1170,21 @@ class TestParallelJacobianWithQAOA:
 
     def test_qaoa_parallel_jacobian_produces_result(self, mpi_comm):
         """QAOA with parallel jacobian should produce valid result."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(2)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="central"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="central")
 
         alg.set_optimiser(
             "scipy",
@@ -1139,21 +1210,21 @@ class TestParallelJacobianCleanup:
 
     def test_destroy_after_parallel_jacobian(self, mpi_comm):
         """destroy() should work after using parallel jacobian."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -1176,21 +1247,21 @@ class TestParallelJacobianCleanup:
 
     def test_reexecute_after_destroy(self, mpi_comm):
         """Should be able to execute again after destroy with parallel jacobian."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
         if size < 2:
             pytest.skip("Need at least 2 MPI processes")
 
+        skip_wavefront_parallel_jacobian()
+
         system_size = 64
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(1)
 
-        alg.set_parallel_jacobian(
-            nodes_per_subcomm=1, processes_per_node=size, maxcomm=2, method="forward"
-        )
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
             "scipy",
@@ -1200,7 +1271,6 @@ class TestParallelJacobianCleanup:
 
         # First execute
         alg.execute()
-        first_result = alg.result.fun if mpi_comm.Get_rank() == 0 else None
 
         # Destroy
         alg.destroy()

@@ -1,27 +1,28 @@
+"""Multivariable quantum optimisation algorithms (QMOA, QOWE)."""
+
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
-from ... import Ansatz
-from ...propagator import composite, momentum, diagonal
-from ...state import position_grid
-from ...param.rand import uniform
-
-####################################
-# imports and classes for type hints
-####################################
-
 from mpi4py import MPI
-from typing import Callable
 
-Intracomm = MPI.Intracomm
+from ...ansatz import Ansatz
+from ...param.rand import uniform
+from ...propagator import composite, diagonal, momentum
+from ...state import position_grid
 
-####################################
+if TYPE_CHECKING:
+    from typing import Callable
+
+    Intracomm = MPI.Intracomm
 
 
-class multivariable(Ansatz):
+class Multivariable(Ansatz):
     """Base class for simulation of the :ref:`QMOA <QMOA>` and :ref:`QOWE`
     algorithm."""
 
-    def set_params(self, param_function: Callable, param_dict: dict = None):
+    def set_params(self, param_function: Callable, param_dict: dict | None = None) -> None:
         """Define the :term:`Parameter Function` for the
         :term:`phase-shift <phase-shift unitary>` and
         :term:`mixing <mixing unitary>` unitaries.
@@ -38,7 +39,7 @@ class multivariable(Ansatz):
         self.UW.param_function = param_function
         self.UW.param_dict = param_dict
 
-    def set_independent_t(self, independent: bool):
+    def set_independent_t(self, independent: bool) -> None:
         """Specify simulation with or without independent :term:`unitary
         parameters <unitary parameter>` (walk times) over each coordinate
         dimension.
@@ -61,7 +62,7 @@ class multivariable(Ansatz):
 
         self.set_unitaries([self.UQ, self.UW])
 
-    def set_qualities(self, function: Callable, operator_dict: dict = None):
+    def set_qualities(self, function: Callable, operator_dict: dict | None = None) -> None:
         """Define the :term:`observables` and :term:`phase-shift unitary` :term:`operator`
 
         Parameters
@@ -98,7 +99,7 @@ class multivariable(Ansatz):
             return grid_points
 
 
-class qmoa(multivariable):
+class QMOA(Multivariable):
     """Simulate the :ref:`QMOA <QMOA>`.
 
     A :term:`QVA` for the optimisation of continuous multivariable
@@ -112,11 +113,20 @@ class qmoa(multivariable):
         MPI Intracomm, by default MPI.COMM_WORLD
     """
 
-    def __init__(self, Ns: list[int], MPI_COMM: Intracomm = MPI.COMM_WORLD):
+    def __init__(self, Ns: list[int], MPI_COMM: Intracomm = MPI.COMM_WORLD) -> None:  # noqa: N803
+        """Initialise a QMOA instance.
+
+        Parameters
+        ----------
+        Ns : list[int]
+            Number of grid points per coordinate dimension (as powers of 2).
+        MPI_COMM : Intracomm, optional
+            MPI communicator, by default ``MPI.COMM_WORLD``.
+        """
         self.Ns = [2**N for N in Ns]
 
         system_size = 1
-        for N in self.Ns:
+        for N in self.Ns:  # noqa: N806
             system_size *= N
 
         super().__init__(system_size, MPI_COMM)
@@ -125,14 +135,14 @@ class qmoa(multivariable):
         self.graphs = Ns  # complete graphs by default
         self.UW_n_params = len(Ns)
 
-        self.UQ = diagonal.unitary(
+        self.UQ = diagonal.Unitary(
             diagonal.operator.observables,
             parameter_function=uniform,
         )
 
         self.UQ.Ns = self.Ns
 
-        self.UW = composite.unitary(
+        self.UW = composite.Unitary(
             self.Ns,
             composite.operator.ith,
             operator_dict={
@@ -145,13 +155,13 @@ class qmoa(multivariable):
 
         self.set_unitaries([self.UQ, self.UW])
 
-    def set_mixer(self, Cs: list[int]):
+    def set_mixer(self, Cs: list[int]) -> None:  # noqa: N803
         """Set the circulant :term:`mixing unitary` :term:`operator` in each
         coordinate dimension.
 
         See Also
         --------
-        :meth:`quop_mpi.propagator.composite.ith`
+        :func:`quop_mpi.propagator.composite.operator.ith`
 
         Parameters
         ----------
@@ -163,15 +173,20 @@ class qmoa(multivariable):
         self.UW.operator_dict = {"args": [], "kwargs": {"Cs": Cs}}
 
 
-class qowe(multivariable):
+class QOWE(Multivariable):
+    """Simulate the Quantum Walk Optimisation by Eigenvalues (QOWE) algorithm.
+
+    A :term:`QVA` for optimisation of continuous multivariable functions
+    using momentum-space mixing unitaries.
+    """
 
     def __init__(
         self,
-        Ns: list[int],
+        Ns: list[int],  # noqa: N803
         deltas: list[float],
         mins: list[float],
-        MPI_COMM: Intracomm = MPI.COMM_WORLD,
-    ):
+        MPI_COMM: Intracomm = MPI.COMM_WORLD,  # noqa: N803
+    ) -> None:
         """Simulate the :ref:`QMOA <QMOA>`.
 
         A :term:`QVA` for the optimisation of continuous multivariable
@@ -193,7 +208,7 @@ class qowe(multivariable):
         self.mins = mins
 
         system_size = 1
-        for N in self.Ns:
+        for N in self.Ns:  # noqa: N806
             system_size *= N
 
         super().__init__(system_size, MPI_COMM)
@@ -203,16 +218,16 @@ class qowe(multivariable):
         self.UW_n_params = len(Ns)
 
         self.deltask = np.array(
-            [2 * np.pi / (n * delta) for (delta, n) in zip(self.deltas, self.Ns)],
+            [2 * np.pi / (n * delta) for (delta, n) in zip(self.deltas, self.Ns, strict=True)],
             dtype=np.float64,
         )
 
         self.minsk = np.array(
-            [-(n / 2) * delta for (delta, n) in zip(self.deltask, self.Ns)],
+            [-(n / 2) * delta for (delta, n) in zip(self.deltask, self.Ns, strict=True)],
             dtype=np.float64,
         )
 
-        self.UQ = diagonal.unitary(
+        self.UQ = diagonal.Unitary(
             diagonal.operator.observables,
             parameter_function=uniform,
         )
@@ -221,7 +236,7 @@ class qowe(multivariable):
         self.UQ.mins = mins
         self.UQ.deltas = self.deltas
 
-        self.UW = momentum.unitary(
+        self.UW = momentum.Unitary(
             self.Ns,
             self.mins,
             self.minsk,

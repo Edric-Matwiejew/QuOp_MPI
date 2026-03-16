@@ -13,7 +13,7 @@ Propagator Class
 
 .. automodule:: quop_mpi.propagator.circulant
    :members:
-   :exclude-members: gen_initial_params, gen_operator, parse_operator_function, parse_parameter_function, parse_plan, copy_plan, destroy, plan, propagate
+   :exclude-members: gen_initial_params, gen_operator, parse_operator_function, parse_parameter_function, destroy, propagate
    :show-inheritance:
 
 Operators

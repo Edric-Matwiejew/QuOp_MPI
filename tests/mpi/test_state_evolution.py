@@ -11,12 +11,11 @@ to enable direct comparison with QWOA using the same parameters.
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_state_evolution.py -v --with-mpi
 """
 
-import pytest
-import numpy as np
-from mpi4py import MPI
-
-import sys
 import os
+import sys
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from conftest import (
@@ -33,9 +32,9 @@ class TestEvolveStateBasic:
 
     def test_evolve_state_runs_without_error(self, mpi_comm, simple_oracle):
         """Verify evolve_state completes without raising exceptions."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -49,11 +48,13 @@ class TestEvolveStateBasic:
         if probs is not None:
             assert len(probs) == simple_oracle.system_size
 
+        alg.destroy()
+
     def test_evolve_state_produces_normalized_state(self, mpi_comm, simple_oracle):
         """Verify the final state is properly normalized (probabilities sum to 1)."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -68,11 +69,13 @@ class TestEvolveStateBasic:
                 abs(total_prob - 1.0) < 1e-10
             ), f"State not normalized: total probability = {total_prob}"
 
+        alg.destroy()
+
     def test_evolve_state_is_deterministic(self, mpi_comm, simple_oracle):
         """Verify same parameters give same results."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -90,9 +93,9 @@ class TestEvolveStateBasic:
         if mpi_comm.Get_rank() == 0:
             assert state1 is not None, "get_final_state returned None on rank 0"
             assert state2 is not None, "get_final_state returned None on rank 0"
-            assert np.allclose(
-                state1, state2
-            ), "Same parameters should produce identical states"
+            assert np.allclose(state1, state2), "Same parameters should produce identical states"
+
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -101,9 +104,9 @@ class TestEvolveStateParameterSensitivity:
 
     def test_different_params_produce_different_states(self, mpi_comm, simple_oracle):
         """Verify different parameters lead to different final states."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -124,11 +127,13 @@ class TestEvolveStateParameterSensitivity:
                 state1, state2
             ), "Different parameters should produce different states"
 
+        alg.destroy()
+
     def test_zero_params_gives_uniform_state(self, mpi_comm, simple_oracle):
         """Verify zero parameters leave the state unchanged (uniform superposition)."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -145,6 +150,8 @@ class TestEvolveStateParameterSensitivity:
                 full_probs, expected_prob, rtol=1e-6
             ), "Zero parameters should give uniform superposition"
 
+        alg.destroy()
+
 
 @pytest.mark.mpi
 class TestEvolveStateCorrectness:
@@ -158,12 +165,12 @@ class TestEvolveStateCorrectness:
         the default hypercube), it becomes equivalent to QWOA and should
         achieve the theoretical Grover success probability.
         """
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         oracle = simple_oracle
         complete_op = make_complete_graph_operator(oracle.system_size)
 
-        alg = qaoa(oracle.system_size, mpi_comm)
+        alg = QAOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -184,6 +191,8 @@ class TestEvolveStateCorrectness:
                 f"got {marked_prob:.4f}, expected {theoretical:.4f}"
             )
 
+        alg.destroy()
+
     def test_qwoa_matches_grover(self, mpi_comm, simple_oracle):
         """
         Verify QWOA achieves the theoretical Grover success probability.
@@ -191,11 +200,11 @@ class TestEvolveStateCorrectness:
         QWOA with a complete graph circulant mixer implements Grover's
         algorithm and should match theoretical predictions.
         """
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -213,6 +222,8 @@ class TestEvolveStateCorrectness:
                 f"got {marked_prob:.4f}, expected {theoretical:.4f}"
             )
 
+        alg.destroy()
+
     def test_qaoa_qwoa_equivalence_with_complete_graph(self, mpi_comm, simple_oracle):
         """
         Verify QAOA (with complete graph) and QWOA produce equivalent results.
@@ -225,14 +236,14 @@ class TestEvolveStateCorrectness:
         implementations, so we compare marked probability rather than
         element-wise equality.
         """
-        from quop_mpi.algorithm.combinatorial import qaoa, qwoa
+        from quop_mpi.algorithm.combinatorial import QAOA, QWOA
 
         oracle = simple_oracle
         complete_op = make_complete_graph_operator(oracle.system_size)
         params = oracle.optimal_params(depth=1)
 
         # Run QAOA with complete graph
-        alg_qaoa = qaoa(oracle.system_size, mpi_comm)
+        alg_qaoa = QAOA(oracle.system_size, mpi_comm)
         alg_qaoa.set_qualities(oracle.qualities_function())
         alg_qaoa.set_depth(1)
         with patch_qaoa_mixer(complete_op):
@@ -241,7 +252,7 @@ class TestEvolveStateCorrectness:
         probs_qaoa = gather_state_probabilities(alg_qaoa, mpi_comm)
 
         # Run QWOA
-        alg_qwoa = qwoa(oracle.system_size, mpi_comm)
+        alg_qwoa = QWOA(oracle.system_size, mpi_comm)
         alg_qwoa.set_qualities(oracle.qualities_function())
         alg_qwoa.set_depth(1)
         alg_qwoa.setup()
@@ -264,22 +275,23 @@ class TestEvolveStateCorrectness:
                 abs(qaoa_marked - theoretical) < 0.01
             ), f"Both should match theory ({theoretical:.4f})"
 
-    def test_optimal_params_concentrate_probability(
-        self, mpi_comm, single_solution_oracle
-    ):
+        alg_qaoa.destroy()
+        alg_qwoa.destroy()
+
+    def test_optimal_params_concentrate_probability(self, mpi_comm, single_solution_oracle):
         """
         Verify optimal parameters concentrate probability on solution states.
 
         With analytically derived optimal parameters, the probability should
         concentrate on the marked (solution) states.
         """
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         oracle = single_solution_oracle
         complete_op = make_complete_graph_operator(oracle.system_size)
         depth = oracle.optimal_iterations
 
-        alg = qaoa(oracle.system_size, mpi_comm)
+        alg = QAOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(depth)
 
@@ -298,7 +310,12 @@ class TestEvolveStateCorrectness:
             # Should match theoretical Grover probability
             assert (
                 abs(marked_prob - theoretical) < 0.02
-            ), f"Optimal params should match theory: got {marked_prob:.4f}, expected {theoretical:.4f}"
+            ), (
+                f"Optimal params should match theory: "
+                f"got {marked_prob:.4f}, expected {theoretical:.4f}"
+            )
+
+        alg.destroy()
 
     def test_multiple_solutions_share_probability(self, mpi_comm, simple_oracle):
         """
@@ -307,13 +324,13 @@ class TestEvolveStateCorrectness:
         When there are multiple marked states, probability should be
         roughly equal among them (by symmetry of Grover's algorithm).
         """
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         oracle = simple_oracle  # Has 4 marked states
         complete_op = make_complete_graph_operator(oracle.system_size)
         depth = oracle.optimal_iterations
 
-        alg = qaoa(oracle.system_size, mpi_comm)
+        alg = QAOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(depth)
 
@@ -336,6 +353,8 @@ class TestEvolveStateCorrectness:
                 max_deviation < 0.1 * mean_marked
             ), f"Marked states should have similar probabilities (max dev: {max_deviation:.4f})"
 
+        alg.destroy()
+
     def test_increasing_depth_improves_concentration(self, mpi_comm):
         """
         Verify deeper circuits can achieve better probability concentration.
@@ -343,7 +362,7 @@ class TestEvolveStateCorrectness:
         For problems with unique solutions, more layers generally allow
         better optimization (up to the optimal depth).
         """
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         oracle = TestOracle(system_size=64, n_marked=1, seed=456)
         complete_op = make_complete_graph_operator(oracle.system_size)
@@ -351,7 +370,7 @@ class TestEvolveStateCorrectness:
         concentrations = []
 
         for depth in [1, 2, 3]:
-            alg = qaoa(oracle.system_size, mpi_comm)
+            alg = QAOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_depth(depth)
 
@@ -366,6 +385,8 @@ class TestEvolveStateCorrectness:
             if mpi_comm.Get_rank() == 0:
                 marked_prob = oracle.compute_marked_probability(full_probs)
                 concentrations.append(marked_prob)
+
+            alg.destroy()
 
         if mpi_comm.Get_rank() == 0:
             # Each depth should match theoretical Grover probability

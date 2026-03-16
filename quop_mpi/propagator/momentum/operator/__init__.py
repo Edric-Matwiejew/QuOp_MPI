@@ -24,13 +24,21 @@ The momentum propagator computes :math:`e^{-itT}|\\psi\\rangle` where
 :math:`T` is the kinetic energy operator, using **multi-dimensional FFT**:
 
 1. Forward multi-dimensional FFT transforms the state from position to momentum space
+<<<<<<< HEAD
 2. Multiply by :math:`e^{-it(k_1^2 + k_2^2 + \cdots)}` (kinetic phase)
+=======
+2. Multiply by :math:`e^{-it(k_1^2 + k_2^2 + \\cdots)}` (kinetic phase)
+>>>>>>> quop_quisa/main
 3. Inverse multi-dimensional FFT transforms back to position space
 
 The implementation uses FFTW with MPI for parallel multi-dimensional transforms.
 Grid parameters (:literal:`Ns`, :literal:`minsq`, :literal:`deltasq`, etc.)
 are specified when constructing the unitary.
 """
+<<<<<<< HEAD
+=======
+
+>>>>>>> quop_quisa/main
 from .grids import magnitude_squared
 
 __all__ = ["magnitude_squared"]

@@ -1,13 +1,25 @@
-from importlib import import_module
+"""Circulant graph unitary propagator."""
+
+from __future__ import annotations
+
+from types import ModuleType
+from typing import Any
+
 import numpy as np
-from ... import config
-from ...Unitary import Unitary
-from ..._lib.propagator import propagator
+
+from ..._lib.propagator import Propagator
+from ...unitary import UnitaryBase
 
 
-class unitary(Unitary):
+class Unitary(UnitaryBase):
+    """Unitary propagator for circulant graph operators.
 
-    def __init__(self, *args, **kwargs):
+    Uses FFT-based propagation for efficient simulation of circulant
+    mixing unitaries.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
+        """Initialise the circulant unitary propagator."""
 
         super().__init__(*args, **kwargs)
 
@@ -15,37 +27,22 @@ class unitary(Unitary):
 
         self.context = None
 
-        # TODO check number of unitary params
-
-    def assign_backend(self, backend):
-
+    def assign_backend(self, backend: ModuleType) -> None:
+        """Assign the compute backend for circulant propagation."""
         self.propagator_module = backend.circulant_propagator
-        self.propagators = [
-            propagator(self.propagator_module.circulant_propagator_wrapper)
-        ]
+        self.propagators = [Propagator(self.propagator_module.circulant_propagator_wrapper)]
 
-    def plan(self, system_size, MPI_COMM):
-
-        size = MPI_COMM.Get_size()
-        rank = MPI_COMM.Get_rank()
-
-        local_i = int(
-            system_size // size + np.ceil((system_size % size) // (rank + 1) / size)
-        )
-
-        return local_i, local_i
-
-    def copy_plan(self, ex_unitary):
-        pass
-
-    def gen_operator(self, *args):
-
+    def gen_operator(self, *args: Any) -> None:  # noqa: ANN401
+        """Generate the circulant operator and plan the propagator."""
         self.propagators[0].plan(self.context)
+        self.planned = True  # Mark as planned so destroy() is called during cleanup
         super().gen_operator(*args)
         self.propagators[0].gen_operator([np.real(self.operator).astype(np.float64)])
 
-    def propagate(self, t):
+    def propagate(self, t: np.ndarray) -> None:
+        """Apply the circulant propagator with parameter ``t``."""
         self.propagators[0].propagate(t[0])
 
-    def destroy(self):
+    def destroy(self) -> None:
+        """Free circulant propagator resources."""
         self.propagators[0].destroy()

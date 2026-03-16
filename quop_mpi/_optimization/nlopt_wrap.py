@@ -1,23 +1,19 @@
+from functools import partial
+from re import search
+from warnings import warn
+
 import nlopt
 from scipy.optimize import OptimizeResult
-from functools import partial
-from warnings import warn
-from re import search
 
 NLOPT_ALGORITHMS_KEYS = list(filter(partial(search, r"^[GL][ND]_"), dir(nlopt)))
 NLOPT_ALGORITHMS = {k: getattr(nlopt, k) for k in NLOPT_ALGORITHMS_KEYS}
 NLOPT_MESSAGES = {
     nlopt.SUCCESS: "Success",
-    nlopt.STOPVAL_REACHED: "Optimization stopped because stopval (above) "
-    "was reached.",
-    nlopt.FTOL_REACHED: "Optimization stopped because ftol_rel or ftol_abs "
-    "(above) was reached.",
-    nlopt.XTOL_REACHED: "Optimization stopped because xtol_rel or xtol_abs "
-    "(above) was reached.",
-    nlopt.MAXEVAL_REACHED: "Optimization stopped because maxeval (above) "
-    "was reached.",
-    nlopt.MAXTIME_REACHED: "Optimization stopped because maxtime (above) "
-    "was reached.",
+    nlopt.STOPVAL_REACHED: "Optimization stopped because stopval (above) " "was reached.",
+    nlopt.FTOL_REACHED: "Optimization stopped because ftol_rel or ftol_abs " "(above) was reached.",
+    nlopt.XTOL_REACHED: "Optimization stopped because xtol_rel or xtol_abs " "(above) was reached.",
+    nlopt.MAXEVAL_REACHED: "Optimization stopped because maxeval (above) " "was reached.",
+    nlopt.MAXTIME_REACHED: "Optimization stopped because maxtime (above) " "was reached.",
     nlopt.FAILURE: "Failure",
     nlopt.INVALID_ARGS: "Invalid arguments (e.g. lower bounds are bigger "
     "than upper bounds, an unknown algorithm was "
@@ -33,10 +29,7 @@ NLOPT_MESSAGES = {
 }
 
 
-# TODO: argument to specify whether to be stateful
-def minimize(
-    fun, x0, args=(), method=None, jac=None, bounds=None, constraints=[], **options
-):
+def minimize(fun, x0, args=(), method=None, jac=None, bounds=None, constraints=None, **options):
     """
     Parameters
     ----------
@@ -70,7 +63,7 @@ def minimize(
         ...
     ValueError: Parameter foo could not be recognized.
 
-    .. todo:: Some sensible way of testing this.
+    The examples below exercise scalar and constrained objective signatures.
 
     >>> x0 = np.array([-1., 1.])
     >>> fun = lambda x: - 2*x[0]*x[1] - 2*x[0] + x[0]**2 + 2*x[1]**2
@@ -100,6 +93,8 @@ def minimize(
         ...
     ValueError: Constraint type not recognized
     """
+    if constraints is None:
+        constraints = []
     # Create NLopt object
     dim = len(x0)
 
@@ -118,7 +113,7 @@ def minimize(
 
     # Normalize and set parameter bounds
     if bounds:
-        lower, upper = zip(*normalize_bounds(bounds))
+        lower, upper = zip(*normalize_bounds(bounds), strict=True)
         opt.set_lower_bounds(lower)
         opt.set_upper_bounds(upper)
 
@@ -136,11 +131,8 @@ def minimize(
         elif constr["type"] == "ineq":
             opt.add_inequality_constraint(fun)
         elif constr["type"] in ("eq_m", "ineq_m"):
-            # TODO: Define '_m' as suffix for now.
-            # TODO: Add support for vector/matrix-valued constraints
-            raise NotImplementedError(
-                "Vector-valued constraints currently " "not supported."
-            )
+            # Reserved for vector-valued NLopt constraints.
+            raise NotImplementedError("Vector-valued constraints currently " "not supported.")
         else:
             raise ValueError("Constraint type not recognized")
 
@@ -150,15 +142,15 @@ def minimize(
             set_option = getattr(opt, "set_{option}".format(option=option))
         except AttributeError:
             raise ValueError(
-                "Parameter {option} could not be " "recognized.".format(option=option)
-            )
+                "Parameter {option} could not be recognized.".format(option=option)
+            ) from None
         else:
             set_option(val)
 
     # Perform the optimization
     try:
         x = opt.optimize(x0)
-    except:  # nlopt.RoundoffLimited:
+    except:  # noqa: E722 — nlopt can raise various C-level exceptions
         # If we encounter a RoundoffLimited exception, simply return last point
         x = path[-1]
 
@@ -216,6 +208,7 @@ def make_nlopt_fun(fun, jac=True, args=(), path=None):
                             "jac=True, but no gradient information is "
                             "available.",
                             RuntimeWarning,
+                            stacklevel=2,
                         )
                     else:
                         grad[:] = grad_temp
@@ -226,6 +219,7 @@ def make_nlopt_fun(fun, jac=True, args=(), path=None):
                             "jac=False, the provided gradient information "
                             "is ignored.",
                             RuntimeWarning,
+                            stacklevel=2,
                         )
 
         return val
@@ -283,7 +277,7 @@ def get_nlopt_enum(method_name=None, default=nlopt.LN_BOBYQA):
     >>> get_nlopt_enum('foobar') == nlopt.LN_BOBYQA
     True
 
-    .. todo:: Exceptional cases (low-priority)
+    Additional low-priority cases:
 
     >>> get_nlopt_enum('G_MLSL') == nlopt.G_MLSL # doctest: +SKIP
     True
@@ -301,6 +295,7 @@ def get_nlopt_enum(method_name=None, default=nlopt.LN_BOBYQA):
             "Method {name} could not be found. Defaulting to "
             "{default}".format(name=method_name, default=default),
             RuntimeWarning,
+            stacklevel=2,
         )
         return default
 
@@ -337,7 +332,7 @@ def normalize_bound(bound):
     return min_, max_
 
 
-def normalize_bounds(bounds=[]):
+def normalize_bounds(bounds=None):
     """
     Examples
     --------
@@ -345,6 +340,8 @@ def normalize_bounds(bounds=[]):
     >>> list(normalize_bounds(bounds))
     [(2.6, 7.2), (-inf, 2), (3.14, inf), (-inf, inf)]
     """
+    if bounds is None:
+        bounds = []
     return map(normalize_bound, bounds)
 
 

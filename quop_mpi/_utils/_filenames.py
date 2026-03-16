@@ -1,6 +1,6 @@
 from os import path
 from pathlib import Path
-from time import localtime, asctime
+from time import asctime, localtime
 
 
 def time_suffix():
@@ -12,7 +12,7 @@ def ensure_directory(filepath):
     Path(path.dirname(filepath)).mkdir(parents=True, exist_ok=True)
 
 
-def ensure_uniqueness(filepath, extension, MPI_COMM, add_time):
+def ensure_uniqueness(filepath, extension, MPI_COMM, add_time):  # noqa: N803
     filepath = (
         modify_file_basename(filepath, time_suffix(), extension)
         if path.exists(filepath) or add_time
@@ -43,7 +43,7 @@ def ensure_path_and_extension(
     extension,
     modifier=None,
     unique=False,
-    MPI_COMM=None,
+    MPI_COMM=None,  # noqa: N803
     ensure_path=True,
     add_time=False,
 ):
@@ -52,11 +52,7 @@ def ensure_path_and_extension(
     filepath = ensure_extension(filepath, extension)
     if modifier is not None:
         filepath = modify_file_basename(filepath, modifier, extension)
-    return (
-        ensure_uniqueness(filepath, extension, MPI_COMM, add_time)
-        if unique
-        else filepath
-    )
+    return ensure_uniqueness(filepath, extension, MPI_COMM, add_time) if unique else filepath
 
 
 def modify_file_basename(filepath, modifier, extension):

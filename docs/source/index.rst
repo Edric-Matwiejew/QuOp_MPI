@@ -28,7 +28,7 @@ Here's a minimal example using QAOA to solve a MaxCut problem:
    from mpi4py import MPI
    import numpy as np
    import networkx as nx
-   from quop_mpi.algorithm.combinatorial import qaoa
+   from quop_mpi.algorithm.combinatorial import QAOA
    from quop_mpi.toolkit import I, Z
 
    # Create a graph
@@ -43,7 +43,7 @@ Here's a minimal example using QAOA to solve a MaxCut problem:
        return -C.diagonal()[local_i_offset:local_i_offset + local_i].real
 
    # Set up and run QAOA
-   alg = qaoa(system_size=2**n_qubits, MPI_COMM=MPI.COMM_WORLD)
+   alg = QAOA(system_size=2**n_qubits, MPI_communicator=MPI.COMM_WORLD)
    alg.set_qualities(maxcut_qualities)
    alg.execute()
    alg.print_result()
@@ -68,7 +68,15 @@ For more examples, see the :doc:`examples` page.
 
    theoretical_background
    package_overview
+   quop_functions
    examples
+   glossary
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Software Architecture
+
+   software_architecture/index
 
 .. toctree::
    :maxdepth: 2
@@ -80,8 +88,8 @@ For more examples, see the :doc:`examples` page.
    :maxdepth: 1
    :caption: Development
 
-   quop_functions
-   developing_for_quop
+   build_system
+   development_standards/index
 
 .. toctree::
    :maxdepth: 1
@@ -89,7 +97,10 @@ For more examples, see the :doc:`examples` page.
 
    cite
    changelog
-   glossary
+
+.. toctree::
+   :hidden:
+
    bibliography
 
 Indices

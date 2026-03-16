@@ -1,14 +1,10 @@
-from .Unitary import Unitary
-from .Ansatz import Ansatz
-from . import propagator
-from . import observable
-from . import state
-from . import param
-from . import toolkit
-from . import algorithm
-from . import config
+from . import algorithm, config, observable, param, propagator, state, toolkit
+from ._utils._deprecation import deprecated_alias_getattr
+from .ansatz import Ansatz
+from .unitary import UnitaryBase
 
 __all__ = [
+    "UnitaryBase",
     "Unitary",
     "Ansatz",
     "propagator",
@@ -20,3 +16,5 @@ __all__ = [
     "meta",
     "config",
 ]
+
+__getattr__ = deprecated_alias_getattr(__name__, globals(), {"Unitary": "UnitaryBase"})

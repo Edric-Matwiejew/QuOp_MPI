@@ -9,15 +9,14 @@ Uses test oracles with analytically known solutions to verify correctness.
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_optimization.py -v --with-mpi
 """
 
-import pytest
-import numpy as np
-from mpi4py import MPI
-
-import sys
 import os
+import sys
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from conftest import TestOracle, gather_state_probabilities
+from conftest import TestOracle
 
 
 @pytest.mark.mpi
@@ -26,9 +25,9 @@ class TestExecuteBasic:
 
     def test_execute_completes_without_error(self, mpi_comm, simple_oracle):
         """Verify execute() runs to completion."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -38,11 +37,13 @@ class TestExecuteBasic:
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None, "Result should be populated after execute()"
 
+        alg.destroy()
+
     def test_execute_returns_result_dictionary(self, mpi_comm, simple_oracle):
         """Verify execute() returns properly structured result."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -53,12 +54,14 @@ class TestExecuteBasic:
             assert "fun" in alg.result, "Result should contain objective value 'fun'"
             assert "x" in alg.result, "Result should contain parameters 'x'"
 
+        alg.destroy()
+
     def test_execute_respects_depth(self, mpi_comm, simple_oracle):
         """Verify execute() uses the configured depth."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         for depth in [1, 2]:
-            alg = qaoa(simple_oracle.system_size, mpi_comm)
+            alg = QAOA(simple_oracle.system_size, mpi_comm)
             alg.set_qualities(simple_oracle.qualities_function())
             alg.set_depth(depth)
 
@@ -72,6 +75,8 @@ class TestExecuteBasic:
                     len(alg.result["x"]) == expected_n_params
                 ), f"Depth {depth} should have {expected_n_params} params"
 
+            alg.destroy()
+
 
 @pytest.mark.mpi
 class TestOptimizationQuality:
@@ -79,9 +84,9 @@ class TestOptimizationQuality:
 
     def test_optimization_beats_random(self, mpi_comm, simple_oracle):
         """Verify optimization achieves better expectation than random/uniform."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(2)
 
@@ -93,16 +98,21 @@ class TestOptimizationQuality:
 
             assert (
                 optimized_expectation < uniform_expectation
-            ), f"Optimized ({optimized_expectation:.4f}) should beat uniform ({uniform_expectation:.4f})"
+            ), (
+                f"Optimized ({optimized_expectation:.4f}) "
+                f"should beat uniform ({uniform_expectation:.4f})"
+            )
+
+        alg.destroy()
 
     def test_optimization_finds_low_expectation(self, mpi_comm):
         """Verify optimization can find solutions with low objective value."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         # Use oracle with multiple solutions (easier to optimize)
         oracle = TestOracle(system_size=64, n_marked=8, seed=789)
 
-        alg = qaoa(oracle.system_size, mpi_comm)
+        alg = QAOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(3)
 
@@ -119,16 +129,18 @@ class TestOptimizationQuality:
                 improvement > 0.1
             ), f"Should improve at least 10% over uniform (got {improvement*100:.1f}%)"
 
+        alg.destroy()
+
     def test_deeper_circuit_can_achieve_better_result(self, mpi_comm):
         """Verify increasing depth allows better optimization."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         oracle = TestOracle(system_size=64, n_marked=4, seed=999)
 
         results = {}
 
         for depth in [1, 3]:
-            alg = qaoa(oracle.system_size, mpi_comm)
+            alg = QAOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_depth(depth)
 
@@ -136,6 +148,8 @@ class TestOptimizationQuality:
 
             if mpi_comm.Get_rank() == 0:
                 results[depth] = alg.result["fun"]
+
+            alg.destroy()
 
         if mpi_comm.Get_rank() == 0:
             # Deeper circuit should achieve at least as good (usually better) result
@@ -148,20 +162,18 @@ class TestOptimizationQuality:
 class TestOptimizationConvergence:
     """Test optimizer convergence behavior."""
 
-    def test_near_optimal_start_converges_quickly(
-        self, mpi_comm, single_solution_oracle
-    ):
+    def test_near_optimal_start_converges_quickly(self, mpi_comm, single_solution_oracle):
         """Verify starting near optimum doesn't diverge.
 
         Uses QWOA since oracle.optimal_params() are calculated for complete
         graph mixing (Grover-like), which matches QWOA's default mixer.
         """
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = single_solution_oracle
         depth = 2
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(depth)
 
@@ -180,18 +192,23 @@ class TestOptimizationConvergence:
             # Starting near optimum should achieve much better than uniform
             assert (
                 final_expectation < uniform * 0.8
-            ), f"Near-optimal start should beat uniform ({uniform:.4f}) significantly (got {final_expectation:.4f})"
+            ), (
+                f"Near-optimal start should beat uniform ({uniform:.4f}) "
+                f"significantly (got {final_expectation:.4f})"
+            )
+
+        alg.destroy()
 
     def test_multiple_executions_give_consistent_results(self, mpi_comm):
         """Verify repeated optimization gives similar results."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         oracle = TestOracle(system_size=32, n_marked=4, seed=111)
 
         expectations = []
 
-        for trial in range(3):
-            alg = qaoa(oracle.system_size, mpi_comm)
+        for _trial in range(3):
+            alg = QAOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_depth(2)
 
@@ -199,6 +216,8 @@ class TestOptimizationConvergence:
 
             if mpi_comm.Get_rank() == 0:
                 expectations.append(alg.result["fun"])
+
+            alg.destroy()
 
         if mpi_comm.Get_rank() == 0:
             # Results should be reasonably consistent
@@ -214,9 +233,9 @@ class TestOptimizationWithDifferentAlgorithms:
 
     def test_qaoa_optimization(self, mpi_comm, simple_oracle):
         """Verify QAOA optimization works correctly."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(2)
 
@@ -224,12 +243,14 @@ class TestOptimizationWithDifferentAlgorithms:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result["fun"] < simple_oracle.uniform_expectation()
+
+        alg.destroy()
 
     def test_qwoa_optimization(self, mpi_comm, simple_oracle):
         """Verify QWOA optimization works correctly."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        alg = qwoa(simple_oracle.system_size, mpi_comm)
+        alg = QWOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(2)
 
@@ -237,3 +258,5 @@ class TestOptimizationWithDifferentAlgorithms:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result["fun"] < simple_oracle.uniform_expectation()
+
+        alg.destroy()

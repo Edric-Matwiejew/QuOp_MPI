@@ -10,9 +10,8 @@ Tests include:
 - Error handling for parameter map
 """
 
-import pytest
 import numpy as np
-from mpi4py import MPI
+import pytest
 
 
 @pytest.mark.mpi
@@ -21,11 +20,11 @@ class TestParameterMapWithExecute:
 
     def test_execute_with_parameter_map(self, mpi_comm, simple_oracle):
         """Verify execute() works with a parameter map."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Parameter map: 2 free params -> full params
@@ -45,16 +44,17 @@ class TestParameterMapWithExecute:
             assert "x" in alg.result
             # Result should have 2 free params
             assert len(alg.result["x"]) == 2
+            assert np.isfinite(alg.result["fun"])
 
-        del alg
+        alg.destroy()
 
     def test_execute_param_map_requires_initial_params(self, mpi_comm, simple_oracle):
         """Verify execute() raises error when param map set but no initial params."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         def parameter_map(ansatz_depth, total_params, free_vec):
@@ -67,15 +67,15 @@ class TestParameterMapWithExecute:
         with pytest.raises(ValueError, match="[Pp]arameter map"):
             alg.execute()  # No variational_parameters
 
-        del alg
+        alg.destroy()
 
     def test_execute_param_map_convergence(self, mpi_comm, simple_oracle):
         """Verify execute() with param map converges to low-cost state."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         def parameter_map(ansatz_depth, total_params, free_vec):
@@ -99,11 +99,11 @@ class TestParameterMapWithExecute:
                 final_fun < uniform_exp
             ), f"Should converge to lower expectation. Got {final_fun}, uniform={uniform_exp}"
 
-        del alg
+        alg.destroy()
 
     def test_execute_param_map_multiple_depths(self, mpi_comm, simple_oracle):
         """Verify execute() with param map works at different depths."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
@@ -113,7 +113,7 @@ class TestParameterMapWithExecute:
 
         results = []
         for depth in [1, 2, 3]:
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_parameter_map(2, parameter_map)
             alg.set_depth(depth)
@@ -124,12 +124,12 @@ class TestParameterMapWithExecute:
             if mpi_comm.Get_rank() == 0:
                 results.append((depth, alg.result["fun"]))
 
-            del alg
+            alg.destroy()
 
         if mpi_comm.Get_rank() == 0:
             assert len(results) == 3
             # All should have converged to something
-            for depth, fun in results:
+            for _depth, fun in results:
                 assert np.isfinite(fun)
 
 
@@ -139,11 +139,11 @@ class TestParameterMapDifferentMappings:
 
     def test_param_map_single_param(self, mpi_comm, simple_oracle):
         """Verify parameter map with single free parameter."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Single parameter controls both gamma and t
@@ -162,15 +162,15 @@ class TestParameterMapDifferentMappings:
             assert alg.result is not None
             assert len(alg.result["x"]) == 1
 
-        del alg
+        alg.destroy()
 
     def test_param_map_layer_dependent(self, mpi_comm, simple_oracle):
         """Verify parameter map can create layer-dependent parameters."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # 2 free params but layer-dependent scaling
@@ -197,15 +197,15 @@ class TestParameterMapDifferentMappings:
             mapped = alg.quop_result["mapped_parameters"]
             assert len(mapped) == 4  # 2 layers * 2 params
 
-        del alg
+        alg.destroy()
 
     def test_param_map_with_constants(self, mpi_comm, simple_oracle):
         """Verify parameter map can include constant parameters."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Only gamma is free, t is fixed
@@ -228,7 +228,7 @@ class TestParameterMapDifferentMappings:
             mapped = alg.quop_result["mapped_parameters"]
             assert abs(mapped[1] - fixed_t) < 1e-10
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -237,11 +237,11 @@ class TestParameterMapWithFunctionDict:
 
     def test_param_map_with_args(self, mpi_comm, simple_oracle):
         """Verify parameter map receives extra arguments via FunctionDict."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Parameter map that uses extra argument
@@ -258,20 +258,18 @@ class TestParameterMapWithFunctionDict:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-            # Verify the scaling was applied
             mapped = alg.quop_result["mapped_parameters"]
-            # mapped gamma should be scaled
-            # (exact value depends on optimization, but initial should be scaled)
+            assert np.isclose(mapped[0] / scale, alg.result["x"][0], atol=1e-8)
 
-        del alg
+        alg.destroy()
 
     def test_param_map_with_kwargs(self, mpi_comm, simple_oracle):
         """Verify parameter map receives keyword arguments."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         def map_with_offset(ansatz_depth, total_params, free_vec, gamma_offset=0.0):
@@ -287,8 +285,11 @@ class TestParameterMapWithFunctionDict:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
+            mapped = alg.quop_result["mapped_parameters"]
+            # Mapping relation: mapped gamma = free_gamma + offset
+            assert np.isclose(mapped[0] - offset, alg.result["x"][0], atol=1e-8)
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -297,11 +298,11 @@ class TestParameterMapValidation:
 
     def test_param_map_wrong_output_size_raises(self, mpi_comm, simple_oracle):
         """Verify error when parameter map returns wrong size vector."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Map returns wrong size
@@ -313,18 +314,26 @@ class TestParameterMapValidation:
 
         initial_params = np.array([np.pi, 0.4])
 
-        with pytest.raises(ValueError):
+        # Setup must be called first so we can check in_subcomm().
+        # The ValueError fires inside subcomm-scoped __to_full();
+        # excluded ranks skip it entirely.
+        alg.setup()
+
+        if alg.subcomms.in_subcomm():
+            with pytest.raises(ValueError):
+                alg.execute(initial_params)
+        else:
             alg.execute(initial_params)
 
-        del alg
+        alg.destroy()
 
     def test_param_map_result_contains_free_params(self, mpi_comm, simple_oracle):
         """Verify result['x'] contains free parameters, not full."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         def parameter_map(ansatz_depth, total_params, free_vec):
@@ -345,7 +354,7 @@ class TestParameterMapValidation:
             assert len(alg.quop_result["variational_parameters"]) == n_free
             assert len(alg.quop_result["mapped_parameters"]) == 6
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -354,11 +363,11 @@ class TestParameterMapWithEvolveState:
 
     def test_evolve_state_with_param_map(self, mpi_comm, simple_oracle):
         """Verify evolve_state() works with parameter map."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         def parameter_map(ansatz_depth, total_params, free_vec):
@@ -378,15 +387,15 @@ class TestParameterMapWithEvolveState:
             assert len(probs) == oracle.system_size
             assert abs(np.sum(probs) - 1.0) < 1e-10
 
-        del alg
+        alg.destroy()
 
     def test_evolve_state_param_map_matches_grover(self, mpi_comm, simple_oracle):
         """Verify evolve_state with param map achieves Grover probability."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         def parameter_map(ansatz_depth, total_params, free_vec):
@@ -420,4 +429,4 @@ class TestParameterMapWithEvolveState:
                 f"got {marked_prob:.4f}, expected {theoretical:.4f}"
             )
 
-        del alg
+        alg.destroy()

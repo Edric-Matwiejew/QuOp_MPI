@@ -3,7 +3,7 @@ networkx
 scipy
 h5py
 m2r
-numpydoc, 
+numpydoc
 graphviz
 mathjax
 sphinxcontrib-bibtex

@@ -22,7 +22,7 @@ def forward_differences(
         1-D real array of ansatz variational parameters
     evaluate : callable
         method or function for computation of the objective function value (see
-        :meth:`~quop_mpi.Ansatz.evaluate`)
+        :meth:`~quop_mpi.ansatz.evaluate`)
     h : float
         step-size used in forward difference approximation
     var : int
@@ -54,7 +54,7 @@ def central(
         1-D real array of ansatz variational parameters
     evaluate : callable
         method or function for computation of the objective function value (see
-        :meth:`~quop_mpi.Ansatz.evaluate`)
+        :meth:`~quop_mpi.ansatz.evaluate`)
     h : float
         Step-size used in central difference approximation.
     var : int

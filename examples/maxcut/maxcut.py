@@ -1,6 +1,7 @@
-from quop_mpi.algorithm.combinatorial import qaoa, serial
-from quop_mpi.toolkit import I, Z
 import networkx as nx
+
+from quop_mpi.algorithm.combinatorial import QAOA, serial
+from quop_mpi.toolkit import I, Z
 
 Graph = nx.circular_ladder_graph(4)
 
@@ -19,7 +20,7 @@ def maxcut_qualities(G):
     return -C.diagonal()
 
 
-alg = qaoa(system_size)
+alg = QAOA(system_size)
 alg.set_qualities(serial, {"args": [maxcut_qualities, G]})
 alg.set_depth(2)
 

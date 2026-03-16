@@ -1,6 +1,6 @@
 """Predefined :term:`Parameter Functions<Parameter Function>`.
 
-See :meth:`quop_mpi.Unitary`.
+See :meth:`quop_mpi.unitary`.
 """
 
 from . import rand

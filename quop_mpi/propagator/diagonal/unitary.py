@@ -1,11 +1,15 @@
-from importlib import import_module
-import numpy as np
-from quop_mpi import config
-from quop_mpi.Unitary import Unitary
-from quop_mpi._lib.propagator import propagator
+"""Diagonal (phase-shift) unitary propagator."""
+
+from __future__ import annotations
+
+from types import ModuleType
+from typing import Any
+
+from quop_mpi._lib.propagator import Propagator
+from quop_mpi.unitary import UnitaryBase
 
 
-class unitary(Unitary):
+class Unitary(UnitaryBase):
     """Compute the action of a :term:`mixing unitary` with a phase_shift
     :term:`operator` or a sequence of mixing-unitaries with phase_shift
     operators (see the :literal:`unitary_n_params` attribute below).
@@ -17,13 +21,13 @@ class unitary(Unitary):
             digraph "sphinx-ext-graphviz" {
                 rankdir="LR";
                 node [fontsize="10"];
-                Unitary[label="quop_mpi.Unitary", shape="rectangle"];
+                Unitary[label="quop_mpi.unitary", shape="rectangle"];
                 unitary[label="quop_mpi.propagator.phase_shift.unitary", shape="rectangle"];
 
                 Unitary -> unitary;
             }
 
-    See :class:`quop_mpi.Unitary`.
+    See :class:`quop_mpi.unitary`.
 
     Attributes
     ----------
@@ -38,7 +42,8 @@ class unitary(Unitary):
         of :literal:`local_i` rows.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
+        """Initialise the diagonal unitary propagator."""
 
         super().__init__(*args, **kwargs)
 
@@ -46,35 +51,20 @@ class unitary(Unitary):
 
         self.context = None
 
-    def assign_backend(self, backend):
-
+    def assign_backend(self, backend: ModuleType) -> None:
+        """Assign the compute backend for diagonal propagation."""
         self.propagator_module = backend.diagonal_propagator
 
         self.propagators = []
-        for i in range(self.unitary_n_params):
-            self.propagators.append(
-                propagator(self.propagator_module.diagonal_propagator_wrapper)
-            )
+        for _ in range(self.unitary_n_params):
+            self.propagators.append(Propagator(self.propagator_module.diagonal_propagator_wrapper))
 
-    def plan(self, system_size, MPI_COMM):
-
-        size = MPI_COMM.Get_size()
-        rank = MPI_COMM.Get_rank()
-
-        local_i = int(
-            system_size // size + np.ceil((system_size % size) // (rank + 1) / size)
-        )
-
-        return local_i, local_i
-
-    def copy_plan(self, ex_unitary):
-        pass
-
-    def gen_operator(self, *args):
-
+    def gen_operator(self, *args: Any) -> None:  # noqa: ANN401
+        """Generate the diagonal operator and plan the propagators."""
         for propagator in self.propagators:
             propagator.plan(self.context)
 
+        self.planned = True  # Mark as planned so destroy() is called during cleanup
         super().gen_operator(*args)
 
         diagonals = self.operator
@@ -87,11 +77,12 @@ class unitary(Unitary):
 
             propagator.gen_operator(operator_args)
 
-    def propagate(self, gammas):
-
-        for i, (gamma, propagator) in enumerate(zip(gammas, self.propagators)):
+    def propagate(self, gammas: list[float]) -> None:
+        """Apply diagonal phase-shift propagators with parameters ``gammas``."""
+        for gamma, propagator in zip(gammas, self.propagators, strict=True):
             propagator.propagate(gamma)
 
-    def destroy(self):
+    def destroy(self) -> None:
+        """Free diagonal propagator resources."""
         for propagator in self.propagators:
             propagator.destroy()

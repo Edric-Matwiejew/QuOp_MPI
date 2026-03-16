@@ -2,10 +2,20 @@ include(FindHDF5)
 set(HDF5_PREFER_PARALLEL TRUE)
 # Check if building on Fedora.
 if(DEFINED ENV{MPI_INCLUDE})
-	set(HDF5_ROOT "$ENV{MPI_BIN};$ENV{MPI_INCLUDE};$ENV{MPI_LIB};$ENV{MPI_FORTRAN_MOD_DIR}")
+  set(HDF5_ROOT "$ENV{MPI_BIN};$ENV{MPI_INCLUDE};$ENV{MPI_LIB};$ENV{MPI_FORTRAN_MOD_DIR}")
 endif()
 
 find_package(HDF5 COMPONENTS C Fortran)
+
+# Homebrew's HDF5 2.x CMake package exports HDF5_PROVIDES_PARALLEL instead of
+# HDF5_ENABLE_PARALLEL, which leaves HDF5_IS_PARALLEL unset in config mode.
+if(HDF5_FOUND AND NOT HDF5_IS_PARALLEL)
+  if(DEFINED HDF5_ENABLE_PARALLEL)
+    set(HDF5_IS_PARALLEL ${HDF5_ENABLE_PARALLEL})
+  elseif(DEFINED HDF5_PROVIDES_PARALLEL)
+    set(HDF5_IS_PARALLEL ${HDF5_PROVIDES_PARALLEL})
+  endif()
+endif()
 
 set(HDF5_ERROR_INSTRUCTIONS "\
 \nIf parallel HDF5 is installed on your system, pass its library and include directories to CMake. 
@@ -20,10 +30,10 @@ $:cmake -B build -S . -DHDF5_Fortran_LIBRARIES=<path to lib dir> -DHDF5_Fortran_
 ")
 
 if ( NOT HDF5_FOUND )
-	message(FATAL_ERROR "HDF5 not found on system.${HDF5_ERROR_INSTRUCTIONS}")	
+  message(FATAL_ERROR "HDF5 not found on system.${HDF5_ERROR_INSTRUCTIONS}")  
 endif()
 if ( NOT HDF5_IS_PARALLEL)
-	message(FATAL_ERROR "Found HDF5 installation is not parallel.${HDF5_ERROR_INSTRUCTIONS}")
+  message(FATAL_ERROR "Found HDF5 installation is not parallel.${HDF5_ERROR_INSTRUCTIONS}")
 endif()
 
 set(HDF5_Fortran_INCLUDE_DIRS ${HDF5_Fortran_INCLUDE_DIRS} CACHE STRING "")
@@ -31,8 +41,8 @@ set(HDF5_Fortran_LIBRARIES ${HDF5_Fortran_LIBRARIES} CACHE STRING "")
 
 
 add_f2py_library(
-	MODULE_NAME parallel_io 
-	SRC ${CMAKE_CURRENT_SOURCE_DIR}/io.f90 
-	INCLUDE_DIRS "${HDF5_Fortran_INCLUDE_DIRS}"
-	LIBRARIES "${HDF5_Fortran_LIBRARIES}" MPI::MPI_Fortran
-	)
+  MODULE_NAME parallel_io 
+  SRC ${CMAKE_CURRENT_SOURCE_DIR}/io.f90 
+  INCLUDE_DIRS "${HDF5_Fortran_INCLUDE_DIRS}"
+  LIBRARIES "${HDF5_Fortran_LIBRARIES}" MPI::MPI_Fortran
+  )

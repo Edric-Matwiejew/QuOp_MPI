@@ -2,10 +2,6 @@
 :term:`phase-shift <phase-shift unitary>` and :term:`mixing <mixing unitary>`
 unitaries with compatible :term:`Operator Functions <Operator Function>`."""
 
-from . import diagonal
-from . import circulant
-from . import sparse
-from . import composite
-from . import momentum
+from . import circulant, composite, diagonal, momentum, sparse
 
 __all__ = ["diagonal", "circulant", "sparse", "composite", "momentum"]

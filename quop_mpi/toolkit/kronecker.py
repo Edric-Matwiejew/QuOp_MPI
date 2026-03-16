@@ -1,15 +1,23 @@
+"""Kronecker (tensor) product utilities for sparse matrices."""
+
 from __future__ import annotations
+
 from copy import copy
+from typing import TYPE_CHECKING
+
 import numpy as np
 from scipy import sparse as __sparse
 
+if TYPE_CHECKING:
+    from scipy.sparse import csr_matrix, spmatrix
 
-def kron(terms: list["sparse"]) -> "csr_matrix":
+
+def kron(terms: list[spmatrix]) -> csr_matrix:
     """Compute the tensor (Kronecker) product of a sequence of sparse matrices.
 
     Parameters
     ----------
-    terms : list[sparse]
+    terms : list[spmatrix]
         a list of scipy sparse matrices
 
     Returns
@@ -40,13 +48,12 @@ def kron(terms: list["sparse"]) -> "csr_matrix":
         return out.tocsr()
 
 
-# """Compute the tensor (Kronecker) product of ``n`` instances of a sparse matrix.
-def kron_power(term: "sparse", n: int) -> "csr_matrix":
+def kron_power(term: spmatrix, n: int) -> csr_matrix:
     """Compute the tensor (Kronecker) product of ``n`` instances of a sparse matrix.
 
     Parameters
     ----------
-    term : sparse
+    term : spmatrix
         a scipy sparse matrix
     n : int
         length of the tensor product sequence

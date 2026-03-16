@@ -1,40 +1,39 @@
+"""Standard initial state functions for quantum variational algorithms."""
+
 from __future__ import annotations
-from importlib import import_module
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 from mpi4py import MPI
-from .._utils._mpi import __scatter_1D_array
 
-####################################
-# imports and classes for type hints
-####################################
+from .._utils._mpi import __scatter_1d_array
 
-from mpi4py import MPI
-from typing import Callable, Union, Iterable
+if TYPE_CHECKING:
+    from typing import Callable
 
-Intracomm = MPI.Intracomm
-
-####################################
+    Intracomm = MPI.Intracomm
 
 
 def equal(system_size: int, local_i: int) -> np.ndarray[np.complex128]:
     """Generate an equal superposition over all :term:`system states<system state>`.
 
-    The default :term:`Initial State Function` of the :class:`quop_mpi.Ansatz`
+    The default :term:`Initial State Function` of the :class:`quop_mpi.ansatz`
     class.
 
     Parameters
     ----------
     system_size : int
-        size of the simulated :term:`QVA`, :class:`quop_mpi.Ansatz` attribute
+        size of the simulated :term:`QVA`, :class:`quop_mpi.ansatz` attribute
     local_i : int
         size of the local :term:`system state` partitions,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
 
     Returns
     -------
     ndarray[complex128]
         1-D complex array of :literal:`local_i` :term:`initial state` values with
-        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.Ansatz`)
+        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.ansatz`)
     """
 
     if local_i is not None:
@@ -53,16 +52,16 @@ def basis(
 
     An :term:`Initial State Function`. The :literal:`basis_states` argument can be
     specified by passing a :term:`FunctionDict` to
-    :meth:`quop_mpi.Ansatz.set_initial_state`.
+    :meth:`quop_mpi.ansatz.set_initial_state`.
 
     Parameters
     ----------
     local_i : int
         size of the local :term:`system state` partitions,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     local_i_offset : int
         global index offset of the local system state partitions,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     basis_states : list[int], optional
         global indexes specifying an equal superposition over a subset of
         states, by default [0]
@@ -71,7 +70,7 @@ def basis(
     -------
     ndarray[complex128]
         1-D complex array of :literal:`local_i` :term:`initial state` values with
-        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.Ansatz` )
+        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.ansatz` )
     """
     if basis_states is None:
         basis_states = [0]
@@ -90,7 +89,7 @@ def basis(
 def array(
     local_i: int,
     local_i_offset: int,
-    MPI_COMM: Intracomm,
+    MPI_COMM: Intracomm,  # noqa: N803
     state: np.ndarray[np.complex128],
     normalize: bool = True,
 ) -> np.ndarray[np.complex128]:
@@ -98,19 +97,19 @@ def array(
 
     An :term:`Initial State Function`. The :literal:`normalize` argument can be
     specified by passing a :term:`FunctionDict` to
-    :meth:`~quop_mpi.Ansatz.set_initial_state` .
+    :meth:`~quop_mpi.ansatz.set_initial_state` .
 
     Parameters
     ----------
     local_i : int
         size of the local :term:`system state` partitions,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     local_i_offset : int
         global index offset of the local system state partitions,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     MPI_COMM : Intracomm
         MPI communicator of the :term:`QVA` simulation,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     state : ndarray[complex128]
         A 1-D array of :term:`system size` initial state values
     normalize : bool, optional
@@ -120,7 +119,7 @@ def array(
     -------
     ndarray[complex128]
         1-D complex array of :literal:`local_i` :term:`initial state` values with
-        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.Ansatz`)
+        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.ansatz`)
     """
     initial_state = np.empty(local_i, dtype=np.complex128)
 
@@ -129,32 +128,30 @@ def array(
     )
 
     if not normalize:
-        normalization = MPI_COMM.allreduce(
-            np.dot(np.conjugate(state), state), op=MPI.SUM
-        )
+        normalization = MPI_COMM.allreduce(np.dot(np.conjugate(state), state), op=MPI.SUM)
         initial_state = initial_state / np.sqrt(normalization)
 
     return initial_state
 
 
 def serial(
-    partition_table: list[int], MPI_COMM: Intracomm, function: Callable, *args, **kwargs
+    partition_table: list[int], MPI_COMM: Intracomm, function: Callable, *args, **kwargs  # noqa: N803
 ) -> np.ndarray[np.complex128]:
     """Generate the :term:`initial state` using a serial Python function.
 
     An :term:`Initial State Function`. The :literal:`function` argument must be
     specified by passing a :term:`FunctionDict` to
-    :meth:`~quop_mpi.Ansatz.set_initial_state`. Additional positional and keyword
+    :meth:`~quop_mpi.ansatz.set_initial_state`. Additional positional and keyword
     arguments in the :literal:`FunctionDict` are passed to :literal:`function`.
 
     Parameters
     ----------
     partition_table : list[int]
         1-D array describing the global partitioning scheme,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     MPI_COMM : Intracomm
         MPI communicator of the :term:`QVA` simulation,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     function : Callable
         a Python function returning a 1-D complex array of :term:`system size`
         initial state values
@@ -163,7 +160,7 @@ def serial(
     -------
     ndarray[complex128]
         1-D complex array of :literal:`local_i` :term:`initial state` values with
-        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.Ansatz`)
+        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.ansatz`)
     """
 
     if args is None:
@@ -179,15 +176,15 @@ def serial(
 
         state = None
 
-    return __scatter_1D_array(state, partition_table, MPI_COMM, np.complex128)
+    return __scatter_1d_array(state, partition_table, MPI_COMM, np.complex128)
 
 
 def position_grid(
     alloc_local: int,
     local_i: int,
     local_i_offset: int,
-    MPI_COMM: Intracomm,
-    Ns: list[int],
+    MPI_COMM: Intracomm,  # noqa: N803
+    Ns: list[int],  # noqa: N803
     deltas: list[float],
     mins: list[float],
     function: Callable,
@@ -195,7 +192,7 @@ def position_grid(
     """Generate an :term:`initial state` discrete Cartesian coordinates.
 
     An :term:`Observables Function`. Arguments :literal:`Ns`, :literal:`deltas`, :literal:`mins` and
-    :literal:`function` must be passed to :meth:`quop_mpi.Ansatz.set_observables` in a
+    :literal:`function` must be passed to :meth:`quop_mpi.ansatz.set_observables` in a
     :term:`FunctionDict`.
 
     The :literal:`function` argument must take an :literal:`len(Ns)` -dimensional coordinate
@@ -210,15 +207,15 @@ def position_grid(
     ----------
     alloc_local : int
         size of the array containing the local partition of the system,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     local_i : int
         number of initial state values in local partition of the
-        :term:`system state`, :class:`quop_mpi.Ansatz` attribute
+        :term:`system state`, :class:`quop_mpi.ansatz` attribute
     local_i_offset : int
         global index offset of the local system state partition,
-        :class:`quop_mpi.Ansatz` attribute
+        :class:`quop_mpi.ansatz` attribute
     MPI_COMM : Intracomm
-        MPI communicator, :class:`quop_mpi.Ansatz` attribute
+        MPI communicator, :class:`quop_mpi.ansatz` attribute
     Ns : list[int]
         number of grid points in each dimension of the Cartesian grid
     deltas : list[float]
@@ -233,16 +230,14 @@ def position_grid(
     -------
     ndarray[complex128]
         1-D complex array of :literal:`local_i` :term:`initial state` values with
-        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.Ansatz`)
+        global index offset :literal:`local_i_offset` (see :class:`quop_mpi.ansatz`)
     """
 
-    if MPI.COMM_WORLD.Get_rank() == 0:
+    if MPI_COMM.Get_rank() == 0:
 
-        maxq = np.array(mins, dtype=np.float64) + np.array(
-            Ns, dtype=np.float64
-        ) * np.array(deltas)
+        maxq = np.array(mins, dtype=np.float64) + np.array(Ns, dtype=np.float64) * np.array(deltas)
 
-        search_domain = list(zip(mins, maxq))
+        search_domain = list(zip(mins, maxq, strict=True))
 
         mean = []
         for domain in search_domain:
@@ -256,7 +251,7 @@ def position_grid(
     else:
         mean = None
 
-    mean = MPI.COMM_WORLD.bcast(mean, root=0)
+    mean = MPI_COMM.bcast(mean, root=0)
 
     def squeezed(x):
 
@@ -267,7 +262,7 @@ def position_grid(
 
         state = 0
 
-        for x_i, m, s, v in zip(x, mean, std, velocity):
+        for x_i, m, s, v in zip(x, mean, std, velocity, strict=True):
             state += (
                 np.exp(1j * v * x_i)
                 * np.exp((-((x_i - m) ** 2)) / (2 * s**2))

@@ -26,6 +26,7 @@
   "qwoa_portfolio": {
     "example_dir": "portfolio_rebalancing",
     "script": "qwoa_portfolio.py",
+    "setup_script": "qwoa_qualities.py",
     "description": "Portfolio rebalancing QWOA",
     "fun_min": -0.40,
     "fun_max": 0.0,

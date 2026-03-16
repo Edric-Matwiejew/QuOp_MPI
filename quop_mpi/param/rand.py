@@ -1,4 +1,7 @@
+"""Random parameter generation functions for variational parameters."""
+
 from __future__ import annotations
+
 import numpy as np
 
 
@@ -8,19 +11,19 @@ def uniform(
     """Generate initial :term:`variational parameters` from a uniform
     distribution.
 
-    The default :term:`Parameter Function` of the :class:`quop_mpi.Unitary`
+    The default :term:`Parameter Function` of the :class:`quop_mpi.unitary`
     class. User specified ``low`` and ``high`` values can be specified by
     passing a corresponding:term:`FunctionDict` to on initialisation of a
-    ``unitary`` instance (see :meth:`quop_mpi.Unitary`).
+    ``unitary`` instance (see :meth:`quop_mpi.unitary`).
 
     Parameters
     ----------
     n_params : int
         total number of :term:`unitary <unitary parameter>` and
         :term:`operator<operator parameter>` :term:`variational parameters`,
-        :class:`quop_mpi.Unitary` attribute
+        :class:`quop_mpi.unitary` attribute
     seed : int
-        seeds random number generation, :class:`quop_mpi.Unitary` attribute
+        seeds random number generation, :class:`quop_mpi.unitary` attribute
     low : float, optional
         lower bound of the generated variational parameters (inclusive), by
         default ``0``

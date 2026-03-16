@@ -27,6 +27,7 @@ The composite propagator exploits the Cartesian sum structure using
 **multi-dimensional FFT**:
 
 1. Forward multi-dimensional FFT transforms the state to the joint eigenbasis
+<<<<<<< HEAD
 2. Multiply by :math:`e^{-it(\lambda^{(1)}_{k_1} + \lambda^{(2)}_{k_2} + \cdots)}`
    where :math:`\lambda^{(d)}_{k_d}` are eigenvalues for each dimension
 3. Inverse multi-dimensional FFT transforms back to the computational basis
@@ -35,6 +36,17 @@ This avoids constructing the full :math:`\prod_i N_i` sized operator by
 exploiting the separable structure of Cartesian sums. The implementation
 uses FFTW with MPI for parallel multi-dimensional transforms.
 """
+=======
+2. Multiply by :math:`e^{-it(\\lambda^{(1)}_{k_1} + \\lambda^{(2)}_{k_2} + \\cdots)}`
+   where :math:`\\lambda^{(d)}_{k_d}` are eigenvalues for each dimension
+3. Inverse multi-dimensional FFT transforms back to the computational basis
+
+This avoids constructing the full :math:`\\prod_i N_i` sized operator by
+exploiting the separable structure of Cartesian sums. The implementation
+uses FFTW with MPI for parallel multi-dimensional transforms.
+"""
+
+>>>>>>> quop_quisa/main
 from .eigenvalues import ith
 
 __all__ = ["ith"]

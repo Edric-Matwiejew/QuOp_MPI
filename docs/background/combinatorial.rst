@@ -20,7 +20,7 @@ initial quantum state with basis states
 :math:`{\hat{U}_{}} \in \mathbb{C}^{N \times N}` is the
 ansatz unitary , integer :math:`p \geq 0` specifies the number of
 applications of :math:`{\hat{U}_{}}` to
-:math:`{{\lvert\psi_0\rangle}}` (the ‘depth’) and
+:math:`{{\lvert\psi_0\rangle}}` (the 'depth') and
 :math:`\bm{\theta}= \{ \theta_i \in \mathbb{R} \}` is an ordered set of
 classically tunable values that parameterise
 :math:`{\hat{U}_{}}`. The ansatz unitary
@@ -38,7 +38,7 @@ expectation value
 
 where :math:`\hat{Q}\in \mathbb{R}^{N \times N}` is a diagonal matrix
 operator with entries :math:`\text{diag}(\hat{Q}) = q_i` that specify
-the ‘quality’ associated with quantum state :math:`{\lvert i\rangle}`.
+the 'quality' associated with quantum state :math:`{\lvert i\rangle}`.
 The variational parameters :math:`\bm{\theta}` are updated using a
 classical optimiser with the objective being minimisation of
 :math:`f`.
@@ -143,7 +143,7 @@ Problems of this type are often difficult to solve as
 :math:`{\left|{\bm{\zeta}}\right|}` and, in general, lacks
 identifiable structure. For this reason, heuristic and metaheuristic
 algorithms are often used to find solutions that satisfy the relaxed
-condition of :math:`{C({\Bar{s}})}` being a ‘sufficiently low’ local
+condition of :math:`{C({\Bar{s}})}` being a 'sufficiently low' local
 minimum.
 
 To apply a quantum variational algorithm to a given combinatorial
@@ -258,7 +258,7 @@ where :math:`\bm{\theta}= \{\gamma_i, t_i \}` and
 Extended-QAOA
 ~~~~~~~~~~~~~
 
-A variation of the QAOA, ‘extended-QAOA’ (ex-QAOA), utilises a sequence
+A variation of the QAOA, 'extended-QAOA' (ex-QAOA), utilises a sequence
 of phase-shift unitaries,
 
 .. math::
@@ -304,7 +304,7 @@ QAOAz
 
 The Quantum Alternating Operator Ansatz was developed to solve problems
 for which :math:`{\bm{\chi}}` creates a correspondence between
-:math:`{\mathcal{S}^\prime}` and quantum states of equal parity – states
+:math:`{\mathcal{S}^\prime}` and quantum states of equal parity - states
 with the same number of :math:`{\lvert 1\rangle}` states. This algorithm
 consists of the phase-shift-unitary defined in
 :math:numref:`eq:phase_shift_qaoa`, followed by a sequence

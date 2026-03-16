@@ -4,20 +4,20 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Union, TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable
 
 import numpy as np
 
+from ._scope import scope
 from ._utils._filenames import ensure_path_and_extension
-from ._utils._tracker import job_tracker
+from ._utils._tracker import JobTracker
 
 if TYPE_CHECKING:
-    from .Ansatz import Ansatz
-    from ._utils._mpi import subcomms
+    from ._utils._comm_size import QuopMpiLayout
 
 
 class Benchmark:
-    """Mixin providing benchmarking functionality for :class:`~quop_mpi.Ansatz`.
+    """Mixin providing benchmarking functionality for :class:`~quop_mpi.ansatz`.
 
     This class is not intended to be instantiated directly. It provides the
     `benchmark` method for systematically studying QVA performance across
@@ -28,7 +28,7 @@ class Benchmark:
     # Type hints for attributes provided by Ansatz
     if TYPE_CHECKING:
         MPI_COMM_WORLD: object
-        subcomms: subcomms
+        subcomms: QuopMpiLayout | None
         variational_parameters: np.ndarray
         ansatz_depth: int
         total_params: int
@@ -37,7 +37,7 @@ class Benchmark:
         repeat: int
         result: dict
         quop_result: dict
-        tracker: job_tracker
+        tracker: JobTracker
         _has_param_map: bool
         _n_free_params: int
 
@@ -48,8 +48,8 @@ class Benchmark:
         def execute(self) -> None: ...
         def print_result(self) -> None: ...
         def save(self, filename: str, label: str, action: str) -> None: ...
-        def _Ansatz__pre(self) -> None: ...
-        def _Ansatz__gen_initial_params(self, depth: int = None) -> np.ndarray: ...
+        def _Ansatz__pre(self) -> None: ...  # noqa: N802
+        def _Ansatz__gen_initial_params(self, depth: int = None) -> np.ndarray: ...  # noqa: N802
 
     def _init_benchmark(self):
         """Initialize benchmark-related instance variables.
@@ -57,14 +57,15 @@ class Benchmark:
         Called by :meth:`Ansatz.__init__`.
         """
         self.benchmarking: bool = False
-        self.tracker: job_tracker | None = None
+        self.tracker: JobTracker | None = None
         self.repeat: int = 0
 
+    @scope("world")
     def benchmark(
         self,
         ansatz_depths: Iterable[int],
         repeats: int,
-        initial_parameters: Union[list[float], np.ndarray[float]] = None,
+        initial_parameters: list[float] | np.ndarray[float] = None,
         param_persist: bool = False,
         verbose: bool = True,
         filename: str = None,
@@ -118,17 +119,19 @@ class Benchmark:
         previous_params = None
 
         if initial_parameters is not None:
-            self.variational_parameters = np.asarray(
-                initial_parameters, dtype=np.float64
-            )
+            self.variational_parameters = np.asarray(initial_parameters, dtype=np.float64)
 
         self.destroy()
         self.setup()
         ansatz_depth_temp = deepcopy(self.ansatz_depth)
         self.benchmarking = True
         suspend_path = "suspend" if suspend_path is None else suspend_path
+<<<<<<< HEAD
         depths_list = list(ansatz_depths)
         self.tracker = job_tracker(
+=======
+        self.tracker = JobTracker(
+>>>>>>> quop_quisa/main
             repeats,
             depths_list,
             time_limit,
@@ -172,6 +175,7 @@ class Benchmark:
                         )
                 else:
                     # Unmapped case
+<<<<<<< HEAD
                     expected_params = depth * self.total_params
                     if (not param_persist) or (depth == depths_list[0]):
                         if initial_parameters is not None:
@@ -190,6 +194,10 @@ class Benchmark:
                             self.variational_parameters = self._Ansatz__gen_initial_params(
                                 depth
                             )
+=======
+                    if (not param_persist) or (depth == 1):
+                        self.variational_parameters = self._Ansatz__gen_initial_params(depth)
+>>>>>>> quop_quisa/main
                     else:
                         # Persist full-vector between repeats/depths
                         # Find the previous depth in the depths list
@@ -212,12 +220,11 @@ class Benchmark:
                             if self.subcomms.SUBCOMM.Get_rank() == 0:
                                 if (
                                     self.tracker.job_list[self.tracker.job_index][1]
-                                    != self.tracker.job_list[
-                                        self.tracker.job_index - 1
-                                    ][1]
+                                    != self.tracker.job_list[self.tracker.job_index - 1][1]
                                 ) or (previous_params is None):
                                     funs = [
                                         result["fun"]
+<<<<<<< HEAD
                                         for result in self.tracker.results_dict[
                                             prev_depth
                                         ]
@@ -227,31 +234,30 @@ class Benchmark:
                                         for result in self.tracker.results_dict[
                                             prev_depth
                                         ]
+=======
+                                        for result in self.tracker.results_dict[depth - 1]
+                                    ]
+                                    xs = [
+                                        result["variational_parameters"]
+                                        for result in self.tracker.results_dict[depth - 1]
+>>>>>>> quop_quisa/main
                                     ]
                                     previous_params = xs[np.argmin(funs)]
                             else:
                                 previous_params = None
 
-                            previous_params = self.subcomms.SUBCOMM.bcast(
-                                previous_params, root=0
-                            )
+                            previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root=0)
 
                             self.variational_parameters = np.empty(
                                 depth * self.total_params, dtype=np.float64
                             )
                             # fill with best from last depth
-                            self.variational_parameters[: len(previous_params)] = (
-                                previous_params
-                            )
+                            self.variational_parameters[: len(previous_params)] = previous_params
                             # new parameters for the final layer
                             new_params = self._Ansatz__gen_initial_params(1)
-                            self.variational_parameters[-self.total_params :] = (
-                                new_params
-                            )
+                            self.variational_parameters[-self.total_params :] = new_params
                         else:
-                            self.variational_parameters = (
-                                self._Ansatz__gen_initial_params()
-                            )
+                            self.variational_parameters = self._Ansatz__gen_initial_params()
 
                 if verbose and self.subcomms.SUBCOMM.Get_rank() == 0:
                     print(f"{repeat} of {repeats} at depth {depth}...", flush=True)
@@ -267,9 +273,7 @@ class Benchmark:
                             best_obj = current_obj
                             previous_params = current_free.copy()
                     # Broadcast updated previous_params to all ranks for next iteration
-                    previous_params = self.subcomms.SUBCOMM.bcast(
-                        previous_params, root=0
-                    )
+                    previous_params = self.subcomms.SUBCOMM.bcast(previous_params, root=0)
 
                 if verbose:
                     self.print_result()

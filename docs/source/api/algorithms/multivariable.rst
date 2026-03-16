@@ -15,4 +15,3 @@ Classes
    :members:
    :exclude-members: cartesian, cartesian_scaled, setup_cartesian, setup, destroy
    :inherited-members:
-   :show-inheritance:

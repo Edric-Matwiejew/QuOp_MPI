@@ -10,14 +10,15 @@ from typing import TYPE_CHECKING
 import numpy as np
 from mpi4py import MPI
 
+from ._scope import scope
 from ._utils._filenames import ensure_path_and_extension
 
 if TYPE_CHECKING:
-    from .Ansatz import Ansatz
+    pass
 
 
 class Logging:
-    """Mixin providing logging and I/O functionality for :class:`~quop_mpi.Ansatz`.
+    """Mixin providing logging and I/O functionality for :class:`~quop_mpi.ansatz`.
 
     This class is not intended to be instantiated directly. It provides methods
     for CSV logging of simulation results and HDF5 saving of quantum states.
@@ -62,9 +63,10 @@ class Logging:
         self.repeat: int = 1
         self.config_name: str | None = None
 
+    @scope("world")
     def set_log(self, filename: str, label: str, action: str = "a"):
         """Creates a CSV in which to save simulation results after a call to
-        :meth:`~quop_mpi.Ansatz.execute`.
+        :meth:`~quop_mpi.ansatz.execute`.
 
         Parameters
         ----------
@@ -84,6 +86,7 @@ class Logging:
 
         self.setup_log = True
 
+    @scope("world")
     def _gen_log(self):
         """Create or open a log file."""
 
@@ -100,8 +103,9 @@ class Logging:
 
         self.log = True
 
+    @scope("world")
     def _create_new_logfile(self):
-        """Create a new log file, called by rank 0 at :attr:`~quop_mpi.Ansatz.MPI_COMM_WORLD`
+        """Create a new log file, called by rank 0 at :attr:`~quop_mpi.ansatz.MPI_COMM_WORLD`
         only."""
 
         headings = [
@@ -116,9 +120,7 @@ class Logging:
         ]
 
         if self.sampling:
-            headings.extend(
-                ("total_shots", "minimum_sampled", "shots_to_global_minimum")
-            )
+            headings.extend(("total_shots", "minimum_sampled", "shots_to_global_minimum"))
 
         if self.optimiser_log is not None:
             headings.extend(iter(self.optimiser_log))
@@ -127,6 +129,7 @@ class Logging:
         self.logfile_csv = csv.writer(self.logfile)
         self.logfile_csv.writerow(headings)
 
+    @scope("world")
     def _log_update(self):
         """Write simulation information to an active log file."""
 
@@ -153,19 +156,19 @@ class Logging:
                 )
             )
         if self.optimiser_log is not None:
-            log_output.extend(
-                self.result[optimiser_log] for optimiser_log in self.optimiser_log
-            )
+            log_output.extend(self.result[optimiser_log] for optimiser_log in self.optimiser_log)
         self.logfile_csv.writerow(log_output)
 
         self.logfile.flush()
 
+    @scope("world")
     def _post_log(self):
         """Close the results log file on simulation completion."""
 
         if self.MPI_COMM_WORLD.Get_rank() == 0 and self.log:
             self.logfile.close()
 
+    @scope("subcomm", returns="none")
     def save(self, file_name: str, config_name: str, action: str = "a"):
         """Write the :term:`final state`, :term:`observables` and results
         summary to a HDf5 file.
@@ -215,8 +218,9 @@ class Logging:
 
         .. warning::
 
-            The :literal:`"final_state"` and :literal:`"observables"` datasets are saved using Fortran
-            subroutines which make use of parallel HDF5.
+            The :literal:`"final_state"` and :literal:`"observables"`
+            datasets are saved using Fortran subroutines which make
+            use of parallel HDF5.
 
             The complex values of the final_state array are saved as a compound
             datatype consisting of contiguous double precision reals. This is
@@ -234,34 +238,34 @@ class Logging:
 
         from quop_mpi._lib import parallel_io
 
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
+        if self.subcomms.SUBCOMM.Get_rank() == 0:
 
             import h5py
 
             self.config_name = config_name
 
             file_name = ensure_path_and_extension(file_name, "h5")
-            File = h5py.File(file_name, action)
+            h5_file = h5py.File(file_name, action)
 
             # If the config_name already exists in the target file, add an underscore.
             duplicate = True
             while duplicate:
-                if self.config_name in File:
+                if self.config_name in h5_file:
                     self.config_name += "_"
                 else:
                     duplicate = False
 
-            config = File.create_group(self.config_name)
+            config = h5_file.create_group(self.config_name)
 
             if self.result is not None:
                 config.attrs["minimize_result"] = str(self.result)
 
-            File.create_dataset(
+            h5_file.create_dataset(
                 f"{self.config_name}/initial_phases",
                 data=self.variational_parameters,
                 dtype=np.float64,
             )
-            File.close()
+            h5_file.close()
         else:
             self.config_name = None
 

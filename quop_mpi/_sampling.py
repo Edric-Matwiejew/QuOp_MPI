@@ -4,19 +4,20 @@
 from __future__ import annotations
 
 from copy import copy
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 from mpi4py import MPI
 
-from ._utils._interface import interface
+from ._scope import scope
+from ._utils._interface import Interface
 
 if TYPE_CHECKING:
-    from .Ansatz import Ansatz
+    pass
 
 
 class Sampling:
-    """Mixin providing simulated sampling functionality for :class:`~quop_mpi.Ansatz`.
+    """Mixin providing simulated sampling functionality for :class:`~quop_mpi.ansatz`.
 
     This class is not intended to be instantiated directly. It provides methods
     for computing the objective function using simulated quantum measurements
@@ -61,6 +62,7 @@ class Sampling:
         self.total_shots: int = 0
         self.setup_sampling: bool = False
 
+    @scope("world")
     def set_sampling(
         self,
         sample_block_size: int,
@@ -71,9 +73,10 @@ class Sampling:
         """Compute the :term:`objective function` using simulated sampling.
 
         Samples are taken in blocks of `sample_block_size`. These are passed as
-        a list of lists to :literal:`function` (a :term:`Sampling Function`), which returns a value for expectation
-        value/objective function and a boolean that indicates whether the sampled
-        result should be passed to the classical optimiser.
+        a list of lists to :literal:`function` (a :term:`Sampling Function`),
+        which returns a value for expectation value/objective function and a
+        boolean that indicates whether the sampled result should be passed to
+        the classical optimiser.
 
         If :literal:`function` is :literal:`None`, the :term:`objective function` is
         computed as the mean of :literal:`sample_block_size` shots.
@@ -96,7 +99,9 @@ class Sampling:
         self.__parse_function_dict__(sampling_dict, "sampling_dict")
 
         if function is None:
-            function = lambda samples: (np.mean(samples), True)
+
+            def function(samples):
+                return np.mean(samples), True
 
         self.sample_block_size = sample_block_size
         self.max_sample_iterations = max_sample_iterations
@@ -108,6 +113,7 @@ class Sampling:
 
         self.setup_sampling = True
 
+    @scope("world")
     def unset_sampling(self):
         """Revert to simulation using exact computation of the
         :term:`objective function`.
@@ -117,6 +123,7 @@ class Sampling:
         self.pre_execution_methods.remove(self._pre_sampling)
         self.post_execution_methods.remove(self._post_sampling)
 
+    @scope("world")
     def _pre_sampling(self):
         """Preparation for simulated sampling."""
 
@@ -128,6 +135,7 @@ class Sampling:
         if self.MPI_COMM_WORLD.Get_rank() == 0:
             print("Executing with simulated sampling.")
 
+    @scope("world")
     def _post_sampling(self):
         """Post simulation steps for simulated sampling."""
 
@@ -135,36 +143,35 @@ class Sampling:
 
             self.quop_result["sampling total shots"] = self.total_shots
             self.quop_result["sampling minimum measured"] = self.minimum_sampled
-            self.quop_result["sampling shots to minimum measured"] = (
-                self.shots_to_global_minimum
-            )
+            self.quop_result["sampling shots to minimum measured"] = self.shots_to_global_minimum
             self.quop_result["observables global minimum"] = self.global_minimum
 
+    @scope("subcomm")
     def _gen_sampling(self):
         """Setup for simulated sampling."""
 
-        if self.subcomms.in_subcomm():
+        self.sampling = True
 
-            self.sampling = True
+        self._parse_sampling_function()
 
-            self._parse_sampling_function()
+        self.global_minimum = self.subcomms.SUBCOMM.reduce(
+            np.min(np.real(self.observables)), op=MPI.MIN
+        )
 
-            self.global_minimum = self.subcomms.SUBCOMM.reduce(
-                np.min(np.real(self.observables)), op=MPI.MIN
-            )
-
+    @scope("subcomm")
     def _parse_sampling_function(self):
         """Bind the arguments of a QuOp Sampling Function to the attributes of
-        and :class:`~quop_mpi.Ansatz` instance.
+        and :class:`~quop_mpi.ansatz` instance.
         """
 
-        self.sampling_function = interface(
+        self.sampling_function = Interface(
             [self, self.unitaries],
             self.sampling_function_input,
             "sampling test function",
             self.subcomms.SUBCOMM,
         )
 
+    @scope("subcomm")
     def _sample_expectation_value(self) -> float:
         """Returns the expectation value of QVA with solution quality values
         sampled according to the probability distribution of the system
@@ -175,8 +182,6 @@ class Sampling:
         float
             expectation value of the sampled solution qualities
         """
-        if not self.subcomms.in_subcomm():
-            return
 
         if self.subcomms.SUBCOMM.Get_rank() == 0:
             self.samples = []
@@ -189,9 +194,7 @@ class Sampling:
 
             # Get the probability from each node in MPI_COMM
             self._get_local_probabilities()
-            total_local_probability = np.array(
-                [self.local_probabilities.sum()], dtype=np.float32
-            )
+            total_local_probability = np.array([self.local_probabilities.sum()], dtype=np.float32)
 
             comm_opt_size = self.subcomms.SUBCOMM.Get_size()
 
@@ -200,9 +203,7 @@ class Sampling:
             else:
                 process_probabilities = None
 
-            self.subcomms.SUBCOMM.Gather(
-                total_local_probability, process_probabilities, root=0
-            )
+            self.subcomms.SUBCOMM.Gather(total_local_probability, process_probabilities, root=0)
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
 
@@ -217,7 +218,7 @@ class Sampling:
 
                 samples_per_rank = np.zeros(comm_opt_size, dtype=int)
 
-                for rank, count in zip(ranks, counts):
+                for rank, count in zip(ranks, counts, strict=True):
                     samples_per_rank[rank] = count
 
             else:
@@ -225,9 +226,7 @@ class Sampling:
 
             self.subcomms.SUBCOMM.Bcast(samples_per_rank, root=0)
 
-            local_normed_probabilities = (
-                self.local_probabilities / self.local_probabilities.sum()
-            )
+            local_normed_probabilities = self.local_probabilities / self.local_probabilities.sum()
 
             local_samples_inds = np.random.choice(
                 list(range(self.local_i)),
@@ -236,19 +235,13 @@ class Sampling:
                 p=local_normed_probabilities,
             ).astype(np.int32)
 
-            local_samples = np.real(self.observables[local_samples_inds]).astype(
-                np.float64
-            )
+            local_samples = np.real(self.observables[local_samples_inds]).astype(np.float64)
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
                 self.samples.append(np.empty(self.sample_block_size, dtype=np.float64))
-                self.sample_indexes.append(
-                    np.empty(self.sample_block_size, dtype=np.int32)
-                )
+                self.sample_indexes.append(np.empty(self.sample_block_size, dtype=np.int32))
 
-            self.subcomms.SUBCOMM.Gatherv(
-                local_samples, [self.samples[-1], samples_per_rank], 0
-            )
+            self.subcomms.SUBCOMM.Gatherv(local_samples, [self.samples[-1], samples_per_rank], 0)
 
             self.subcomms.SUBCOMM.Gatherv(
                 local_samples_inds + self.local_i_offset,
@@ -269,9 +262,7 @@ class Sampling:
             else:
                 sampling_function_result = None
 
-            expectation, sample_test = self.subcomms.SUBCOMM.bcast(
-                sampling_function_result, root=0
-            )
+            expectation, sample_test = self.subcomms.SUBCOMM.bcast(sampling_function_result, root=0)
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
                 argmin = np.argmin(self.samples[-1])

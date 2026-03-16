@@ -1,5 +1,9 @@
+"""Eigenvalue functions for circulant graph operators."""
+
 from __future__ import annotations
+
 import numpy as np
+
 
 def complete(system_size: int) -> np.ndarray[np.float64]:
     """Return a placeholder array for a complete circulant graph.
@@ -20,11 +24,10 @@ def complete(system_size: int) -> np.ndarray[np.float64]:
     ndarray[float64]
         1-D array with a single element (placeholder for complete graph)
     """
-    return np.empty(1, dtype = np.float64)
+    return np.empty(1, dtype=np.float64)
 
-def graph(
-        system_size: int,
-        i: int = 1) -> np.ndarray[np.float64]:
+
+def graph(system_size: int, i: int = 1) -> np.ndarray[np.float64]:
     """Generate the eigenvalues of the i-th symmetric circulant graph with
     edge weightings :literal:`1`.
 
@@ -47,14 +50,14 @@ def graph(
         placeholder array if :literal:`i >= system_size // 2` (complete graph)
     """
 
-    if (i >= system_size//2):
-        graph_array = np.empty(1, dtype = np.float64)
+    if i >= system_size // 2:
+        graph_array = np.empty(1, dtype=np.float64)
     else:
 
-        graph_array = np.zeros(system_size, dtype = np.float64)
+        graph_array = np.zeros(system_size, dtype=np.float64)
 
-        for j in range(1,i+1):
+        for j in range(1, i + 1):
             graph_array[j] = 1
-            graph_array[system_size - j]=1
+            graph_array[system_size - j] = 1
 
     return graph_array

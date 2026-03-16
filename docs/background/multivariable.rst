@@ -112,7 +112,7 @@ interpreted as implementing a continuous-time quantum walk for time
 :math:`t \geq 0` over an undirected graph of :math:`K` vertices with
 adjacency matrix :math:`w_{kk^\prime}`, where :math:`w_{kk^\prime} = 1`
 if vertices :math:`k` and :math:`k^\prime` are connected and
-:math:`k \neq k^\prime` :cite:p:`hadfield_quantum_2019,marsh_quantum_2019`.
+:math:`k \neq k^\prime` :cite:p:`hadfield_quantum_2019,marsh_quantum_2019`.
 For a complete graph :math:`\hat{W}`, one can write
 
 .. math::
@@ -138,7 +138,7 @@ particular coefficient :math:`\alpha_k` then depends on how this local
 information compares with the global average. This is a useful property
 in the absence of an identified solution space structure, since
 :math:`k` is distinguished solely by the locally phase-encoded
-:math:`f_k` :cite:p:`slate_quantum_2021,bennett_quantum_2022`.
+:math:`f_k` :cite:p:`slate_quantum_2021,bennett_quantum_2022`.
 Notice that the unbiased coupling in :math:numref:`qaoa_c_op`
 means that amplitudes at any two points :math:`k`, :math:`k'` with
 :math:`f_k \approx f_{k'}` evolve similarly under
@@ -153,7 +153,7 @@ The QAOA was originally defined with the :math:`\hat{W}` structured
 according to a hypercube graph, as a hypercube on :math:`M` qubits is
 easily implemented as :math:`\sum_ {i=0}^{M-1}\hat{X}^{(i)}`, where
 superscript :math:`(i)` denotes action on qubit
-:math:`i` :cite:p:`farhi_quantum_2014`. For a hypercube graph
+:math:`i` :cite:p:`farhi_quantum_2014`. For a hypercube graph
 :math:`\hat{W}`, the QAOA mixing unitary can be written as:
 
 .. math::
@@ -180,11 +180,11 @@ In the context of a quantum search over the discretised solution space
 of a CMOP, the hypercube has the desirable property of (at least
 approximate) preservation of the solution space structure, as grids in
 one, two, and three dimensions can be embedded in a
-hypercube :cite:p:`ostrouchov_parallel_1987`. Examples of the
+hypercube :cite:p:`ostrouchov_parallel_1987`. Examples of the
 grid embedding induced by :math:`\hat{U}_{W\text{-QAOA}}` are shown in
 Fig. :ref:`hypercube-mixing-structure <hypercube-mixing-structure>`. Also, a
 hypercube graph has a diameter of :math:`M` and :math:`M` disjoint paths
-between any two vertices :cite:p:`ostrouchov_parallel_1987`,
+between any two vertices :cite:p:`ostrouchov_parallel_1987`,
 so the distance between any two :math:`\bm{x}_k` is exponentially
 smaller than :math:`K`.
 
@@ -266,8 +266,8 @@ a momentum space grid point with a similar indexing to :math:`\bm{x}_k`.
 
 Applying the phase-shift unitary followed by the first Fourier transform
 in :math:numref:`gaussian_mixer` and computational basis
-measurement is related to Jordan’s algorithm for gradient
-computation :cite:p:`jordan_fast_2005`. Here, the gradient
+measurement is related to Jordan's algorithm for gradient
+computation :cite:p:`jordan_fast_2005`. Here, the gradient
 information is used coherently by following the first Fourier transform
 by the remaining two unitaries
 in :math:numref:`gaussian_mixer`, instead of performing

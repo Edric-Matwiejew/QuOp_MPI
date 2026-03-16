@@ -6,14 +6,17 @@ functions.
     The following compatible :term:`Operator Functions <Operator Function>` may
     be imported from the :mod:`~quop_mpi.algorithm.multivariable` :
 
-    * :meth:`~quop_mpi.diagonal.operator.setup_cartesian`
-    * :meth:`~quop_mpi.diagonal.operator.cartesian`
-    * :meth:`~quop_mpi.diagonal.operator.cartesian_scaled`
+    * :func:`~quop_mpi.propagator.diagonal.operator.setup_cartesian`
+    * :func:`~quop_mpi.propagator.diagonal.operator.cartesian`
+    * :func:`~quop_mpi.propagator.diagonal.operator.cartesian_scaled`
 """
 
-from .multivariable import qmoa, qowe
-from ...propagator.diagonal.operator import setup_cartesian as setup_cartesian
+from ..._utils._deprecation import deprecated_alias_getattr
 from ...propagator.diagonal.operator import cartesian as cartesian
 from ...propagator.diagonal.operator import cartesian_scaled as cartesian_scaled
+from ...propagator.diagonal.operator import setup_cartesian as setup_cartesian
+from .multivariable import QMOA, QOWE
 
-__all__ = ["qmoa", "qowe", "setup_cartesian", "cartesian", "cartesian_scaled"]
+__all__ = ["QMOA", "QOWE", "qmoa", "qowe", "setup_cartesian", "cartesian", "cartesian_scaled"]
+
+__getattr__ = deprecated_alias_getattr(__name__, globals(), {"qmoa": "QMOA", "qowe": "QOWE"})

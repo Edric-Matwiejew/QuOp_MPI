@@ -7,9 +7,8 @@ that bug #3 (undefined self.rank) is addressed.
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_algorithms.py -v --with-mpi
 """
 
-import pytest
 import numpy as np
-from mpi4py import MPI
+import pytest
 
 
 @pytest.mark.mpi
@@ -18,21 +17,24 @@ class TestQAOA:
 
     def test_qaoa_creation(self, mpi_comm):
         """Test that QAOA can be instantiated."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         system_size = 16
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
 
         assert alg is not None
         assert alg.system_size == system_size
 
+        alg.destroy()
+
     def test_qaoa_with_qualities(self, mpi_comm):
         """Test QAOA with quality function defined."""
-        from quop_mpi.algorithm.combinatorial import qaoa
         import networkx as nx
 
+        from quop_mpi.algorithm.combinatorial import QAOA
+
         # Create a simple graph
-        G = nx.complete_graph(4)
+        G = nx.complete_graph(4)  # noqa: N806
         n_vertices = len(G.nodes)
         system_size = 2**n_vertices
 
@@ -40,7 +42,7 @@ class TestQAOA:
         def qualities(local_i, local_i_offset):
             return np.random.rand(local_i)
 
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -48,6 +50,10 @@ class TestQAOA:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
+            assert np.isfinite(alg.result["fun"])
+            assert len(alg.result["x"]) == alg.n_free_params
+
+        alg.destroy()
 
     def test_qaoa_error_message_formatting(self, mpi_comm):
         """
@@ -55,10 +61,10 @@ class TestQAOA:
 
         This test verifies the error path doesn't crash due to missing self.rank.
         """
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         system_size = 16
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
 
         # Don't set qualities - this should trigger the error path
         # The error message uses self.rank which may not be defined
@@ -73,6 +79,8 @@ class TestQAOA:
             excinfo.value
         ), f"Expected quality-related error, got: {excinfo.value}"
 
+        alg.destroy()
+
 
 @pytest.mark.mpi
 class TestQWOA:
@@ -80,24 +88,26 @@ class TestQWOA:
 
     def test_qwoa_creation(self, mpi_comm):
         """Test that QWOA can be instantiated."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 16
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
 
         assert alg is not None
         assert alg.system_size == system_size
 
+        alg.destroy()
+
     def test_qwoa_with_qualities(self, mpi_comm):
         """Test QWOA with quality function defined."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 16
 
         def qualities(local_i, local_i_offset):
             return np.random.rand(local_i)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -105,15 +115,19 @@ class TestQWOA:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
+            assert np.isfinite(alg.result["fun"])
+            assert len(alg.result["x"]) == alg.n_free_params
+
+        alg.destroy()
 
     def test_qwoa_error_message_formatting(self, mpi_comm):
         """
         Bug #3: QWOA uses self.rank in error message but it's not defined.
         """
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 16
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
 
         # Don't set qualities - should trigger error
         with pytest.raises(RuntimeError) as excinfo:
@@ -122,3 +136,5 @@ class TestQWOA:
         assert "qualities" in str(excinfo.value).lower() or "Solution" in str(
             excinfo.value
         ), f"Expected quality-related error, got: {excinfo.value}"
+
+        alg.destroy()

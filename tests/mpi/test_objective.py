@@ -11,9 +11,8 @@ function parameters. The function should NOT expect expectation_value as
 a parameter - instead it computes its own objective from available state data.
 """
 
-import pytest
 import numpy as np
-from mpi4py import MPI
+import pytest
 
 
 @pytest.mark.mpi
@@ -22,11 +21,11 @@ class TestSetObjectiveBasic:
 
     def test_set_objective_accepts_function(self, mpi_comm, simple_oracle):
         """Verify set_objective accepts a callable function."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Custom objective that computes from local_probabilities and observables
@@ -49,15 +48,15 @@ class TestSetObjectiveBasic:
             assert exp is not None
             assert np.isfinite(exp)
 
-        del alg
+        alg.destroy()
 
     def test_default_objective_is_expectation(self, mpi_comm, simple_oracle):
         """Verify default objective function returns expectation value."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -75,7 +74,7 @@ class TestSetObjectiveBasic:
             # For Grover oracle at optimal params, should be less than uniform
             assert exp < oracle.uniform_expectation()
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -93,18 +92,19 @@ class TestSetObjectiveCustomFunctions:
 
     def test_objective_with_penalty_execute(self, mpi_comm, simple_oracle):
         """Verify objective function can add penalty terms during optimization."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Objective with penalty - must do MPI reduction like get_expectation_value
         penalty = 0.5
 
-        def penalized_objective(local_probabilities, observables, MPI_COMM):
+        def penalized_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
             local_exp = np.dot(local_probabilities, observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + penalty
@@ -119,21 +119,22 @@ class TestSetObjectiveCustomFunctions:
             # Result fun should include the penalty
             assert alg.result["fun"] >= penalty
 
-        del alg
+        alg.destroy()
 
     def test_objective_negated_execute(self, mpi_comm, simple_oracle):
         """Verify negated objective results in different optimization."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        def negated_objective(local_probabilities, observables, MPI_COMM):
+        def negated_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
             local_exp = np.dot(local_probabilities, observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return -global_exp
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_objective(negated_objective)
         alg.set_depth(1)
@@ -147,7 +148,7 @@ class TestSetObjectiveCustomFunctions:
                 alg.result["fun"] < 0
             ), f"Negated objective should be negative: {alg.result['fun']}"
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -156,16 +157,17 @@ class TestSetObjectiveWithFunctionDict:
 
     def test_objective_with_args_execute(self, mpi_comm, simple_oracle):
         """Verify objective function receives extra positional arguments during execute."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Objective that uses extra argument and does proper MPI reduction
-        def objective_with_offset(local_probabilities, observables, MPI_COMM, offset):
+        def objective_with_offset(local_probabilities, observables, MPI_COMM, offset):  # noqa: N803
             local_exp = np.dot(local_probabilities, observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + offset
@@ -182,21 +184,20 @@ class TestSetObjectiveWithFunctionDict:
             assert alg.result is not None
             assert alg.result["fun"] >= offset_value
 
-        del alg
+        alg.destroy()
 
     def test_objective_with_kwargs_execute(self, mpi_comm, simple_oracle):
         """Verify objective function receives keyword arguments during execute."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
-        def objective_with_weight(
-            local_probabilities, observables, MPI_COMM, weight=1.0
-        ):
+        def objective_with_weight(local_probabilities, observables, MPI_COMM, weight=1.0):  # noqa: N803
             local_exp = np.dot(local_probabilities, observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return weight * global_exp
@@ -213,7 +214,7 @@ class TestSetObjectiveWithFunctionDict:
             # Weighted result should be larger than unweighted expectation
             assert alg.result["fun"] > 0
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -222,18 +223,19 @@ class TestSetObjectiveWithOptimization:
 
     def test_custom_objective_with_execute(self, mpi_comm, simple_oracle):
         """Verify custom objective function is used during execute()."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
         # Custom objective with shift - must do MPI reduction
         shift = 1.0
 
-        def shifted_objective(local_probabilities, observables, MPI_COMM):
+        def shifted_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
             local_exp = np.dot(local_probabilities, observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + shift
@@ -248,21 +250,20 @@ class TestSetObjectiveWithOptimization:
             assert alg.result is not None
             final_fun = alg.result["fun"]
             # The optimized fun should be shifted (greater than shift)
-            assert (
-                final_fun >= shift * 0.9
-            ), f"Shifted objective result too low: {final_fun}"
+            assert final_fun >= shift * 0.9, f"Shifted objective result too low: {final_fun}"
 
-        del alg
+        alg.destroy()
 
     def test_negated_objective_maximizes(self, mpi_comm, simple_oracle):
         """Verify negated objective effectively maximizes expectation."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
         # Normal minimization
-        alg_min = qwoa(oracle.system_size, mpi_comm)
+        alg_min = QWOA(oracle.system_size, mpi_comm)
         alg_min.set_qualities(oracle.qualities_function())
         alg_min.set_depth(1)
 
@@ -270,10 +271,10 @@ class TestSetObjectiveWithOptimization:
         alg_min.execute(initial_params)
 
         # Maximization via negation
-        alg_max = qwoa(oracle.system_size, mpi_comm)
+        alg_max = QWOA(oracle.system_size, mpi_comm)
         alg_max.set_qualities(oracle.qualities_function())
 
-        def negate_objective(local_probabilities, observables, MPI_COMM):
+        def negate_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
             local_exp = np.dot(local_probabilities, observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return -global_exp
@@ -292,5 +293,5 @@ class TestSetObjectiveWithOptimization:
                 min_fun < -max_fun + 0.1
             ), f"Minimized exp ({min_fun}) should be less than maximized ({-max_fun})"
 
-        del alg_min
-        del alg_max
+        alg_min.destroy()
+        alg_max.destroy()

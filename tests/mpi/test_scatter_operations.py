@@ -3,16 +3,15 @@ Tests for core MPI scatter/gather operations.
 
 These tests verify the foundational MPI data distribution functions that
 all higher-level QuOp_MPI components depend on:
-- scatter_1D_array: Distributes 1D arrays across MPI ranks
+- scatter_1d_array: Distributes 1D arrays across MPI ranks
 - scatter_sparse: Distributes CSR sparse matrices across MPI ranks
 - gather_array: Gathers distributed arrays back to rank 0
 
 Run with: mpiexec -n <N> python -m pytest tests/mpi/test_scatter_operations.py -v --with-mpi
 """
 
-import pytest
 import numpy as np
-from mpi4py import MPI
+import pytest
 from scipy import sparse as sp
 
 # Import the internal functions at module level to avoid Python name mangling
@@ -20,7 +19,7 @@ from scipy import sparse as sp
 import quop_mpi._utils._mpi as mpi_utils
 
 # Create aliases for the dunder-prefixed functions
-scatter_1D_array = mpi_utils.__scatter_1D_array
+scatter_1d_array = mpi_utils.__scatter_1d_array
 scatter_sparse = mpi_utils.__scatter_sparse
 gather_array = mpi_utils.gather_array
 
@@ -68,17 +67,17 @@ def create_test_csr_matrix(n_rows, n_cols, density=0.3, seed=42):
 
 
 # =============================================================================
-# Tests for scatter_1D_array
+# Tests for scatter_1d_array
 # =============================================================================
 
 
 @pytest.mark.mpi
 class TestScatter1DArray:
-    """Tests for the scatter_1D_array function."""
+    """Tests for the scatter_1d_array function."""
 
     def test_scatter_float64_even_distribution(self, mpi_comm):
         """Test scattering float64 array with even distribution across ranks."""
-        # using module-level scatter_1D_array
+        # using module-level scatter_1d_array
 
         size = mpi_comm.Get_size()
         rank = mpi_comm.Get_rank()
@@ -94,9 +93,7 @@ class TestScatter1DArray:
             full_array = None
 
         # Scatter
-        local_array = scatter_1D_array(
-            full_array, partition_table, mpi_comm, np.float64
-        )
+        local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.float64)
 
         # Verify local partition
         local_i = partition_table[rank + 1] - partition_table[rank]
@@ -115,7 +112,7 @@ class TestScatter1DArray:
 
     def test_scatter_float64_uneven_distribution(self, mpi_comm):
         """Test scattering float64 array with uneven distribution (remainder)."""
-        # using module-level scatter_1D_array
+        # using module-level scatter_1d_array
 
         size = mpi_comm.Get_size()
         rank = mpi_comm.Get_rank()
@@ -129,23 +126,19 @@ class TestScatter1DArray:
         else:
             full_array = None
 
-        local_array = scatter_1D_array(
-            full_array, partition_table, mpi_comm, np.float64
-        )
+        local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.float64)
 
         local_i = partition_table[rank + 1] - partition_table[rank]
         local_i_offset = partition_table[rank] - 1
 
         assert len(local_array) == local_i
 
-        expected = (
-            np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64) * 2.5
-        )
+        expected = np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64) * 2.5
         np.testing.assert_allclose(local_array, expected, rtol=1e-14)
 
     def test_scatter_complex128(self, mpi_comm):
         """Test scattering complex128 array."""
-        # using module-level scatter_1D_array
+        # using module-level scatter_1d_array
 
         size = mpi_comm.Get_size()
         rank = mpi_comm.Get_rank()
@@ -160,9 +153,7 @@ class TestScatter1DArray:
         else:
             full_array = None
 
-        local_array = scatter_1D_array(
-            full_array, partition_table, mpi_comm, np.complex128
-        )
+        local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.complex128)
 
         local_i = partition_table[rank + 1] - partition_table[rank]
         local_i_offset = partition_table[rank] - 1
@@ -170,9 +161,7 @@ class TestScatter1DArray:
         assert len(local_array) == local_i
         assert local_array.dtype == np.complex128
 
-        expected_real = np.arange(
-            local_i_offset, local_i_offset + local_i, dtype=np.float64
-        )
+        expected_real = np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
         expected_imag = expected_real * 0.5
         expected = expected_real + 1j * expected_imag
 
@@ -180,7 +169,7 @@ class TestScatter1DArray:
 
     def test_scatter_small_system(self, mpi_comm):
         """Test scattering when system_size is smaller than or equal to rank count."""
-        # using module-level scatter_1D_array
+        # using module-level scatter_1d_array
 
         size = mpi_comm.Get_size()
         rank = mpi_comm.Get_rank()
@@ -194,9 +183,7 @@ class TestScatter1DArray:
         else:
             full_array = None
 
-        local_array = scatter_1D_array(
-            full_array, partition_table, mpi_comm, np.float64
-        )
+        local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.float64)
 
         local_i = partition_table[rank + 1] - partition_table[rank]
         assert len(local_array) == local_i
@@ -208,7 +195,7 @@ class TestScatter1DArray:
 
     def test_scatter_preserves_precision(self, mpi_comm):
         """Test that scatter preserves floating point precision."""
-        # using module-level scatter_1D_array
+        # using module-level scatter_1d_array
 
         size = mpi_comm.Get_size()
         rank = mpi_comm.Get_rank()
@@ -225,9 +212,7 @@ class TestScatter1DArray:
         else:
             full_array = None
 
-        local_array = scatter_1D_array(
-            full_array, partition_table, mpi_comm, np.float64
-        )
+        local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.float64)
 
         # Gather back and compare
         gathered = mpi_comm.gather(local_array.tolist(), root=0)
@@ -260,9 +245,7 @@ class TestGatherArray:
         local_i_offset = partition_table[rank] - 1
 
         # Each rank creates its local portion
-        local_array = np.arange(
-            local_i_offset, local_i_offset + local_i, dtype=np.float64
-        )
+        local_array = np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
         gathered = gather_array(local_array, partition_table, mpi_comm)
 
@@ -288,9 +271,7 @@ class TestGatherArray:
         local_i_offset = partition_table[rank] - 1
 
         # Create complex local array
-        real_part = np.arange(
-            local_i_offset, local_i_offset + local_i, dtype=np.float64
-        )
+        real_part = np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
         imag_part = real_part * 2.0
         local_array = (real_part + 1j * imag_part).astype(np.complex128)
 
@@ -318,15 +299,13 @@ class TestGatherArray:
             original = None
 
         # Broadcast original for later comparison
-        original = mpi_comm.bcast(original, root=0)
+        # original = mpi_comm.bcast(original, root=0)
 
         # Scatter
         if rank == 0:
-            local_array = scatter_1D_array(
-                original, partition_table, mpi_comm, np.float64
-            )
+            local_array = scatter_1d_array(original, partition_table, mpi_comm, np.float64)
         else:
-            local_array = scatter_1D_array(None, partition_table, mpi_comm, np.float64)
+            local_array = scatter_1d_array(None, partition_table, mpi_comm, np.float64)
 
         # Gather
         gathered = gather_array(local_array, partition_table, mpi_comm)
@@ -355,9 +334,7 @@ class TestScatterSparse:
         partition_table = create_partition_table(system_size, size)
 
         if rank == 0:
-            matrix = create_test_csr_matrix(
-                system_size, system_size, density=0.3, seed=42
-            )
+            matrix = create_test_csr_matrix(system_size, system_size, density=0.3, seed=42)
             # Convert to 1-based indexing for QuOp_MPI convention
             row_starts = [matrix.indptr + 1]
             col_indexes = [matrix.indices + 1]
@@ -367,25 +344,40 @@ class TestScatterSparse:
             col_indexes = None
             values = None
 
+<<<<<<< HEAD
         W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
+=======
+        w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
+>>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
         # Verify we got one term back
+<<<<<<< HEAD
         assert len(W_row_starts) == 1
         assert len(W_col_indexes) == 1
         assert len(W_values) == 1
         assert is_unit_valued == False  # We passed explicit values
+=======
+        print(
+            f"Rank {rank}: is_unit_valued={is_unit_valued}, "
+            f"w_row_starts={w_row_starts}, w_col_indexes={w_col_indexes}, w_values={w_values}"
+        )
+        assert len(w_row_starts) == 1
+        assert len(w_col_indexes) == 1
+        assert len(w_values) == 1
+        assert not is_unit_valued  # We passed explicit values
+>>>>>>> quop_quisa/main
 
         local_i = partition_table[rank + 1] - partition_table[rank]
 
         # Row starts should have local_i + 1 entries
-        assert len(W_row_starts[0]) == local_i + 1
+        assert len(w_row_starts[0]) == local_i + 1
 
         # Number of non-zeros should match
-        n_local_nnz = W_row_starts[0][-1] - W_row_starts[0][0]
-        assert len(W_col_indexes[0]) == n_local_nnz
-        assert len(W_values[0]) == n_local_nnz
+        n_local_nnz = w_row_starts[0][-1] - w_row_starts[0][0]
+        assert len(w_col_indexes[0]) == n_local_nnz
+        assert len(w_values[0]) == n_local_nnz
 
     def test_scatter_sparse_values_correct(self, mpi_comm):
         """Test that scattered sparse matrix values are correct."""
@@ -399,9 +391,7 @@ class TestScatterSparse:
 
         # Create a simple diagonal matrix for easy verification
         if rank == 0:
-            matrix = sp.diags(
-                np.arange(1, system_size + 1, dtype=np.complex128), format="csr"
-            )
+            matrix = sp.diags(np.arange(1, system_size + 1, dtype=np.complex128), format="csr")
             row_starts = [matrix.indptr + 1]
             col_indexes = [matrix.indices + 1]
             values = [matrix.data]
@@ -414,7 +404,11 @@ class TestScatterSparse:
 
         original_data = mpi_comm.bcast(original_data, root=0)
 
+<<<<<<< HEAD
         W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
+=======
+        w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
+>>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
@@ -427,7 +421,7 @@ class TestScatterSparse:
             local_i_offset + 1, local_i_offset + local_i + 1, dtype=np.complex128
         )
 
-        np.testing.assert_allclose(W_values[0], expected_values, rtol=1e-14)
+        np.testing.assert_allclose(w_values[0], expected_values, rtol=1e-14)
 
     def test_scatter_multiple_sparse_matrices(self, mpi_comm):
         """Test scattering multiple sparse matrices (list of CSR)."""
@@ -445,9 +439,7 @@ class TestScatterSparse:
             col_indexes = []
             values = []
             for i in range(n_matrices):
-                matrix = create_test_csr_matrix(
-                    system_size, system_size, density=0.2, seed=42 + i
-                )
+                matrix = create_test_csr_matrix(system_size, system_size, density=0.2, seed=42 + i)
                 row_starts.append(matrix.indptr + 1)
                 col_indexes.append(matrix.indices + 1)
                 values.append(matrix.data)
@@ -456,22 +448,26 @@ class TestScatterSparse:
             col_indexes = None
             values = None
 
+<<<<<<< HEAD
         W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
+=======
+        w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
+>>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
         # Verify we got all matrices
-        assert len(W_row_starts) == n_matrices
-        assert len(W_col_indexes) == n_matrices
-        assert len(W_values) == n_matrices
+        assert len(w_row_starts) == n_matrices
+        assert len(w_col_indexes) == n_matrices
+        assert len(w_values) == n_matrices
 
         local_i = partition_table[rank + 1] - partition_table[rank]
 
         for i in range(n_matrices):
-            assert len(W_row_starts[i]) == local_i + 1
-            n_local_nnz = W_row_starts[i][-1] - W_row_starts[i][0]
-            assert len(W_col_indexes[i]) == n_local_nnz
-            assert len(W_values[i]) == n_local_nnz
+            assert len(w_row_starts[i]) == local_i + 1
+            n_local_nnz = w_row_starts[i][-1] - w_row_starts[i][0]
+            assert len(w_col_indexes[i]) == n_local_nnz
+            assert len(w_values[i]) == n_local_nnz
 
     def test_scatter_sparse_empty_rows(self, mpi_comm):
         """Test scattering sparse matrix where some rows may be empty."""
@@ -485,9 +481,7 @@ class TestScatterSparse:
 
         if rank == 0:
             # Create a very sparse matrix (some rows will be empty)
-            matrix = create_test_csr_matrix(
-                system_size, system_size, density=0.1, seed=123
-            )
+            matrix = create_test_csr_matrix(system_size, system_size, density=0.1, seed=123)
             row_starts = [matrix.indptr + 1]
             col_indexes = [matrix.indices + 1]
             values = [matrix.data]
@@ -497,12 +491,16 @@ class TestScatterSparse:
             values = None
 
         # Should not raise even with empty rows
+<<<<<<< HEAD
         W_row_starts, W_col_indexes, W_values, is_unit_valued = scatter_sparse(
+=======
+        w_row_starts, w_col_indexes, w_values, is_unit_valued = scatter_sparse(
+>>>>>>> quop_quisa/main
             row_starts, col_indexes, values, partition_table, mpi_comm
         )
 
         local_i = partition_table[rank + 1] - partition_table[rank]
-        assert len(W_row_starts[0]) == local_i + 1
+        assert len(w_row_starts[0]) == local_i + 1
 
 
 # =============================================================================
@@ -528,9 +526,7 @@ class TestPartitionTableConsistency:
             assert partition_table[-1] == system_size + 1
 
             # Total elements across all partitions
-            total = sum(
-                partition_table[i + 1] - partition_table[i] for i in range(size)
-            )
+            total = sum(partition_table[i + 1] - partition_table[i] for i in range(size))
             assert total == system_size
 
     def test_all_ranks_agree_on_partition(self, mpi_comm):
@@ -577,9 +573,7 @@ class TestEdgeCases:
         else:
             full_array = None
 
-        local_array = scatter_1D_array(
-            full_array, partition_table, mpi_comm, np.float64
-        )
+        local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.float64)
 
         assert len(local_array) == 1
         assert local_array[0] == rank * 10.0
@@ -595,20 +589,16 @@ class TestEdgeCases:
         partition_table = create_partition_table(system_size, size)
 
         if rank == 0:
-            full_array = (
-                np.random.default_rng(42).random(system_size).astype(np.float64)
-            )
+            full_array = np.random.default_rng(42).random(system_size).astype(np.float64)
         else:
             full_array = None
 
         full_array = mpi_comm.bcast(full_array, root=0)
 
         if rank == 0:
-            local_array = scatter_1D_array(
-                full_array, partition_table, mpi_comm, np.float64
-            )
+            local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.float64)
         else:
-            local_array = scatter_1D_array(None, partition_table, mpi_comm, np.float64)
+            local_array = scatter_1d_array(None, partition_table, mpi_comm, np.float64)
 
         gathered = gather_array(local_array, partition_table, mpi_comm)
 
@@ -637,13 +627,9 @@ class TestEdgeCases:
             full_array = mpi_comm.bcast(full_array, root=0)
 
             if rank == 0:
-                local_array = scatter_1D_array(
-                    full_array, partition_table, mpi_comm, np.float64
-                )
+                local_array = scatter_1d_array(full_array, partition_table, mpi_comm, np.float64)
             else:
-                local_array = scatter_1D_array(
-                    None, partition_table, mpi_comm, np.float64
-                )
+                local_array = scatter_1d_array(None, partition_table, mpi_comm, np.float64)
 
             gathered = gather_array(local_array, partition_table, mpi_comm)
 

@@ -2,6 +2,8 @@
 *.csv
 *.out
 build
+build_*
+build-*
 dist
 *egg*
 *.h5
@@ -25,4 +27,19 @@ trace_*.txt
 *.tex
 *.aux
 *.md
+<<<<<<< HEAD
 dev
+=======
+!standards/*.md
+dev
+.venv
+.deps/
+.DS_Store
+env.sh
+pawsey_env.sh
+.vscode
+.pytest_cache
+build_wavefront_ubuntu.sh
+hipfft-*
+_skbuild
+>>>>>>> quop_quisa/main

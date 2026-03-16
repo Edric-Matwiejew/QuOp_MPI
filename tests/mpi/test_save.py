@@ -7,11 +7,11 @@ This module tests the HDF5 save functionality including:
 - Append vs overwrite modes
 """
 
-import pytest
-import numpy as np
 import os
 import tempfile
-from mpi4py import MPI
+
+import numpy as np
+import pytest
 
 
 @pytest.fixture
@@ -45,11 +45,11 @@ class TestSaveBasic:
 
     def test_save_creates_h5_file(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify save() creates an HDF5 file."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -65,17 +65,18 @@ class TestSaveBasic:
                 temp_h5_file + ".h5"
             ), f"HDF5 file not created at {temp_h5_file}.h5"
 
-        del alg
+        alg.destroy()
 
     def test_save_creates_config_group(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify save() creates a config group in the HDF5 file."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "my_simulation"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -88,19 +89,17 @@ class TestSaveBasic:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                assert (
-                    config_name in f
-                ), f"Config group '{config_name}' not found in file"
+                assert config_name in f, f"Config group '{config_name}' not found in file"
 
-        del alg
+        alg.destroy()
 
     def test_save_adds_h5_extension(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify save() adds .h5 extension if not present."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -116,7 +115,7 @@ class TestSaveBasic:
             # File should have .h5 extension
             assert os.path.exists(temp_h5_file + ".h5")
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -125,13 +124,14 @@ class TestSaveDatasets:
 
     def test_save_contains_final_state(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify saved file contains final_state dataset."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "state_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -146,22 +146,21 @@ class TestSaveDatasets:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
                 assert "final_state" in f[config_name], "final_state dataset not found"
 
-                final_state = np.array(f[config_name]["final_state"]).view(
-                    np.complex128
-                )
+                final_state = np.array(f[config_name]["final_state"]).view(np.complex128)
                 assert final_state.shape[0] == oracle.system_size
 
-        del alg
+        alg.destroy()
 
     def test_save_contains_observables(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify saved file contains observables dataset."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "obs_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -179,17 +178,18 @@ class TestSaveDatasets:
                 observables = np.array(f[config_name]["observables"]).view(np.float64)
                 assert observables.shape[0] == oracle.system_size
 
-        del alg
+        alg.destroy()
 
     def test_save_contains_initial_state(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify saved file contains initial_state dataset."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "init_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -202,28 +202,23 @@ class TestSaveDatasets:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                assert (
-                    "initial_state" in f[config_name]
-                ), "initial_state dataset not found"
+                assert "initial_state" in f[config_name], "initial_state dataset not found"
 
-                initial_state = np.array(f[config_name]["initial_state"]).view(
-                    np.complex128
-                )
+                initial_state = np.array(f[config_name]["initial_state"]).view(np.complex128)
                 assert initial_state.shape[0] == oracle.system_size
 
-        del alg
+        alg.destroy()
 
-    def test_save_contains_variational_params(
-        self, mpi_comm, simple_oracle, temp_h5_file
-    ):
+    def test_save_contains_variational_params(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify saved file contains initial_phases (variational parameters)."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "params_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -237,21 +232,20 @@ class TestSaveDatasets:
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
                 # Verify the initial_phases dataset exists
-                assert (
-                    "initial_phases" in f[config_name]
-                ), "initial_phases dataset not found"
+                assert "initial_phases" in f[config_name], "initial_phases dataset not found"
 
-        del alg
+        alg.destroy()
 
     def test_save_contains_minimize_result(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify saved file contains minimize_result attribute."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "result_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -271,24 +265,23 @@ class TestSaveDatasets:
                 result_str = f[config_name].attrs["minimize_result"]
                 assert len(result_str) > 0
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
 class TestSaveDuplicateHandling:
     """Tests for save() duplicate config name handling."""
 
-    def test_save_duplicate_config_adds_underscore(
-        self, mpi_comm, simple_oracle, temp_h5_file
-    ):
+    def test_save_duplicate_config_adds_underscore(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify duplicate config names get underscore suffix."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "duplicate_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -304,11 +297,9 @@ class TestSaveDuplicateHandling:
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
                 assert config_name in f, "Original config not found"
-                assert (
-                    f"{config_name}_" in f
-                ), "Duplicate config with underscore not found"
+                assert f"{config_name}_" in f, "Duplicate config with underscore not found"
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -317,12 +308,13 @@ class TestSaveModes:
 
     def test_save_append_mode(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify append mode preserves existing configs."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -342,16 +334,17 @@ class TestSaveModes:
                 assert "config_1" in f, "First config not preserved"
                 assert "config_2" in f, "Second config not added"
 
-        del alg
+        alg.destroy()
 
     def test_save_overwrite_mode(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify overwrite mode replaces file contents."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -371,7 +364,7 @@ class TestSaveModes:
                 assert "old_config" not in f, "Old config should be removed"
                 assert "new_config" in f, "New config should exist"
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -380,13 +373,14 @@ class TestSaveDataIntegrity:
 
     def test_saved_state_matches_computed(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify saved final_state matches computed state."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "integrity_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -402,9 +396,7 @@ class TestSaveDataIntegrity:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                final_state = np.array(f[config_name]["final_state"]).view(
-                    np.complex128
-                )
+                final_state = np.array(f[config_name]["final_state"]).view(np.complex128)
                 observables = np.array(f[config_name]["observables"]).view(np.float64)
 
                 # Compute expectation from saved data
@@ -415,17 +407,18 @@ class TestSaveDataIntegrity:
                     expectation_before, saved_expectation, rtol=1e-10
                 ), f"Expectation mismatch: computed={expectation_before}, saved={saved_expectation}"
 
-        del alg
+        alg.destroy()
 
     def test_saved_observables_are_valid(self, mpi_comm, simple_oracle, temp_h5_file):
         """Verify saved observables are valid (non-empty, correct size, finite)."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         config_name = "qualities_test"
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -444,11 +437,9 @@ class TestSaveDataIntegrity:
                 assert (
                     saved_obs.shape[0] == oracle.system_size
                 ), f"Expected {oracle.system_size} observables, got {saved_obs.shape[0]}"
-                assert np.all(
-                    np.isfinite(saved_obs)
-                ), "Observables contain non-finite values"
+                assert np.all(np.isfinite(saved_obs)), "Observables contain non-finite values"
 
-        del alg
+        alg.destroy()
 
 
 # =============================================================================
@@ -462,20 +453,17 @@ class TestParallelIODataIntegrity:
 
     def test_distributed_state_assembled_correctly(self, mpi_comm, temp_h5_file):
         """Verify that distributed state pieces are correctly assembled in HDF5."""
-        from quop_mpi.algorithm.combinatorial import qwoa
-        from quop_mpi._utils._mpi import gather_array
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 16
 
         def qualities(local_i, local_i_offset):
             # Each rank has unique observable values for identification
-            return (
-                np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
-                * 2.0
-            )
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64) * 2.0
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -494,9 +482,7 @@ class TestParallelIODataIntegrity:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                saved_state = np.array(f[config_name]["final_state"]).view(
-                    np.complex128
-                )
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
 
                 # Verify saved state matches gathered state
                 np.testing.assert_allclose(
@@ -506,13 +492,14 @@ class TestParallelIODataIntegrity:
                     err_msg="Saved state does not match gathered distributed state",
                 )
 
-        del alg
+        alg.destroy()
 
     def test_distributed_observables_assembled_correctly(self, mpi_comm, temp_h5_file):
         """Verify that distributed observables are correctly assembled in HDF5."""
-        from quop_mpi.algorithm.combinatorial import qwoa
-        from quop_mpi._utils._mpi import gather_array
         import h5py
+
+        from quop_mpi._utils._mpi import gather_array
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 32
 
@@ -523,21 +510,24 @@ class TestParallelIODataIntegrity:
                 dtype=np.float64,
             )
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
         params = np.array([0.0, 0.0])
         alg.execute(params)
 
-        # Gather observables after setup (observables are set after execute)
-        local_obs = alg.observables[: alg.local_i]
-        partition_table = alg.partition_table
-
-        full_obs_gathered = gather_array(local_obs, partition_table, mpi_comm)
-
         config_name = "dist_obs_test"
-        alg.save(temp_h5_file, config_name)
+        full_obs_gathered = None
+
+        if alg.subcomms.in_subcomm():
+            # Gather observables after setup (observables are set after execute)
+            local_obs = alg.observables[: alg.local_i]
+            partition_table = alg.partition_table
+
+            full_obs_gathered = gather_array(local_obs, partition_table, alg.MPI_COMM)
+
+            alg.save(temp_h5_file, config_name)
 
         mpi_comm.barrier()
 
@@ -553,12 +543,13 @@ class TestParallelIODataIntegrity:
                     err_msg="Saved observables do not match gathered distributed observables",
                 )
 
-        del alg
+        alg.destroy()
 
     def test_partition_contributions_are_contiguous(self, mpi_comm, temp_h5_file):
         """Verify each rank's partition appears at correct offset in saved file."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 24
 
@@ -571,14 +562,11 @@ class TestParallelIODataIntegrity:
                 dtype=np.float64,
             )
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
         # Store local info for verification
-        local_i = alg.local_i
-        local_i_offset = alg.local_i_offset
-        rank = mpi_comm.Get_rank()
 
         params = np.array([0.0, 0.0])
         alg.execute(params)
@@ -596,26 +584,26 @@ class TestParallelIODataIntegrity:
                 # Each element should encode: rank * 1000 + global_index
                 for i in range(system_size):
                     val = saved_obs[i]
-                    encoded_rank = int(val) // 1000
                     encoded_index = int(val) % 1000
 
                     assert (
                         encoded_index == i
                     ), f"Index mismatch at position {i}: expected {i}, got {encoded_index}"
 
-        del alg
+        alg.destroy()
 
     def test_complex_data_real_imag_preserved(self, mpi_comm, temp_h5_file):
         """Verify complex state data preserves both real and imaginary parts."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 16
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -633,9 +621,7 @@ class TestParallelIODataIntegrity:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                saved_state = np.array(f[config_name]["final_state"]).view(
-                    np.complex128
-                )
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
 
                 # Verify real parts match
                 np.testing.assert_allclose(
@@ -653,12 +639,13 @@ class TestParallelIODataIntegrity:
                     err_msg="Imaginary parts of state do not match",
                 )
 
-        del alg
+        alg.destroy()
 
     def test_uneven_partition_sizes(self, mpi_comm, temp_h5_file):
         """Verify correct saving with uneven partition sizes across ranks."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         # Use a system size that doesn't divide evenly by common rank counts
         # 17 is prime, guarantees uneven partitioning
@@ -667,15 +654,16 @@ class TestParallelIODataIntegrity:
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
-        # Verify uneven partitioning exists
-        all_local_i = mpi_comm.allgather(alg.local_i)
-
+        # Verify uneven partitioning exists (note: local_i is 0 before setup)
         params = np.array([0.2, 0.3])
         alg.execute(params)
+
+        if alg.subcomms.in_subcomm():
+            alg.MPI_COMM.allgather(alg.local_i)
 
         config_name = "uneven_test"
         alg.save(temp_h5_file, config_name)
@@ -685,9 +673,7 @@ class TestParallelIODataIntegrity:
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
                 saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
-                saved_state = np.array(f[config_name]["final_state"]).view(
-                    np.complex128
-                )
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
 
                 # Verify correct sizes
                 assert (
@@ -701,21 +687,20 @@ class TestParallelIODataIntegrity:
                 expected_obs = np.arange(system_size, dtype=np.float64)
                 np.testing.assert_allclose(saved_obs, expected_obs, rtol=1e-14)
 
-        del alg
+        alg.destroy()
 
     def test_large_system_parallel_save(self, mpi_comm, temp_h5_file):
         """Test parallel save with larger system size for stress testing."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 256  # Larger system
 
         def qualities(local_i, local_i_offset):
-            return np.sin(
-                np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
-            )
+            return np.sin(np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64))
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -729,9 +714,7 @@ class TestParallelIODataIntegrity:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                saved_state = np.array(f[config_name]["final_state"]).view(
-                    np.complex128
-                )
+                saved_state = np.array(f[config_name]["final_state"]).view(np.complex128)
                 saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
 
                 # Verify sizes
@@ -748,19 +731,20 @@ class TestParallelIODataIntegrity:
                 expected_obs = np.sin(np.arange(system_size, dtype=np.float64))
                 np.testing.assert_allclose(saved_obs, expected_obs, rtol=1e-10)
 
-        del alg
+        alg.destroy()
 
     def test_initial_state_parallel_save(self, mpi_comm, temp_h5_file):
         """Verify initial_state is correctly saved in parallel."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 32
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -774,31 +758,28 @@ class TestParallelIODataIntegrity:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                saved_init = np.array(f[config_name]["initial_state"]).view(
-                    np.complex128
-                )
+                saved_init = np.array(f[config_name]["initial_state"]).view(np.complex128)
 
                 # Initial state should be uniform superposition
                 expected_amplitude = 1.0 / np.sqrt(system_size)
-                expected_init = np.full(
-                    system_size, expected_amplitude, dtype=np.complex128
-                )
+                expected_init = np.full(system_size, expected_amplitude, dtype=np.complex128)
 
                 np.testing.assert_allclose(saved_init, expected_init, rtol=1e-10)
 
-        del alg
+        alg.destroy()
 
     def test_multiple_configs_independent(self, mpi_comm, temp_h5_file):
         """Verify multiple saved configs don't interfere with each other."""
-        from quop_mpi.algorithm.combinatorial import qwoa
         import h5py
+
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = 16
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -824,15 +805,9 @@ class TestParallelIODataIntegrity:
                 state3 = np.array(f["config_3"]["final_state"]).view(np.complex128)
 
                 # States should be different
-                assert not np.allclose(
-                    state1, state2
-                ), "config_1 and config_2 should differ"
-                assert not np.allclose(
-                    state2, state3
-                ), "config_2 and config_3 should differ"
-                assert not np.allclose(
-                    state1, state3
-                ), "config_1 and config_3 should differ"
+                assert not np.allclose(state1, state2), "config_1 and config_2 should differ"
+                assert not np.allclose(state2, state3), "config_2 and config_3 should differ"
+                assert not np.allclose(state1, state3), "config_1 and config_3 should differ"
 
                 # Each should be normalized
                 for state, name in [
@@ -841,8 +816,6 @@ class TestParallelIODataIntegrity:
                     (state3, "config_3"),
                 ]:
                     probs = np.abs(state) ** 2
-                    assert np.isclose(
-                        np.sum(probs), 1.0, rtol=1e-10
-                    ), f"{name} not normalized"
+                    assert np.isclose(np.sum(probs), 1.0, rtol=1e-10), f"{name} not normalized"
 
-        del alg
+        alg.destroy()

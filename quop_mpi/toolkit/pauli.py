@@ -1,6 +1,14 @@
+"""Pauli operator construction for multi-qubit systems."""
+
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 from scipy import sparse as __sparse
+
+if TYPE_CHECKING:
+    from scipy.sparse import csr_matrix
 
 y = __sparse.coo_matrix(np.array([[0, -1j], [1j, 0]]))
 x = __sparse.coo_matrix(np.array([[0, 1], [1, 0]]))
@@ -22,7 +30,7 @@ def __pauli_term(matrix, index, n_qubits):
     return kron_terms[0].tocsr()
 
 
-def I(n_qubits: int) -> "csr_matrix":
+def I(n_qubits: int) -> csr_matrix:  # noqa: E743, N802 — standard Pauli operator name
     """Generate a sparse identity matrix of size ``2 ** n_qubits``.
 
     Parameters
@@ -38,7 +46,7 @@ def I(n_qubits: int) -> "csr_matrix":
     return __sparse.identity(2**n_qubits, format="csr")
 
 
-def X(index: int, n_qubits: int) -> "csr_matrix":
+def X(index: int, n_qubits: int) -> csr_matrix:  # noqa: N802
     """Generate the Pauli X operator acting on qubit ``index`` in a system of
     ``n_qubits``.
 
@@ -57,7 +65,7 @@ def X(index: int, n_qubits: int) -> "csr_matrix":
     return __pauli_term(x, index, n_qubits)
 
 
-def Y(index: int, n_qubits: int) -> "csr_matrix":
+def Y(index: int, n_qubits: int) -> csr_matrix:  # noqa: N802
     """Generate the Pauli Y operator acting on qubit ``index`` in a system of
     ``n_qubits``.
 
@@ -76,7 +84,7 @@ def Y(index: int, n_qubits: int) -> "csr_matrix":
     return __pauli_term(y, index, n_qubits)
 
 
-def Z(index: int, n_qubits: int):
+def Z(index: int, n_qubits: int):  # noqa: N802
     """Generate the Pauli Z operator acting on qubit ``index`` in a system of
     ``n_qubits``.
 

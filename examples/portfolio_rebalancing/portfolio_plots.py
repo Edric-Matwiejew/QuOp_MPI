@@ -1,6 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import h5py as h5
 import pandas as pd
 
 plt.rcParams["font.size"] = 16

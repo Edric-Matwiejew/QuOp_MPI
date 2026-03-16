@@ -1,26 +1,32 @@
+"""Random diagonal operator functions for phase-shift unitaries."""
+
 from __future__ import annotations
+
+from typing import Iterable
+
 import numpy as np
-from quop_mpi._utils._mpi import __scatter_1D_array
 
 ####################################
 # imports and classes for type hints
 ####################################
-
 from mpi4py import MPI
-from typing import Callable, Union, Iterable
+
+from quop_mpi._utils._mpi import __scatter_1d_array
 
 Intracomm = MPI.Intracomm
 iterable = Iterable
 
 ####################################
 
+
 def uniform(
-        system_size: int,
-        partition_table: int,
-        seed: int,
-        MPI_COMM: Intracomm,
-        low: float = 0,
-        high: float = 1) -> np.ndarray[np.float64]:
+    system_size: int,
+    partition_table: int,
+    seed: int,
+    MPI_COMM: Intracomm,  # noqa: N803
+    low: float = 0,
+    high: float = 1,
+) -> np.ndarray[np.float64]:
     """Generate the diagonal of a :term:`phase-shift unitary` :term:`operator`
     from a uniform distribution.
 
@@ -32,13 +38,13 @@ def uniform(
     Parameters
     ----------
     system_size : int
-        :term:`system size` of the simulated :term:`QVA`, :class:`quop_mpi.Unitary` attribute
+        :term:`system size` of the simulated :term:`QVA`, :class:`quop_mpi.unitary` attribute
     partition_table : int
-        describes the parallel partitioning scheme, :class:`quop_mpi.Unitary` attribute
+        describes the parallel partitioning scheme, :class:`quop_mpi.unitary` attribute
     seed : int
-        seeds the random number generator, :class:`quop_mpi.Unitary` attribute
+        seeds the random number generator, :class:`quop_mpi.unitary` attribute
     MPI_COMM : Intracomm
-        MPI communicator, :class:`quop_mpi.Unitary` attribute
+        MPI communicator, :class:`quop_mpi.unitary` attribute
     low : float, optional
         lower bound of the uniform distribution (inclusive), by default 0
     high : float, optional
@@ -55,11 +61,10 @@ def uniform(
 
         np.random.seed(seed)
 
-        diagonal = np.random.uniform(low = low, high = high, size = system_size)
+        diagonal = np.random.uniform(low=low, high=high, size=system_size)
 
     else:
 
         diagonal = None
 
-    return __scatter_1D_array(diagonal, partition_table, MPI_COMM, np.float64)
-
+    return __scatter_1d_array(diagonal, partition_table, MPI_COMM, np.float64)

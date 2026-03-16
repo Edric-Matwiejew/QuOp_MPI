@@ -27,11 +27,27 @@ def load_expected_results():
         return json.load(f)
 
 
-def run_example(script_path, cwd, nprocs=4, timeout=300):
+def _integration_env():
+    env = dict(os.environ)
+    # Keep integration tests deterministic and independent of live market APIs.
+    env["QUOP_PORTFOLIO_USE_SAMPLE_DATA"] = "1"
+    return env
+
+
+def _build_launch_cmd(nprocs, launcher="mpiexec"):
+    """Return the MPI launcher command prefix as a list."""
+    if launcher == "srun":
+        return ["srun", "-N", "1", "-n", str(nprocs), "--gpus=" + str(nprocs)]
+    return ["mpiexec", "-n", str(nprocs)]
+
+
+def run_example(script_path, cwd, nprocs=4, timeout=300, launcher="mpiexec"):
     """Run an example script and return parsed results."""
+    cmd = _build_launch_cmd(nprocs, launcher) + ["python", script_path]
     result = subprocess.run(
-        ["mpiexec", "-n", str(nprocs), "python", script_path],
+        cmd,
         cwd=str(cwd),
+        env=_integration_env(),
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -79,12 +95,14 @@ def validate_result(result, config):
 
 
 def main():
-    # Get number of MPI processes from command line (default: 4)
+    # Usage: run_integration_tests.py [nprocs] [launcher]
+    #   launcher: "mpiexec" (default) or "srun" (Cray)
     nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+    launcher = sys.argv[2] if len(sys.argv) > 2 else "mpiexec"
 
     expected = load_expected_results()
 
-    print(f"Running {len(expected)} integration tests with {nprocs} MPI processes...")
+    print(f"Running {len(expected)} integration tests with {nprocs} MPI processes ({launcher})...")
     print("=" * 60)
 
     passed = 0
@@ -97,7 +115,25 @@ def main():
         print(f"\n[{test_name}] {config['description']}...")
 
         try:
-            result = run_example(script, example_dir, nprocs=nprocs)
+            # Run setup script if specified (e.g., to generate data files)
+            if "setup_script" in config:
+                setup_script = config["setup_script"]
+                print(f"  Running setup: {setup_script}...")
+                setup_result = subprocess.run(
+                    ["python", setup_script],
+                    cwd=str(example_dir),
+                    env=_integration_env(),
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                if setup_result.returncode != 0:
+                    print("  FAILED (setup script failed)")
+                    print(f"    {setup_result.stderr}")
+                    failed += 1
+                    continue
+
+            result = run_example(script, example_dir, nprocs=nprocs, launcher=launcher)
             errors = validate_result(result, config)
 
             if result["success"] and not errors:

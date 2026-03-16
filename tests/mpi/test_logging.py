@@ -7,12 +7,11 @@ This module tests the logging functionality including:
 - Log file format
 """
 
-import pytest
-import numpy as np
-import tempfile
-import os
 import csv
-from mpi4py import MPI
+import os
+import tempfile
+
+import pytest
 
 
 @pytest.mark.mpi
@@ -21,14 +20,14 @@ class TestSetLogBasic:
 
     def test_set_log_creates_file(self, mpi_comm, simple_oracle):
         """Verify set_log creates a log file after execute()."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
         with tempfile.TemporaryDirectory() as tmpdir:
             log_path = os.path.join(tmpdir, "test_log")
 
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_log(log_path, "test_run")
             alg.set_depth(1)
@@ -41,22 +40,20 @@ class TestSetLogBasic:
 
             if mpi_comm.Get_rank() == 0:
                 expected_file = log_path + ".csv"
-                assert os.path.exists(
-                    expected_file
-                ), f"Log file not created: {expected_file}"
+                assert os.path.exists(expected_file), f"Log file not created: {expected_file}"
 
-            del alg
+            alg.destroy()
 
     def test_set_log_adds_csv_extension(self, mpi_comm, simple_oracle):
         """Verify .csv extension is added automatically."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
         with tempfile.TemporaryDirectory() as tmpdir:
             log_path = os.path.join(tmpdir, "my_log")  # No .csv
 
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_log(log_path, "label")
             alg.set_depth(1)
@@ -76,18 +73,18 @@ class TestSetLogBasic:
                     or log_path.endswith(".csv")
                 )
 
-            del alg
+            alg.destroy()
 
     def test_set_log_with_csv_extension(self, mpi_comm, simple_oracle):
         """Verify explicit .csv extension works."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
         with tempfile.TemporaryDirectory() as tmpdir:
             log_path = os.path.join(tmpdir, "my_log.csv")
 
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_log(log_path, "label")
             alg.set_depth(1)
@@ -100,7 +97,7 @@ class TestSetLogBasic:
             if mpi_comm.Get_rank() == 0:
                 assert os.path.exists(log_path)
 
-            del alg
+            alg.destroy()
 
 
 @pytest.mark.mpi
@@ -109,7 +106,7 @@ class TestSetLogContent:
 
     def test_log_contains_label(self, mpi_comm, simple_oracle):
         """Verify log file contains the specified label."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
@@ -117,7 +114,7 @@ class TestSetLogContent:
             log_path = os.path.join(tmpdir, "test_log.csv")
             label = "my_test_label"
 
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_log(log_path, label)
             alg.set_depth(1)
@@ -132,18 +129,18 @@ class TestSetLogContent:
                     content = f.read()
                 assert label in content, f"Label '{label}' not found in log file"
 
-            del alg
+            alg.destroy()
 
     def test_log_contains_objective_value(self, mpi_comm, simple_oracle):
         """Verify log file contains the final objective value."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
         with tempfile.TemporaryDirectory() as tmpdir:
             log_path = os.path.join(tmpdir, "test_log.csv")
 
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_log(log_path, "test")
             alg.set_depth(1)
@@ -167,7 +164,7 @@ class TestSetLogContent:
                 has_float = any(self._is_float(x) for x in data_row)
                 assert has_float, "Log should contain numeric objective value"
 
-            del alg
+            alg.destroy()
 
     @staticmethod
     def _is_float(s):
@@ -179,7 +176,7 @@ class TestSetLogContent:
 
     def test_log_contains_depth(self, mpi_comm, simple_oracle):
         """Verify log file contains the ansatz depth."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
         depth = 2
@@ -187,7 +184,7 @@ class TestSetLogContent:
         with tempfile.TemporaryDirectory() as tmpdir:
             log_path = os.path.join(tmpdir, "test_log.csv")
 
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_log(log_path, "test")
             alg.set_depth(depth)
@@ -203,7 +200,7 @@ class TestSetLogContent:
                 # Depth value should appear somewhere in the log
                 assert str(depth) in content, f"Depth {depth} not found in log file"
 
-            del alg
+            alg.destroy()
 
 
 @pytest.mark.mpi
@@ -212,7 +209,7 @@ class TestSetLogModes:
 
     def test_log_append_mode(self, mpi_comm, simple_oracle):
         """Verify append mode adds to existing log file."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
@@ -220,12 +217,12 @@ class TestSetLogModes:
             log_path = os.path.join(tmpdir, "test_log.csv")
 
             # First run
-            alg1 = qwoa(oracle.system_size, mpi_comm)
+            alg1 = QWOA(oracle.system_size, mpi_comm)
             alg1.set_qualities(oracle.qualities_function())
             alg1.set_log(log_path, "run1", action="a")
             alg1.set_depth(1)
             alg1.execute(oracle.optimal_params(depth=1))
-            del alg1
+            alg1.destroy()
 
             mpi_comm.barrier()
 
@@ -237,12 +234,12 @@ class TestSetLogModes:
             lines_after_first = mpi_comm.bcast(lines_after_first, root=0)
 
             # Second run - should append
-            alg2 = qwoa(oracle.system_size, mpi_comm)
+            alg2 = QWOA(oracle.system_size, mpi_comm)
             alg2.set_qualities(oracle.qualities_function())
             alg2.set_log(log_path, "run2", action="a")
             alg2.set_depth(1)
             alg2.execute(oracle.optimal_params(depth=1))
-            del alg2
+            alg2.destroy()
 
             mpi_comm.barrier()
 
@@ -257,7 +254,7 @@ class TestSetLogModes:
 
     def test_log_overwrite_mode(self, mpi_comm, simple_oracle):
         """Verify overwrite mode replaces log file content."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
@@ -265,22 +262,22 @@ class TestSetLogModes:
             log_path = os.path.join(tmpdir, "test_log.csv")
 
             # First run
-            alg1 = qwoa(oracle.system_size, mpi_comm)
+            alg1 = QWOA(oracle.system_size, mpi_comm)
             alg1.set_qualities(oracle.qualities_function())
             alg1.set_log(log_path, "first_run", action="w")
             alg1.set_depth(1)
             alg1.execute(oracle.optimal_params(depth=1))
-            del alg1
+            alg1.destroy()
 
             mpi_comm.barrier()
 
             # Second run - should overwrite
-            alg2 = qwoa(oracle.system_size, mpi_comm)
+            alg2 = QWOA(oracle.system_size, mpi_comm)
             alg2.set_qualities(oracle.qualities_function())
             alg2.set_log(log_path, "second_run", action="w")
             alg2.set_depth(1)
             alg2.execute(oracle.optimal_params(depth=1))
-            del alg2
+            alg2.destroy()
 
             mpi_comm.barrier()
 
@@ -299,14 +296,14 @@ class TestSetLogWithMultipleExecutions:
 
     def test_multiple_executes_multiple_log_entries(self, mpi_comm, simple_oracle):
         """Verify multiple execute() calls create multiple log entries."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
         with tempfile.TemporaryDirectory() as tmpdir:
             log_path = os.path.join(tmpdir, "test_log.csv")
 
-            alg = qwoa(oracle.system_size, mpi_comm)
+            alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
             alg.set_log(log_path, "multi_run", action="a")
             alg.set_depth(1)
@@ -327,8 +324,6 @@ class TestSetLogWithMultipleExecutions:
 
                 # Should have header + n_runs data rows
                 # (or just n_runs rows if header is per-run)
-                assert (
-                    len(rows) >= n_runs
-                ), f"Expected at least {n_runs} rows, got {len(rows)}"
+                assert len(rows) >= n_runs, f"Expected at least {n_runs} rows, got {len(rows)}"
 
-            del alg
+            alg.destroy()

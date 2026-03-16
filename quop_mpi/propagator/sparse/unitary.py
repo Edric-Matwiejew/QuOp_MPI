@@ -1,11 +1,17 @@
-from importlib import import_module
+"""Sparse matrix unitary propagator."""
+
+from __future__ import annotations
+
+from types import ModuleType
+from typing import Any
+
 import numpy as np
-from quop_mpi.Unitary import Unitary
-from quop_mpi import config
-from quop_mpi._lib.propagator import propagator
+
+from quop_mpi._lib.propagator import Propagator
+from quop_mpi.unitary import UnitaryBase
 
 
-class unitary(Unitary):
+class Unitary(UnitaryBase):
     """Compute the action of a :term:`mixing unitary` with a sparse
     :term:`operator` or a sequence of mixing-unitaries with sparse
     operators (see the :literal:`unitary_n_params` attribute below).
@@ -17,13 +23,13 @@ class unitary(Unitary):
             digraph "sphinx-ext-graphviz" {
                 rankdir="LR";
                 node [fontsize="10"];
-                Unitary[label="quop_mpi.Unitary", shape="rectangle"];
+                Unitary[label="quop_mpi.unitary", shape="rectangle"];
                 unitary[label="quop_mpi.propagator.sparse.unitary", shape="rectangle"];
 
                 Unitary -> unitary;
             }
 
-    See :class:`quop_mpi.Unitary`.
+    See :class:`quop_mpi.unitary`.
 
     Attributes
     ----------
@@ -38,7 +44,8 @@ class unitary(Unitary):
         of :literal:`local_i` rows.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
+        """Initialise the sparse unitary propagator."""
 
         super().__init__(*args, **kwargs)
 
@@ -47,11 +54,12 @@ class unitary(Unitary):
         self.context = None
         self.backend = None
 
-    def assign_backend(self, backend):
-
+    def assign_backend(self, backend: ModuleType) -> None:
+        """Assign the compute backend for sparse propagation."""
         self.propagator_module = backend.sparse_propagator
 
         self.propagators = []
+<<<<<<< HEAD
         for i in range(self.unitary_n_params):
             self.propagators.append(
                 propagator(self.propagator_module.sparse_propagator_wrapper)
@@ -73,15 +81,28 @@ class unitary(Unitary):
 
     def gen_operator(self, *args):
         import sys
+=======
+        for _ in range(self.unitary_n_params):
+            self.propagators.append(Propagator(self.propagator_module.sparse_propagator_wrapper))
+>>>>>>> quop_quisa/main
 
+    def gen_operator(self, *args: Any) -> None:  # noqa: ANN401
+        """Generate the sparse operator and plan the propagators."""
         for propagator in self.propagators:
             propagator.plan(self.context)
 
+        self.planned = True  # Mark as planned so destroy() is called during cleanup
         super().gen_operator(*args)
 
         # Unpack operator result - may have 3 or 4 elements depending on source
         if len(self.operator) == 4:
+<<<<<<< HEAD
             self.W_row_starts, self.W_col_indexes, self.W_values, self.is_unit_valued = self.operator
+=======
+            self.W_row_starts, self.W_col_indexes, self.W_values, self.is_unit_valued = (
+                self.operator
+            )
+>>>>>>> quop_quisa/main
         else:
             self.W_row_starts, self.W_col_indexes, self.W_values = self.operator
             # Detect unit-valued from None values
@@ -104,12 +125,14 @@ class unitary(Unitary):
                 ]
             propagator.gen_operator(operator_args)
 
-    def propagate(self, ts):
-        for i, (t, propagator) in enumerate(zip(ts, self.propagators)):
+    def propagate(self, ts: np.ndarray) -> None:
+        """Apply sparse propagators with parameters ``ts``."""
+        for i, (t, propagator) in enumerate(zip(ts, self.propagators, strict=True)):
             propagator.propagate(np.abs(t))
             if i < len(ts) - 1:
                 propagator.context.initial_state = propagator.context.final_state
 
-    def destroy(self):
+    def destroy(self) -> None:
+        """Free sparse propagator resources."""
         for propagator in self.propagators:
             propagator.destroy()

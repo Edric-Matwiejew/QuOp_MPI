@@ -2,14 +2,22 @@
 Shared pytest fixtures for QuOp_MPI tests.
 
 MPI tests should be run with:
-    mpiexec -n <nprocs> python -m pytest tests/mpi/
+    mpiexec -n <nprocs> python -m pytest tests/ --with-mpi
+
+Use --backend to select the backend:
+    mpiexec -n <nprocs> python -m pytest tests/ --with-mpi --backend mpi
+    mpiexec -n <nprocs> python -m pytest tests/ --with-mpi --backend wavefront
 """
 
-import os
-import pytest
-import numpy as np
 import math
+import os
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import pytest
 from mpi4py import MPI
 
 # Set OMP_NUM_THREADS=1 to prevent OpenMP thread contention with MPI
@@ -17,17 +25,104 @@ from mpi4py import MPI
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 
+def _system_tmp_is_shared() -> bool:
+    """Return True if the system temp directory is writable AND on a shared filesystem.
+
+    Parallel HDF5 / MPI-IO requires files to be on a shared (e.g. Lustre)
+    filesystem.  On Cray compute nodes ``/tmp`` is typically a node-local
+    RAM-backed tmpfs -- writable, but invisible to MPI-IO and other ranks.
+    We therefore check not only writability but also whether the temp dir
+    lives on the same device as CWD (which is normally on scratch/Lustre).
+    """
+    tmp_root = tempfile.gettempdir()
+    try:
+        fd, probe_path = tempfile.mkstemp(prefix="quop_tmp_probe_", dir=tmp_root)
+    except OSError:
+        return False
+
+    try:
+        os.close(fd)
+        os.unlink(probe_path)
+    except OSError:
+        return False
+
+    # If /tmp is on a different device from CWD it is probably node-local.
+    try:
+        tmp_dev = os.stat(tmp_root).st_dev
+        cwd_dev = os.stat(".").st_dev
+        if tmp_dev != cwd_dev:
+            return False
+    except OSError:
+        return False
+
+    return True
+
+
+def _configure_temp_fallback_if_needed(config):
+    """
+    Configure tempfile/pytest temp roots to a hidden CWD folder when system
+    temp is not writable or not on a shared filesystem (needed for MPI-IO).
+    """
+    if _system_tmp_is_shared():
+        return
+
+    cwd = Path.cwd()
+    fallback_root = cwd / ".quop_pytest_tmp"
+    shared_root = fallback_root / "shared"
+    pytest_base = shared_root / "pytest_basetemp"
+
+    shared_root.mkdir(parents=True, exist_ok=True)
+    pytest_base.mkdir(parents=True, exist_ok=True)
+
+    fallback_tmp = str(shared_root.resolve())
+    os.environ["TMPDIR"] = fallback_tmp
+    os.environ["TEMP"] = fallback_tmp
+    os.environ["TMP"] = fallback_tmp
+    tempfile.tempdir = fallback_tmp
+
+    if getattr(config.option, "basetemp", None) is None:
+        config.option.basetemp = str(pytest_base.resolve())
+
+
 # =============================================================================
 # Pytest Configuration
 # =============================================================================
 
 
+def pytest_addoption(parser):
+    """Add --backend option to pytest."""
+    parser.addoption(
+        "--backend",
+        action="store",
+        default=None,
+        choices=["mpi", "wavefront"],
+        help="Set the QuOp backend: mpi or wavefront",
+    )
+
+
 def pytest_configure(config):
-    """Register custom markers."""
+    """Register custom markers and set backend environment variable."""
+    _configure_temp_fallback_if_needed(config)
+
+    # Set backend environment variable before any quop_mpi imports
+    backend = config.getoption("--backend")
+    if backend:
+        os.environ["QUOP_BACKEND"] = backend
+
     config.addinivalue_line(
         "markers",
         "requires_nprocs(n): skip test unless at least n MPI processes are available",
     )
+
+
+def pytest_report_header(config):
+    """Add backend information to pytest header."""
+    from quop_mpi import config as quop_config
+
+    return [
+        f"QuOp backend: {quop_config.backend}",
+        f"MPI size: {MPI.COMM_WORLD.Get_size()}",
+    ]
 
 
 def pytest_runtest_setup(item):
@@ -80,6 +175,23 @@ def grover_params(n_marked: int, system_size: int) -> GroverResult:
 # =============================================================================
 # MPI Fixtures
 # =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def _mpi_barrier_teardown(request):
+    """Barrier on COMM_WORLD after every test to prevent cascade desync.
+
+    When FFTW excludes ranks from a SUBCOMM, some tests leave unmatched
+    collectives in flight.  A world barrier at teardown guarantees all
+    ranks are synchronised before the next test begins.
+    """
+    yield
+    if MPI.Is_initialized() and not MPI.Is_finalized():
+        MPI.COMM_WORLD.Barrier()
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            import sys
+
+            print(f"[BARRIER] after {request.node.nodeid}", file=sys.stderr, flush=True)
 
 
 @pytest.fixture(scope="session")
@@ -263,9 +375,7 @@ class _GroverOracle:
                     cols.append(j)
 
         data = np.ones(len(rows), dtype=np.float64)
-        complete_graph = csr_matrix(
-            (data, (rows, cols)), shape=(system_size, system_size)
-        )
+        complete_graph = csr_matrix((data, (rows, cols)), shape=(system_size, system_size))
 
         def _operator():
             """Return complete graph as list of CSR matrices for sparse.operator.serial."""
@@ -339,8 +449,6 @@ def gather_state_probabilities(alg, comm):
 # Algorithm Factory Functions
 # =============================================================================
 
-from contextlib import contextmanager
-
 
 @contextmanager
 def patch_qaoa_mixer(complete_graph_operator_func):
@@ -359,7 +467,7 @@ def patch_qaoa_mixer(complete_graph_operator_func):
     Usage
     -----
     >>> complete_op = make_complete_graph_operator(system_size)
-    >>> alg = qaoa(system_size, comm)
+    >>> alg = QAOA(system_size, comm)
     >>> alg.set_qualities(oracle.qualities_function())
     >>> alg.set_depth(1)
     >>> with patch_qaoa_mixer(complete_op):
@@ -412,7 +520,7 @@ def make_complete_graph_operator(system_size: int):
     data = np.ones(len(rows), dtype=np.float64)
     complete_graph = csr_matrix((data, (rows, cols)), shape=(system_size, system_size))
 
-    def complete_graph_operator(partition_table, MPI_COMM, *args, **kwargs):
+    def complete_graph_operator(partition_table, MPI_COMM, *args, **kwargs):  # noqa: N803
         """
         Complete graph operator with same signature as sparse.operator.hypercube.
 
@@ -431,9 +539,7 @@ def make_complete_graph_operator(system_size: int):
             col_indexes = None
             values = None
 
-        return __scatter_sparse(
-            row_starts, col_indexes, values, partition_table, MPI_COMM
-        )
+        return __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
 
     return complete_graph_operator
 
@@ -469,17 +575,17 @@ def create_qaoa_complete_graph(system_size: int, comm, oracle: TestOracle = None
     complete_op = TestOracle.complete_graph_sparse_operator(system_size)
 
     # Set up unitaries: phase separator (diagonal) + mixer (complete graph sparse)
-    UQ = diagonal.unitary(
+    phase_unitary = diagonal.Unitary(
         diagonal.operator.observables,
     )
 
     # Use operator_dict with 'kwargs' key to pass function to serial
-    UW = sparse.unitary(
+    mixer_unitary = sparse.Unitary(
         sparse.operator.serial,
         operator_dict={"kwargs": {"function": complete_op}},
     )
 
-    alg.set_unitaries([UQ, UW])
+    alg.set_unitaries([phase_unitary, mixer_unitary])
 
     if oracle is not None:
         alg.set_observables(oracle.qualities_function())
@@ -507,9 +613,9 @@ def create_qwoa_complete_graph(system_size: int, comm, oracle: TestOracle = None
     qwoa
         QWOA instance with complete graph circulant mixer
     """
-    from quop_mpi.algorithm.combinatorial import qwoa
+    from quop_mpi.algorithm.combinatorial import QWOA
 
-    alg = qwoa(system_size, comm)
+    alg = QWOA(system_size, comm)
 
     if oracle is not None:
         alg.set_qualities(oracle.qualities_function())

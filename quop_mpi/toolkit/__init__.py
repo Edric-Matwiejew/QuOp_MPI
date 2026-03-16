@@ -2,8 +2,8 @@
 State Function>` and :term:`Observables <Observables Function>` functions.
 """
 
-from .kronecker import *
-from .pauli import *
-from .string import *
+from .kronecker import kron, kron_power
+from .pauli import I, X, Y, Z
+from .string import string
 
 __all__ = ["kron", "kron_power", "I", "X", "Y", "Z", "string"]

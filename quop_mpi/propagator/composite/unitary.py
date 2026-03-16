@@ -1,13 +1,35 @@
-from importlib import import_module
+"""Composite unitary propagator for multidimensional circulant operators."""
+
+from __future__ import annotations
+
+from types import ModuleType
+from typing import Any
+
 import numpy as np
-from ... import config
-from ...Unitary import Unitary
-from ..._lib.propagator import propagator
+
+from ..._lib.propagator import Propagator
+from ...unitary import UnitaryBase
 
 
-class unitary(Unitary):
+class Unitary(UnitaryBase):
+    """Unitary propagator for composite (multidimensional) circulant operators.
 
-    def __init__(self, Ns, *args, **kwargs):
+    Handles tensor-product structure of circulant graphs across multiple
+    coordinate dimensions.
+    """
+
+    def __init__(self, Ns, *args: Any, **kwargs: Any) -> None:  # noqa: N803, ANN001, ANN401
+        """Initialise the composite unitary propagator.
+
+        Parameters
+        ----------
+        Ns : array_like of int
+            Number of grid points per coordinate dimension.
+        *args
+            Forwarded to :class:`~quop_mpi.unitary.UnitaryBase`.
+        **kwargs
+            Forwarded to :class:`~quop_mpi.unitary.UnitaryBase`.
+        """
 
         self.Ns = np.array(Ns, dtype=np.int32)
 
@@ -21,36 +43,22 @@ class unitary(Unitary):
 
         self.planner = True
 
-    def assign_backend(self, backend):
-
+    def assign_backend(self, backend: ModuleType) -> None:
+        """Assign the compute backend for composite propagation."""
         self.propagator_module = backend.composite_propagator
-        self.propagators = [
-            propagator(self.propagator_module.composite_propagator_wrapper)
-        ]
+        self.propagators = [Propagator(self.propagator_module.composite_propagator_wrapper)]
 
-    def plan(self, system_size, MPI_COMM):
-
-        size = MPI_COMM.Get_size()
-        rank = MPI_COMM.Get_rank()
-
-        local_i = int(
-            system_size // size + np.ceil((system_size % size) // (rank + 1) / size)
-        )
-
-        return local_i, local_i
-
-    def copy_plan(self, ex_unitary):
-        pass
-
-    def gen_operator(self, *args):
-
+    def gen_operator(self, *args: Any) -> None:  # noqa: ANN401
+        """Generate the composite operator and plan the propagator."""
         self.propagators[0].plan(self.context)
+        self.planned = True  # Mark as planned so destroy() is called during cleanup
         super().gen_operator(*args)
-        g_shape = self.operator.shape
         self.propagators[0].gen_operator([self.Ns, self.operator.flatten()])
 
-    def propagate(self, t):
+    def propagate(self, t: np.ndarray) -> None:
+        """Apply the composite propagator with parameters ``t``."""
         self.propagators[0].propagate(t)
 
-    def destroy(self):
+    def destroy(self) -> None:
+        """Free composite propagator resources."""
         self.propagators[0].destroy()

@@ -6,7 +6,7 @@ This module provides:
 - NLopt optimizer wrapper
 """
 
-from .finite_differences import forward_differences, central
+from .finite_differences import central, forward_differences
 from .parallel_jacobian import Jacobian
 
 __all__ = ["Jacobian", "forward_differences", "central"]
