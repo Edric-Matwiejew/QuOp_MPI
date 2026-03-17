@@ -36,7 +36,7 @@ def qualities(local_i, local_i_offset, system_size):
 # Helpers
 # ---------------------------------------------------------------------------
 
-N_EVOLVE = 5  # number of evolve_state calls to average
+N_EVOLVE = 10  # number of evolve_state calls to average
 
 
 def parse_args():
