@@ -109,6 +109,7 @@ usage() {
     echo "Options:"
     echo "  --account ACCOUNT   SLURM account name (required for scheduler=slurm)"
     echo "  --verify            Record state_norm and expectation_value"
+    echo "  --no-early-stop     Disable early-stop checks (run all scaling points)"
     echo "  clean               Remove benchmark artefacts"
 }
 
@@ -121,12 +122,17 @@ fi
 # Extract flags and positional args
 VERIFY_FLAG=""
 ACCOUNT=""
+EARLY_STOP=1
 declare -a POSITIONAL=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --verify)
             VERIFY_FLAG="--verify"
+            shift
+            ;;
+        --no-early-stop)
+            EARLY_STOP=0
             shift
             ;;
         --account)
@@ -417,7 +423,7 @@ submit_slurm_chain() {
         job_script="${sbatch_headers}
 
 # Early-stop check
-if [[ -f \"${stop_file}\" ]]; then
+if [[ ${EARLY_STOP} -eq 1 && -f \"${stop_file}\" ]]; then
     echo \"Stop file found (${stop_file}), exiting.\"
     exit 0
 fi
@@ -437,7 +443,7 @@ $(declare -f check_early_stop)
 
 # Early-stop: check if previous step showed a slowdown
 PREV_CSV=\"${RESULTS_DIR}/${ALGORITHM}_${BACKEND}_${SIZE_TAG}_${PHASE}_${prev_np}.csv\"
-if [[ -n \"${prev_np}\" && -f \"\${PREV_CSV}\" ]]; then
+if [[ ${EARLY_STOP} -eq 1 && -n \"${prev_np}\" && -f \"\${PREV_CSV}\" ]]; then
     PREV_EVOLVE=\$(mean_evolve_from_csv \"\${PREV_CSV}\")
     echo \"Previous step (nprocs=${prev_np}) mean_evolve_s = \${PREV_EVOLVE}\"
 fi
@@ -459,7 +465,7 @@ if [[ -f \"\${CSV_PATH}\" ]]; then
 fi
 
 # Post-run early-stop check
-if [[ -n \"${prev_np}\" ]]; then
+if [[ ${EARLY_STOP} -eq 1 && -n \"${prev_np}\" ]]; then
     check_early_stop \"\${PREV_CSV}\" \"\${CSV_PATH}\" \"${stop_file}\" \"${np}\" || true
 fi"
 
@@ -507,7 +513,7 @@ run_local_benchmarks() {
         local csv_file="${ALGORITHM}_${BACKEND}_${SIZE_TAG}_${PHASE}_${np}.csv"
 
         # Check for stop file
-        if [[ -f "$stop_file" ]]; then
+        if [[ $EARLY_STOP -eq 1 && -f "$stop_file" ]]; then
             echo "Stop file found (${stop_file}), skipping remaining runs."
             break
         fi
@@ -563,7 +569,7 @@ run_local_benchmarks() {
         fi
 
         # Early-stop check
-        if [[ -n "$prev_np" ]]; then
+        if [[ $EARLY_STOP -eq 1 && -n "$prev_np" ]]; then
             local prev_csv="${RESULTS_DIR}/${ALGORITHM}_${BACKEND}_${SIZE_TAG}_${PHASE}_${prev_np}.csv"
             if check_early_stop "$prev_csv" "$csv_path" "$stop_file" "$np"; then
                 echo "Stopping early due to slowdown."
