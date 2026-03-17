@@ -2,11 +2,12 @@ module mpi_circulant
 
     use, intrinsic :: iso_fortran_env, only: real32, real64, int32, int64, error_unit
     use, intrinsic :: iso_c_binding
+    use mpi
     use mpi_circulant_operators, only: graph_eigenvalues
     use sparse_vector, only: to_sparse_vector
     use mpi_backend, only: mpi_context
-    use mpi
     use comm_info_module, only: quop_mpi_layout_t
+    use fftw_mpi_init_guard, only: ensure_fftw_mpi_init
 
     implicit none
 
@@ -80,10 +81,12 @@ contains
         type(quop_mpi_layout_t), intent(inout) :: ci
         integer(int32), intent(out) :: error_code
 
-        integer(C_INTPTR_T) :: local_i, local_i_offset, local_o, local_o_offset
+        integer(C_INTPTR_T) :: system_size, local_i, local_i_offset
         integer(C_INTPTR_T) :: alloc_local
         integer(int32) :: ierr, comm_size, comm_rank
         integer(int32) :: n_active
+
+        call ensure_fftw_mpi_init()
 
         error_code = 0
 
@@ -107,15 +110,24 @@ contains
             return
         end if
 
+        system_size = int(ci%get_system_size(), C_INTPTR_T)
+        local_i = int(ci%get_local_i(), C_INTPTR_T)
+        local_i_offset = int(ci%get_local_i_offset(), C_INTPTR_T)
+        self%local_o = int(ci%get_local_i(), C_INTPTR_T)
+        self%local_o_offset = int(ci%get_local_i_offset(), C_INTPTR_T)
+
         ! Query FFTW for the distribution it will use
-        alloc_local = fftw_mpi_local_size_1d(int(ci%get_system_size(), C_INTPTR_T), &
+        alloc_local = fftw_mpi_local_size_1d(system_size, &
                                              ci%get_SUBCOMM(), &
                                              FFTW_FORWARD, &
                                              FFTW_ESTIMATE, &
                                              local_i, &
                                              local_i_offset, &
-                                             local_o, &
-                                             local_o_offset)
+                                             self%local_o, &
+                                             self%local_o_offset)
+
+        ! Allocate enough for the local input and output sizes.
+        alloc_local = max(local_i, self%local_o)
 
         ! Count how many ranks have local_i > 0
         if (local_i > 0) then
@@ -125,7 +137,7 @@ contains
         end if
         call MPI_Allreduce(MPI_IN_PLACE, n_active, 1, MPI_INTEGER, MPI_SUM, ci%get_SUBCOMM(), ierr)
 
-        ! Update layout with FFTW distribution (via setters)
+        ! Update layout with FFTW distribution
         call ci%set_n_processes(int(n_active, int64), error_code)
         if (error_code /= 0) return
         call ci%set_partitioning(int(local_i, int64), int(local_i_offset, int64), &
@@ -171,7 +183,7 @@ contains
             return
         end if
 
-        call fftw_mpi_init()
+        call ensure_fftw_mpi_init()
 
         alloc_local = fftw_mpi_local_size_1d(system_size, &
                                              self%context%ci%get_SUBCOMM(), &

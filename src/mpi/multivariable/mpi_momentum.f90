@@ -2,10 +2,11 @@ module mpi_momentum
 
     use, intrinsic :: iso_fortran_env, only: real32, real64, int32, int64, error_unit
     use, intrinsic :: iso_c_binding
-    use MPI
+    use mpi
     use mpi_backend, only: mpi_context
     use cartesian, only: get_index
     use comm_info_module, only: quop_mpi_layout_t
+    use fftw_mpi_init_guard, only: ensure_fftw_mpi_init
 
     implicit none
 
@@ -83,6 +84,8 @@ contains
         integer(int64) :: slab_size, local_i_64, local_i_offset_64
 
         error_code = 0
+
+        call ensure_fftw_mpi_init()
 
         available_ranks = int(ci%get_n_processes(), int32)
 
@@ -263,7 +266,7 @@ contains
         if (synced_error /= 0) return
 
         if (.not. self%operator_generated) then
-            call fftw_mpi_init()
+            call ensure_fftw_mpi_init()
 
             if (n_dim == 1) then
                 ! 1D: six-step algorithm via fftw_mpi_local_size_many_1d

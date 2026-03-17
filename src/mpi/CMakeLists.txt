@@ -58,6 +58,10 @@ set_target_properties(mpi_circulant_operators PROPERTIES
   Fortran_MODULE_DIRECTORY "${CMAKE_Fortran_MODULE_DIRECTORY}"
   INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_Fortran_MODULE_DIRECTORY}")
 
+add_library(fftw_mpi_init_guard OBJECT fftw_mpi_init_guard.f90)
+target_link_libraries(fftw_mpi_init_guard PUBLIC MPI::MPI_Fortran "${FFTW_DOUBLE_MPI_LIB}")
+target_include_directories(fftw_mpi_init_guard PUBLIC ${FFTW_INCLUDE_DIRS})
+
 add_subdirectory(sparse)
 add_subdirectory(diagonal)
 add_subdirectory(circulant)
