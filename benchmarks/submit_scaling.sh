@@ -460,7 +460,7 @@ fi
 
 # Post-run early-stop check
 if [[ -n \"${prev_np}\" ]]; then
-    check_early_stop \"\${PREV_CSV}\" \"\${CSV_PATH}\" \"${stop_file}\" \"${np}\"
+    check_early_stop \"\${PREV_CSV}\" \"\${CSV_PATH}\" \"${stop_file}\" \"${np}\" || true
 fi"
 
         # Save job script for debugging
