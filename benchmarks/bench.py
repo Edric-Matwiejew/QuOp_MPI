@@ -239,7 +239,7 @@ def main():
     state_norm = None
     expectation_value = None
     if args.verify:
-        state_norm = alg.state_norm
+        state_norm = alg.get_state_norm()
         expectation_value = alg.get_expectation_value()
 
     # ----- Write results (rank 0 only) -----

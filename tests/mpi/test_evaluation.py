@@ -190,23 +190,24 @@ class TestGetExpectationValue:
         params = simple_oracle.optimal_params(depth=1)
         alg.evolve_state(params)
 
-        # state_norm is only computed on the root of the subcomm
-        # On non-root ranks (including non-root members of subcomm 0), state_norm is None
+        # get_state_norm() is collective over SUBCOMM and returns the norm
+        # on all active ranks.  Excluded ranks receive None.
         alg.get_expectation_value()
+        computed_norm = alg.get_state_norm()
 
         if alg.subcomms.in_subcomm():
-            # Root of subcomm: state_norm should be set and equal to 1.0 (normalized)
+            # Active ranks: state_norm should be set and equal to 1.0 (normalized)
             assert (
-                alg.state_norm is not None
-            ), "state_norm should be set on subcomm root after get_expectation_value()"
+                computed_norm is not None
+            ), "get_state_norm() should return a value on active subcomm ranks"
             assert np.isclose(
-                float(alg.state_norm), 1.0, atol=1e-10
-            ), f"State should be normalized, got norm {alg.state_norm}"
+                float(computed_norm), 1.0, atol=1e-10
+            ), f"State should be normalized, got norm {computed_norm}"
         else:
-            # Non-root ranks: state_norm should be None
+            # Excluded ranks: get_state_norm() should return None
             assert (
-                alg.state_norm is None
-            ), f"state_norm should be None on ranks outside of subcomm, got {alg.state_norm}"
+                computed_norm is None
+            ), f"get_state_norm() should return None on ranks outside of subcomm, got {computed_norm}"
 
         alg.destroy()
 

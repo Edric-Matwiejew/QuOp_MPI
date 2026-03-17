@@ -141,7 +141,7 @@ class Logging:
             self.system_size,
             self.ansatz_depth,
             self.repeat,
-            self.state_norm,
+            self._state_norm,
             self.time,
             self.subcomms.SUBCOMM.size,
             self.neval_mpi_jac,
