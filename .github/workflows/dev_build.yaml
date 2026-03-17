@@ -1,0 +1,76 @@
+name: 'Development Build'
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        py-version:
+          - 3.6
+          - 3.7
+          - 3.8
+          - 3.9
+        py-arch:
+          - x64
+        mpi:
+          - openmpi
+          - mpich
+        os:
+          - ubuntu-18.04
+          
+    steps:
+
+    - name: Configure hostname
+      run:  echo 127.0.0.1 `hostname` | sudo tee -a /etc/hosts > /dev/null
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: dev
+
+    - name: Setup MPI (${{ matrix.mpi }})
+      uses: mpi4py/setup-mpi@v1
+      with:
+        mpi: ${{ matrix.mpi }}
+           
+    - name: Install HDF5 and FFTW parallel libraries (open-mpi)
+      if: matrix.mpi == 'openmpi'
+      run: sudo apt install -y -q pkg-config libhdf5-openmpi-dev libfftw3-dev libfftw3-mpi-dev
+      
+    - name: Install HDF5 and FFTW parallel libraries (mpich)
+      if: matrix.mpi == 'mpich'
+      run: sudo apt install -y -q pkg-config libhdf5-openmpi-dev libfftw3-dev libfftw3-mpi-dev
+
+    - name: Use Python ${{ matrix.py-version }} ${{ matrix.py-arch }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.py-version }}
+        architecture: ${{ matrix.py-arch }}
+        
+    - name: Install packaing dependencies
+      run:  python -m pip install setuptools wheel
+      
+    - name: Install build dependencies
+      run:  python -m pip install numpy
+            
+    - name: Set build environment variables
+      run: |
+        echo "CC=mpicc" >> $GITHUB_ENV
+        echo "HDF5_MPI=ON" >> $GITHUB_ENV
+        echo "HDF5_PKGCONFIG_NAME=hdf5" >> $GITHUB_ENV
+
+    - name: Build QuOp_MPI wheel
+      run: python -m pip wheel -vvv --wheel-dir=dist . --no-deps
+        
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v1
+      with:
+        name: quop_mpi-py${{matrix.py-version}}-${{matrix.py-arch}}-${{matrix.mpi}}-${{matrix.os}}
+        path: dist

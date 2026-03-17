@@ -1,0 +1,23 @@
+[profile]
+description = "Generic Linux (MPI only)"
+wavefront_supported = false
+python_version = "3.11"
+
+[install]
+root = ".quop-install"
+venv_dir = ".venv_{profile}_{backend}"
+work_dir = ".cache/quop/{profile}/{backend}"
+
+[benchmarks]
+scheduler = "local"
+ranks_per_node = 4
+intra_sequence = [1, 2, 4]
+
+[benchmarks.qaoa]
+args_intra = [1024, 4096, 16384]
+
+[benchmarks.qwoa]
+args_intra = [1024, 4096, 16384]
+
+[benchmarks.qmoa]
+args_intra = ["2 2 2 2", "3 3 3"]

@@ -1,0 +1,32 @@
+add_library(mpi_circulant OBJECT mpi_circulant.f90)
+ 
+target_link_libraries(
+    mpi_circulant
+  MPI::MPI_Fortran
+  "${FFTW_DOUBLE_LIB}"
+  "${FFTW_DOUBLE_MPI_LIB}" 
+    mpi_circulant_operators
+    sparse_vector
+    mpi_context
+)
+add_dependencies(mpi_circulant comm_info_mod)
+
+target_include_directories(
+    mpi_circulant
+    PUBLIC
+  ${FFTW_INCLUDE_DIRS}
+    ${CMAKE_Fortran_MODULE_DIRECTORY}/mpi_circulant_operators
+    ${CMAKE_Fortran_MODULE_DIRECTORY}/sparse_vector
+    ${CMAKE_Fortran_MODULE_DIRECTORY}/mpi_context
+)
+
+set(_depends mpi_circulant_operators mpi_context mpi_circulant sparse_vector comm_info_mod ${_COMM_INFO_EXTRA})
+set(_definitions context=mpi_backend context_type=mpi_context propagator=mpi_circulant propagator_type=circulant_propagator propagator_wrapper=circulant_propagator_wrapper)
+
+add_f2py_library(
+  MODULE_NAME mpi_circulant_propagator 
+  DEPENDS "${_depends}" 
+  DEFINITIONS "${_definitions}" 
+  SRC ${PROPAGATOR_WRAPPER}
+  INSTALL_SUBDIR mpi
+  )
