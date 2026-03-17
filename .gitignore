@@ -41,3 +41,4 @@ hipfft-*
 _skbuild
 .venv*
 .cache
+*.pdf
