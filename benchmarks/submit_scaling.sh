@@ -550,8 +550,8 @@ run_local_benchmarks() {
         local start_time end_time elapsed
 
         start_time=$(date +%s.%N 2>/dev/null || date +%s)
-        "$mpiexec_cmd" -n "$np" "${bench_cmd[@]}"
-        local rc=$?
+        local rc=0
+        "$mpiexec_cmd" -n "$np" "${bench_cmd[@]}" || rc=$?
         end_time=$(date +%s.%N 2>/dev/null || date +%s)
 
         if [[ $rc -ne 0 ]]; then
