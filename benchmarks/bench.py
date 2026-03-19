@@ -84,18 +84,33 @@ def parse_size_arg(algorithm, size_arg):
                 " got an empty size_arg"
             )
         try:
-            return [int(part) for part in parts]
+            values = [int(part) for part in parts]
         except ValueError as exc:
             raise ValueError(f"qmoa size_arg must contain only integers, got {size_arg!r}") from exc
 
+        if any(value < 0 for value in values):
+            raise ValueError(
+                "qmoa size_arg exponents must be non-negative integers, "
+                f"got {size_arg!r}"
+            )
+
+        return values
+
     try:
-        return [int(size_arg)]
+        value = int(size_arg)
     except ValueError as exc:
         msg = (
             f"{algorithm} expects a single integer"
             f" system_size, got {size_arg!r}"
         )
         raise ValueError(msg) from exc
+
+    if value <= 0:
+        raise ValueError(
+            f"{algorithm} system_size must be a positive integer, got {size_arg!r}"
+        )
+
+    return [value]
 
 
 def size_spec(algorithm, size_args):

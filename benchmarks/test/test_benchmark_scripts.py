@@ -3,6 +3,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 
 def load_bench_module():
     module_path = Path(__file__).resolve().parents[1] / "bench.py"
@@ -47,6 +49,47 @@ def test_non_qmoa_benchmark_metadata_keeps_legacy_filename_shape():
         "qaoa", "mpi", 1024, "1024", 16, "multi",
     )
     assert result == "qaoa_mpi_1024_multi_16.csv"
+
+
+def test_parse_size_arg_rejects_negative_qmoa_exponents():
+    bench = load_bench_module()
+
+    with pytest.raises(ValueError, match="non-negative"):
+        bench.parse_size_arg("qmoa", "-1 3")
+
+
+def test_parse_size_arg_rejects_non_positive_system_size_for_qaoa_qwoa():
+    bench = load_bench_module()
+
+    with pytest.raises(ValueError, match="positive integer"):
+        bench.parse_size_arg("qaoa", "0")
+
+    with pytest.raises(ValueError, match="positive integer"):
+        bench.parse_size_arg("qwoa", "-8")
+
+
+def test_parse_args_phase_and_verify_flags(monkeypatch):
+    bench = load_bench_module()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["bench.py", "qwoa", "1024", "--phase", "multi", "--verify"],
+    )
+    args = bench.parse_args()
+
+    assert args.algorithm == "qwoa"
+    assert args.size_arg == "1024"
+    assert args.phase == "multi"
+    assert args.verify is True
+
+
+def test_algorithm_classes_expose_get_state_norm():
+    bench = load_bench_module()
+
+    import quop_mpi.ansatz as ansatz
+
+    assert hasattr(ansatz.Ansatz, "get_state_norm")
 
 
 def test_csv_header_includes_profile_column():
