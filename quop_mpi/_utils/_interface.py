@@ -1,5 +1,6 @@
 from functools import partial
 from inspect import Parameter, signature
+from warnings import warn
 
 
 class Interface:
@@ -68,10 +69,19 @@ class Interface:
 
         for positional_param in self.positional_params:
             param_name = positional_param.split(":")[0]
+            found = False
             for obj in self.objs:
                 param_value = getattr(obj, param_name, None)
                 if param_value is not None:
                     self.args.append(param_value)
+                    found = True
                     break
+            if not found:
+                warn(
+                    f"Interface '{self.function_name}': parameter '{param_name}' "
+                    f"not found on any bound object (rank {self.rank}). "
+                    f"Positional argument binding may be incorrect.",
+                    stacklevel=2,
+                )
 
         self.call = partial(self.function, *self.args)

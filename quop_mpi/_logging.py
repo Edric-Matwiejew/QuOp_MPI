@@ -125,7 +125,7 @@ class Logging:
         if self.optimiser_log is not None:
             headings.extend(iter(self.optimiser_log))
 
-        self.logfile = open(self.filename, "w")
+        self.logfile = open(self.filename, "w", newline="")
         self.logfile_csv = csv.writer(self.logfile)
         self.logfile_csv.writerow(headings)
 

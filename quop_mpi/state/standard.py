@@ -80,8 +80,8 @@ def basis(
     n_basis_states = len(basis_states)
 
     for state in basis_states:
-        if (state > local_i_offset) and (state <= local_i_offset + local_i):
-            initial_state[state] = 1.0 / np.sqrt(n_basis_states, dtype=np.float64)
+        if (state >= local_i_offset) and (state < local_i_offset + local_i):
+            initial_state[state - local_i_offset] = 1.0 / np.sqrt(n_basis_states, dtype=np.float64)
 
     return initial_state
 

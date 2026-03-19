@@ -149,7 +149,7 @@ def hdf5(
 
     import h5py as h5
 
-    if MPI_COMM.rank == 0:
+    if MPI_COMM.Get_rank() == 0:
         f = h5.File(filename, "r", **kwargs)
 
         operator = np.array(f[dataset_name], dtype=np.float64)

@@ -150,9 +150,9 @@ def minimize(fun, x0, args=(), method=None, jac=None, bounds=None, constraints=N
     # Perform the optimization
     try:
         x = opt.optimize(x0)
-    except:  # noqa: E722 — nlopt can raise various C-level exceptions
+    except Exception:  # nlopt can raise various C-level exceptions
         # If we encounter a RoundoffLimited exception, simply return last point
-        x = path[-1]
+        x = path[-1] if path else x0.copy()
 
     return OptimizeResult(
         x=x,
