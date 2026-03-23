@@ -242,7 +242,6 @@ class QOWE(Multivariable):
             self.minsk,
             self.deltas,
             self.deltask,
-            momentum.operator.magnitude_squared,
             parameter_function=uniform,
             unitary_n_params=len(self.Ns),
         )

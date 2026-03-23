@@ -127,7 +127,7 @@ def array(
         state[local_i_offset : local_i_offset + local_i], np.complex128
     )
 
-    if not normalize:
+    if normalize:
         normalization = MPI_COMM.allreduce(np.dot(np.conjugate(state), state), op=MPI.SUM)
         initial_state = initial_state / np.sqrt(normalization)
 

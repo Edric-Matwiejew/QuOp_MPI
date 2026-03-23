@@ -72,17 +72,22 @@ class Unitary(UnitaryBase):
         minsk: list[float],
         deltasq: list[float],
         deltask: list[float],
-        *args: Any,  # noqa: ANN401
         **kwargs: Any,  # noqa: ANN401
     ) -> None:
-        """Initialise the momentum unitary propagator."""
+        """Initialise the momentum unitary propagator.
+
+        The momentum propagator does not accept an :term:`Operator Function`.
+        Momentum-space eigenvalues are computed internally by the Fortran
+        backend from the grid parameters.
+        """
         self.Ns = np.array(Ns, dtype=np.int32)
         self.minsq = np.array(minsq, dtype=np.float64)
         self.minsk = np.array(minsk, dtype=np.float64)
         self.deltasq = np.array(deltasq, dtype=np.float64)
         self.deltask = np.array(deltask, dtype=np.float64)
 
-        super().__init__(*args, **kwargs)
+        # No operator function — eigenvalues are computed by the Fortran backend.
+        super().__init__(operator_function=lambda: None, **kwargs)
 
         self.unitary_type = "momentum"
         self.context = None
@@ -94,19 +99,16 @@ class Unitary(UnitaryBase):
         self.propagator_module = backend.momentum_propagator
         self.propagators = [Propagator(self.propagator_module.momentum_propagator_wrapper)]
 
-    def gen_operator(self, *args: Any) -> None:  # noqa: ANN401
+    def gen_operator(self) -> None:
         """Generate the momentum-space operator.
 
-        Sets up the FFTW plans and computes the phase factors and
-        momentum-space eigenvalues needed for propagation.
+        Sets up the FFTW plans and passes grid parameters to the Fortran
+        backend, which computes the phase factors and momentum-space
+        eigenvalues internally.
         """
         self.propagators[0].plan(self.context)
         self.planned = True  # Mark as planned so destroy() is called during cleanup
-        super().gen_operator(*args)
 
-        # Pass grid parameters to the Fortran propagator
-        # The operator function returns eigenvalues, but the momentum propagator
-        # computes its own based on grid parameters
         self.propagators[0].gen_operator(
             [self.Ns, self.minsq, self.minsk, self.deltasq, self.deltask]
         )

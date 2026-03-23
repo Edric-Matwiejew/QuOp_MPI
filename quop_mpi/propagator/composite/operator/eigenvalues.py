@@ -38,6 +38,9 @@ def ith(Ns: list[int], Cs: list[int] = None) -> np.ndarray[np.float64]:  # noqa:
         mixing unitary with global index offset :literal:`local_i_offset`
     """
 
+    if Cs is None:
+        return np.empty((len(Ns), 1), dtype=np.float64)
+
     circulant_eigenvalues = import_module("quop_mpi.propagator.circulant.operator.eigenvalues")
 
     complete = [C >= N // 2 for C, N in zip(Cs, Ns, strict=True)]

@@ -16,10 +16,8 @@ Propagator Class
    :exclude-members: gen_initial_params, gen_operator, parse_operator_function, parse_parameter_function, destroy, evolve_group, evolve_single
    :show-inheritance:
 
-Operators
-=========
+.. note::
 
-Pre-defined operator functions for momentum propagators.
-
-.. automodule:: quop_mpi.propagator.momentum.operator
-   :members:
+   The momentum propagator does not accept user-defined operator functions.
+   Momentum-space eigenvalues are computed internally by the Fortran backend
+   from the grid parameters passed to the :class:`Unitary` constructor.
