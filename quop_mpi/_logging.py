@@ -133,6 +133,8 @@ class Logging:
     def _log_update(self):
         """Write simulation information to an active log file."""
 
+        state_norm = self.get_state_norm()
+
         if self.MPI_COMM_WORLD.Get_rank() != 0:
             return
 
@@ -141,7 +143,7 @@ class Logging:
             self.system_size,
             self.ansatz_depth,
             self.repeat,
-            self._state_norm,
+            state_norm,
             self.time,
             self.subcomms.SUBCOMM.size,
             self.neval_mpi_jac,
@@ -157,6 +159,7 @@ class Logging:
             )
         if self.optimiser_log is not None:
             log_output.extend(self.result[optimiser_log] for optimiser_log in self.optimiser_log)
+
         self.logfile_csv.writerow(log_output)
 
         self.logfile.flush()

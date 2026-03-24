@@ -679,6 +679,24 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             seeds the generation of random parameters
         """
         self.seed = seed
+    
+    @scope("subcomm", returns="all")
+    def get_state_norm(self) -> float:
+        """Compute the norm of the wavefunction, should be 1 for a properly normalised state.
+
+        Returns
+        -------
+        float
+            objective function value, or None on excluded ranks
+        """
+
+        if self.subcomms.get_subcomm_index() == 0:
+            state_norm = self.__get_state_norm()
+        else:
+            state_norm = None
+
+        return self.subcomms.SUBCOMM.bcast(state_norm, root=0)
+
 
     @scope("subcomm", returns="all")
     def get_expectation_value(self) -> float:
