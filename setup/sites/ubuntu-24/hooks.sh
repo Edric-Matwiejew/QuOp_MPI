@@ -124,14 +124,24 @@ profile_install_h5py() {
     fi
 
     if [[ -n "$hdf5_pkg" ]]; then
-        export HDF5_PKGCONFIG_NAME="${hdf5_pkg}"
+        (
+            unset HDF5_DIR
+            CC="${CC}" \
+            CFLAGS="${CFLAGS:-} ${mpi_inc}" \
+            HDF5_MPI="ON" \
+            HDF5_PKGCONFIG_NAME="${hdf5_pkg}" \
+                python -m pip install --no-binary=h5py --no-cache-dir --force-reinstall h5py
+        )
+    else
+        (
+            unset HDF5_PKGCONFIG_NAME
+            CC="${CC}" \
+            CFLAGS="${CFLAGS:-} ${mpi_inc}" \
+            HDF5_MPI="ON" \
+            HDF5_DIR="${HDF5_DIR}" \
+                python -m pip install --no-binary=h5py --no-cache-dir --force-reinstall h5py
+        )
     fi
-
-    CC="${CC}" \
-    CFLAGS="${CFLAGS:-} ${mpi_inc}" \
-    HDF5_MPI="ON" \
-    HDF5_DIR="${HDF5_DIR}" \
-        python -m pip install --no-binary=h5py --no-cache-dir --force-reinstall h5py
 }
 
 # ---- CMake flags -------------------------------------------------------------

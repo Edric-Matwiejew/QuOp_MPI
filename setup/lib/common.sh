@@ -48,6 +48,14 @@ find_rocm_path() {
         printf '%s\n' "$ROCM_PATH"
         return 0
     fi
+    if command -v hipconfig >/dev/null 2>&1; then
+        local rocm_path
+        rocm_path="$(hipconfig --path 2>/dev/null || true)"
+        if [[ -n "$rocm_path" && -d "$rocm_path" ]]; then
+            printf '%s\n' "$rocm_path"
+            return 0
+        fi
+    fi
     prefix_from_executable hipcc
 }
 

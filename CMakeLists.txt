@@ -190,8 +190,6 @@ if(WAVEFRONT_BACKEND)
   set(CMAKE_CXX_COMPILER_WORKS 1)
   enable_language(CXX)
 
-  find_package(MPI REQUIRED COMPONENTS CXX)
-
   message(CHECK_START "Checking HIP compiler")
   file(
     WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.cpp

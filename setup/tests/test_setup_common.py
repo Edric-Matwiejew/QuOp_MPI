@@ -120,6 +120,24 @@ resolve_python_interpreter 9.9
     assert "expected 9.9" in (result.stdout + result.stderr)
 
 
+def test_find_rocm_path_prefers_hipconfig_prefix_over_wrapper_location():
+    script = f"""
+tmpbin="$(mktemp -d)"
+trap 'rm -rf "$tmpbin"' EXIT
+printf '%s\\n' '#!/usr/bin/env bash' 'printf "/opt/rocm-6.3.2\\n"' >"$tmpbin/hipconfig"
+printf '%s\\n' '#!/usr/bin/env bash' 'exit 0' >"$tmpbin/hipcc"
+chmod +x "$tmpbin/hipconfig" "$tmpbin/hipcc"
+PATH="$tmpbin:$PATH"
+source {shlex.quote(str(COMMON_SH))}
+find_rocm_path
+"""
+
+    result = run_shell(script)
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert result.stdout.strip() == "/opt/rocm-6.3.2"
+
+
 def test_site_listing_helpers_are_portable_and_sorted():
     script = f"""
 SITES_DIR={shlex.quote(str(PROJECT_ROOT / "setup" / "sites"))}
@@ -280,6 +298,13 @@ def test_src_cmakelists_keeps_wavefront_placeholders_for_direct_builds():
     assert "if(${WAVEFRONT_BACKEND})" in src_cmake_text
     assert "add_custom_target(wavefront_context_f2py)" in src_cmake_text
     assert "add_custom_target(wavefront_sparse_propagator_f2py)" in src_cmake_text
+
+
+def test_top_level_cmake_requires_mpi_fortran_but_not_mpi_cxx():
+    cmake_lists_text = CMAKE_LISTS.read_text()
+
+    assert "find_package(MPI REQUIRED COMPONENTS Fortran)" in cmake_lists_text
+    assert "find_package(MPI REQUIRED COMPONENTS CXX)" not in cmake_lists_text
 
 
 def test_fortran_barrier_helper_is_shared_by_f2py_and_wavefront_context():
@@ -553,6 +578,66 @@ printf '%s\\n' "${{VENV_ARGS[*]}}"
 
     assert result.returncode == 0, result.stderr or result.stdout
     assert result.stdout.strip() == "--system-site-packages"
+
+
+def test_ubuntu_h5py_uses_pkgconfig_without_inheriting_hdf5_dir():
+    script = f"""
+tmpbin="$(mktemp -d)"
+trap 'rm -rf "$tmpbin"' EXIT
+printf '%s\\n' '#!/usr/bin/env bash' \
+    'if [[ "$1" == "--exists" && "$2" == "hdf5-openmpi" ]]; then exit 0; fi' \
+    'if [[ "$1" == "--exists" && "$2" == "hdf5" ]]; then exit 1; fi' \
+    'exit 1' >"$tmpbin/pkg-config"
+printf '%s\\n' '#!/usr/bin/env bash' \
+    'if [[ "$1" == "--showme:compile" ]]; then printf "%s\\n" "-I/fake/mpi/include"; fi' >"$tmpbin/mpicc"
+printf '%s\\n' '#!/usr/bin/env bash' \
+    'env | grep "^HDF5" | sort' >"$tmpbin/python"
+chmod +x "$tmpbin/pkg-config" "$tmpbin/mpicc" "$tmpbin/python"
+PATH="$tmpbin:$PATH"
+source {shlex.quote(str(COMMON_SH))}
+source {shlex.quote(str(UBUNTU_24_HOOKS))}
+info() {{ :; }}
+CC=/usr/bin/gcc
+export HDF5_DIR=/usr
+profile_install_h5py
+"""
+
+    result = run_shell(script)
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert result.stdout.splitlines() == [
+        "HDF5_MPI=ON",
+        "HDF5_PKGCONFIG_NAME=hdf5-openmpi",
+    ]
+
+
+def test_ubuntu_h5py_falls_back_to_hdf5_dir_without_inheriting_pkgconfig_name():
+    script = f"""
+tmpbin="$(mktemp -d)"
+trap 'rm -rf "$tmpbin"' EXIT
+printf '%s\\n' '#!/usr/bin/env bash' 'exit 1' >"$tmpbin/pkg-config"
+printf '%s\\n' '#!/usr/bin/env bash' \
+    'if [[ "$1" == "--showme:compile" ]]; then printf "%s\\n" "-I/fake/mpi/include"; fi' >"$tmpbin/mpicc"
+printf '%s\\n' '#!/usr/bin/env bash' \
+    'env | grep "^HDF5" | sort' >"$tmpbin/python"
+chmod +x "$tmpbin/pkg-config" "$tmpbin/mpicc" "$tmpbin/python"
+PATH="$tmpbin:$PATH"
+source {shlex.quote(str(COMMON_SH))}
+source {shlex.quote(str(UBUNTU_24_HOOKS))}
+info() {{ :; }}
+CC=/usr/bin/gcc
+export HDF5_DIR=/usr
+export HDF5_PKGCONFIG_NAME=stale
+profile_install_h5py
+"""
+
+    result = run_shell(script)
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert result.stdout.splitlines() == [
+        "HDF5_DIR=/usr",
+        "HDF5_MPI=ON",
+    ]
 
 
 def test_run_profile_environment_hooks_applies_wavefront_sequence():
