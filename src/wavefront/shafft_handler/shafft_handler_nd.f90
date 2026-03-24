@@ -30,6 +30,9 @@ module shafft_handler_nd
         integer(c_size_t), dimension(:), allocatable :: subsize ! Local tensor size (initial)
         integer(c_size_t), dimension(:), allocatable :: offset ! Local tensor offset (initial)
         integer(int32), dimension(:), allocatable :: strides ! Global strides (initial layout)
+        integer(c_size_t), dimension(:), allocatable :: subsize_transformed
+        integer(c_size_t), dimension(:), allocatable :: offset_transformed
+        integer(int32), dimension(:), allocatable :: strides_transformed
     contains
         procedure :: configure => fft_nd_configure
         procedure :: init => fft_nd_init
@@ -61,16 +64,20 @@ contains
         integer(int32), intent(out) :: ierr
 
         integer(c_size_t), dimension(:), allocatable :: subsize, offset
+        integer(c_size_t), dimension(:), allocatable :: transformed_subsize, transformed_offset
+        integer(int32), dimension(:), allocatable :: strides, transformed_strides
         integer(int32) :: total_gpus, nda
         integer(int32) :: devcomm_size, used_ranks
         integer(int32) :: ierr_mpi, ierr_dims
+        integer(c_int) :: ierr_c
         integer(int64) :: free_mem, total_mem
-        integer(int32) :: i
         integer(c_size_t) :: total_elements
         integer(int32), allocatable :: requested_comm_dims(:)
+        type(c_ptr) :: temp_plan
 
         ierr = 0
         self%n_dims = size(dims)
+        temp_plan = c_null_ptr
 
         ! Store tensor dimensions
         if (allocated(self%tensor_dims)) deallocate (self%tensor_dims)
@@ -79,8 +86,14 @@ contains
 
         ! Allocate working arrays
         allocate (subsize(self%n_dims), offset(self%n_dims))
+        allocate (transformed_subsize(self%n_dims), transformed_offset(self%n_dims))
+        allocate (strides(self%n_dims), transformed_strides(self%n_dims))
         subsize(:) = 0
         offset(:) = 0
+        transformed_subsize(:) = 0
+        transformed_offset(:) = 0
+        strides(:) = 0
+        transformed_strides(:) = 0
 
         ! Initialize output
         layout_out%local_i = 0
@@ -138,34 +151,76 @@ contains
             end if
             if (any(self%COMM_DIMS /= requested_comm_dims)) then
                 ierr = SHAFFT_ERR_INVALID_DECOMP
-                deallocate (subsize, offset)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
                 return
             end if
 
-            ! Compute local_i as product of subsize
-            layout_out%local_i = int(product(real(subsize, real64)), c_size_t)
+            call shafftNDCreate(temp_plan, ierr_c)
+            if (ierr_c /= SHAFFT_SUCCESS) then
+                ierr = int(ierr_c, int32)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
+                return
+            end if
+            call shafftNDInit(temp_plan, self%COMM_DIMS, dims, &
+                              SHAFFT_Z2Z, DEVCOMM, SHAFFT_LAYOUT_REDISTRIBUTED, ierr_c)
+            if (ierr_c /= SHAFFT_SUCCESS) then
+                ierr = int(ierr_c, int32)
+                call shafftDestroy(temp_plan, ierr_c)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
+                return
+            end if
+            call shafftPlan(temp_plan, ierr_c)
+            if (ierr_c /= SHAFFT_SUCCESS) then
+                ierr = int(ierr_c, int32)
+                call shafftDestroy(temp_plan, ierr_c)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
+                return
+            end if
 
-            ! Compute linear offset using C-order (last index fastest) expected by SHAFFT
-            layout_out%local_i_offset = offset(self%n_dims)
-            do i = self%n_dims - 1, 1, -1
-                layout_out%local_i_offset = layout_out%local_i_offset + &
-                                            offset(i) * int(product(real(dims(i + 1:self%n_dims), real64)), c_size_t)
-            end do
+            call query_nd_layout_state(temp_plan, dims, SHAFFT_TENSOR_LAYOUT_INITIAL, &
+                                       subsize, offset, strides, &
+                                       layout_out%local_i, layout_out%local_i_offset, ierr)
+            if (ierr /= SHAFFT_SUCCESS) then
+                call shafftDestroy(temp_plan, ierr_c)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
+                return
+            end if
+
+            call query_nd_layout_state(temp_plan, dims, SHAFFT_TENSOR_LAYOUT_REDISTRIBUTED, &
+                                       transformed_subsize, transformed_offset, transformed_strides, &
+                                       layout_out%transformed_local_i, layout_out%transformed_local_i_offset, ierr)
+            if (ierr /= SHAFFT_SUCCESS) then
+                call shafftDestroy(temp_plan, ierr_c)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
+                return
+            end if
+
+            call shafftGetAllocSize(temp_plan, layout_out%alloc_size, ierr_c)
+            if (ierr_c /= SHAFFT_SUCCESS) then
+                ierr = int(ierr_c, int32)
+                call shafftDestroy(temp_plan, ierr_c)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
+                return
+            end if
+
+            call shafftDestroy(temp_plan, ierr_c)
+            temp_plan = c_null_ptr
 
             ! Contiguity / bounds check
             total_elements = int(product(int(dims, c_size_t)), c_size_t)
             if (layout_out%local_i_offset + layout_out%local_i > total_elements) then
                 ierr = SHAFFT_ERR_INVALID_DECOMP
-                deallocate (subsize, offset)
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
                 return
             end if
-
-            ! For configuration phase, transformed = initial (will be updated in init)
-            layout_out%transformed_local_i = layout_out%local_i
-            layout_out%transformed_local_i_offset = layout_out%local_i_offset
+            if (layout_out%transformed_local_i_offset + layout_out%transformed_local_i > total_elements) then
+                ierr = SHAFFT_ERR_INVALID_DECOMP
+                deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
+                return
+            end if
         end if
 
-        deallocate (subsize, offset)
+        deallocate (subsize, offset, transformed_subsize, transformed_offset, strides, transformed_strides)
 
         self%layout = layout_out
         self%initialized = .true.
@@ -183,10 +238,8 @@ contains
         integer(int32), intent(in) :: DEVCOMM
         integer(int32), intent(out) :: ierr
 
-        integer(int32) :: i
         integer(c_size_t) :: total_elements
         integer(int32) :: devcomm_size, used_ranks, ierr_dims, ierr_mpi, nda_guess
-        integer(int32), allocatable :: ca(:), da(:)
 
         ierr = 0
         self%n_dims = size(dims)
@@ -241,10 +294,16 @@ contains
         if (allocated(self%subsize)) deallocate (self%subsize)
         if (allocated(self%offset)) deallocate (self%offset)
         if (allocated(self%strides)) deallocate (self%strides)
+        if (allocated(self%subsize_transformed)) deallocate (self%subsize_transformed)
+        if (allocated(self%offset_transformed)) deallocate (self%offset_transformed)
+        if (allocated(self%strides_transformed)) deallocate (self%strides_transformed)
 
         allocate (self%subsize(self%n_dims))
         allocate (self%offset(self%n_dims))
         allocate (self%strides(self%n_dims))
+        allocate (self%subsize_transformed(self%n_dims))
+        allocate (self%offset_transformed(self%n_dims))
+        allocate (self%strides_transformed(self%n_dims))
 
         ! Create SHAFFT ND plan
         call shafftNDCreate(self%shafft_plan, ierr)
@@ -252,42 +311,22 @@ contains
 
         ! Initialize SHAFFT ND plan
         call shafftNDInit(self%shafft_plan, self%COMM_DIMS, dims, &
-                          SHAFFT_Z2Z, DEVCOMM, SHAFFT_LAYOUT_INITIAL, ierr)
+                          SHAFFT_Z2Z, DEVCOMM, SHAFFT_LAYOUT_REDISTRIBUTED, ierr)
         if (ierr /= SHAFFT_SUCCESS) return
 
         ! Create FFT plans
         call shafftPlan(self%shafft_plan, ierr)
         if (ierr /= SHAFFT_SUCCESS) return
 
-        ! Get layouts from SHAFFT
-        call shafftGetLayout(self%shafft_plan, self%subsize, self%offset, &
-                             SHAFFT_TENSOR_LAYOUT_CURRENT, ierr)
+        call query_nd_layout_state(self%shafft_plan, dims, SHAFFT_TENSOR_LAYOUT_INITIAL, &
+                                   self%subsize, self%offset, self%strides, &
+                                   self%layout%local_i, self%layout%local_i_offset, ierr)
         if (ierr /= SHAFFT_SUCCESS) return
 
-        allocate (ca(self%n_dims), da(self%n_dims))
-
-        ca = -1
-        da = -1
-        call shafftGetAxes(self%shafft_plan, ca, da, SHAFFT_TENSOR_LAYOUT_CURRENT, ierr)
+        call query_nd_layout_state(self%shafft_plan, dims, SHAFFT_TENSOR_LAYOUT_REDISTRIBUTED, &
+                                   self%subsize_transformed, self%offset_transformed, self%strides_transformed, &
+                                   self%layout%transformed_local_i, self%layout%transformed_local_i_offset, ierr)
         if (ierr /= SHAFFT_SUCCESS) return
-        call compute_layout_strides_from_axes(dims, ca, da, self%strides, ierr)
-        if (ierr /= SHAFFT_SUCCESS) return
-
-        deallocate (ca, da)
-
-        ! Update layout info
-        self%layout%local_i = int(product(real(self%subsize, real64)), c_size_t)
-
-        ! Compute initial layout offset using the reported initial-axis strides.
-        self%layout%local_i_offset = 0_c_size_t
-        do i = 1, self%n_dims
-            self%layout%local_i_offset = self%layout%local_i_offset + &
-                                         self%offset(i) * int(self%strides(i), c_size_t)
-        end do
-
-        ! With SHAFFT_LAYOUT_INITIAL, transformed layout is identical to initial layout.
-        self%layout%transformed_local_i = self%layout%local_i
-        self%layout%transformed_local_i_offset = self%layout%local_i_offset
 
         ! Debug bounds/contiguity checks on linearised slabs
         total_elements = int(product(int(dims, c_size_t)), c_size_t)
@@ -427,6 +466,9 @@ contains
         if (allocated(self%subsize)) deallocate (self%subsize)
         if (allocated(self%offset)) deallocate (self%offset)
         if (allocated(self%strides)) deallocate (self%strides)
+        if (allocated(self%subsize_transformed)) deallocate (self%subsize_transformed)
+        if (allocated(self%offset_transformed)) deallocate (self%offset_transformed)
+        if (allocated(self%strides_transformed)) deallocate (self%strides_transformed)
 
         self%initialized = .false.
         self%planned = .false.
@@ -459,18 +501,18 @@ contains
     function fft_nd_get_subsize_transformed(self) result(subsize)
         class(fft_nd_handler), intent(in) :: self
         integer(c_size_t), dimension(:), allocatable :: subsize
-        if (allocated(self%subsize)) then
-            allocate (subsize(size(self%subsize)))
-            subsize = self%subsize
+        if (allocated(self%subsize_transformed)) then
+            allocate (subsize(size(self%subsize_transformed)))
+            subsize = self%subsize_transformed
         end if
     end function fft_nd_get_subsize_transformed
 
     function fft_nd_get_offset_transformed(self) result(offset)
         class(fft_nd_handler), intent(in) :: self
         integer(c_size_t), dimension(:), allocatable :: offset
-        if (allocated(self%offset)) then
-            allocate (offset(size(self%offset)))
-            offset = self%offset
+        if (allocated(self%offset_transformed)) then
+            allocate (offset(size(self%offset_transformed)))
+            offset = self%offset_transformed
         end if
     end function fft_nd_get_offset_transformed
 
@@ -486,11 +528,49 @@ contains
     function fft_nd_get_strides_transformed(self) result(strides)
         class(fft_nd_handler), intent(in) :: self
         integer(int32), dimension(:), allocatable :: strides
-        if (allocated(self%strides)) then
-            allocate (strides(size(self%strides)))
-            strides = self%strides
+        if (allocated(self%strides_transformed)) then
+            allocate (strides(size(self%strides_transformed)))
+            strides = self%strides_transformed
         end if
     end function fft_nd_get_strides_transformed
+
+    subroutine query_nd_layout_state(plan, dims, layout_kind, subsize_out, offset_out, strides_out, &
+                                     local_i_out, local_i_offset_out, ierr)
+        type(c_ptr), intent(in) :: plan
+        integer(int32), intent(in) :: dims(:)
+        integer(c_int), intent(in) :: layout_kind
+        integer(c_size_t), intent(out) :: subsize_out(:), offset_out(:)
+        integer(int32), intent(out) :: strides_out(:)
+        integer(c_size_t), intent(out) :: local_i_out, local_i_offset_out
+        integer(int32), intent(out) :: ierr
+
+        integer(int32) :: i
+        integer(int32), allocatable :: ca(:), da(:)
+
+        ierr = SHAFFT_SUCCESS
+
+        call shafftGetLayout(plan, subsize_out, offset_out, layout_kind, ierr)
+        if (ierr /= SHAFFT_SUCCESS) return
+
+        allocate (ca(size(dims)), da(size(dims)))
+        ca = -1
+        da = -1
+        call shafftGetAxes(plan, ca, da, layout_kind, ierr)
+        if (ierr /= SHAFFT_SUCCESS) then
+            deallocate (ca, da)
+            return
+        end if
+
+        call compute_layout_strides_from_axes(dims, ca, da, strides_out, ierr)
+        deallocate (ca, da)
+        if (ierr /= SHAFFT_SUCCESS) return
+
+        local_i_out = int(product(real(subsize_out, real64)), c_size_t)
+        local_i_offset_out = 0_c_size_t
+        do i = 1, size(dims)
+            local_i_offset_out = local_i_offset_out + offset_out(i) * int(strides_out(i), c_size_t)
+        end do
+    end subroutine query_nd_layout_state
 
     subroutine compute_layout_strides_from_axes(dims, ca, da, strides_out, ierr)
         integer(int32), intent(in) :: dims(:)

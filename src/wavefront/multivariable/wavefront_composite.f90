@@ -407,7 +407,9 @@ contains
 
             end if
 
-            call hipCheck(hipMalloc(self%dev_mixer, int(self%transformed_local_i, c_size_t)))
+            if (self%transformed_local_i > 0_c_size_t) then
+                call hipCheck(hipMalloc(self%dev_mixer, int(self%transformed_local_i, c_size_t)))
+            end if
             call hipCheck(hipMalloc(self%dev_t, int(size(self%tensor_dims, kind=c_size_t), c_size_t)))
 
             self%generated_operator = .true.
@@ -429,10 +431,12 @@ contains
         integer(int32) :: ierr
 
         integer(int32) :: numblocks
+        integer(int64) :: ci_device_local_i
 
         error_code = 0
 
         if (self%context%has_device) then
+            ci_device_local_i = self%context%ci%get_device_local_i()
 
             if (self%n_dims > MAX_KERNEL_DIMS) then
                 write (error_unit, '(A,I0,A,I0)') &
@@ -441,7 +445,7 @@ contains
                 error_code = 1
                 return
             end if
-            if (self%transformed_local_i <= 0_c_size_t) then
+            if (ci_device_local_i <= 0) then
                 return
             end if
 
@@ -463,32 +467,31 @@ contains
                 return
             end if
 
-            ! After forward FFT, data is in TRANSFORMED layout
-            ! Use transformed_local_i and transformed_local_i_offset for eigenvalue operations
-            numblocks = int((self%transformed_local_i + 255_c_size_t) / 256_c_size_t, int32)
-            call launch_gen_composite_mixer_kernel(dim3(numblocks), &
-                                                   dim3(256), &
-                                                   0, c_null_ptr, &
-                                                   size(self%tensor_dims), &
-                                                   self%Ns_max, &
-                                                   c_loc(self%dev_tensor_dims), &
-                                                   c_loc(self%dev_strides), &
-                                                   c_loc(self%dev_t), &
-                                                   c_loc(self%dev_eigenvalues), &
-                                                   c_loc(self%dev_mixer), &
-                                                   self%transformed_local_i, &
-                                                   self%transformed_local_i_offset)
-            call hipCheck(hipDeviceSynchronize())
+            if (self%transformed_local_i > 0_c_size_t) then
+                ! After forward FFT, data is in the redistributed Fourier-space layout.
+                numblocks = int((self%transformed_local_i + 255_c_size_t) / 256_c_size_t, int32)
+                call launch_gen_composite_mixer_kernel(dim3(numblocks), &
+                                                       dim3(256), &
+                                                       0, c_null_ptr, &
+                                                       size(self%tensor_dims), &
+                                                       self%Ns_max, &
+                                                       c_loc(self%dev_tensor_dims), &
+                                                       c_loc(self%dev_strides), &
+                                                       c_loc(self%dev_t), &
+                                                       c_loc(self%dev_eigenvalues), &
+                                                       c_loc(self%dev_mixer), &
+                                                       self%transformed_local_i, &
+                                                       self%transformed_local_i_offset)
+                call hipCheck(hipDeviceSynchronize())
 
-            ! Apply the phase-shift in Fourier space (still in transformed layout)
-            call launch_constant_phase_shift_kernel(dim3(numblocks), &
-                                                    dim3(256), &
-                                                    0, c_null_ptr, &
-                                                    c_loc(self%dev_mixer), &
-                                                    c_loc(self%context%state), &
-                                                    self%transformed_local_i)
-
-            call hipCheck(hipDeviceSynchronize())
+                call launch_constant_phase_shift_kernel(dim3(numblocks), &
+                                                        dim3(256), &
+                                                        0, c_null_ptr, &
+                                                        c_loc(self%dev_mixer), &
+                                                        c_loc(self%context%state), &
+                                                        self%transformed_local_i)
+                call hipCheck(hipDeviceSynchronize())
+            end if
 
             ! Backward FFT using polymorphic handler
             call self%shafft_handler%backward(self%context%state, self%context%work, ierr)
@@ -508,24 +511,36 @@ contains
 
     subroutine wavefront_composite_destroy(self)
         class(composite_propagator), intent(inout) :: self
+        logical :: has_device
 
-        if (self%context%has_device .and. self%generated_operator) then
+        has_device = .false.
+        if (associated(self%context)) then
+            has_device = self%context%has_device
+        end if
 
-            call hipCheck(hipFree(self%dev_tensor_dims))
-            call hipCheck(hipFree(self%dev_strides))
-            call hipCheck(hipFree(self%dev_eigenvalues))
-            call hipCheck(hipFree(self%dev_mixer))
-            call hipCheck(hipFree(self%dev_t))
+        if (has_device .and. self%generated_operator) then
 
-            if (allocated(self%strides)) then
-                deallocate (self%strides)
-            end if
+            if (associated(self%dev_tensor_dims)) call hipCheck(hipFree(self%dev_tensor_dims))
+            if (associated(self%dev_strides)) call hipCheck(hipFree(self%dev_strides))
+            if (associated(self%dev_eigenvalues)) call hipCheck(hipFree(self%dev_eigenvalues))
+            if (associated(self%dev_mixer)) call hipCheck(hipFree(self%dev_mixer))
+            if (associated(self%dev_t)) call hipCheck(hipFree(self%dev_t))
+
+            self%dev_tensor_dims => null()
+            self%dev_strides => null()
+            self%dev_eigenvalues => null()
+            self%dev_mixer => null()
+            self%dev_t => null()
 
             self%generated_operator = .false.
 
         end if
 
-        if (self%context%has_device .and. self%planned) then
+        if (allocated(self%strides)) then
+            deallocate (self%strides)
+        end if
+
+        if (has_device .and. self%planned) then
             ! Destroy FFT handler (polymorphic call)
             if (allocated(self%shafft_handler)) then
                 call self%shafft_handler%destroy()

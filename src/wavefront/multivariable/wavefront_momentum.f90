@@ -136,7 +136,8 @@ module wavefront_momentum
         integer(int32), dimension(:), pointer :: tensor_dims => null()
         integer(c_size_t) :: transformed_local_i = 0
         integer(c_size_t) :: transformed_local_i_offset = 0
-        integer(int32), allocatable, dimension(:) :: strides
+        integer(int32), allocatable, dimension(:) :: strides_initial
+        integer(int32), allocatable, dimension(:) :: strides_transformed
         integer(int32) :: Ns_max
         ! Polymorphic FFT handler - supports both 1D and ND
         class(fft_handler_base), allocatable :: shafft_handler
@@ -144,7 +145,8 @@ module wavefront_momentum
         logical :: generated_operator = .false.
 
         ! Device arrays
-        integer(int32), dimension(:), pointer :: dev_strides => null()
+        integer(int32), dimension(:), pointer :: dev_strides_initial => null()
+        integer(int32), dimension(:), pointer :: dev_strides_transformed => null()
         integer(int32), dimension(:), pointer :: dev_tensor_dims => null()
         real(real64), dimension(:), pointer :: dev_eigenvalues => null()
         real(real64), dimension(:), pointer :: dev_mixer => null()
@@ -338,18 +340,24 @@ contains
                     self%transformed_local_i = fft_layout%transformed_local_i
                     self%transformed_local_i_offset = fft_layout%transformed_local_i_offset
 
-                    if (allocated(self%strides)) then
-                        deallocate (self%strides)
+                    if (allocated(self%strides_initial)) then
+                        deallocate (self%strides_initial)
+                    end if
+                    if (allocated(self%strides_transformed)) then
+                        deallocate (self%strides_transformed)
                     end if
                     select type (fft_impl => self%shafft_handler)
                     type is (fft_nd_handler)
-                        self%strides = fft_impl%get_strides()
+                        self%strides_initial = fft_impl%get_strides()
+                        self%strides_transformed = fft_impl%get_strides_transformed()
                     class default
-                        allocate (self%strides(size(self%tensor_dims)))
-                        self%strides(size(self%tensor_dims)) = 1
+                        allocate (self%strides_initial(size(self%tensor_dims)))
+                        self%strides_initial(size(self%tensor_dims)) = 1
                         do i_stride = size(self%tensor_dims) - 1, 1, -1
-                            self%strides(i_stride) = self%strides(i_stride + 1) * self%tensor_dims(i_stride + 1)
+                            self%strides_initial(i_stride) = self%strides_initial(i_stride + 1) * self%tensor_dims(i_stride + 1)
                         end do
+                        allocate (self%strides_transformed(size(self%tensor_dims)))
+                        self%strides_transformed = self%strides_initial
                     end select
 
                     if (self%n_dims > MAX_KERNEL_DIMS) then
@@ -436,19 +444,25 @@ contains
             ci_device_local_i = self%context%ci%get_device_local_i()
             ci_device_local_i_offset = self%context%ci%get_device_local_i_offset()
 
-            ! Allocate device arrays for tensor dimensions and strides
+            ! Allocate device arrays for tensor dimensions and both layout-specific stride sets.
             call hipCheck(hipMalloc(self%dev_tensor_dims, int(size(self%tensor_dims, kind=c_size_t), c_size_t)))
-            call hipCheck(hipMalloc(self%dev_strides, int(size(self%tensor_dims, kind=c_size_t), c_size_t)))
+            call hipCheck(hipMalloc(self%dev_strides_initial, int(size(self%tensor_dims, kind=c_size_t), c_size_t)))
+            call hipCheck(hipMalloc(self%dev_strides_transformed, int(size(self%tensor_dims, kind=c_size_t), c_size_t)))
             call hipCheck(hipMemcpy(self%dev_tensor_dims, int(self%tensor_dims, int32), hipMemcpyHostToDevice))
 
-            if (.not. allocated(self%strides)) then
-                allocate (self%strides(size(self%tensor_dims)))
-                self%strides(size(self%tensor_dims)) = 1
+            if (.not. allocated(self%strides_initial)) then
+                allocate (self%strides_initial(size(self%tensor_dims)))
+                self%strides_initial(size(self%tensor_dims)) = 1
                 do i = size(self%tensor_dims) - 1, 1, -1
-                    self%strides(i) = self%strides(i + 1) * self%tensor_dims(i + 1)
+                    self%strides_initial(i) = self%strides_initial(i + 1) * self%tensor_dims(i + 1)
                 end do
             end if
-            call hipCheck(hipMemcpy(self%dev_strides, self%strides, hipMemcpyHostToDevice))
+            if (.not. allocated(self%strides_transformed)) then
+                allocate (self%strides_transformed(size(self%tensor_dims)))
+                self%strides_transformed = self%strides_initial
+            end if
+            call hipCheck(hipMemcpy(self%dev_strides_initial, self%strides_initial, hipMemcpyHostToDevice))
+            call hipCheck(hipMemcpy(self%dev_strides_transformed, self%strides_transformed, hipMemcpyHostToDevice))
 
             ! Allocate and copy grid parameters to device
             call hipCheck(hipMalloc(self%dev_minsq, int(self%n_dims, c_size_t)))
@@ -478,10 +492,29 @@ contains
             call hipCheck(hipDeviceSynchronize())
 
             ! Allocate phase factors for position<->momentum transforms
-            call hipCheck(hipMalloc(self%dev_phase_k, int(ci_device_local_i * 16_int64, c_size_t))) ! 16 bytes per complex
+            if (self%transformed_local_i > 0_c_size_t) then
+                call hipCheck(hipMalloc(self%dev_phase_k, int(self%transformed_local_i * 16_c_size_t, c_size_t))) ! 16 bytes per complex
+                numblocks = int((self%transformed_local_i + 255_c_size_t) / 256_c_size_t, int32)
+                call launch_gen_phase_factors_kernel(dim3(numblocks), &
+                                                     dim3(256), &
+                                                     0, c_null_ptr, &
+                                                     size(self%tensor_dims), &
+                                                     self%Ns_max, &
+                                                     c_loc(self%dev_tensor_dims), &
+                                                     c_loc(self%dev_strides_transformed), &
+                                                     c_loc(self%dev_minsq), & ! target mins
+                                                     c_loc(self%dev_deltask), & ! source deltas
+                                                     c_loc(self%dev_minsk), & ! source mins
+                                                     self%dev_phase_k, &
+                                                     self%transformed_local_i, &
+                                                     self%transformed_local_i_offset, &
+                                                     0) ! direction 0 = phase_k
+                call hipCheck(hipDeviceSynchronize())
+            end if
+
             call hipCheck(hipMalloc(self%dev_phase_q, int(ci_device_local_i * 16_int64, c_size_t)))
 
-            ! Generate phase_k = exp(-i * sum(k * minsq)) for position->momentum transform
+            ! Generate phase_q = exp(i * sum(q * minsk)) for momentum->position transform
             numblocks = int((ci_device_local_i + 255_int64) / 256_int64, int32)
             call launch_gen_phase_factors_kernel(dim3(numblocks), &
                                                  dim3(256), &
@@ -489,24 +522,7 @@ contains
                                                  size(self%tensor_dims), &
                                                  self%Ns_max, &
                                                  c_loc(self%dev_tensor_dims), &
-                                                 c_loc(self%dev_strides), &
-                                                 c_loc(self%dev_minsq), & ! target mins
-                                                 c_loc(self%dev_deltask), & ! source deltas
-                                                 c_loc(self%dev_minsk), & ! source mins
-                                                 self%dev_phase_k, &
-                                                 int(ci_device_local_i, c_size_t), &
-                                                 int(ci_device_local_i_offset, c_size_t), &
-                                                 0) ! direction 0 = phase_k
-            call hipCheck(hipDeviceSynchronize())
-
-            ! Generate phase_q = exp(i * sum(q * minsk)) for momentum->position transform
-            call launch_gen_phase_factors_kernel(dim3(numblocks), &
-                                                 dim3(256), &
-                                                 0, c_null_ptr, &
-                                                 size(self%tensor_dims), &
-                                                 self%Ns_max, &
-                                                 c_loc(self%dev_tensor_dims), &
-                                                 c_loc(self%dev_strides), &
+                                                 c_loc(self%dev_strides_initial), &
                                                  c_loc(self%dev_minsk), & ! target mins
                                                  c_loc(self%dev_deltasq), & ! source deltas
                                                  c_loc(self%dev_minsq), & ! source mins
@@ -517,7 +533,9 @@ contains
             call hipCheck(hipDeviceSynchronize())
 
             ! Allocate mixer and time parameter arrays
-            call hipCheck(hipMalloc(self%dev_mixer, int(ci_device_local_i, c_size_t)))
+            if (self%transformed_local_i > 0_c_size_t) then
+                call hipCheck(hipMalloc(self%dev_mixer, int(self%transformed_local_i, c_size_t)))
+            end if
             call hipCheck(hipMalloc(self%dev_t, int(size(self%tensor_dims, kind=c_size_t), c_size_t)))
 
             self%generated_operator = .true.
@@ -554,7 +572,7 @@ contains
                 error_code = 1
                 return
             end if
-            if (ci_device_local_i <= 0 .or. self%transformed_local_i <= 0) then
+            if (ci_device_local_i <= 0) then
                 return
             end if
 
@@ -576,7 +594,7 @@ contains
                                                   size(self%tensor_dims), &
                                                   self%Ns_max, &
                                                   c_loc(self%dev_tensor_dims), &
-                                                  c_loc(self%dev_strides), &
+                                                  c_loc(self%dev_strides_initial), &
                                                   c_loc(self%context%state), &
                                                   int(ci_device_local_i, c_size_t), &
                                                   int(ci_device_local_i_offset, c_size_t))
@@ -592,51 +610,53 @@ contains
                 return
             end if
 
-            ! Apply phase_k
-            call launch_apply_complex_phase_kernel(dim3(numblocks_transformed), &
-                                                   dim3(256), &
-                                                   0, c_null_ptr, &
-                                                   self%dev_phase_k, &
-                                                   c_loc(self%context%state), &
-                                                   self%transformed_local_i)
-            call hipCheck(hipDeviceSynchronize())
+            if (self%transformed_local_i > 0_c_size_t) then
+                ! Apply phase_k
+                call launch_apply_complex_phase_kernel(dim3(numblocks_transformed), &
+                                                       dim3(256), &
+                                                       0, c_null_ptr, &
+                                                       self%dev_phase_k, &
+                                                       c_loc(self%context%state), &
+                                                       self%transformed_local_i)
+                call hipCheck(hipDeviceSynchronize())
 
-            ! Generate momentum-space mixer (kinetic energy evolution)
-            call launch_gen_momentum_mixer_kernel(dim3(numblocks_transformed), &
-                                                  dim3(256), &
-                                                  0, c_null_ptr, &
-                                                  size(self%tensor_dims), &
-                                                  self%Ns_max, &
-                                                  c_loc(self%dev_tensor_dims), &
-                                                  c_loc(self%dev_strides), &
-                                                  c_loc(self%dev_t), &
-                                                  c_loc(self%dev_eigenvalues), &
-                                                  c_loc(self%dev_mixer), &
-                                                  self%transformed_local_i, &
-                                                  self%transformed_local_i_offset)
-            call hipCheck(hipDeviceSynchronize())
+                ! Generate momentum-space mixer (kinetic energy evolution)
+                call launch_gen_momentum_mixer_kernel(dim3(numblocks_transformed), &
+                                                      dim3(256), &
+                                                      0, c_null_ptr, &
+                                                      size(self%tensor_dims), &
+                                                      self%Ns_max, &
+                                                      c_loc(self%dev_tensor_dims), &
+                                                      c_loc(self%dev_strides_transformed), &
+                                                      c_loc(self%dev_t), &
+                                                      c_loc(self%dev_eigenvalues), &
+                                                      c_loc(self%dev_mixer), &
+                                                      self%transformed_local_i, &
+                                                      self%transformed_local_i_offset)
+                call hipCheck(hipDeviceSynchronize())
 
-            ! Apply kinetic energy evolution: exp(-i * mixer)
-            call launch_constant_phase_shift_kernel(dim3(numblocks_transformed), &
-                                                    dim3(256), &
-                                                    0, c_null_ptr, &
-                                                    c_loc(self%dev_mixer), &
-                                                    c_loc(self%context%state), &
-                                                    self%transformed_local_i)
-            call hipCheck(hipDeviceSynchronize())
+                ! Apply kinetic energy evolution: exp(-i * mixer)
+                call launch_constant_phase_shift_kernel(dim3(numblocks_transformed), &
+                                                        dim3(256), &
+                                                        0, c_null_ptr, &
+                                                        c_loc(self%dev_mixer), &
+                                                        c_loc(self%context%state), &
+                                                        self%transformed_local_i)
+                call hipCheck(hipDeviceSynchronize())
 
-            ! Apply checkerboard phase before inverse FFT
-            call launch_apply_checkerboard_kernel(dim3(numblocks_transformed), &
-                                                  dim3(256), &
-                                                  0, c_null_ptr, &
-                                                  size(self%tensor_dims), &
-                                                  self%Ns_max, &
-                                                  c_loc(self%dev_tensor_dims), &
-                                                  c_loc(self%dev_strides), &
-                                                  c_loc(self%context%state), &
-                                                  self%transformed_local_i, &
-                                                  self%transformed_local_i_offset)
-            call hipCheck(hipDeviceSynchronize())
+                ! Apply checkerboard phase before inverse FFT
+                call launch_apply_checkerboard_kernel(dim3(numblocks_transformed), &
+                                                      dim3(256), &
+                                                      0, c_null_ptr, &
+                                                      size(self%tensor_dims), &
+                                                      self%Ns_max, &
+                                                      c_loc(self%dev_tensor_dims), &
+                                                      c_loc(self%dev_strides_transformed), &
+                                                      c_loc(self%context%state), &
+                                                      self%transformed_local_i, &
+                                                      self%transformed_local_i_offset)
+                call hipCheck(hipDeviceSynchronize())
+            end if
 
             ! Backward FFT using polymorphic handler
             call self%shafft_handler%backward(self%context%state, self%context%work, ierr)
@@ -665,30 +685,53 @@ contains
 
     subroutine wavefront_momentum_destroy(self)
         class(momentum_propagator), intent(inout) :: self
+        logical :: has_device
 
-        if (self%context%has_device .and. self%generated_operator) then
+        has_device = .false.
+        if (associated(self%context)) then
+            has_device = self%context%has_device
+        end if
 
-            call hipCheck(hipFree(self%dev_tensor_dims))
-            call hipCheck(hipFree(self%dev_strides))
-            call hipCheck(hipFree(self%dev_eigenvalues))
-            call hipCheck(hipFree(self%dev_mixer))
-            call hipCheck(hipFree(self%dev_t))
-            call hipCheck(hipFree(self%dev_minsq))
-            call hipCheck(hipFree(self%dev_minsk))
-            call hipCheck(hipFree(self%dev_deltasq))
-            call hipCheck(hipFree(self%dev_deltask))
-            call hipCheck(hipFree(self%dev_phase_k))
-            call hipCheck(hipFree(self%dev_phase_q))
+        if (has_device .and. self%generated_operator) then
 
-            if (allocated(self%strides)) then
-                deallocate (self%strides)
-            end if
+            if (associated(self%dev_tensor_dims)) call hipCheck(hipFree(self%dev_tensor_dims))
+            if (associated(self%dev_strides_initial)) call hipCheck(hipFree(self%dev_strides_initial))
+            if (associated(self%dev_strides_transformed)) call hipCheck(hipFree(self%dev_strides_transformed))
+            if (associated(self%dev_eigenvalues)) call hipCheck(hipFree(self%dev_eigenvalues))
+            if (associated(self%dev_mixer)) call hipCheck(hipFree(self%dev_mixer))
+            if (associated(self%dev_t)) call hipCheck(hipFree(self%dev_t))
+            if (associated(self%dev_minsq)) call hipCheck(hipFree(self%dev_minsq))
+            if (associated(self%dev_minsk)) call hipCheck(hipFree(self%dev_minsk))
+            if (associated(self%dev_deltasq)) call hipCheck(hipFree(self%dev_deltasq))
+            if (associated(self%dev_deltask)) call hipCheck(hipFree(self%dev_deltask))
+            if (c_associated(self%dev_phase_k)) call hipCheck(hipFree(self%dev_phase_k))
+            if (c_associated(self%dev_phase_q)) call hipCheck(hipFree(self%dev_phase_q))
+
+            self%dev_tensor_dims => null()
+            self%dev_strides_initial => null()
+            self%dev_strides_transformed => null()
+            self%dev_eigenvalues => null()
+            self%dev_mixer => null()
+            self%dev_t => null()
+            self%dev_minsq => null()
+            self%dev_minsk => null()
+            self%dev_deltasq => null()
+            self%dev_deltask => null()
+            self%dev_phase_k = c_null_ptr
+            self%dev_phase_q = c_null_ptr
 
             self%generated_operator = .false.
 
         end if
 
-        if (self%context%has_device .and. self%planned) then
+        if (allocated(self%strides_initial)) then
+            deallocate (self%strides_initial)
+        end if
+        if (allocated(self%strides_transformed)) then
+            deallocate (self%strides_transformed)
+        end if
+
+        if (has_device .and. self%planned) then
             ! Destroy FFT handler (polymorphic call)
             if (allocated(self%shafft_handler)) then
                 call self%shafft_handler%destroy()
