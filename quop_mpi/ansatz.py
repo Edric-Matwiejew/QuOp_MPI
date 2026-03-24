@@ -406,6 +406,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                     self._param_map_raw,
                     "parameter map",
                     self.subcomms.SUBCOMM,
+                    call_args=self.param_map_dict["args"],
+                    call_kwargs=self.param_map_dict["kwargs"],
                 )
 
             self._need_bind_param_map = False
@@ -614,6 +616,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self._initial_state_function_raw,
             "initial state",
             self.subcomms.SUBCOMM,
+            call_args=self.initial_state_dict["args"],
+            call_kwargs=self.initial_state_dict["kwargs"],
         )
 
     # Sampling methods (set_sampling, unset_sampling, etc.) are inherited from Sampling mixin
@@ -745,6 +749,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self._objective_function_raw,
             "objective",
             self.subcomms.SUBCOMM,
+            call_args=self.objective_dict["args"],
+            call_kwargs=self.objective_dict["kwargs"],
         )
 
     @scope("subcomm")
@@ -938,6 +944,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self._initial_state_function_raw = equal
 
         self.__parse_initial_state_function()
+        self.initial_state_function.update_parameters()
 
         self.ansatz_initial_state = self.initial_state_function.call(
             *self.initial_state_dict["args"], **self.initial_state_dict["kwargs"]
@@ -951,8 +958,14 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if callable(self.observable_function):
 
             self.parsed_observable_function = Interface(
-                [self], self.observable_function, "observable", self.subcomms.SUBCOMM
+                [self],
+                self.observable_function,
+                "observable",
+                self.subcomms.SUBCOMM,
+                call_args=self.observable_dict["args"],
+                call_kwargs=self.observable_dict["kwargs"],
             )
+            self.parsed_observable_function.update_parameters()
 
             self.observables = self.parsed_observable_function.call(
                 *self.observable_dict["args"], **self.observable_dict["kwargs"]

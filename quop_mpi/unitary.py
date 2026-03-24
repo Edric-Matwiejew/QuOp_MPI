@@ -249,11 +249,15 @@ class UnitaryBase(Bindable):
 
     def parse_operator_function(self) -> None:
         """Wrap the operator function in an :class:`Interface` for calling."""
+        self.__parse_function_dict__(self.operator_dict, "operator_dict")
+
         self.parsed_operator_function = Interface(
             [self],
             self.operator_function,
             "operator",
             self.MPI_COMM,
+            call_args=self.operator_dict["args"],
+            call_kwargs=self.operator_dict["kwargs"],
         )
 
     def parse_parameter_function(self) -> None:
@@ -270,6 +274,8 @@ class UnitaryBase(Bindable):
             self.parameter_function,
             "initial parameters",
             self.MPI_COMM,
+            call_args=self.param_dict["args"],
+            call_kwargs=self.param_dict["kwargs"],
         )
 
     def gen_initial_params(self) -> np.ndarray:
@@ -284,8 +290,7 @@ class UnitaryBase(Bindable):
         """Generate the unitary operator from the operator function."""
         self.__parse_function_dict__(self.operator_dict, "operator_dict")
 
-        if len(self.variational_parameters) > 0:
-            self.parsed_operator_function.update_parameters()
+        self.parsed_operator_function.update_parameters()
 
         self.operator = self.parsed_operator_function.call(
             *self.operator_dict["args"], **self.operator_dict["kwargs"]

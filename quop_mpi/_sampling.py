@@ -169,6 +169,8 @@ class Sampling:
             self.sampling_function_input,
             "sampling test function",
             self.subcomms.SUBCOMM,
+            call_args=self.sampling_dict["args"],
+            call_kwargs=self.sampling_dict["kwargs"],
         )
 
     @scope("subcomm")
