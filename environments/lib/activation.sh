@@ -24,19 +24,19 @@ write_activation_script() {
     local activation_config_line='CONFIG_FILE=""'
     local runtime_rel
     local venv_rel
-    local site_work_rel
+    local profile_work_rel
     local build_deps_rel
     local fetchcontent_rel
     local skbuild_rel
 
     runtime_rel="$(relative_path_from_root "$INSTALL_ROOT" "$ACTIVATION_RUNTIME_DIR")"
     venv_rel="$(relative_path_from_root "$INSTALL_ROOT" "$VENV_DIR")"
-    site_work_rel="$(relative_path_from_root "$INSTALL_ROOT" "$SITE_WORK_DIR")"
+    profile_work_rel="$(relative_path_from_root "$INSTALL_ROOT" "$PROFILE_WORK_DIR")"
     build_deps_rel="$(relative_path_from_root "$INSTALL_ROOT" "$BUILD_DEPS_DIR")"
     fetchcontent_rel="$(relative_path_from_root "$INSTALL_ROOT" "$FETCHCONTENT_BASE_DIR")"
     skbuild_rel="$(relative_path_from_root "$INSTALL_ROOT" "$SKBUILD_BUILD_DIR")"
     if [[ -n "$ACTIVATION_CONFIG_FILE" ]]; then
-        activation_config_line='CONFIG_FILE="$SETUP_DIR/config.toml"'
+        activation_config_line='CONFIG_FILE="$ENVIRONMENTS_DIR/config.toml"'
     fi
 
     cat >"$activation_script" <<EOF
@@ -50,37 +50,46 @@ fi
 
 INSTALL_ROOT="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="\$INSTALL_ROOT"
-SETUP_DIR="\$INSTALL_ROOT/$(printf '%q' "$runtime_rel")"
-LIB_DIR="\$SETUP_DIR"
-SITES_DIR="\$SETUP_DIR"
-COMMON_LIB="\$SETUP_DIR/common.sh"
-CONFIG_RENDERER="\$SETUP_DIR/render_config.py"
-PATH_HELPER="\$SETUP_DIR/path_helper.py"
-SITE_DIR="\$SETUP_DIR"
-PROFILE_FILE="\$SETUP_DIR/hooks.sh"
+ENVIRONMENTS_DIR="\$INSTALL_ROOT/$(printf '%q' "$runtime_rel")"
+# Legacy aliases are kept so older helper scripts continue to work.
+SETUP_DIR="\$ENVIRONMENTS_DIR"
+LIB_DIR="\$ENVIRONMENTS_DIR"
+PROFILES_DIR="\$ENVIRONMENTS_DIR"
+SITES_DIR="\$PROFILES_DIR"
+COMMON_LIB="\$ENVIRONMENTS_DIR/common.sh"
+CONFIG_RENDERER="\$ENVIRONMENTS_DIR/render_config.py"
+PATH_HELPER="\$ENVIRONMENTS_DIR/path_helper.py"
+PROFILE_DIR="\$ENVIRONMENTS_DIR"
+SITE_DIR="\$PROFILE_DIR"
+PROFILE_FILE="\$ENVIRONMENTS_DIR/hooks.sh"
 $activation_config_line
 PROFILE=$(printf '%q' "$PROFILE")
 PROFILE_ID=$(printf '%q' "$PROFILE_ID")
 BACKEND=$(printf '%q' "$BACKEND")
 VENV_DIR="\$INSTALL_ROOT/$(printf '%q' "$venv_rel")"
 CONFIG_PYTHON="\$VENV_DIR/bin/python"
-SITE_WORK_DIR="\$INSTALL_ROOT/$(printf '%q' "$site_work_rel")"
+PROFILE_WORK_DIR="\$INSTALL_ROOT/$(printf '%q' "$profile_work_rel")"
+SITE_WORK_DIR="\$PROFILE_WORK_DIR"
 BUILD_DEPS_DIR="\$INSTALL_ROOT/$(printf '%q' "$build_deps_rel")"
 FETCHCONTENT_BASE_DIR="\$INSTALL_ROOT/$(printf '%q' "$fetchcontent_rel")"
 SKBUILD_BUILD_DIR="\$INSTALL_ROOT/$(printf '%q' "$skbuild_rel")"
 QUOP_SKBUILD_BUILD_DIR="\$SKBUILD_BUILD_DIR"
 
 export PROJECT_ROOT
+export ENVIRONMENTS_DIR
 export SETUP_DIR
 export LIB_DIR
+export PROFILES_DIR
 export SITES_DIR
 export COMMON_LIB
 export CONFIG_RENDERER
 export PATH_HELPER
 export CONFIG_PYTHON
+export PROFILE_DIR
 export SITE_DIR
 export PROFILE_FILE
 export CONFIG_FILE
+export PROFILE_WORK_DIR
 export SITE_WORK_DIR
 export BUILD_DEPS_DIR
 export FETCHCONTENT_BASE_DIR

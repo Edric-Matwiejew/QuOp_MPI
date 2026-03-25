@@ -40,7 +40,7 @@ build.tool-args = ["-j1"]
 # scikit-build-core builds each listed target separately. The wavefront targets
 # are real extension targets when WAVEFRONT_BACKEND=ON and no-op placeholders
 # when WAVEFRONT_BACKEND=OFF, so direct `python -m build` remains backend-aware
-# via CMAKE_ARGS without requiring setup/install.sh.
+# via CMAKE_ARGS without requiring environments/install.sh.
 build.targets = [
     "cartesian_f2py",
     "comm_info_wrapper_f2py",

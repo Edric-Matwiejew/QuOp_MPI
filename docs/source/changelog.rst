@@ -15,7 +15,7 @@ Added
 - SHAFFT-based wavefront FFT handling with layout negotiation support
 - Development standards documentation for Python, Fortran, and extension-module conventions
 - Curated ASX ticker candidate dataset for the portfolio rebalancing example
-- Profile-based installer (``setup/install.sh``) with site profiles replacing the Spack-driven setup
+- Profile-based installer (``environments/install.sh``) with installation profiles replacing the Spack-driven setup
 - Unified benchmark submission script with single (intra) - and multi-node configurations
 - ``run_tests.sh`` test runner covering unit, MPI, parallel-Jacobian and integration tests
 - Integration test suite that runs example scripts and validates results against expected bounds
@@ -25,8 +25,8 @@ Changed
 -------
 
 - Migrated build system to scikit-build-core
-- ``config.toml`` is now the single source of truth for site-specific module lists and environment settings
-- Setup installer libraries split into sourced modules with shared helpers in ``common.sh``
+- ``config.toml`` is now the single source of truth for profile-specific module lists and environment settings
+- Environment installer libraries split into sourced modules with shared helpers in ``common.sh``
 - Linux wavefront wheels are now repaired with auditwheel/patchelf to include shared library dependencies 
 - SHAFFT dependency caching and library install paths improved
 - CMake minimum version raised; Fortran preprocessing uses ``Fortran_PREPROCESS`` property (fixes Ninja builds)
@@ -51,7 +51,7 @@ Fixed
 - ``Swarm.execute_swarm`` now applies tracker-assigned seeds to each ``Ansatz`` instance before execution
 - NLopt wrapper defaults no longer use mutable arguments (``constraints``/``bounds`` helpers), preventing cross-call state leakage
 - Portfolio rebalancing live-data fetch now handles partial Yahoo responses more robustly and falls back cleanly to bundled sample data
-- Bash 3 compatibility for setup scripts (guarded empty expansions under ``set -u``)
+- Bash 3 compatibility for environment scripts (guarded empty expansions under ``set -u``)
 - F2PY wrapper module dependencies and build targets corrected for parallel builds
 - ``CMAKE_ARGS`` parsing fixed for environment-driven configuration
 - hipfort module compatibility verification added to wavefront builds

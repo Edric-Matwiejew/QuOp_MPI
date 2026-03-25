@@ -10,13 +10,13 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-COMMON_SH = PROJECT_ROOT / "setup" / "lib" / "common.sh"
-ACTIVATION_LIB = PROJECT_ROOT / "setup" / "lib" / "activation.sh"
-POST_INSTALL_LIB = PROJECT_ROOT / "setup" / "lib" / "post_install.sh"
-WHEEL_LIB = PROJECT_ROOT / "setup" / "lib" / "wheel.sh"
-INSTALL_SH = PROJECT_ROOT / "setup" / "install.sh"
-VALIDATE_INSTALL = PROJECT_ROOT / "setup" / "lib" / "validate_install.py"
-PYPROJECT_DEPS_HELPER = PROJECT_ROOT / "setup" / "lib" / "pyproject_deps.py"
+COMMON_SH = PROJECT_ROOT / "environments" / "lib" / "common.sh"
+ACTIVATION_LIB = PROJECT_ROOT / "environments" / "lib" / "activation.sh"
+POST_INSTALL_LIB = PROJECT_ROOT / "environments" / "lib" / "post_install.sh"
+WHEEL_LIB = PROJECT_ROOT / "environments" / "lib" / "wheel.sh"
+INSTALL_SH = PROJECT_ROOT / "environments" / "install.sh"
+VALIDATE_INSTALL = PROJECT_ROOT / "environments" / "lib" / "validate_install.py"
+PYPROJECT_DEPS_HELPER = PROJECT_ROOT / "environments" / "lib" / "pyproject_deps.py"
 PYPROJECT_TOML = PROJECT_ROOT / "pyproject.toml"
 CMAKE_LISTS = PROJECT_ROOT / "CMakeLists.txt"
 NATIVE_CMAKE_LISTS = PROJECT_ROOT / "native" / "CMakeLists.txt"
@@ -25,14 +25,14 @@ HIPFORT_DEPENDENCY_CMAKE = PROJECT_ROOT / "cmake" / "HipfortDependency.cmake"
 SHAFFT_DEPENDENCY_CMAKE = PROJECT_ROOT / "cmake" / "SHAFFTDependency.cmake"
 ADD_F2PY_CMAKE = PROJECT_ROOT / "cmake" / "QuOpF2pyLibrary.cmake"
 WAVEFRONT_CONTEXT_CMAKE = PROJECT_ROOT / "native" / "wavefront" / "context" / "CMakeLists.txt"
-GENERIC_HOOKS = PROJECT_ROOT / "setup" / "sites" / "generic" / "hooks.sh"
-MACOS_HOOKS = PROJECT_ROOT / "setup" / "sites" / "macos" / "hooks.sh"
-UBUNTU_24_HOOKS = PROJECT_ROOT / "setup" / "sites" / "ubuntu-24" / "hooks.sh"
-PAWSEY_HOOKS = PROJECT_ROOT / "setup" / "sites" / "pawsey-setonix" / "hooks.sh"
-PAWSEY_CONFIG = PROJECT_ROOT / "setup" / "sites" / "pawsey-setonix" / "mpi" / "config.toml"
-MACOS_CONFIG = PROJECT_ROOT / "setup" / "sites" / "macos" / "mpi" / "config.toml"
-UBUNTU_24_CONFIG = PROJECT_ROOT / "setup" / "sites" / "ubuntu-24" / "mpi" / "config.toml"
-GENERIC_CONFIG = PROJECT_ROOT / "setup" / "sites" / "generic" / "mpi" / "config.toml"
+GENERIC_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "generic" / "hooks.sh"
+MACOS_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "macos" / "hooks.sh"
+UBUNTU_24_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "hooks.sh"
+PAWSEY_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "hooks.sh"
+PAWSEY_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "mpi" / "config.toml"
+MACOS_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "macos" / "mpi" / "config.toml"
+UBUNTU_24_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "mpi" / "config.toml"
+GENERIC_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "generic" / "mpi" / "config.toml"
 
 
 def load_module(path: Path, module_name: str):
@@ -120,12 +120,12 @@ resolve_python_interpreter 9.9
     assert "expected 9.9" in (result.stdout + result.stderr)
 
 
-def test_site_listing_helpers_are_portable_and_sorted():
+def test_profile_listing_helpers_are_portable_and_sorted():
     script = f"""
-SITES_DIR={shlex.quote(str(PROJECT_ROOT / "setup" / "sites"))}
+PROFILES_DIR={shlex.quote(str(PROJECT_ROOT / "environments" / "profiles"))}
 source {shlex.quote(str(COMMON_SH))}
-list_available_sites
-print_available_sites
+list_available_profiles
+print_available_profiles
 """
 
     result = run_shell(script)
@@ -142,7 +142,7 @@ print_available_sites
 
 def test_load_profile_config_exposes_macos_homebrew_overrides():
     script = f"""
-CONFIG_RENDERER={shlex.quote(str(PROJECT_ROOT / "setup" / "lib" / "render_config.py"))}
+CONFIG_RENDERER={shlex.quote(str(PROJECT_ROOT / "environments" / "lib" / "render_config.py"))}
 source {shlex.quote(str(COMMON_SH))}
 load_profile_config {shlex.quote(str(MACOS_CONFIG))}
 printf 'PREFIX=%s\\n' "${{CFG_HOMEBREW_PREFIX-unset}}"
@@ -160,7 +160,7 @@ printf 'FFTW=%s\\n' "${{CFG_HOMEBREW_FFTW_FORMULA-unset}}"
     ]
 
 
-def test_default_site_configs_use_dedicated_install_subdir():
+def test_default_profile_configs_use_dedicated_install_subdir():
     for config_path in (GENERIC_CONFIG, MACOS_CONFIG, UBUNTU_24_CONFIG, PAWSEY_CONFIG):
         assert 'root = ".quop-install"' in config_path.read_text()
 
@@ -316,8 +316,8 @@ def test_build_uses_standard_cmake_build_type_everywhere():
     # Per-backend config files: MPI config is the default, wavefront checked separately.
     ubuntu_24_mpi_config_text = UBUNTU_24_CONFIG.read_text()
     pawsey_mpi_config_text = PAWSEY_CONFIG.read_text()
-    ubuntu_24_wf_config = PROJECT_ROOT / "setup" / "sites" / "ubuntu-24" / "wavefront" / "config.toml"
-    pawsey_wf_config = PROJECT_ROOT / "setup" / "sites" / "pawsey-setonix" / "wavefront" / "config.toml"
+    ubuntu_24_wf_config = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "wavefront" / "config.toml"
+    pawsey_wf_config = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "wavefront" / "config.toml"
     ubuntu_24_wf_config_text = ubuntu_24_wf_config.read_text()
     pawsey_wf_config_text = pawsey_wf_config.read_text()
 
@@ -395,7 +395,7 @@ def test_install_script_aborts_on_wheel_or_install_validation_failure():
     assert 'if ! INSTALLED_PACKAGE_PATH="$(validate_installed_package)"; then' in install_text
 
 
-def test_install_script_uses_common_setup_helpers():
+def test_install_script_uses_common_environment_helpers():
     install_text = INSTALL_SH.read_text()
 
     assert "readlink -f" not in install_text
@@ -405,7 +405,7 @@ def test_install_script_uses_common_setup_helpers():
     assert "cleanup_install_state" in install_text
     assert "ensure_python_build_requirements" in install_text
     assert 'ensure_path_within_root "$INSTALL_ROOT" "$VENV_DIR" "virtual environment"' in install_text
-    assert 'ensure_path_within_root "$INSTALL_ROOT" "$SITE_WORK_DIR" "site work directory"' in install_text
+    assert 'ensure_path_within_root "$INSTALL_ROOT" "$PROFILE_WORK_DIR" "profile work directory"' in install_text
     assert 'ensure_path_within_root "$INSTALL_ROOT" "$ACTIVATION_SCRIPT" "activation script"' in install_text
 
 
@@ -414,7 +414,7 @@ def test_install_script_builds_docs_in_separate_venv_from_pyproject_metadata():
     post_install_text = POST_INSTALL_LIB.read_text()
     install_tail = install_text[install_text.index('step "Copying examples and benchmarks"'):]
 
-    assert 'DOCS_VENV_DIR="$SITE_WORK_DIR/docs-venv"' in install_text
+    assert 'DOCS_VENV_DIR="$PROFILE_WORK_DIR/docs-venv"' in install_text
     assert 'ensure_path_within_root "$INSTALL_ROOT" "$DOCS_VENV_DIR" "documentation virtual environment"' in install_text
     assert '"$CONFIG_PYTHON" "$PYPROJECT_DEPS_HELPER" docs-build "$PYPROJECT_TOML"' in post_install_text
     assert '"$CONFIG_PYTHON" -m venv "$DOCS_VENV_DIR"' in post_install_text
@@ -684,7 +684,7 @@ def test_validate_install_no_longer_requires_fixed_vendor_lib_paths():
     assert not hasattr(validator, "required_vendor_libs")
 
 
-CONFIG_RENDERER = PROJECT_ROOT / "setup" / "lib" / "render_config.py"
+CONFIG_RENDERER = PROJECT_ROOT / "environments" / "lib" / "render_config.py"
 
 
 def test_render_config_benchmark_section_round_trips_without_warnings():
@@ -783,11 +783,11 @@ typo_key = "oops"
         os.unlink(config_path)
 
 
-def test_all_site_configs_have_benchmark_section():
+def test_all_profile_configs_have_benchmark_section():
     """Every per-backend config.toml must include a [benchmarks] section with
     at least a scheduler key and per-algorithm args_intra sub-tables."""
-    sites_dir = PROJECT_ROOT / "setup" / "sites"
-    found_configs = list(sites_dir.glob("*/*/config.toml"))
+    profiles_dir = PROJECT_ROOT / "environments" / "profiles"
+    found_configs = list(profiles_dir.glob("*/*/config.toml"))
     assert len(found_configs) >= 4, (
         f"Expected at least 4 per-backend config files, found {len(found_configs)}"
     )

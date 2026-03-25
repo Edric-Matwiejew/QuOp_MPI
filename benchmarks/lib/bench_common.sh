@@ -3,7 +3,7 @@
 # Shared helpers for QuOp_MPI benchmark scripts.
 #
 # Sourced by submit_scaling.sh after the profile activation script, so helpers
-# from setup/lib/common.sh (info, step, require_command, etc.) are available.
+# from environments/lib/common.sh (info, step, require_command, etc.) are available.
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -153,4 +153,3 @@ clean_results() {
     find "${results_dir}" -maxdepth 1 -name '*.csv' ! -name 'summary.csv' -print -delete 2>/dev/null || true
     echo "Clean complete."
 }
-

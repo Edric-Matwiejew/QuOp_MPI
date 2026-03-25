@@ -30,7 +30,7 @@ endif()
 # User-configurable options (visible in ccmake/cmake-gui)
 # =============================================================================
 # These are the primary configuration variables. They can be set via: 1. Command-line: cmake -DWAVEFRONT_BACKEND=ON ...
-# 2. Build frontend passthrough (e.g., CMAKE_ARGS from setup/install.sh) 3. Interactive tools: ccmake or cmake-gui
+# 2. Build frontend passthrough (e.g., CMAKE_ARGS from environments/install.sh) 3. Interactive tools: ccmake or cmake-gui
 
 # --- Backend Selection ---
 # MPI backend modules are always built; wavefront is optional.
