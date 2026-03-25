@@ -122,12 +122,11 @@ select = ["E", "F", "W", "I", "N", "B", "ANN"]
 "src/quop_mpi/state/**" = ["ANN"]
 "src/quop_mpi/toolkit/**" = ["ANN"]
 "src/quop_mpi/__init__.py" = ["ANN"]
-"setup/tests/**" = ["ANN"]
 "tests/**" = ["ANN"]
 "benchmarks/**" = ["ANN"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "setup/tests", "benchmarks/tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"

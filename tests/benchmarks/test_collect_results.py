@@ -5,7 +5,8 @@ import pandas as pd
 
 
 def load_collect_results_module():
-    module_path = Path(__file__).resolve().parents[1] / "collect_results.py"
+    project_root = Path(__file__).resolve().parents[2]
+    module_path = project_root / "benchmarks" / "collect_results.py"
     spec = importlib.util.spec_from_file_location("benchmark_collect_results", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

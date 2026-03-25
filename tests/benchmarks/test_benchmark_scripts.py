@@ -7,7 +7,8 @@ import pytest
 
 
 def load_bench_module():
-    module_path = Path(__file__).resolve().parents[1] / "bench.py"
+    project_root = Path(__file__).resolve().parents[2]
+    module_path = project_root / "benchmarks" / "bench.py"
     spec = importlib.util.spec_from_file_location("benchmark_bench", module_path)
     module = importlib.util.module_from_spec(spec)
 
