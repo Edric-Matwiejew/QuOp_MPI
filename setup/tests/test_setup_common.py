@@ -19,12 +19,12 @@ VALIDATE_INSTALL = PROJECT_ROOT / "setup" / "lib" / "validate_install.py"
 PYPROJECT_DEPS_HELPER = PROJECT_ROOT / "setup" / "lib" / "pyproject_deps.py"
 PYPROJECT_TOML = PROJECT_ROOT / "pyproject.toml"
 CMAKE_LISTS = PROJECT_ROOT / "CMakeLists.txt"
-SRC_CMAKE_LISTS = PROJECT_ROOT / "src" / "CMakeLists.txt"
+NATIVE_CMAKE_LISTS = PROJECT_ROOT / "native" / "CMakeLists.txt"
 FORTRAN_PREPROCESS_CMAKE = PROJECT_ROOT / "cmake" / "QuOpFortranPreprocess.cmake"
 HIPFORT_DEPENDENCY_CMAKE = PROJECT_ROOT / "cmake" / "HipfortDependency.cmake"
 SHAFFT_DEPENDENCY_CMAKE = PROJECT_ROOT / "cmake" / "SHAFFTDependency.cmake"
 ADD_F2PY_CMAKE = PROJECT_ROOT / "cmake" / "QuOpF2pyLibrary.cmake"
-WAVEFRONT_CONTEXT_CMAKE = PROJECT_ROOT / "src" / "wavefront" / "context" / "CMakeLists.txt"
+WAVEFRONT_CONTEXT_CMAKE = PROJECT_ROOT / "native" / "wavefront" / "context" / "CMakeLists.txt"
 GENERIC_HOOKS = PROJECT_ROOT / "setup" / "sites" / "generic" / "hooks.sh"
 MACOS_HOOKS = PROJECT_ROOT / "setup" / "sites" / "macos" / "hooks.sh"
 UBUNTU_24_HOOKS = PROJECT_ROOT / "setup" / "sites" / "ubuntu-24" / "hooks.sh"
@@ -274,12 +274,12 @@ def test_pyproject_build_targets_are_backend_aware_without_install_sh():
     assert "quop_f2py_targets" not in targets
 
 
-def test_src_cmakelists_keeps_wavefront_placeholders_for_direct_builds():
-    src_cmake_text = SRC_CMAKE_LISTS.read_text()
+def test_native_cmakelists_keeps_wavefront_placeholders_for_direct_builds():
+    native_cmake_text = NATIVE_CMAKE_LISTS.read_text()
 
-    assert "if(${WAVEFRONT_BACKEND})" in src_cmake_text
-    assert "add_custom_target(wavefront_context_f2py)" in src_cmake_text
-    assert "add_custom_target(wavefront_sparse_propagator_f2py)" in src_cmake_text
+    assert "if(${WAVEFRONT_BACKEND})" in native_cmake_text
+    assert "add_custom_target(wavefront_context_f2py)" in native_cmake_text
+    assert "add_custom_target(wavefront_sparse_propagator_f2py)" in native_cmake_text
 
 
 def test_fortran_barrier_helper_is_shared_by_f2py_and_wavefront_context():
@@ -591,7 +591,7 @@ def test_validate_install_rejects_source_tree_origin():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
-        source_init = project_root / "quop_mpi" / "__init__.py"
+        source_init = project_root / "src" / "quop_mpi" / "__init__.py"
         source_init.parent.mkdir(parents=True)
         source_init.write_text("# source package\n")
 

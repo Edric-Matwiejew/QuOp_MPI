@@ -5,7 +5,7 @@ Overview
 --------
 
 The communicator hierarchy is implemented in
-``src/comm_info/comm_info_module.f90`` with two core objects:
+``native/comm_info/comm_info_module.f90`` with two core objects:
 
 - ``split_info_t``: pre/post-negotiate worker metadata (``SUBCOMM``,
   ``ROOTCOMM``, ``JACCOMM``, worker ids)

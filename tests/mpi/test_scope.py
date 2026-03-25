@@ -13,14 +13,11 @@ Run with:
 """
 
 import inspect
-import os
-import sys
 
 import numpy as np
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from conftest import TestOracle
+from tests.conftest import TestOracle
 
 from quop_mpi._scope import get_returns, get_scope
 

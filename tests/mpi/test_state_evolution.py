@@ -11,14 +11,10 @@ to enable direct comparison with QWOA using the same parameters.
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_state_evolution.py -v --with-mpi
 """
 
-import os
-import sys
-
 import numpy as np
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from conftest import (
+from tests.conftest import (
     TestOracle,
     gather_state_probabilities,
     make_complete_graph_operator,

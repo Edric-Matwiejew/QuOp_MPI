@@ -18,9 +18,9 @@ are defined in `CODE_STANDARD.md`.
 
 This guide applies to:
 
-- `src/**/*.cpp`
-- `src/**/*.hpp`
-- `src/**/*.h`
+- `native/**/*.cpp`
+- `native/**/*.hpp`
+- `native/**/*.h`
 - HIP kernel code compiled via HIP/CUDA language modes in CMake
 
 This guide does not apply to:
@@ -42,10 +42,10 @@ sense.
 
 Current baseline examples:
 
-- `src/sparse_propagators/src/kernels/hip_vector_kernels.cpp`
-- `src/sparse_propagators/src/kernels/hip_spmv_kernels.cpp`
-- `src/sparse_propagators/src/kernels/hip_reduction_kernels.cpp`
-- `src/sparse_propagators/src/kernels/hip_common.hpp`
+- `native/sparse_propagators/src/kernels/hip_vector_kernels.cpp`
+- `native/sparse_propagators/src/kernels/hip_spmv_kernels.cpp`
+- `native/sparse_propagators/src/kernels/hip_reduction_kernels.cpp`
+- `native/sparse_propagators/src/kernels/hip_common.hpp`
 
 ## 2. Naming
 
@@ -79,7 +79,7 @@ Current baseline examples:
 
 Current baseline:
 
-- `src/sparse_propagators/src/kernels/hip_common.hpp` uses include guards.
+- `native/sparse_propagators/src/kernels/hip_common.hpp` uses include guards.
 
 ## 5. Formatting
 
@@ -154,8 +154,8 @@ Recommended default base for this project:
 Recommended local usage:
 
 ```bash
-clang-format -i src/wavefront/hip_kernels.cpp
-clang-format -i src/sparse_propagators/src/kernels/*.cpp src/sparse_propagators/src/kernels/*.hpp
+clang-format -i native/wavefront/hip_kernels.cpp
+clang-format -i native/sparse_propagators/src/kernels/*.cpp native/sparse_propagators/src/kernels/*.hpp
 ```
 
 ### 10.2 Linter
@@ -175,8 +175,8 @@ Example CI-style check sequence:
 
 ```bash
 # 1) format check (fails if reformat is needed)
-clang-format --dry-run --Werror src/wavefront/hip_kernels.cpp
-clang-format --dry-run --Werror src/sparse_propagators/src/kernels/*.cpp src/sparse_propagators/src/kernels/*.hpp
+clang-format --dry-run --Werror native/wavefront/hip_kernels.cpp
+clang-format --dry-run --Werror native/sparse_propagators/src/kernels/*.cpp native/sparse_propagators/src/kernels/*.hpp
 
 # 2) warning-enabled HIP/C++ build (example)
 cmake -S . -B build-hip-lint \

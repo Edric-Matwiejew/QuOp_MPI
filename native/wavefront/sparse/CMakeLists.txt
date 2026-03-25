@@ -1,4 +1,4 @@
-set(SPARSE_PROPAGATORS_SRC ${CMAKE_SOURCE_DIR}/src/sparse_propagators/src)
+set(SPARSE_PROPAGATORS_SRC ${CMAKE_SOURCE_DIR}/native/sparse_propagators/src)
 set(SPARSE_KERNELS_SRC ${SPARSE_PROPAGATORS_SRC}/kernels)
 
 if(HIP_PLATFORM STREQUAL nvidia)
@@ -100,7 +100,7 @@ set(_definitions context=wavefront context_type=wavefront_context propagator=wav
                  propagator_type=sparse_propagator propagator_wrapper=sparse_propagator_wrapper
 )
 
-set(PROPAGATOR_WRAPPER "${CMAKE_SOURCE_DIR}/src/propagator_wrapper.f90")
+set(PROPAGATOR_WRAPPER "${CMAKE_SOURCE_DIR}/native/propagator_wrapper.f90")
 
 get_target_property(_hipfort_inc_dirs ${QUOP_HIPFORT_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
 quop_preprocess_fortran_source(

@@ -8,15 +8,12 @@ Run with: mpiexec -n 2 python -m pytest tests/mpi/test_lifecycle.py -v --with-mp
 """
 
 import gc
-import os
-import sys
 import weakref
 
 import pytest
 from mpi4py import MPI
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from conftest import TestOracle
+from tests.conftest import TestOracle
 
 
 @pytest.mark.mpi

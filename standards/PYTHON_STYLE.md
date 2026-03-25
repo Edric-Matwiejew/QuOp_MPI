@@ -17,7 +17,7 @@ interface semantics are defined in `CODE_STANDARD.md`.
 
 This guide applies to:
 
-- `quop_mpi/**/*.py`
+- `src/quop_mpi/**/*.py`
 - `tests/**/*.py`
 - selected project Python scripts under repository root when they are part of
   normal development workflows

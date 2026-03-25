@@ -3,7 +3,7 @@
 ! MPI-backend stub for gpu_topology_t.
 !
 ! Provides the same type name and public interface as the real
-! gpu_topology module (src/wavefront/context/gpu_topology.f90)
+! gpu_topology module (native/wavefront/context/gpu_topology.f90)
 ! but with no HIP/GPU dependencies.  All GPU fields are initialised
 ! to zero/false defaults.
 !
