@@ -3,9 +3,9 @@ Wavefront Layout Example: ``N=256``, ``16`` Ranks, ``2`` GPUs
 
 This example matches the current wavefront layout logic in:
 
-- ``src/comm_info/comm_info_module.f90`` (``device_block_distribute``)
-- ``src/wavefront/context/partitions.f90``
-- ``src/wavefront/context/wavefront_context.f90``
+- ``native/comm_info/comm_info_module.f90`` (``device_block_distribute``)
+- ``native/wavefront/context/partitions.f90``
+- ``native/wavefront/context/wavefront_context.f90``
 
 Assumptions
 -----------

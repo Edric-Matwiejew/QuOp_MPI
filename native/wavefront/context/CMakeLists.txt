@@ -69,7 +69,7 @@ set(_depends
 )
 set(_definitions context=wavefront context_type=wavefront_context)
 
-set(CONTEXT_WRAPPER "${CMAKE_SOURCE_DIR}/src/context_wrapper.f90")
+set(CONTEXT_WRAPPER "${CMAKE_SOURCE_DIR}/native/context_wrapper.f90")
 
 quop_preprocess_fortran_source(
   _context_wrapper_src

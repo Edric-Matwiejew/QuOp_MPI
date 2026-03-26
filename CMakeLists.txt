@@ -282,12 +282,12 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native -fopenmp")
 endif()
 
-add_subdirectory(src)
+add_subdirectory(native)
 
 option(BUILD_TESTING "Build native tests" OFF)
 if(BUILD_TESTING)
   enable_testing()
-  add_subdirectory(src_tests)
+  add_subdirectory(native_tests)
 endif()
 
 message("-------------------------------------------------")

@@ -1,4 +1,4 @@
-# quop_mpi/_utils/_dump.py
+# src/quop_mpi/_utils/_dump.py
 """Diagnostic dump utility for quop_mpi_layout_t.
 
 Triggered by the ``QUOP_DUMP_COMM_INFO`` environment variable:

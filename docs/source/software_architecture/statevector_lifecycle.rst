@@ -7,9 +7,9 @@ Scope
 This page describes the current wavefront state/observable lifecycle implemented
 in:
 
-- ``src/wavefront/context/wavefront_context.f90``
-- ``src/wavefront/sparse/wavefront_sparse.f90``
-- ``src/wavefront/circulant/wavefront_circulant.f90``
+- ``native/wavefront/context/wavefront_context.f90``
+- ``native/wavefront/sparse/wavefront_sparse.f90``
+- ``native/wavefront/circulant/wavefront_circulant.f90``
 
 Key Arrays and Ownership
 ------------------------

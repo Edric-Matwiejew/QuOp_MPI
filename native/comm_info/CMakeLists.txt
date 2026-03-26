@@ -1,8 +1,8 @@
-# src/comm_info/CMakeLists.txt Build configuration for comm_info_module (quop_mpi_layout_t + split_info_t) and the
+# native/comm_info/CMakeLists.txt Build configuration for comm_info_module (quop_mpi_layout_t + split_info_t) and the
 # comm_info_wrapper f2py extension.
 #
 # MPI backend: uses gpu_topology_stub.f90, no CPP definitions needed. Wavefront backend: uses the real gpu_topology.f90
-# and communicators.f90 from src/wavefront/context, defines WAVEFRONT_BACKEND so comm_info_module.f90 enables GPU
+# and communicators.f90 from native/wavefront/context, defines WAVEFRONT_BACKEND so comm_info_module.f90 enables GPU
 # topology detection, communicator creation, and rebuild/shrink cascading.  These wavefront sources are compiled as
 # OBJECT libraries here (ci_gpu_topology, ci_communicators) so they are available before the wavefront subdirectory is
 # processed.
@@ -18,10 +18,10 @@ if(WAVEFRONT_BACKEND)
   # Compile the real gpu_topology and communicators modules as local OBJECT libraries so comm_info_mod can depend on
   # them without circular ordering issues with the wavefront subdirectory.
   #
-  # These sources are also compiled in src/wavefront/context/ (wf_gpu_topology etc.).  To avoid duplicate .mod providers
+  # These sources are also compiled in native/wavefront/context/ (wf_gpu_topology etc.).  To avoid duplicate .mod providers
   # - which breaks Ninja's Fortran dyndep module-dependency resolution - the ci_* targets write their .mod files to a
   # private directory instead of the global CMAKE_Fortran_MODULE_DIRECTORY.
-  set(_WF_CONTEXT_DIR "${CMAKE_SOURCE_DIR}/src/wavefront/context")
+  set(_WF_CONTEXT_DIR "${CMAKE_SOURCE_DIR}/native/wavefront/context")
   set(_CI_MOD_DIR "${CMAKE_CURRENT_BINARY_DIR}/ci_modules")
 
   add_library(ci_gpu_topology OBJECT "${_WF_CONTEXT_DIR}/numa_detect.f90" "${_WF_CONTEXT_DIR}/gpu_topology.f90")

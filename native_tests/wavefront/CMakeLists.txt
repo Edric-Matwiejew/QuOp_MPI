@@ -1,4 +1,4 @@
-# src_tests/wavefront/CMakeLists.txt
+# native_tests/wavefront/CMakeLists.txt
 # CTest configuration for wavefront backend tests
 #
 # These tests validate the wavefront backend components:
@@ -277,7 +277,7 @@ add_gpu_test(array_transfer_8proc test_array_transfer 8)
 # ============================================================================
 
 # Preprocess the context wrapper with wavefront definitions
-set(WAVEFRONT_CONTEXT_WRAPPER_SRC "${CMAKE_SOURCE_DIR}/src/context_wrapper.f90")
+set(WAVEFRONT_CONTEXT_WRAPPER_SRC "${CMAKE_SOURCE_DIR}/native/context_wrapper.f90")
 set(WAVEFRONT_CONTEXT_WRAPPER_PREPROCESSED "${CMAKE_CURRENT_BINARY_DIR}/preprocessed_wavefront_context_wrapper.F90")
 
 add_custom_command(

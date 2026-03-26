@@ -18,7 +18,7 @@ set(_definitions context=wavefront context_type=wavefront_context propagator=wav
                  propagator_type=diagonal_propagator propagator_wrapper=diagonal_propagator_wrapper
 )
 
-set(PROPAGATOR_WRAPPER "${CMAKE_SOURCE_DIR}/src/propagator_wrapper.f90")
+set(PROPAGATOR_WRAPPER "${CMAKE_SOURCE_DIR}/native/propagator_wrapper.f90")
 
 get_target_property(_hipfort_inc_dirs ${QUOP_HIPFORT_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
 quop_preprocess_fortran_source(

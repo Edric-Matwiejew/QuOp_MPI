@@ -2,7 +2,7 @@ GPU Transfer Layer (``gpu_transfer.f90``)
 =========================================
 
 The active transfer implementation is in
-``src/wavefront/context/gpu_transfer.f90``.
+``native/wavefront/context/gpu_transfer.f90``.
 
 It replaces the older ``hipMPIMemcpy`` helper model and exposes two public,
 layout-aware collectives used by ``wavefront_context``.

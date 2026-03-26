@@ -56,13 +56,13 @@ def locate_package_init(package_name: str = "quop_mpi") -> Path:
 
 def ensure_not_source_tree(package_init: Path, project_root: Path) -> None:
     package_init = package_init.resolve()
-    source_package_init = (project_root / "quop_mpi" / "__init__.py").resolve()
+    source_package_init = (project_root / "src" / "quop_mpi" / "__init__.py").resolve()
     if package_init == source_package_init:
         raise ValidationError(
             "Installed package validation failed: Python would import quop_mpi "
             f"from the source tree at {package_init}. "
-            f"For a standard install, run Python outside {project_root} "
-            "or use `python -P`."
+            f"For a standard install, avoid adding {project_root / 'src'} to PYTHONPATH "
+            "and do not validate against an editable install."
         )
 
 

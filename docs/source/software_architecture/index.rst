@@ -6,14 +6,14 @@ QuOp_MPI Backend & Software Architecture
 
 This section documents the backend architecture and implementation-level
 details for QuOp_MPI. The pages below are aligned with the Fortran sources in
-``src/comm_info`` and ``src/wavefront``.
+``native/comm_info`` and ``native/wavefront``.
 
 Implementation details are aligned with the current Fortran sources in:
 
-- ``src/comm_info/comm_info_module.f90``
-- ``src/mpi/mpi_context.f90``
-- ``src/wavefront/context/wavefront_context.f90``
-- ``src/wavefront/context/gpu_transfer.f90``
+- ``native/comm_info/comm_info_module.f90``
+- ``native/mpi/mpi_context.f90``
+- ``native/wavefront/context/wavefront_context.f90``
+- ``native/wavefront/context/gpu_transfer.f90``
 
 Backend Overview
 ================

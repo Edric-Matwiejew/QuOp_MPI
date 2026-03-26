@@ -24,7 +24,7 @@ function(add_f2py_library)
     set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/modules")
   endif()
 
-  set(f2py_cmap "${CMAKE_SOURCE_DIR}/src/.f2py_f2cmap")
+  set(f2py_cmap "${CMAKE_SOURCE_DIR}/native/.f2py_f2cmap")
   set(module_pyf "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}.pyf")
   set(module_f2py_wrapper "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}-f2pywrappers2.f90")
   set(module_f2py_c "${CMAKE_CURRENT_BINARY_DIR}/${F2PY_LIBRARY_MODULE_NAME}module.c")

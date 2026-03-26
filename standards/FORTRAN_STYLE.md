@@ -9,7 +9,7 @@ contracts, and portability requirements are defined in `CODE_STANDARD.md`.
 ## Status
 
 - This version is descriptive-first.
-- New Fortran code in `src/` and `src_tests/` MUST follow this guide.
+- New Fortran code in `native/` and `native_tests/` MUST follow this guide.
 - Modified Fortran code SHOULD be brought into compliance when touched.
 - Existing inconsistencies are tracked as migration work, not precedent.
 
@@ -17,9 +17,9 @@ contracts, and portability requirements are defined in `CODE_STANDARD.md`.
 
 This guide applies to:
 
-- `src/**/*.f90`
-- `src_tests/**/*.f90`
-- Fortran test sources in `src/sparse_propagators/tests/src/**/*.f90`
+- `native/**/*.f90`
+- `native_tests/**/*.f90`
+- Fortran test sources in `native/sparse_propagators/tests/src/**/*.f90`
 
 This guide does not apply to:
 
@@ -238,15 +238,15 @@ breaking lines would significantly reduce readability of failure messages.
 - The project formatter for Fortran source is `fprettify`.
 - `fprettify` is used to enforce layout/style consistency only.
 - Formatter runs SHOULD target files in this guide's scope:
-  - `src/**/*.f90`
-  - `src_tests/**/*.f90`
-  - `src/sparse_propagators/tests/src/**/*.f90`
+  - `native/**/*.f90`
+  - `native_tests/**/*.f90`
+  - `native/sparse_propagators/tests/src/**/*.f90`
 
 Recommended local usage:
 
 ```bash
-fprettify -r src src_tests
-fprettify -r src/sparse_propagators/tests/src
+fprettify -r native native_tests
+fprettify -r native/sparse_propagators/tests/src
 ```
 
 ### 10.2 Linter
@@ -280,7 +280,7 @@ Example CI-style check sequence:
 
 ```bash
 # 1) format check (fails if reformat is needed)
-fprettify -r src src_tests src/sparse_propagators/tests/src
+fprettify -r native native_tests native/sparse_propagators/tests/src
 git diff --exit-code
 
 # 2) warning-enabled configure/build (example flags)

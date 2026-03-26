@@ -1,4 +1,4 @@
-# src_tests/mpi/CMakeLists.txt
+# native_tests/mpi/CMakeLists.txt
 # CTest configuration for MPI backend tests
 
 # Collect wavefront link dependencies for tests that use comm_info_mod

@@ -1,8 +1,8 @@
 ``quop_mpi_layout_t`` Flow (Current Implementation)
 ===================================================
 
-This page documents the current Fortran flow in ``src/comm_info`` and the
-f2py-facing wrappers in ``src/comm_info/comm_info_wrapper.f90``.
+This page documents the current Fortran flow in ``native/comm_info`` and the
+f2py-facing wrappers in ``native/comm_info/comm_info_wrapper.f90``.
 
 Phase Flow
 ----------
