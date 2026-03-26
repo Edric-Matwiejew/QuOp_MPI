@@ -13,10 +13,6 @@ prepare_activation_runtime() {
     cp "$CONFIG_RENDERER" "$ACTIVATION_CONFIG_RENDERER"
     cp "$PATH_HELPER" "$ACTIVATION_PATH_HELPER"
     cp "$PROFILE_FILE" "$ACTIVATION_PROFILE_FILE"
-
-    if [[ -n "$CONFIG_FILE" ]]; then
-        cp "$CONFIG_FILE" "$ACTIVATION_CONFIG_FILE"
-    fi
 }
 
 write_activation_script() {
