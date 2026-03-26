@@ -25,16 +25,6 @@ HIPFORT_DEPENDENCY_CMAKE = PROJECT_ROOT / "cmake" / "HipfortDependency.cmake"
 SHAFFT_DEPENDENCY_CMAKE = PROJECT_ROOT / "cmake" / "SHAFFTDependency.cmake"
 ADD_F2PY_CMAKE = PROJECT_ROOT / "cmake" / "QuOpF2pyLibrary.cmake"
 WAVEFRONT_CONTEXT_CMAKE = PROJECT_ROOT / "native" / "wavefront" / "context" / "CMakeLists.txt"
-<<<<<<<< HEAD:install_tests/test_setup_common.py
-GENERIC_HOOKS = PROJECT_ROOT / "setup" / "sites" / "generic" / "hooks.sh"
-MACOS_HOOKS = PROJECT_ROOT / "setup" / "sites" / "macos" / "hooks.sh"
-UBUNTU_24_HOOKS = PROJECT_ROOT / "setup" / "sites" / "ubuntu-24" / "hooks.sh"
-PAWSEY_HOOKS = PROJECT_ROOT / "setup" / "sites" / "pawsey-setonix" / "hooks.sh"
-PAWSEY_CONFIG = PROJECT_ROOT / "setup" / "sites" / "pawsey-setonix" / "mpi" / "config.toml"
-MACOS_CONFIG = PROJECT_ROOT / "setup" / "sites" / "macos" / "mpi" / "config.toml"
-UBUNTU_24_CONFIG = PROJECT_ROOT / "setup" / "sites" / "ubuntu-24" / "mpi" / "config.toml"
-GENERIC_CONFIG = PROJECT_ROOT / "setup" / "sites" / "generic" / "mpi" / "config.toml"
-========
 GENERIC_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "generic" / "hooks.sh"
 MACOS_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "macos" / "hooks.sh"
 UBUNTU_24_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "hooks.sh"
@@ -43,7 +33,6 @@ PAWSEY_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / 
 MACOS_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "macos" / "mpi" / "config.toml"
 UBUNTU_24_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "mpi" / "config.toml"
 GENERIC_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "generic" / "mpi" / "config.toml"
->>>>>>>> 7febcaca4904d9b669f613e5f9a0613c5a776652:tests/environments/test_environments_common.py
 
 
 def load_module(path: Path, module_name: str):
@@ -131,7 +120,6 @@ resolve_python_interpreter 9.9
     assert "expected 9.9" in (result.stdout + result.stderr)
 
 
-<<<<<<<< HEAD:install_tests/test_setup_common.py
 def test_find_rocm_path_prefers_hipconfig_prefix_over_wrapper_location():
     script = f"""
 tmpbin="$(mktemp -d)"
@@ -150,10 +138,7 @@ find_rocm_path
     assert result.stdout.strip() == "/opt/rocm-6.3.2"
 
 
-def test_site_listing_helpers_are_portable_and_sorted():
-========
 def test_profile_listing_helpers_are_portable_and_sorted():
->>>>>>>> 7febcaca4904d9b669f613e5f9a0613c5a776652:tests/environments/test_environments_common.py
     script = f"""
 PROFILES_DIR={shlex.quote(str(PROJECT_ROOT / "environments" / "profiles"))}
 source {shlex.quote(str(COMMON_SH))}
@@ -314,8 +299,6 @@ def test_native_cmakelists_keeps_wavefront_placeholders_for_direct_builds():
     assert "if(${WAVEFRONT_BACKEND})" in native_cmake_text
     assert "add_custom_target(wavefront_context_f2py)" in native_cmake_text
     assert "add_custom_target(wavefront_sparse_propagator_f2py)" in native_cmake_text
-<<<<<<<< HEAD:install_tests/test_setup_common.py
-
 
 def test_top_level_cmake_uses_native_subdir_for_compiled_sources():
     cmake_lists_text = CMAKE_LISTS.read_text()
@@ -329,9 +312,6 @@ def test_top_level_cmake_requires_mpi_fortran_but_not_mpi_cxx():
 
     assert "find_package(MPI REQUIRED COMPONENTS Fortran)" in cmake_lists_text
     assert "find_package(MPI REQUIRED COMPONENTS CXX)" not in cmake_lists_text
-========
->>>>>>>> 7febcaca4904d9b669f613e5f9a0613c5a776652:tests/environments/test_environments_common.py
-
 
 def test_fortran_barrier_helper_is_shared_by_f2py_and_wavefront_context():
     preprocess_text = FORTRAN_PREPROCESS_CMAKE.read_text()
