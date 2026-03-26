@@ -9,7 +9,7 @@ venv_dir = ".venv_{profile}_{backend}"
 work_dir = ".cache/quop/{profile}/{backend}"
 
 [build]
-offload_arch = "gfx90a"
+offload_arch = "gfx1100"
 wavefront_build_type = "Release"
 
 [compilers]
