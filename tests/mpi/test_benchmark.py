@@ -11,6 +11,7 @@ tracking results and supporting features like:
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_benchmark.py -v --with-mpi
 """
 
+import math
 import os
 import sys
 import tempfile
@@ -874,6 +875,66 @@ class TestBenchmarkWithParameterMap:
         alg.destroy()
 
 
+def _ranks_per_gpu_for_workers(mpi_comm, n_workers):
+    """Compute the QUOP_RANKS_PER_GPU needed so each worker subcomm has GPU ranks.
+
+    With *n_workers* subcommunicators, every MPI rank must be a GPU rank.
+    This requires ``QUOP_RANKS_PER_GPU >= ceil(node_size / n_physical_gpus)``.
+
+    Returns the computed value, or ``None`` if the backend is not wavefront.
+    """
+    from quop_mpi import config
+
+    if config.backend != "wavefront":
+        return None
+
+    from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+    from quop_mpi._utils._comm_size import _unwrap_pointer_status
+
+    backend_flag = 1
+    topo_ptr = _unwrap_pointer_status(
+        _ciw.wrapper_discover_topology(mpi_comm.py2f(), backend_flag),
+        "discover_topology",
+    )
+    try:
+        n_gpus, _, node_size = _ciw.wrapper_get_topology_info(topo_ptr)
+        n_gpus = int(n_gpus)
+        node_size = int(node_size)
+    finally:
+        _ciw.wrapper_destroy_topology(topo_ptr)
+
+    if n_gpus < 1:
+        pytest.skip("No GPUs detected; parallel jacobian on wavefront requires GPUs")
+
+    return math.ceil(node_size / n_gpus)
+
+
+@pytest.fixture
+def ensure_ranks_per_gpu_for_workers(mpi_comm):
+    """Fixture that sets QUOP_RANKS_PER_GPU high enough for parallel jacobian tests.
+
+    On the wavefront backend, each worker subcommunicator needs at least one
+    GPU rank.  This fixture temporarily raises QUOP_RANKS_PER_GPU so that
+    all MPI ranks become GPU ranks, ensuring every subcomm has coverage.
+    """
+    n_workers = 3  # matches the n_workers used in the test class
+    rpg = _ranks_per_gpu_for_workers(mpi_comm, n_workers)
+    if rpg is None:
+        # MPI backend — no env var needed
+        yield
+        return
+
+    old_val = os.environ.get("QUOP_RANKS_PER_GPU")
+    os.environ["QUOP_RANKS_PER_GPU"] = str(rpg)
+    try:
+        yield
+    finally:
+        if old_val is None:
+            os.environ.pop("QUOP_RANKS_PER_GPU", None)
+        else:
+            os.environ["QUOP_RANKS_PER_GPU"] = old_val
+
+
 @pytest.mark.mpi
 @pytest.mark.requires_nprocs(12)
 class TestBenchmarkWithParallelJacobian:
@@ -939,7 +1000,11 @@ class TestBenchmarkWithParallelJacobian:
 
         alg.destroy()
 
-    def test_benchmark_with_param_map_and_parallel_jacobian(self, mpi_comm, simple_oracle):
+        mpi_comm.barrier()  # Sync before test
+
+    def test_benchmark_with_param_map_and_parallel_jacobian(
+        self, mpi_comm, simple_oracle, ensure_ranks_per_gpu_for_workers
+    ):
         """Verify benchmark runs with both parameter map and parallel jacobian.
 
         This test requires sufficient MPI ranks to create multiple subcommunicators.
@@ -962,7 +1027,6 @@ class TestBenchmarkWithParallelJacobian:
 
         initial_params = np.array([np.pi, 0.5])
 
-        # Run benchmark - parallel jacobian will work if enough ranks are available
         alg.benchmark(
             ansatz_depths=[1],
             repeats=1,
@@ -975,7 +1039,9 @@ class TestBenchmarkWithParallelJacobian:
 
         alg.destroy()
 
-    def test_parallel_jacobian_with_param_map_convergence(self, mpi_comm, simple_oracle):
+    def test_parallel_jacobian_with_param_map_convergence(
+        self, mpi_comm, simple_oracle, ensure_ranks_per_gpu_for_workers
+    ):
         """Verify benchmark with parallel jacobian + param map converges to low-cost state.
 
         This test uses the Grover search oracle and verifies that:
