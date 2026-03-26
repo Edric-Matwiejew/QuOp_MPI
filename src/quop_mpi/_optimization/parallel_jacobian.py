@@ -49,10 +49,10 @@ class Jacobian:
         """
         self.jacobian_input: list | None = None
         self.jacobian: object = None
-        self.var: int | None = None
         self.jac_ranks: list | None = None
         self.h: float = np.sqrt(np.finfo(float).eps)
         self.neval_mpi_jac: int = 0
+        self.var : int = -999  # Placeholder value to detect if it's not being set correctly
         self.var_map: list | None = None
 
     @scope("world")
@@ -193,9 +193,11 @@ class Jacobian:
         partials = []
         if self.subcomms.JACCOMM.Get_rank() != 0:
             for var in self.var_map[self.subcomms.get_subcomm_index()]:
+                self.var = var
+                print(self.var, flush = True)  # Debug print to check if var is being set correctly
                 self.jacobian.update_parameters()
                 # Pass the parameter index - jacobian.call computes partial derivative
-                partials.append(self.jacobian.call(var))
+                partials.append(self.jacobian.call())
 
         if self.subcomms.JACCOMM.Get_rank() == 0:
             jacobian = np.zeros(self.n_free_params, dtype=np.float64)
