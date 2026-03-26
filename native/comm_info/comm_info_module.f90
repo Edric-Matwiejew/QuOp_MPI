@@ -33,7 +33,7 @@ module comm_info_module
     implicit none
     private
     public :: quop_mpi_layout_t, split_info_t, negotiate_callback_iface
-    public :: discover_topology, destroy_topology, split_workers, negotiate
+    public :: discover_topology, destroy_topology, get_topology_info, split_workers, negotiate
     public :: create_jaccomm, create_rootcomm
     public :: create_split_from_subcomm
     public :: dump_comm_info
@@ -1063,6 +1063,11 @@ contains
             call create_layout_nodecomm(self%SUBCOMM, self%NODECOMM)
 #ifdef WAVEFRONT_BACKEND
             if (self%backend_flag == 1) then
+                ! Zero host fields; device_block_distribute derives them
+                ! bottom-up from device partitioning.
+                self%local_i = 0
+                self%local_i_offset = 0
+                self%alloc_local = 0
                 ! Rebuild wavefront communicator hierarchy from the new SUBCOMM.
                 call create_devcomm_with_topology(self%SUBCOMM, self%NODECOMM, &
                                                   self%topology, &
@@ -1186,6 +1191,21 @@ contains
         deallocate (topo)
         topo_ptr = c_null_ptr
     end subroutine destroy_topology
+
+    subroutine get_topology_info(topo_ptr, n_physical_gpus, ranks_per_gpu, node_size)
+        !! Return key topology fields for Python-side configuration.
+        !! NOT collective -- purely local read.
+        type(c_ptr), intent(in) :: topo_ptr
+        integer(int32), intent(out) :: n_physical_gpus
+        integer(int32), intent(out) :: ranks_per_gpu
+        integer(int32), intent(out) :: node_size
+        type(gpu_topology_t), pointer :: topo
+
+        call c_f_pointer(topo_ptr, topo)
+        n_physical_gpus = topo%n_physical_gpus
+        ranks_per_gpu = topo%ranks_per_gpu
+        node_size = topo%node_size
+    end subroutine get_topology_info
 
     subroutine discover_topology(topo_ptr, MPI_COMM, backend_flag, error_code)
         !! Phase 0: Detect node structure and GPU hardware.
@@ -1604,15 +1624,28 @@ contains
 
         ! Phase 2: NEGOTIATE loop
         ! Block distribute initial partitioning
+#ifdef WAVEFRONT_BACKEND
+        if (backend_flag == 1) then
+            ! Zero host fields; device_block_distribute derives them
+            ! bottom-up from device partitioning.
+            ci%local_i = 0
+            ci%local_i_offset = 0
+            ci%alloc_local = 0
+            call device_block_distribute(ci)
+        else
+            call block_distribute(ci, comm_size, rank, bd_err)
+            if (bd_err /= 0) then
+                status = 5
+                layout_ptr = c_loc(ci)
+                return
+            end if
+        end if
+#else
         call block_distribute(ci, comm_size, rank, bd_err)
         if (bd_err /= 0) then
             status = 5
             layout_ptr = c_loc(ci)
             return
-        end if
-#ifdef WAVEFRONT_BACKEND
-        if (backend_flag == 1) then
-            call device_block_distribute(ci)
         end if
 #endif
 
@@ -1657,15 +1690,28 @@ contains
                 call MPI_Comm_rank(ci%SUBCOMM, rank, ierr)
                 ci%n_processes = int(comm_size, int64)
                 ! Re-block-distribute with new communicator size
+#ifdef WAVEFRONT_BACKEND
+                if (backend_flag == 1) then
+                    ! Zero host fields; device_block_distribute derives them
+                    ! bottom-up from device partitioning.
+                    ci%local_i = 0
+                    ci%local_i_offset = 0
+                    ci%alloc_local = 0
+                    call device_block_distribute(ci)
+                else
+                    call block_distribute(ci, comm_size, rank, bd_err)
+                    if (bd_err /= 0) then
+                        status = 5
+                        layout_ptr = c_loc(ci)
+                        return
+                    end if
+                end if
+#else
                 call block_distribute(ci, comm_size, rank, bd_err)
                 if (bd_err /= 0) then
                     status = 5
                     layout_ptr = c_loc(ci)
                     return
-                end if
-#ifdef WAVEFRONT_BACKEND
-                if (backend_flag == 1) then
-                    call device_block_distribute(ci)
                 end if
 #endif
                 iteration = iteration + 1

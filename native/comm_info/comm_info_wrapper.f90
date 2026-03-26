@@ -12,6 +12,7 @@ module comm_info_wrapper
     use comm_info_module, only: quop_mpi_layout_t, split_info_t, &
                                 discover_topology_impl => discover_topology, &
                                 destroy_topology_impl => destroy_topology, &
+                                get_topology_info_impl => get_topology_info, &
                                 split_workers_impl => split_workers, &
                                 negotiate_impl => negotiate, &
                                 create_jaccomm_impl => create_jaccomm, &
@@ -648,5 +649,22 @@ contains
         call c_f_pointer(ci_ptr, ci)
         call ci%dump(phase)
     end subroutine wrapper_dump_comm_info
+
+    subroutine wrapper_get_topology_info(topo_ptr, n_physical_gpus, &
+                                         ranks_per_gpu, node_size)
+        !! Return key topology fields for Python-side configuration.
+        !! NOT collective -- purely local read.
+        !f2py integer(int64), intent(in)  :: topo_ptr
+        !f2py integer(int32), intent(out) :: n_physical_gpus
+        !f2py integer(int32), intent(out) :: ranks_per_gpu
+        !f2py integer(int32), intent(out) :: node_size
+        type(c_ptr), intent(in) :: topo_ptr
+        integer(int32), intent(out) :: n_physical_gpus
+        integer(int32), intent(out) :: ranks_per_gpu
+        integer(int32), intent(out) :: node_size
+
+        call get_topology_info_impl(topo_ptr, n_physical_gpus, &
+                                    ranks_per_gpu, node_size)
+    end subroutine wrapper_get_topology_info
 
 end module comm_info_wrapper

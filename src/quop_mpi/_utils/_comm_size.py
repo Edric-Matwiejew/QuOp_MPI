@@ -690,6 +690,30 @@ class QuopMpiLayout:
         """The raw Fortran gpu_topology_t c_ptr (int64)."""
         return self._topo_ptr
 
+    def get_topology_info(self):
+        """Return key GPU topology fields from the Fortran topology handle.
+
+        Returns
+        -------
+        dict
+            ``n_physical_gpus`` : int
+                Number of unique physical GPUs detected on this rank's node.
+            ``ranks_per_gpu`` : int
+                Current ``QUOP_RANKS_PER_GPU`` value (default 1).
+            ``node_size`` : int
+                Number of MPI ranks on this rank's node.
+        """
+        if self._topo_ptr is None or self._topo_ptr == 0:
+            return {"n_physical_gpus": 0, "ranks_per_gpu": 1, "node_size": 0}
+        n_physical_gpus, ranks_per_gpu, node_size = _ciw.wrapper_get_topology_info(
+            self._topo_ptr
+        )
+        return {
+            "n_physical_gpus": int(n_physical_gpus),
+            "ranks_per_gpu": int(ranks_per_gpu),
+            "node_size": int(node_size),
+        }
+
     # -- Cleanup -----------------------------------------------------
 
     def destroy(self):
