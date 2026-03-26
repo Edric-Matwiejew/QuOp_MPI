@@ -325,6 +325,12 @@ mkdir -p \
     "$FETCHCONTENT_BASE_DIR" \
     "$ACTIVATION_RUNTIME_DIR"
 
+# Copy config into the environment so the install is self-contained.
+if [[ -n "$CONFIG_FILE" ]]; then
+    cp "$CONFIG_FILE" "$ACTIVATION_CONFIG_FILE"
+    CONFIG_FILE="$ACTIVATION_CONFIG_FILE"
+fi
+
 info "Root:   $INSTALL_ROOT"
 info "Cache:  $CACHE_ROOT"
 info "Venv:   $VENV_DIR"
