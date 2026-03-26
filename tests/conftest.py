@@ -24,8 +24,6 @@ from mpi4py import MPI
 # Set OMP_NUM_THREADS=1 to prevent OpenMP thread contention with MPI
 # This must be set before any OpenMP-enabled libraries are loaded
 os.environ.setdefault("OMP_NUM_THREADS", "1")
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
 
 def _system_tmp_is_shared() -> bool:
     """Return True if the system temp directory is writable AND on a shared filesystem.
