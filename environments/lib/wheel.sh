@@ -204,7 +204,7 @@ repair_linux_wheel() {
     step "Inspecting raw wheel with auditwheel" >&2
     run_auditwheel "$auditwheel_ld_path" show "$wheel_path" >&2 || return 1
 
-    repair_dir="$SITE_WORK_DIR/repaired"
+    repair_dir="$PROFILE_WORK_DIR/repaired"
     rm -rf "$repair_dir"
     mkdir -p "$repair_dir"
 
@@ -226,7 +226,7 @@ repair_linux_wheel() {
     # Retag to linux_x86_64 so pip accepts the wheel on this platform.
     # auditwheel may produce a manylinux tag higher than what pip's sys_tags()
     # reports (e.g. manylinux_2_39 vs pip supporting up to manylinux_2_38 on
-    # SUSE/Cray). Since this is a site-specific wheel, linux_x86_64 is correct.
+    # SUSE/Cray). Since this is a profile-specific wheel, linux_x86_64 is correct.
     step "Retagging repaired wheel to linux_x86_64" >&2
     python -m wheel tags --remove --platform-tag linux_x86_64 "${wheel_files[0]}" >&2
 
@@ -249,7 +249,7 @@ repair_linux_wheel() {
 }
 
 build_and_inspect_wheel() {
-    local wheel_dir="$SITE_WORK_DIR/dist"
+    local wheel_dir="$PROFILE_WORK_DIR/dist"
     local -a wheel_files=()
     local wheel_file
     local final_wheel

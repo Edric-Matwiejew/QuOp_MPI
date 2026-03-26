@@ -101,12 +101,12 @@ use the installer script with the appropriate profile and backend options:
 
 .. code-block:: bash
 
-    bash setup/install.sh -p macos -b mpi --prefix ./.quop-install              # macOS with Homebrew
-    bash setup/install.sh -p generic -b mpi --prefix ./.quop-install            # generic Linux
-    bash setup/install.sh -p pawsey-setonix -b wavefront --prefix /scratch/$USER/quop  # Pawsey Setonix GPU
+    bash environments/install.sh -p macos -b mpi --prefix ./.quop-install              # macOS with Homebrew
+    bash environments/install.sh -p generic -b mpi --prefix ./.quop-install            # generic Linux
+    bash environments/install.sh -p pawsey-setonix -b wavefront --prefix /scratch/$USER/quop  # Pawsey Setonix GPU
 
-Available profiles live under ``setup/sites/``.
-Run ``./setup/install.sh --help`` for the full list of options.
+Available profiles live under ``environments/profiles/``.
+Run ``./environments/install.sh --help`` for the full list of options.
 Use ``--clean`` to clear the install cache under the chosen prefix, or
 ``--veryclean`` to clear both the cache and the fetched dependency tree.
 

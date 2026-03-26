@@ -10,15 +10,11 @@ Known issue: Deadlocks have been observed with N > 2 processes.
 These tests are designed to help isolate the root cause.
 """
 
-import os
-import sys
-
 import numpy as np
 import pytest
 from mpi4py import MPI
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from conftest import TestOracle
+from tests.conftest import TestOracle
 
 
 def get_mpi_info():

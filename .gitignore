@@ -42,4 +42,4 @@ _skbuild
 .venv*
 .cache
 *.pdf
-.quop_install
+.quop_*

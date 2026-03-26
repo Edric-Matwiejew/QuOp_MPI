@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# QuOp_MPI -- site-profile-based installer
+# QuOp_MPI -- profile-based environment installer
 #
 # Creates a virtual environment, builds mpi4py / h5py according to the chosen
-# site profile, and installs the QuOp_MPI Python package with profile-specific
+# profile, and installs the QuOp_MPI Python package with profile-specific
 # CMake arguments.
 #
-# Usage:  ./setup/install.sh -p <profile> [-b mpi|wavefront] [--prefix <dir>] [--clean]
+# Usage:  ./environments/install.sh -p <profile> [-b mpi|wavefront] [--prefix <dir>] [--clean]
 # =============================================================================
 set -euo pipefail
 
 # ---- Resolve project root (one level above this script) --------------------
 CALLER_CWD="$(pwd)"
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-SETUP_DIR="$PROJECT_ROOT/setup"
-LIB_DIR="$SETUP_DIR/lib"
-SITES_DIR="$SETUP_DIR/sites"
+ENVIRONMENTS_DIR="$PROJECT_ROOT/environments"
+LIB_DIR="$ENVIRONMENTS_DIR/lib"
+PROFILES_DIR="$ENVIRONMENTS_DIR/profiles"
 COMMON_LIB="$LIB_DIR/common.sh"
 CONFIG_RENDERER="$LIB_DIR/render_config.py"
 PATH_HELPER="$LIB_DIR/path_helper.py"
@@ -24,7 +24,7 @@ PYPROJECT_DEPS_HELPER="$LIB_DIR/pyproject_deps.py"
 PYPROJECT_TOML="$PROJECT_ROOT/pyproject.toml"
 
 if [[ ! -f "$COMMON_LIB" ]]; then
-    echo "Error: shared setup library '$COMMON_LIB' not found"
+    echo "Error: shared environments library '$COMMON_LIB' not found"
     exit 1
 fi
 if [[ ! -f "$INSTALL_VALIDATOR" ]]; then
@@ -53,7 +53,7 @@ WHEEL_LIB="$LIB_DIR/wheel.sh"
 
 for _lib_file in "$ACTIVATION_LIB" "$POST_INSTALL_LIB" "$WHEEL_LIB"; do
     if [[ ! -f "$_lib_file" ]]; then
-        echo "Error: setup library '$_lib_file' not found"
+        echo "Error: environments library '$_lib_file' not found"
         exit 1
     fi
     # shellcheck disable=SC1090
@@ -73,18 +73,18 @@ PACKAGE="false"
 # ---- Usage ------------------------------------------------------------------
 usage() {
     local profiles
-    profiles="$(list_available_sites)"
+    profiles="$(list_available_profiles)"
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
 Set up a Python virtual environment for QuOp_MPI with all dependencies
-correctly built for the target site and backend.
+correctly built for the selected profile and backend.
 
 Options:
-  -p, --profile PROFILE   Site profile to use (required)
+  -p, --profile PROFILE   Profile to use (required)
                           Available: ${profiles:-<none found>}
   -c, --config FILE       TOML config file for profile overrides
-                          Default: setup/sites/<profile>/<backend>/config.toml when present
+                          Default: environments/profiles/<profile>/<backend>/config.toml when present
   -b, --backend BACKEND   Build backend: mpi (default) or wavefront
   --prefix DIR            Install prefix for the venv, caches, deps, and
                           activation script. Relative paths use the caller's cwd.
@@ -146,7 +146,7 @@ ensure_python_support_packages() {
 }
 
 validate_installed_package() {
-    local validation_dir="$SITE_WORK_DIR/validate"
+    local validation_dir="$PROFILE_WORK_DIR/validate"
     mkdir -p "$validation_dir"
 
     (
@@ -196,17 +196,17 @@ if [[ "$_py3_major" -lt 3 || ( "$_py3_major" -eq 3 && "$_py3_minor" -lt 11 ) ]];
 fi
 unset _py3_cmd _py3_version _py3_major _py3_minor
 
-SITE_DIR="$SITES_DIR/${PROFILE}"
-PROFILE_FILE="$SITE_DIR/hooks.sh"
+PROFILE_DIR="$PROFILES_DIR/${PROFILE}"
+PROFILE_FILE="$PROFILE_DIR/hooks.sh"
 if [[ ! -f "$PROFILE_FILE" ]]; then
     echo "Error: profile '$PROFILE' not found at $PROFILE_FILE"
     echo "Available profiles:"
-    print_available_sites
+    print_available_profiles
     exit 1
 fi
 
 if [[ -z "$CONFIG_FILE" ]]; then
-    DEFAULT_CONFIG_FILE="$SITE_DIR/$BACKEND/config.toml"
+    DEFAULT_CONFIG_FILE="$PROFILE_DIR/$BACKEND/config.toml"
     if [[ -f "$DEFAULT_CONFIG_FILE" ]]; then
         CONFIG_FILE="$DEFAULT_CONFIG_FILE"
     fi
@@ -265,15 +265,15 @@ else
     INSTALL_ROOT="$(expand_install_path "${CFG_INSTALL_ROOT:-.quop-install}" "$PROJECT_ROOT")"
 fi
 VENV_DIR="$(expand_install_path "${CFG_VENV_DIR_TEMPLATE:-.venv_${PROFILE_ID}_${BACKEND}}" "$INSTALL_ROOT")"
-SITE_WORK_DIR="$(expand_install_path "${CFG_WORK_DIR_TEMPLATE:-.cache/quop/$PROFILE_ID/$BACKEND}" "$INSTALL_ROOT")"
+PROFILE_WORK_DIR="$(expand_install_path "${CFG_WORK_DIR_TEMPLATE:-.cache/quop/$PROFILE_ID/$BACKEND}" "$INSTALL_ROOT")"
 CACHE_ROOT="$INSTALL_ROOT/.cache"
 DEPS_ROOT="$INSTALL_ROOT/.deps"
 FETCHCONTENT_BASE_DIR="$INSTALL_ROOT/.deps/$PROFILE_ID/$BACKEND"
-SKBUILD_BUILD_DIR="$SITE_WORK_DIR/skbuild"
-BUILD_DEPS_DIR="$SITE_WORK_DIR/deps"
-DOCS_VENV_DIR="$SITE_WORK_DIR/docs-venv"
+SKBUILD_BUILD_DIR="$PROFILE_WORK_DIR/skbuild"
+BUILD_DEPS_DIR="$PROFILE_WORK_DIR/deps"
+DOCS_VENV_DIR="$PROFILE_WORK_DIR/docs-venv"
 ACTIVATION_SCRIPT="$INSTALL_ROOT/activate-${PROFILE_ID}-${BACKEND}.sh"
-ACTIVATION_RUNTIME_DIR="$INSTALL_ROOT/.setup-runtime/$PROFILE_ID/$BACKEND"
+ACTIVATION_RUNTIME_DIR="$INSTALL_ROOT/.environments-runtime/$PROFILE_ID/$BACKEND"
 ACTIVATION_COMMON_LIB="$ACTIVATION_RUNTIME_DIR/common.sh"
 ACTIVATION_CONFIG_RENDERER="$ACTIVATION_RUNTIME_DIR/render_config.py"
 ACTIVATION_PATH_HELPER="$ACTIVATION_RUNTIME_DIR/path_helper.py"
@@ -292,7 +292,7 @@ if [[ "$INSTALL_ROOT_REAL" == "$PROJECT_ROOT_REAL" ]]; then
 fi
 
 ensure_path_within_root "$INSTALL_ROOT" "$VENV_DIR" "virtual environment"
-ensure_path_within_root "$INSTALL_ROOT" "$SITE_WORK_DIR" "site work directory"
+ensure_path_within_root "$INSTALL_ROOT" "$PROFILE_WORK_DIR" "profile work directory"
 ensure_path_within_root "$INSTALL_ROOT" "$BUILD_DEPS_DIR" "build dependency directory"
 ensure_path_within_root "$INSTALL_ROOT" "$DOCS_VENV_DIR" "documentation virtual environment"
 ensure_path_within_root "$INSTALL_ROOT" "$FETCHCONTENT_BASE_DIR" "FetchContent cache"
@@ -300,7 +300,7 @@ ensure_path_within_root "$INSTALL_ROOT" "$SKBUILD_BUILD_DIR" "scikit-build direc
 ensure_path_within_root "$INSTALL_ROOT" "$ACTIVATION_SCRIPT" "activation script"
 ensure_path_within_root "$INSTALL_ROOT" "$ACTIVATION_RUNTIME_DIR" "activation runtime directory"
 
-export SITE_WORK_DIR
+export PROFILE_WORK_DIR
 export BUILD_DEPS_DIR
 export FETCHCONTENT_BASE_DIR
 export QUOP_FETCHCONTENT_BASE_DIR="$FETCHCONTENT_BASE_DIR"
@@ -320,7 +320,7 @@ cleanup_install_state
 mkdir -p \
     "$INSTALL_ROOT" \
     "$(dirname "$VENV_DIR")" \
-    "$SITE_WORK_DIR" \
+    "$PROFILE_WORK_DIR" \
     "$BUILD_DEPS_DIR" \
     "$FETCHCONTENT_BASE_DIR" \
     "$ACTIVATION_RUNTIME_DIR"
@@ -328,7 +328,7 @@ mkdir -p \
 info "Root:   $INSTALL_ROOT"
 info "Cache:  $CACHE_ROOT"
 info "Venv:   $VENV_DIR"
-info "Work:   $SITE_WORK_DIR"
+info "Work:   $PROFILE_WORK_DIR"
 info "Deps:   $FETCHCONTENT_BASE_DIR"
 
 # ---- Create venv & install Python dependencies -----------------------------
@@ -406,7 +406,7 @@ if [[ "$PACKAGE" == "true" ]]; then
 fi
 
 # ---- Done -------------------------------------------------------------------
-step "Setup complete"
+step "Environment ready"
 info "Activate the environment with:"
 info "  source $ACTIVATION_SCRIPT"
 info ""
@@ -415,6 +415,6 @@ info "  QUOP_EXAMPLES_DIR    -- examples directory"
 info "  QUOP_BENCHMARKS_DIR  -- benchmarks directory"
 info "  QUOP_DOCS_DIR        -- documentation directory"
 info ""
-info "Standard-install note: running Python from $PROJECT_ROOT will import the"
-info "source checkout before site-packages. Run from outside the repository or"
-info "use 'python -P' when checking the installed package."
+info "Standard-install note: if PYTHONPATH includes $PROJECT_ROOT/src, Python"
+info "will import the source checkout before site-packages. Unset that path"
+info "when checking the installed package."

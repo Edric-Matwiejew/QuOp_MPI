@@ -8,14 +8,9 @@ access the full wavefunction.
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_sampling.py -v --with-mpi
 """
 
-import os
-import sys
-
 import numpy as np
 import pytest
 from mpi4py import MPI
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 @pytest.mark.mpi

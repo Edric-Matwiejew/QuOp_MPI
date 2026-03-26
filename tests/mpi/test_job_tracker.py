@@ -13,13 +13,9 @@ Run with: mpiexec -n 2 python -m pytest tests/mpi/test_job_tracker.py -v --with-
 
 import os
 import pickle
-import sys
 import tempfile
 
 import pytest
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 @pytest.mark.mpi
 class TestJobTrackerBasicInit:

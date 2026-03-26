@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:native_tests/wavefront/CMakeLists.txt
 # native_tests/wavefront/CMakeLists.txt
+========
+# native/tests/wavefront/CMakeLists.txt
+>>>>>>>> 7febcaca4904d9b669f613e5f9a0613c5a776652:native/tests/wavefront/CMakeLists.txt
 # CTest configuration for wavefront backend tests
 #
 # These tests validate the wavefront backend components:

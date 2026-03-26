@@ -18,7 +18,8 @@ if(WAVEFRONT_BACKEND)
   # Compile the real gpu_topology and communicators modules as local OBJECT libraries so comm_info_mod can depend on
   # them without circular ordering issues with the wavefront subdirectory.
   #
-  # These sources are also compiled in native/wavefront/context/ (wf_gpu_topology etc.).  To avoid duplicate .mod providers
+  # These sources are also compiled in native/wavefront/context/ (wf_gpu_topology etc.).  To avoid duplicate .mod
+  # providers
   # - which breaks Ninja's Fortran dyndep module-dependency resolution - the ci_* targets write their .mod files to a
   # private directory instead of the global CMAKE_Fortran_MODULE_DIRECTORY.
   set(_WF_CONTEXT_DIR "${CMAKE_SOURCE_DIR}/native/wavefront/context")

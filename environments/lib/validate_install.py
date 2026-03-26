@@ -61,8 +61,8 @@ def ensure_not_source_tree(package_init: Path, project_root: Path) -> None:
         raise ValidationError(
             "Installed package validation failed: Python would import quop_mpi "
             f"from the source tree at {package_init}. "
-            f"For a standard install, avoid adding {project_root / 'src'} to PYTHONPATH "
-            "and do not validate against an editable install."
+            f"For a standard install, avoid adding {project_root / 'src'} "
+            "to PYTHONPATH when checking the installed package."
         )
 
 

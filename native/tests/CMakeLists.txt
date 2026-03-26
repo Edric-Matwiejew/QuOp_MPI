@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:native_tests/CMakeLists.txt
 # native_tests/CMakeLists.txt CTest configuration for QuOp_MPI native (Fortran/C++) tests
+========
+# native/tests/CMakeLists.txt CTest configuration for QuOp_MPI native (Fortran/C++) tests
+>>>>>>>> 7febcaca4904d9b669f613e5f9a0613c5a776652:native/tests/CMakeLists.txt
 
 # Find MPI (should already be found by parent, but ensure it's available)
 find_package(MPI REQUIRED COMPONENTS Fortran)

@@ -24,7 +24,7 @@ sense.
 This standard applies to:
 
 - `native/`
-- `native_tests/`
+- `native/tests/`
 - the immediate Python adapter layer that directly wraps or normalizes native
   behavior, including `src/quop_mpi/_lib/` and
   `src/quop_mpi/_utils/_comm_size.py`
@@ -455,7 +455,7 @@ coverage in the best test infrastructure currently available:
 
 ### 9.2 Test placement
 
-- For now, native regression coverage should primarily be added in `native_tests/`.
+- For now, native regression coverage should primarily be added in `native/tests/`.
 - When dedicated wrapper-level or Python-level test infrastructure is expanded,
   behavior in the immediate Python interface should gain coverage there as well.
 - Changes that should behave the same across MPI and wavefront SHOULD gain

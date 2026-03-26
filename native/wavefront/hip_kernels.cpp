@@ -442,7 +442,7 @@ __global__ void gen_momentum_mixer(int n_dim, int Ns_max, int* Ns, int* strides,
 // Note: dense_one_norms, infinity_norm, vector_infinity_norm, inplace_vec_sum,
 // b_scale, unity_spmm, regular_unity_spmm, non_scaled_unity_spmm,
 // non_scaled_regular_unity_spmm, pack_send_values, unpack_rec_values
-// kernels have been moved to sparse_propagators/src/kernels/
+// kernels have been moved to native/sparse_propagators/src/kernels/
 
 extern "C" {
 void launch_expectation_value_kernel(dim3* grid, dim3* block, int shmem, hipStream_t stream, double* dout,
@@ -596,4 +596,4 @@ void launch_gen_momentum_mixer_kernel(dim3* grid, dim3* block, int shmem, hipStr
 // Note: launch wrappers for dense_one_norms, infinity_norm, vector_infinity_norm,
 // inplace_vec_sum, b_scale, pack_send_values, unpack_rec_values, unity_spmm,
 // regular_unity_spmm, non_scaled_unity_spmm, non_scaled_regular_unity_spmm
-// have been moved to sparse_propagators/src/kernels/
+// have been moved to native/sparse_propagators/src/kernels/

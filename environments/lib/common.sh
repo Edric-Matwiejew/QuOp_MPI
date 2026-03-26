@@ -9,7 +9,7 @@ step() { printf '\n===> %s\n\n' "$*"; }
 
 # ---- Shared discovery helpers ------------------------------------------------
 # These were extracted from the Ubuntu and Setonix hooks where they were
-# duplicated.  Site hooks can override or extend behaviour by wrapping these.
+# duplicated.  Profile hooks can override or extend behaviour by wrapping these.
 
 require_command() {
     local cmd="$1"
@@ -117,52 +117,70 @@ apply_profile_defaults() {
     PYTHON_VERSION="${PYTHON_VERSION:-${CFG_PYTHON_VERSION:-}}"
 }
 
-available_site_names() {
-    local site_dir
+available_profile_names() {
+    local profiles_dir="${PROFILES_DIR:-${SITES_DIR:-}}"
+    local profile_dir
     local nullglob_was_set=0
-    local -a site_names=()
+    local -a profile_names=()
+
+    if [[ -z "$profiles_dir" || ! -d "$profiles_dir" ]]; then
+        return 0
+    fi
 
     if shopt -q nullglob; then
         nullglob_was_set=1
     fi
     shopt -s nullglob
-    for site_dir in "$SITES_DIR"/*; do
-        [[ -d "$site_dir" ]] || continue
-        site_names+=("$(basename "$site_dir")")
+    for profile_dir in "$profiles_dir"/*; do
+        [[ -d "$profile_dir" ]] || continue
+        profile_names+=("$(basename "$profile_dir")")
     done
     if ((nullglob_was_set == 0)); then
         shopt -u nullglob
     fi
 
-    if ((${#site_names[@]} == 0)); then
+    if ((${#profile_names[@]} == 0)); then
         return 0
     fi
 
-    printf '%s\n' "${site_names[@]}" | sort
+    printf '%s\n' "${profile_names[@]}" | sort
 }
 
-list_available_sites() {
-    local site_name
+list_available_profiles() {
+    local profile_name
     local joined=""
 
-    while IFS= read -r site_name; do
-        [[ -z "$site_name" ]] && continue
+    while IFS= read -r profile_name; do
+        [[ -z "$profile_name" ]] && continue
         if [[ -n "$joined" ]]; then
             joined+=", "
         fi
-        joined+="$site_name"
-    done < <(available_site_names)
+        joined+="$profile_name"
+    done < <(available_profile_names)
 
     printf '%s\n' "$joined"
 }
 
-print_available_sites() {
-    local site_name
+print_available_profiles() {
+    local profile_name
 
-    while IFS= read -r site_name; do
-        [[ -z "$site_name" ]] && continue
-        printf '  %s\n' "$site_name"
-    done < <(available_site_names)
+    while IFS= read -r profile_name; do
+        [[ -z "$profile_name" ]] && continue
+        printf '  %s\n' "$profile_name"
+    done < <(available_profile_names)
+}
+
+# Backward-compatible aliases for the previous site-based naming.
+available_site_names() {
+    available_profile_names "$@"
+}
+
+list_available_sites() {
+    list_available_profiles "$@"
+}
+
+print_available_sites() {
+    print_available_profiles "$@"
 }
 
 ensure_module_command() {

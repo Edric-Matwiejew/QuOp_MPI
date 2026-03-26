@@ -20,7 +20,7 @@ This guide applies to:
 
 - `CMakeLists.txt`
 - `native/**/CMakeLists.txt`
-- `native_tests/**/CMakeLists.txt`
+- `native/tests/**/CMakeLists.txt`
 - `cmake/**/*.cmake`
 
 This guide does not apply to:
@@ -162,7 +162,7 @@ Rules:
 Recommended local usage:
 
 ```bash
-cmake-format -i CMakeLists.txt native/**/CMakeLists.txt native_tests/**/CMakeLists.txt cmake/**/*.cmake
+cmake-format -i CMakeLists.txt native/**/CMakeLists.txt native/tests/**/CMakeLists.txt cmake/**/*.cmake
 ```
 
 ### 11.2 Linter
@@ -173,7 +173,7 @@ cmake-format -i CMakeLists.txt native/**/CMakeLists.txt native_tests/**/CMakeLis
 Recommended local usage:
 
 ```bash
-cmakelint CMakeLists.txt native/**/CMakeLists.txt native_tests/**/CMakeLists.txt cmake/**/*.cmake
+cmakelint CMakeLists.txt native/**/CMakeLists.txt native/tests/**/CMakeLists.txt cmake/**/*.cmake
 ```
 
 ### 11.3 CI policy
@@ -183,8 +183,8 @@ cmakelint CMakeLists.txt native/**/CMakeLists.txt native_tests/**/CMakeLists.txt
 Suggested sequence:
 
 ```bash
-cmake-format --check CMakeLists.txt native/**/CMakeLists.txt native_tests/**/CMakeLists.txt cmake/**/*.cmake
-cmakelint CMakeLists.txt native/**/CMakeLists.txt native_tests/**/CMakeLists.txt cmake/**/*.cmake
+cmake-format --check CMakeLists.txt native/**/CMakeLists.txt native/tests/**/CMakeLists.txt cmake/**/*.cmake
+cmakelint CMakeLists.txt native/**/CMakeLists.txt native/tests/**/CMakeLists.txt cmake/**/*.cmake
 ```
 
 ## 12. Non-Goals
