@@ -247,6 +247,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.param_map_dict = {"args": [], "kwargs": {}}
         self._need_bind_param_map = False  # postpone binding until SUBCOMM exists
         self._n_free_params = None  # set when param map is configured
+        self.free_vec: np.ndarray | None = None  # bound by Interface for param map
 
         # -- Scope-nesting validation stack ----------------------
         self._scope_stack: list[tuple[int, str]] = []
@@ -307,9 +308,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             return vec
 
         # otherwise, map the parameters
+        self.free_vec = vec
         self._param_map_parsed.update_parameters()
         full_vec = self._param_map_parsed.call(
-            vec,
             *self.param_map_dict["args"],
             **self.param_map_dict["kwargs"],
         )
