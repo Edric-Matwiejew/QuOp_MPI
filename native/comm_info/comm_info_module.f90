@@ -33,7 +33,7 @@ module comm_info_module
     implicit none
     private
     public :: quop_mpi_layout_t, split_info_t, negotiate_callback_iface
-    public :: discover_topology, destroy_topology, get_topology_info, split_workers, negotiate
+    public :: discover_topology, destroy_topology, get_topology_info, get_layout_topology_info, split_workers, negotiate
     public :: create_jaccomm, create_rootcomm
     public :: create_split_from_subcomm
     public :: dump_comm_info
@@ -1435,6 +1435,29 @@ contains
         ranks_per_gpu = topo%ranks_per_gpu
         node_size = topo%node_size
     end subroutine get_topology_info
+
+    subroutine get_layout_topology_info(ci_ptr, n_physical_gpus, ranks_per_gpu, node_size)
+        !! Return key topology fields from the current layout state.
+        !! NOT collective -- purely local read.
+        type(c_ptr), intent(in) :: ci_ptr
+        integer(int32), intent(out) :: n_physical_gpus
+        integer(int32), intent(out) :: ranks_per_gpu
+        integer(int32), intent(out) :: node_size
+        type(quop_mpi_layout_t), pointer :: ci
+
+        n_physical_gpus = 0
+        ranks_per_gpu = 1
+        node_size = 0
+
+        if (.not. c_associated(ci_ptr)) return
+
+        call c_f_pointer(ci_ptr, ci)
+        if (.not. associated(ci)) return
+
+        n_physical_gpus = ci%topology%n_physical_gpus
+        ranks_per_gpu = ci%topology%ranks_per_gpu
+        node_size = ci%topology%node_size
+    end subroutine get_layout_topology_info
 
     subroutine discover_topology(topo_ptr, MPI_COMM, backend_flag, error_code)
         !! Phase 0: Detect node structure and GPU hardware.

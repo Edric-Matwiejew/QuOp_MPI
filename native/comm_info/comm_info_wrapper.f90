@@ -13,6 +13,7 @@ module comm_info_wrapper
                                 discover_topology_impl => discover_topology, &
                                 destroy_topology_impl => destroy_topology, &
                                 get_topology_info_impl => get_topology_info, &
+                                get_layout_topology_info_impl => get_layout_topology_info, &
                                 split_workers_impl => split_workers, &
                                 negotiate_impl => negotiate, &
                                 create_jaccomm_impl => create_jaccomm, &
@@ -680,20 +681,8 @@ contains
         integer(int32), intent(out) :: ranks_per_gpu
         integer(int32), intent(out) :: node_size
 
-        type(quop_mpi_layout_t), pointer :: ci
-
-        n_physical_gpus = 0
-        ranks_per_gpu = 1
-        node_size = 0
-
-        if (.not. c_associated(ci_ptr)) return
-
-        call c_f_pointer(ci_ptr, ci)
-        if (.not. associated(ci)) return
-
-        n_physical_gpus = ci%get_topology()%n_physical_gpus
-        ranks_per_gpu = ci%get_topology()%ranks_per_gpu
-        node_size = ci%get_topology()%node_size
+        call get_layout_topology_info_impl(ci_ptr, n_physical_gpus, &
+                                           ranks_per_gpu, node_size)
     end subroutine wrapper_get_layout_topology_info
 
 end module comm_info_wrapper
