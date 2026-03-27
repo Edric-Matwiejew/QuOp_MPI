@@ -72,16 +72,12 @@ def _configure_temp_fallback_if_needed(config):
     pytest_base = shared_root / "pytest_basetemp"
 
     shared_root.mkdir(parents=True, exist_ok=True)
-    pytest_base.mkdir(parents=True, exist_ok=True)
 
     fallback_tmp = str(shared_root.resolve())
     os.environ["TMPDIR"] = fallback_tmp
     os.environ["TEMP"] = fallback_tmp
     os.environ["TMP"] = fallback_tmp
     tempfile.tempdir = fallback_tmp
-
-    if getattr(config.option, "basetemp", None) is None:
-        config.option.basetemp = str(pytest_base.resolve())
 
 
 # =============================================================================
