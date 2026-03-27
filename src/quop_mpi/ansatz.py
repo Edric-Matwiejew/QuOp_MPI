@@ -29,7 +29,7 @@ from ._utils._interface import Interface
 from ._utils._mpi import gather_array
 
 if TYPE_CHECKING:
-    from types import TracebackType
+    from types import ModuleType, TracebackType
     from typing import Callable
 
     from quop_mpi import UnitaryBase
@@ -224,6 +224,18 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.result = None
 
         self.seed = 0
+
+        # -- Attributes set later by setup / configuration methods --
+        self.unitaries: list[UnitaryBase] | None = None
+        self.param_map: np.ndarray | None = None
+        self.backend: ModuleType | None = None
+        self.context: Context | None = None
+        self.initial_state_function: Callable | Interface | None = None
+        self.n_variational_parameters: int | None = None
+        self.optimiser_args: dict | None = None
+        self.optimiser_log: list[str] | None = None
+        self.parsed_observable_function: Interface | None = None
+        self.time: float | None = None
 
         # Initialize sampling subsystem
         self._init_sampling()
@@ -678,7 +690,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         "local_i_offset": "Global index offset for this rank's partition",
         "partition_table": "Array describing global partitioning scheme",
         # Observables and state
-        "observables": "Local partition of observable values (after setup)",
+        "local_observables": "Local partition of observable values (after setup)",
         "ansatz_initial_state": "Local partition of initial state vector",
         "final_state": "Local partition of current/final state vector",
         # Variational parameters
