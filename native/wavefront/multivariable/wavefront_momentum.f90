@@ -211,7 +211,8 @@ contains
         error_code = synced_error
         if (synced_error /= 0) return
 
-        call sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset)
+        call sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset, error_code)
+        if (error_code /= 0) return
 
         ! Update the required allocation size (alloc_size from configure if
         ! available, otherwise at least device_local_i)

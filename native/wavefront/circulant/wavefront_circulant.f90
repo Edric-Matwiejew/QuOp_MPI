@@ -125,7 +125,8 @@ contains
         device_local_i = int(local_N, int64)
         device_local_i_offset = int(local_start, int64)
 
-        call sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset)
+        call sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset, error_code)
+        if (error_code /= 0) return
 
         if (int(local_alloc_size, int64) > ci%get_device_alloc_local()) then
             call ci%set_device_alloc_local(int(local_alloc_size, int64), error_code)

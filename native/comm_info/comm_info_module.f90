@@ -1161,7 +1161,11 @@ contains
                                                   self%topology, &
                                                   self%DEVCOMM, self%DEVCOMM_NODE)
                 call refresh_layout_topology(self)
-                call device_block_distribute(self)
+                call device_block_distribute(self, bd_err)
+                if (bd_err /= 0) then
+                    error_code = bd_err
+                    return
+                end if
             else
                 call block_distribute(self, comm_size, rank, bd_err)
                 if (bd_err /= 0) then
@@ -1293,7 +1297,11 @@ contains
                                                   self%topology, &
                                                   self%DEVCOMM, self%DEVCOMM_NODE)
                 call refresh_layout_topology(self)
-                call device_block_distribute(self)
+                call device_block_distribute(self, bd_err)
+                if (bd_err /= 0) then
+                    error_code = bd_err
+                    return
+                end if
             else
                 call block_distribute(self, comm_size, rank, bd_err)
                 if (bd_err /= 0) then
@@ -2023,7 +2031,7 @@ contains
                 ci%local_i = 0
                 ci%local_i_offset = 0
                 ci%alloc_local = 0
-                call device_block_distribute(ci)
+                call device_block_distribute(ci, error_code)
                 return
             end if
 #endif
@@ -2051,14 +2059,10 @@ contains
                     status = -1
                     return
                 end if
+                ! filter_active_ranks already redistributed internally;
+                ! just sync the negotiate-local comm_size / rank variables.
                 call MPI_Comm_size(ci%SUBCOMM, comm_size, ierr)
                 call MPI_Comm_rank(ci%SUBCOMM, rank, ierr)
-                ci%n_processes = int(comm_size, int64)
-                call redistribute_current_layout(bd_err)
-                if (bd_err /= 0) then
-                    status = 5
-                    return
-                end if
                 restart = .true.
                 return
             end if
@@ -2152,15 +2156,19 @@ contains
     end subroutine block_distribute
 
 #ifdef WAVEFRONT_BACKEND
-    subroutine sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset)
+    subroutine sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset, error_code)
         !! Derive host-level fields bottom-up from a device partition and
-        !! update the layout in-place. Intended for negotiate-time use.
+        !! update the layout via setters. Intended for negotiate-time use
+        !! (layout must not be locked).
         type(quop_mpi_layout_t), intent(inout) :: ci
         integer(int64), intent(in) :: device_local_i, device_local_i_offset
+        integer(int32), intent(out) :: error_code
 
         integer(int32) :: ierr, has_data, node_ranks_with_data
         integer(int64) :: DEVCOMM_NODE_total_local_i, DEVCOMM_NODE_rank_0_offset
         integer(int64) :: NODECOMM_local_i, NODECOMM_local_i_offset
+
+        error_code = 0
 
         call DEVCOMM_NODE_layout_from_DEVCOMM(device_local_i, device_local_i_offset, &
                                               ci%DEVCOMM_NODE, &
@@ -2180,10 +2188,10 @@ contains
                                                active_device_local_i=device_local_i, &
                                                cpu_numa_node=ci%topology%cpu_numa_node)
 
-        ci%device_local_i = device_local_i
-        ci%device_local_i_offset = device_local_i_offset
-        ci%local_i = NODECOMM_local_i
-        ci%local_i_offset = DEVCOMM_NODE_rank_0_offset + NODECOMM_local_i_offset
+        call ci%set_partitioning(NODECOMM_local_i, &
+                                 DEVCOMM_NODE_rank_0_offset + NODECOMM_local_i_offset, &
+                                 device_local_i, device_local_i_offset, error_code)
+        if (error_code /= 0) return
 
         if (device_local_i > 0_int64) then
             has_data = 1
@@ -2192,18 +2200,21 @@ contains
         end if
         call MPI_Allreduce(has_data, node_ranks_with_data, 1, MPI_INTEGER, &
                            MPI_SUM, ci%NODECOMM, ierr)
-        ci%device_n_processes = int(node_ranks_with_data, int64)
+        call ci%set_device_n_processes(int(node_ranks_with_data, int64), error_code)
     end subroutine sync_layout_from_device_partition
 
-    subroutine device_block_distribute(ci)
+    subroutine device_block_distribute(ci, error_code)
         !! Block-distribute system_size over DEVCOMM ranks, then derive
         !! host-level fields bottom-up via DEVCOMM_NODE and NODECOMM.
         !! COLLECTIVE over SUBCOMM (and sub-communicators).
         type(quop_mpi_layout_t), intent(inout) :: ci
+        integer(int32), intent(out) :: error_code
 
         integer(int32) :: ierr, devcomm_size, devcomm_rank
         integer(int64) :: base_size, remainder
         integer(int64) :: dev_li, dev_li_off
+
+        error_code = 0
 
         ! Block-distribute over DEVCOMM
         dev_li = 0
@@ -2226,7 +2237,8 @@ contains
         ! Set device fields
         ci%device_alloc_local = dev_li
 
-        call sync_layout_from_device_partition(ci, dev_li, dev_li_off)
+        call sync_layout_from_device_partition(ci, dev_li, dev_li_off, error_code)
+        if (error_code /= 0) return
         ci%alloc_local = ci%local_i
 
     end subroutine device_block_distribute
