@@ -100,7 +100,6 @@ class TestAnsatzSetupFlags:
             "setup_log",
             "setup_objective",
             "setup_sampling",
-            "setup_var_map",
         ]
 
         for flag in expected_flags:

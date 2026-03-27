@@ -52,7 +52,6 @@ class Logging:
 
         Called by :meth:`Ansatz.__init__`.
         """
-        self.setup_log: bool = False
         self.log: bool = False
         self.filename: str | None = None
         self.label: str | None = None

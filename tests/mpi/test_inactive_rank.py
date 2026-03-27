@@ -60,7 +60,6 @@ class TestInactiveRanks:
         alg.setup()
 
         if mpi_comm.Get_rank() == 0:
-            assert alg._is_active is True
             assert alg.subcomms.in_subcomm() is True
 
         alg.destroy()

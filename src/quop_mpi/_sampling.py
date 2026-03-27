@@ -60,7 +60,6 @@ class Sampling:
         self.shots_to_global_minimum: int | str = "not found"
         self.global_minimum_found: bool = False
         self.total_shots: int = 0
-        self.setup_sampling: bool = False
 
     @scope("world")
     def set_sampling(
