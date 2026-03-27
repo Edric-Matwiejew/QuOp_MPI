@@ -121,21 +121,37 @@ resolve_python_interpreter 9.9
 
 
 def test_find_rocm_path_prefers_hipconfig_prefix_over_wrapper_location():
-    script = f"""
-tmpbin="$(mktemp -d)"
-trap 'rm -rf "$tmpbin"' EXIT
-printf '%s\\n' '#!/usr/bin/env bash' 'printf "/opt/rocm-6.3.2\\n"' >"$tmpbin/hipconfig"
-printf '%s\\n' '#!/usr/bin/env bash' 'exit 0' >"$tmpbin/hipcc"
-chmod +x "$tmpbin/hipconfig" "$tmpbin/hipcc"
-PATH="$tmpbin:$PATH"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        tmpbin = tmpdir_path / "bin"
+        tmprocm = tmpdir_path / "rocm-prefix"
+        tmpbin.mkdir()
+        tmprocm.mkdir()
+
+        hipconfig = tmpbin / "hipconfig"
+        hipconfig.write_text(
+            "#!/usr/bin/env bash\n"
+            f"printf '%s\\n' {shlex.quote(str(tmprocm))}\n"
+        )
+        os.chmod(hipconfig, 0o755)
+
+        hipcc = tmpbin / "hipcc"
+        hipcc.write_text("#!/usr/bin/env bash\nexit 0\n")
+        os.chmod(hipcc, 0o755)
+
+        script = f"""
+unset ROCM_PATH
+unset -f hipconfig hipcc 2>/dev/null || true
+PATH={shlex.quote(str(tmpbin))}:$PATH
+hash -r
 source {shlex.quote(str(COMMON_SH))}
 find_rocm_path
 """
 
-    result = run_shell(script)
+        result = run_shell(script)
 
     assert result.returncode == 0, result.stderr or result.stdout
-    assert result.stdout.strip() == "/opt/rocm-6.3.2"
+    assert result.stdout.strip() == str(tmprocm)
 
 
 def test_profile_listing_helpers_are_portable_and_sorted():

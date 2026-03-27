@@ -728,7 +728,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.print_bindable_attributes()
 
         # Print Unitary attributes if unitaries have been set
-        if hasattr(self, "unitaries") and self.unitaries:
+        if self.unitaries is not None:
             for unitary in self.unitaries:
                 unitary.print_bindable_attributes()
         else:
@@ -1111,12 +1111,12 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         # Free unitary plans
         if self._layout is not None and self._layout.in_subcomm():
             for unitary in self.unitaries:
-                if hasattr(unitary, "planned") and unitary.planned:
+                if unitary.planned:
                     unitary.destroy()
                     unitary.planned = False
 
         # Free context BEFORE layout -- context_destroy uses borrowed SUBCOMM
-        if hasattr(self, "context") and self.context is not None:
+        if self.context is not None:
             self.context.destroy()
             self.context = None
 
@@ -1270,14 +1270,14 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self._setup_done and not self.benchmarking and self.log:
             self._post_log()
 
-        if hasattr(self, "unitaries"):
+        if self.unitaries is not None:
             for unitary in self.unitaries:
                 if getattr(unitary, "planned", False):
                     unitary.destroy()
                     unitary.planned = False
 
         # Free context BEFORE layout -- context_destroy uses borrowed SUBCOMM
-        if hasattr(self, "context") and self.context is not None:
+        if self.context is not None:
             self.context.destroy()
             self.context = None
 
