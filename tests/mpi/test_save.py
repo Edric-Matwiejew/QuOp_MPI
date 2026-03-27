@@ -522,7 +522,7 @@ class TestParallelIODataIntegrity:
 
         if alg.subcomms.in_subcomm():
             # Gather observables after setup (observables are set after execute)
-            local_obs = alg.observables[: alg.local_i]
+            local_obs = alg.local_observables[: alg.local_i]
             partition_table = alg.partition_table
 
             full_obs_gathered = gather_array(local_obs, partition_table, alg.MPI_COMM)

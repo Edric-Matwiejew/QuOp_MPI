@@ -505,7 +505,7 @@ class TestCartesianSetup:
         alg.evolve_state(params)
 
         # Observables should be non-negative for sphere function
-        local_obs = alg.observables
+        local_obs = alg.local_observables
         if alg.subcomms.in_subcomm():
             assert local_obs is not None, "Observables should be set after evolve_state"
             assert np.all(local_obs >= 0), "Sphere function should be non-negative"

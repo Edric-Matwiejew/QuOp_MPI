@@ -118,6 +118,7 @@ _EXPECTED = {
     "execute": ("world", "none"),
     # Ansatz evaluation -- subcomm
     "get_expectation_value": ("subcomm", "all"),
+    "get_state_norm": ("subcomm", "all"),
     "evaluate": ("subcomm", "all"),
     "gen_initial_params": ("subcomm", "all"),
     "objective": ("subcomm", "root"),

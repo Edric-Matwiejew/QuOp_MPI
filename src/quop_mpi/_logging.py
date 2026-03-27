@@ -304,6 +304,6 @@ class Logging:
             "a",
             self.system_size,
             self.local_i_offset,
-            self.observables[: self.local_i],
+            self.local_observables[: self.local_i],
             self.subcomms.SUBCOMM.py2f(),
         )

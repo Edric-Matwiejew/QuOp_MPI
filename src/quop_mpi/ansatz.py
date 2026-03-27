@@ -180,7 +180,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.setup_called = False
 
         # variables that must be set by the 'pre' method of the child class
-        self.observables = None
+        self.local_observables = None
         self.observable_dict = None
         self.observable_function = None
         self.variational_parameters = None
@@ -251,6 +251,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         # -- Scope-nesting validation stack ----------------------
         self._scope_stack: list[tuple[int, str]] = []
+
+        # Attributes that can be bound by user-defined QuOp Functions (not exhaustive).
+        self.local_observables : np.ndarray = np.empty(0)  # set in __gen_observables
+        self.local_probabilities : np.ndarray = np.empty(0)  # set in evolve_state
 
     # -- Layout property (canonical partitioning source of truth) ----
 
@@ -968,19 +972,19 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             )
             self.parsed_observable_function.update_parameters()
 
-            self.observables = self.parsed_observable_function.call(
+            self.local_observables = self.parsed_observable_function.call(
                 *self.observable_dict["args"], **self.observable_dict["kwargs"]
             )
 
-            if self.observables.shape[0] != self.local_i:
-                self.observables = np.reshape(self.observables, (self.local_i,))
+            if self.local_observables.shape[0] != self.local_i:
+                self.local_observables = np.reshape(self.local_observables, (self.local_i,))
 
         else:
 
             unitary = self.unitaries[self.observable_function]
 
             if unitary.unitary_type == "diagonal":
-                self.observables = unitary.operator
+                self.local_observables = unitary.operator
             else:
                 raise RuntimeError(
                     f"Rank {self.subcomms.SUBCOMM.Get_rank()}:"
@@ -988,7 +992,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                     " no diagonal unitary defined"
                 )
 
-        self.context.observables = self.observables.astype(np.float64)
+        self.context.observables = self.local_observables.astype(np.float64)
 
     @scope("subcomm")
     def __gen_optimiser(self) -> None:
@@ -1152,7 +1156,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         >>> alg.set_qualities(my_observables)
         >>> alg.prepare()  # Fully initialize
         >>> alg.print_all_bindable_attributes()  # Now shows actual values
-        >>> print(f"Observables range: {alg.observables.min():.2f} to {alg.observables.max():.2f}")
+        >>> print(f"Observables range: {alg.local_observables.min():.2f} to {alg.local_observables.max():.2f}")
 
         Related methods: ``setup()`` for low-level setup and ``execute()`` to
         run optimization.
@@ -1294,7 +1298,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                     unitary.gen_operator()
 
                     if isinstance(self.observable_function, int) and i == self.observable_function:
-                        self.observables = unitary.operator
+                        self.local_observables = unitary.operator
 
                 else:
                     evolution_parameter = param_slice
@@ -1635,7 +1639,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         self._get_local_probabilities()
 
-        local_expectation = np.dot(self.local_probabilities, self.observables)
+        local_expectation = np.dot(self.local_probabilities, self.local_observables)
 
         return np.real(self.subcomms.SUBCOMM.allreduce(local_expectation, op=MPI.SUM))
 

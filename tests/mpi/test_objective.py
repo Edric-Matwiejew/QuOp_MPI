@@ -30,8 +30,8 @@ class TestSetObjectiveBasic:
 
         # Custom objective that computes from local_probabilities and observables
         # These are bound by the interface class
-        def custom_objective(local_probabilities, observables):
-            return np.dot(local_probabilities, observables)
+        def custom_objective(local_probabilities, local_observables):
+            return np.dot(local_probabilities, local_observables)
 
         alg.set_objective(custom_objective)
         alg.set_depth(1)
@@ -104,8 +104,8 @@ class TestSetObjectiveCustomFunctions:
         # Objective with penalty - must do MPI reduction like get_expectation_value
         penalty = 0.5
 
-        def penalized_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
-            local_exp = np.dot(local_probabilities, observables)
+        def penalized_objective(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + penalty
 
@@ -129,8 +129,8 @@ class TestSetObjectiveCustomFunctions:
 
         oracle = simple_oracle
 
-        def negated_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
-            local_exp = np.dot(local_probabilities, observables)
+        def negated_objective(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return -global_exp
 
@@ -167,8 +167,8 @@ class TestSetObjectiveWithFunctionDict:
         alg.set_qualities(oracle.qualities_function())
 
         # Objective that uses extra argument and does proper MPI reduction
-        def objective_with_offset(local_probabilities, observables, MPI_COMM, offset):  # noqa: N803
-            local_exp = np.dot(local_probabilities, observables)
+        def objective_with_offset(local_probabilities, local_observables, MPI_COMM, offset):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + offset
 
@@ -197,8 +197,8 @@ class TestSetObjectiveWithFunctionDict:
         alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
-        def objective_with_weight(local_probabilities, observables, MPI_COMM, weight=1.0):  # noqa: N803
-            local_exp = np.dot(local_probabilities, observables)
+        def objective_with_weight(local_probabilities, local_observables, MPI_COMM, weight=1.0):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return weight * global_exp
 
@@ -235,8 +235,8 @@ class TestSetObjectiveWithOptimization:
         # Custom objective with shift - must do MPI reduction
         shift = 1.0
 
-        def shifted_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
-            local_exp = np.dot(local_probabilities, observables)
+        def shifted_objective(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + shift
 
@@ -274,8 +274,8 @@ class TestSetObjectiveWithOptimization:
         alg_max = QWOA(oracle.system_size, mpi_comm)
         alg_max.set_qualities(oracle.qualities_function())
 
-        def negate_objective(local_probabilities, observables, MPI_COMM):  # noqa: N803
-            local_exp = np.dot(local_probabilities, observables)
+        def negate_objective(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return -global_exp
 

@@ -155,7 +155,7 @@ class Sampling:
         self._parse_sampling_function()
 
         self.global_minimum = self.subcomms.SUBCOMM.reduce(
-            np.min(np.real(self.observables)), op=MPI.MIN
+            np.min(np.real(self.local_observables)), op=MPI.MIN
         )
 
     @scope("subcomm")
@@ -237,7 +237,7 @@ class Sampling:
                 p=local_normed_probabilities,
             ).astype(np.int32)
 
-            local_samples = np.real(self.observables[local_samples_inds]).astype(np.float64)
+            local_samples = np.real(self.local_observables[local_samples_inds]).astype(np.float64)
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
                 self.samples.append(np.empty(self.sample_block_size, dtype=np.float64))
