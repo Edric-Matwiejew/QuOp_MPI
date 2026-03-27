@@ -2077,14 +2077,10 @@ contains
                     status = -1
                     return
                 end if
+                ! shrink already redistributed internally;
+                ! just sync the negotiate-local comm_size / rank variables.
                 call MPI_Comm_size(ci%SUBCOMM, comm_size, ierr)
                 call MPI_Comm_rank(ci%SUBCOMM, rank, ierr)
-                ci%n_processes = int(comm_size, int64)
-                call redistribute_current_layout(bd_err)
-                if (bd_err /= 0) then
-                    status = 5
-                    return
-                end if
                 restart = .true.
                 return
             end if

@@ -89,6 +89,12 @@ class Context:
     def destroy(self):
         if self.initialised and self.ptr not in (None, 0):
             self.context_wrapper.destroy(self.ptr)
+        # Mirror the Ansatz destroy path: once native cleanup completes,
+        # release borrowed Python-side references to the negotiated layout
+        # and communicator so a still-live Context object cannot outlive
+        # the layout teardown with stale MPI handles attached.
+        self.SUBCOMM = None
+        self._comm_info = None
         self.ptr = 0
         self.initialised = False
 

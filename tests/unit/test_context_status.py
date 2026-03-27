@@ -1,3 +1,5 @@
+import gc
+import weakref
 from types import SimpleNamespace
 
 import numpy as np
@@ -203,3 +205,23 @@ class TestContextStatusTranslation:
             ctx.get_state_norm()
 
         assert wrapper.get_state_norm_calls == [ctx.ptr]
+
+    def test_destroy_releases_borrowed_layout_and_subcomm_refs(self):
+        wrapper = _FakeContextWrapper()
+        comm_info = _FakeCommInfo()
+        layout_ref = weakref.ref(comm_info)
+        subcomm_ref = weakref.ref(comm_info.subcomm)
+
+        ctx = Context(_make_backend(wrapper), comm_info)
+        ctx.destroy()
+
+        del comm_info
+        gc.collect()
+
+        assert wrapper.destroyed_ptr == 456
+        assert ctx.ptr == 0
+        assert ctx.initialised is False
+        assert ctx._comm_info is None
+        assert ctx.SUBCOMM is None
+        assert layout_ref() is None
+        assert subcomm_ref() is None
