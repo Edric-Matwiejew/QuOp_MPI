@@ -175,6 +175,8 @@ program test_wavefront_comms
     test_passed = 1
 
     ! Initialize partition variables
+    devcomm_local_i = 0_int64
+    devcomm_local_i_offset = 0_int64
     devcomm_node_local_i = 0
     devcomm_node_rank_0_offset = 0
 
@@ -213,12 +215,17 @@ program test_wavefront_comms
     test_passed = 1
 
     call NODECOMM_layout_from_DEVCOMM_NODE(devcomm_node_local_i, devcomm_node_rank_0_offset, &
-                                           DEVCOMM_NODE, NODECOMM, nodecomm_local_i, nodecomm_local_i_offset)
+                                           DEVCOMM_NODE, NODECOMM, nodecomm_local_i, nodecomm_local_i_offset, &
+                                           active_device_local_i=devcomm_local_i, &
+                                           cpu_numa_node=topology%cpu_numa_node)
 
     ! Each NODECOMM process should get some elements (or zero if no GPUs)
     if (nodecomm_local_i < 0) then
         test_passed = 0
         error_msg = "NODECOMM_local_i is negative"
+    else if (devcomm_local_i > 0_int64 .and. nodecomm_local_i <= 0_int64) then
+        test_passed = 0
+        error_msg = "Active GPU rank should receive host elements"
     end if
 
     call MPI_Allreduce(test_passed, global_passed, 1, MPI_INTEGER, MPI_MIN, COMM, ierr)

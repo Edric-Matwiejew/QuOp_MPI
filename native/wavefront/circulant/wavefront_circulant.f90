@@ -21,8 +21,7 @@ module wavefront_circulant
     use wavefront, only: wavefront_context
     use communicators, only: create_NODECOMM, create_devcomm_with_topology
     use gpu_topology, only: gpu_topology_t, init_gpu_topology
-    use partitions, only: DEVCOMM_NODE_layout_from_DEVCOMM, NODECOMM_layout_from_DEVCOMM_NODE
-    use comm_info_module, only: quop_mpi_layout_t
+    use comm_info_module, only: quop_mpi_layout_t, sync_layout_from_device_partition
 
     implicit none
 
@@ -100,13 +99,7 @@ contains
         integer(c_int) :: ierr_c
         integer(int32) :: ierr
 
-        ! For host-level field computation
         integer(int64) :: device_local_i, device_local_i_offset
-        integer(int64) :: DEVCOMM_NODE_total_local_i, DEVCOMM_NODE_rank_0_offset
-        integer(int64) :: NODECOMM_local_i, NODECOMM_local_i_offset
-
-        ! For counting ranks with non-zero data on this node
-        integer(int32) :: has_data, node_ranks_with_data
 
         error_code = 0
 
@@ -132,37 +125,7 @@ contains
         device_local_i = int(local_N, int64)
         device_local_i_offset = int(local_start, int64)
 
-        ! Compute host-level fields from the device distribution
-        call DEVCOMM_NODE_layout_from_DEVCOMM(device_local_i, &
-                                              device_local_i_offset, &
-                                              ci%get_DEVCOMM_NODE(), &
-                                              ci%get_DEVCOMM(), &
-                                              DEVCOMM_NODE_total_local_i, &
-                                              DEVCOMM_NODE_rank_0_offset)
-
-        call NODECOMM_layout_from_DEVCOMM_NODE(DEVCOMM_NODE_total_local_i, &
-                                               DEVCOMM_NODE_rank_0_offset, &
-                                               ci%get_DEVCOMM_NODE(), &
-                                               ci%get_NODECOMM(), &
-                                               NODECOMM_local_i, &
-                                               NODECOMM_local_i_offset)
-
-        ! Count how many ranks on this node have non-zero data
-        if (device_local_i > 0) then
-            has_data = 1
-        else
-            has_data = 0
-        end if
-        call MPI_Allreduce(has_data, node_ranks_with_data, 1, MPI_INTEGER, &
-                           MPI_SUM, ci%get_NODECOMM(), ierr)
-
-        ! Update layout fields via setters
-        call ci%set_partitioning(NODECOMM_local_i, &
-                                 DEVCOMM_NODE_rank_0_offset + NODECOMM_local_i_offset, &
-                                 device_local_i, device_local_i_offset, error_code)
-        if (error_code /= 0) return
-        call ci%set_device_n_processes(int(node_ranks_with_data, int64), error_code)
-        if (error_code /= 0) return
+        call sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset)
 
         if (int(local_alloc_size, int64) > ci%get_device_alloc_local()) then
             call ci%set_device_alloc_local(int(local_alloc_size, int64), error_code)

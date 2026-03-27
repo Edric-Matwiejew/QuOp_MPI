@@ -37,6 +37,9 @@ module comm_info_module
     public :: create_jaccomm, create_rootcomm
     public :: create_split_from_subcomm
     public :: dump_comm_info
+#ifdef WAVEFRONT_BACKEND
+    public :: sync_layout_from_device_partition
+#endif
 
     ! -- Validation error-code bit flags (public for wrapper) --------
     integer(int32), parameter, public :: LAYOUT_ERR_NON_NEGATIVE = 1 ! bit 0
@@ -152,6 +155,7 @@ module comm_info_module
 
         ! Communicator management
         procedure :: shrink => layout_shrink
+        procedure :: filter_active_ranks => layout_filter_active_ranks
         procedure :: rebuild_communicators => layout_rebuild_communicators
 
         ! Getters
@@ -1116,6 +1120,135 @@ contains
         end if
     end subroutine layout_shrink
 
+    subroutine layout_filter_active_ranks(self, error_code)
+        !! Rebuild SUBCOMM to keep only ranks with non-zero host data.
+        !! Active ranks are repartitioned over the filtered communicator and the
+        !! partition table is rebuilt before return.
+        !! For wavefront backend: NODECOMM, DEVCOMM, and DEVCOMM_NODE are
+        !! rebuilt from the filtered SUBCOMM before repartitioning.
+        !! COLLECTIVE over the current SUBCOMM.
+        class(quop_mpi_layout_t), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+        integer(int32) :: rank, color, ierr, comm_size, pt_err, bd_err, local_error
+        integer(int32) :: active_host_rank, active_host_ranks
+        integer(int32) :: old_subcomm, new_subcomm
+
+        error_code = 0
+        local_error = 0
+        if (self%locked) then
+            call layout_note_error(error_code, 1, &
+                                   "ERROR: cannot filter ranks on locked quop_mpi_layout_t")
+            local_error = 1
+        end if
+
+        if (local_error == 0 .and. self%SUBCOMM == MPI_COMM_NULL) then
+            call layout_note_error(error_code, 2, &
+                                   "ERROR: cannot filter ranks without a valid SUBCOMM")
+            local_error = 2
+        end if
+
+        call layout_sync_precondition_error(self%SUBCOMM, local_error, error_code)
+        if (local_error /= 0) return
+
+        active_host_rank = merge(1_int32, 0_int32, self%local_i > 0_int64)
+        call MPI_Allreduce(active_host_rank, active_host_ranks, 1, &
+                           MPI_INTEGER, MPI_SUM, self%SUBCOMM, ierr)
+        if (active_host_ranks <= 0) then
+            call layout_note_error(error_code, 3, &
+                                   "ERROR: cannot filter ranks when all local_i are zero")
+            return
+        end if
+
+#ifdef WAVEFRONT_BACKEND
+        ! Free device communicators BEFORE the SUBCOMM rebuild
+        ! (they were derived from the old SUBCOMM).
+        if (self%DEVCOMM /= MPI_COMM_NULL) then
+            call MPI_Comm_free(self%DEVCOMM, ierr)
+            self%DEVCOMM = MPI_COMM_NULL
+        end if
+        if (self%DEVCOMM_NODE /= MPI_COMM_NULL) then
+            call MPI_Comm_free(self%DEVCOMM_NODE, ierr)
+            self%DEVCOMM_NODE = MPI_COMM_NULL
+        end if
+#endif
+        if (self%NODECOMM /= MPI_COMM_NULL) then
+            call MPI_Comm_free(self%NODECOMM, ierr)
+            self%NODECOMM = MPI_COMM_NULL
+        end if
+
+        call MPI_Comm_rank(self%SUBCOMM, rank, ierr)
+        if (self%local_i > 0_int64) then
+            color = 0
+        else
+            color = MPI_UNDEFINED
+        end if
+
+        old_subcomm = self%SUBCOMM
+        call MPI_Comm_split(old_subcomm, color, rank, new_subcomm, ierr)
+        call MPI_Comm_free(old_subcomm, ierr)
+
+        self%SUBCOMM = new_subcomm
+
+        if (self%SUBCOMM /= MPI_COMM_NULL) then
+            call MPI_Comm_size(self%SUBCOMM, comm_size, ierr)
+            call MPI_Comm_rank(self%SUBCOMM, rank, ierr)
+            self%n_processes = int(comm_size, int64)
+            call create_layout_nodecomm(self%SUBCOMM, self%NODECOMM)
+#ifdef WAVEFRONT_BACKEND
+            if (self%backend_flag == 1) then
+                ! Zero host fields; device_block_distribute derives them
+                ! bottom-up from device partitioning.
+                self%local_i = 0
+                self%local_i_offset = 0
+                self%alloc_local = 0
+                ! Rebuild wavefront communicator hierarchy from the filtered SUBCOMM.
+                call create_devcomm_with_topology(self%SUBCOMM, self%NODECOMM, &
+                                                  self%topology, &
+                                                  self%DEVCOMM, self%DEVCOMM_NODE)
+                call device_block_distribute(self)
+            else
+                call block_distribute(self, comm_size, rank, bd_err)
+                if (bd_err /= 0) then
+                    error_code = bd_err
+                    return
+                end if
+                self%device_n_processes = 0
+                self%device_local_i = 0
+                self%device_local_i_offset = 0
+                self%device_alloc_local = 0
+            end if
+#else
+            call block_distribute(self, comm_size, rank, bd_err)
+            if (bd_err /= 0) then
+                error_code = bd_err
+                return
+            end if
+            self%device_n_processes = 0
+            self%device_local_i = 0
+            self%device_local_i_offset = 0
+            self%device_alloc_local = 0
+#endif
+            call self%build_partition_table(pt_err)
+            if (pt_err /= 0) then
+                call layout_note_error(error_code, 4, &
+                                       "ERROR: filter_active_ranks failed to rebuild partition_table")
+                return
+            end if
+        else
+            self%n_processes = 0
+            self%local_i = 0
+            self%local_i_offset = 0
+            self%alloc_local = 0
+            self%device_local_i = 0
+            self%device_local_i_offset = 0
+            self%device_n_processes = 0
+            self%device_alloc_local = 0
+            if (allocated(self%partition_table)) then
+                deallocate (self%partition_table)
+            end if
+        end if
+    end subroutine layout_filter_active_ranks
+
     subroutine layout_rebuild_communicators(self, error_code)
         !! Rebuild DEVCOMM/DEVCOMM_NODE for current partitioning.
         !! MPI backend: No-op (NODECOMM is unchanged and device comms are NULL).
@@ -1125,7 +1258,7 @@ contains
         !! COLLECTIVE over SUBCOMM (and NODECOMM when applicable).
         class(quop_mpi_layout_t), intent(inout) :: self
         integer(int32), intent(out) :: error_code
-        integer(int32) :: ierr, local_error
+        integer(int32) :: ierr, local_error, dn_size
 
         error_code = 0
         local_error = 0
@@ -1160,12 +1293,23 @@ contains
             self%DEVCOMM_NODE = MPI_COMM_NULL
         end if
 
+        ! Reset transient device allocation metadata before the next
+        ! negotiation pass repopulates it from propagator callbacks.
+        self%device_alloc_local = 0
+
         ! Rebuild based on current partitioning:
         ! A rank joins DEVCOMM only if it has a GPU AND has non-zero local data.
         call create_devcomm_with_data(self%SUBCOMM, self%NODECOMM, &
                                       self%topology, &
                                       self%device_local_i > 0, &
                                       self%DEVCOMM, self%DEVCOMM_NODE)
+
+        if (self%DEVCOMM_NODE /= MPI_COMM_NULL) then
+            call MPI_Comm_size(self%DEVCOMM_NODE, dn_size, ierr)
+            self%device_n_processes = int(dn_size, int64)
+        else
+            self%device_n_processes = 0
+        end if
 #else
         ! MPI backend: nothing to rebuild.
         continue
@@ -1492,13 +1636,15 @@ contains
         !! each one's max_comm_size callback with the layout.  Propagators
         !! may lower ci%n_processes (requesting a smaller communicator) or
         !! override ci%local_i/local_i_offset (e.g. FFTW distribution).
-        !! The loop shrinks SUBCOMM and re-distributes until stable.
+        !! The loop filters/shrinks SUBCOMM and re-distributes until stable.
         !!
         !! status ==    0: success, rank is active, layout locked.
-        !! status ==   -1: rank excluded during negotiate (SUBCOMM shrunk).
+        !! status ==   -1: rank excluded during negotiate (SUBCOMM shrunk/filtered).
         !! status ==    1: system_size <= 0.
         !! status ==    3: failed to converge.
         !! status ==    4: shrink finalization failed during negotiate.
+        !! status ==    6: communicator rebuild failed during negotiate.
+        !! status ==    7: zero-host-data rank filtering failed during negotiate.
         !! status == 1000 + code: propagator max_comm_size callback failed
         !!     with recoverable status code.
         type(c_ptr), intent(out) :: layout_ptr
@@ -1515,11 +1661,9 @@ contains
         type(gpu_topology_t), pointer :: topo
         type(quop_mpi_layout_t), pointer :: ci
         integer(int32) :: comm_size, rank, ierr, i
-        integer(int32) :: shrink_err
+        integer(int32) :: shrink_err, rebuild_err, filter_err
         integer(int32) :: callback_err, synced_callback_err
         integer(int32) :: bd_err, pt_err, lock_err
-        integer(int64) :: base_size, remainder
-        integer(int64) :: li, li_off
         integer(int64) :: prev_n_procs, prev_local_i, prev_offset
 
         ! For callback dispatch
@@ -1529,7 +1673,10 @@ contains
 
         ! Stability check
         integer(int32) :: local_stable_int, global_stable_int
+        integer(int32) :: local_filter_int, global_filter_int
+        integer(int32) :: local_rebuild_int, global_rebuild_int
         logical :: global_stable
+        logical :: restart_loop
 
         integer(int32), parameter :: MAX_ITERATIONS = 100
         integer(int32) :: iteration
@@ -1602,43 +1749,14 @@ contains
         call create_layout_nodecomm(ci%SUBCOMM, ci%NODECOMM)
 #endif
 
-        ! Initial shrink if more ranks than system elements.
-        ! At most system_size ranks can own non-zero data in a contiguous block
-        ! distribution, so shrink directly to that cap.
-        if (system_size < int(comm_size, int64)) then
-            call ci%shrink(system_size, shrink_err)
-            if (shrink_err /= 0) then
-                status = 4
-                layout_ptr = c_loc(ci)
-                return
-            end if
-            if (ci%SUBCOMM == MPI_COMM_NULL) then
-                status = -1
-                layout_ptr = c_loc(ci)
-                return
-            end if
-            call MPI_Comm_size(ci%SUBCOMM, comm_size, ierr)
-            call MPI_Comm_rank(ci%SUBCOMM, rank, ierr)
-            ci%n_processes = int(comm_size, int64)
-        end if
-
         ! Phase 2: NEGOTIATE loop
         ! Block distribute initial partitioning
 #ifdef WAVEFRONT_BACKEND
-        if (backend_flag == 1) then
-            ! Zero host fields; device_block_distribute derives them
-            ! bottom-up from device partitioning.
-            ci%local_i = 0
-            ci%local_i_offset = 0
-            ci%alloc_local = 0
-            call device_block_distribute(ci)
-        else
-            call block_distribute(ci, comm_size, rank, bd_err)
-            if (bd_err /= 0) then
-                status = 5
-                layout_ptr = c_loc(ci)
-                return
-            end if
+        call redistribute_current_layout(bd_err)
+        if (bd_err /= 0) then
+            status = 5
+            layout_ptr = c_loc(ci)
+            return
         end if
 #else
         call block_distribute(ci, comm_size, rank, bd_err)
@@ -1673,47 +1791,12 @@ contains
                 end if
             end do
 
-            ! Check if any propagator requested a smaller communicator
-            if (ci%n_processes < prev_n_procs) then
-                call ci%shrink(ci%n_processes, shrink_err)
-                if (shrink_err /= 0) then
-                    status = 4
-                    layout_ptr = c_loc(ci)
-                    return
-                end if
-                if (ci%SUBCOMM == MPI_COMM_NULL) then
-                    status = -1
-                    layout_ptr = c_loc(ci)
-                    return
-                end if
-                call MPI_Comm_size(ci%SUBCOMM, comm_size, ierr)
-                call MPI_Comm_rank(ci%SUBCOMM, rank, ierr)
-                ci%n_processes = int(comm_size, int64)
-                ! Re-block-distribute with new communicator size
-#ifdef WAVEFRONT_BACKEND
-                if (backend_flag == 1) then
-                    ! Zero host fields; device_block_distribute derives them
-                    ! bottom-up from device partitioning.
-                    ci%local_i = 0
-                    ci%local_i_offset = 0
-                    ci%alloc_local = 0
-                    call device_block_distribute(ci)
-                else
-                    call block_distribute(ci, comm_size, rank, bd_err)
-                    if (bd_err /= 0) then
-                        status = 5
-                        layout_ptr = c_loc(ci)
-                        return
-                    end if
-                end if
-#else
-                call block_distribute(ci, comm_size, rank, bd_err)
-                if (bd_err /= 0) then
-                    status = 5
-                    layout_ptr = c_loc(ci)
-                    return
-                end if
-#endif
+            call reconcile_post_callbacks(prev_n_procs, restart_loop)
+            if (status /= 0) then
+                layout_ptr = c_loc(ci)
+                return
+            end if
+            if (restart_loop) then
                 iteration = iteration + 1
                 cycle negotiate_loop
             end if
@@ -1750,6 +1833,16 @@ contains
                         return
                     end if
                 end do
+
+                call reconcile_post_callbacks(prev_n_procs, restart_loop)
+                if (status /= 0) then
+                    layout_ptr = c_loc(ci)
+                    return
+                end if
+                if (restart_loop) then
+                    iteration = iteration + 1
+                    cycle negotiate_loop
+                end if
 
                 if (ci%n_processes == prev_n_procs .and. &
                     ci%local_i == prev_local_i .and. &
@@ -1816,6 +1909,118 @@ contains
         end if
 
         layout_ptr = c_loc(ci)
+    contains
+
+        subroutine redistribute_current_layout(error_code)
+            integer(int32), intent(out) :: error_code
+
+            error_code = 0
+#ifdef WAVEFRONT_BACKEND
+            if (backend_flag == 1) then
+                ! Zero host fields; device_block_distribute derives them
+                ! bottom-up from device partitioning.
+                ci%local_i = 0
+                ci%local_i_offset = 0
+                ci%alloc_local = 0
+                call device_block_distribute(ci)
+                return
+            end if
+#endif
+            call block_distribute(ci, comm_size, rank, error_code)
+            if (error_code /= 0) return
+            ci%device_n_processes = 0
+            ci%device_local_i = 0
+            ci%device_local_i_offset = 0
+            ci%device_alloc_local = 0
+        end subroutine redistribute_current_layout
+
+        subroutine reconcile_post_callbacks(prev_process_count, restart)
+            integer(int64), intent(in) :: prev_process_count
+            logical, intent(out) :: restart
+
+            restart = .false.
+
+            if (host_membership_changed()) then
+                call ci%filter_active_ranks(filter_err)
+                if (filter_err /= 0) then
+                    status = 7
+                    return
+                end if
+                if (ci%SUBCOMM == MPI_COMM_NULL) then
+                    status = -1
+                    return
+                end if
+                call MPI_Comm_size(ci%SUBCOMM, comm_size, ierr)
+                call MPI_Comm_rank(ci%SUBCOMM, rank, ierr)
+                ci%n_processes = int(comm_size, int64)
+                call redistribute_current_layout(bd_err)
+                if (bd_err /= 0) then
+                    status = 5
+                    return
+                end if
+                restart = .true.
+                return
+            end if
+
+            if (ci%n_processes < prev_process_count) then
+                call ci%shrink(ci%n_processes, shrink_err)
+                if (shrink_err /= 0) then
+                    status = 4
+                    return
+                end if
+                if (ci%SUBCOMM == MPI_COMM_NULL) then
+                    status = -1
+                    return
+                end if
+                call MPI_Comm_size(ci%SUBCOMM, comm_size, ierr)
+                call MPI_Comm_rank(ci%SUBCOMM, rank, ierr)
+                ci%n_processes = int(comm_size, int64)
+                call redistribute_current_layout(bd_err)
+                if (bd_err /= 0) then
+                    status = 5
+                    return
+                end if
+                restart = .true.
+                return
+            end if
+
+#ifdef WAVEFRONT_BACKEND
+            if (backend_flag == 1 .and. device_membership_changed()) then
+                call ci%rebuild_communicators(rebuild_err)
+                if (rebuild_err /= 0) then
+                    status = 6
+                    return
+                end if
+                restart = .true.
+            end if
+#endif
+        end subroutine reconcile_post_callbacks
+
+        logical function host_membership_changed()
+            host_membership_changed = .false.
+
+            local_filter_int = 0
+            if (ci%local_i == 0_int64) then
+                local_filter_int = 1
+            end if
+            call MPI_Allreduce(local_filter_int, global_filter_int, &
+                               1, MPI_INTEGER, MPI_MAX, ci%SUBCOMM, ierr)
+            host_membership_changed = (global_filter_int /= 0)
+        end function host_membership_changed
+
+#ifdef WAVEFRONT_BACKEND
+        logical function device_membership_changed()
+            device_membership_changed = .false.
+
+            local_rebuild_int = 0
+            if ((ci%device_local_i > 0_int64) .neqv. (ci%DEVCOMM /= MPI_COMM_NULL)) then
+                local_rebuild_int = 1
+            end if
+            call MPI_Allreduce(local_rebuild_int, global_rebuild_int, &
+                               1, MPI_INTEGER, MPI_MAX, ci%SUBCOMM, ierr)
+            device_membership_changed = (global_rebuild_int /= 0)
+        end function device_membership_changed
+#endif
     end subroutine negotiate
 
     ! ====================================================================
@@ -1846,6 +2051,49 @@ contains
     end subroutine block_distribute
 
 #ifdef WAVEFRONT_BACKEND
+    subroutine sync_layout_from_device_partition(ci, device_local_i, device_local_i_offset)
+        !! Derive host-level fields bottom-up from a device partition and
+        !! update the layout in-place. Intended for negotiate-time use.
+        type(quop_mpi_layout_t), intent(inout) :: ci
+        integer(int64), intent(in) :: device_local_i, device_local_i_offset
+
+        integer(int32) :: ierr, has_data, node_ranks_with_data
+        integer(int64) :: DEVCOMM_NODE_total_local_i, DEVCOMM_NODE_rank_0_offset
+        integer(int64) :: NODECOMM_local_i, NODECOMM_local_i_offset
+
+        call DEVCOMM_NODE_layout_from_DEVCOMM(device_local_i, device_local_i_offset, &
+                                              ci%DEVCOMM_NODE, &
+                                              ci%DEVCOMM, &
+                                              DEVCOMM_NODE_total_local_i, &
+                                              DEVCOMM_NODE_rank_0_offset)
+
+        call NODECOMM_layout_from_DEVCOMM_NODE(DEVCOMM_NODE_total_local_i, &
+                                               DEVCOMM_NODE_rank_0_offset, &
+                                               ci%DEVCOMM_NODE, &
+                                               ci%NODECOMM, &
+                                               NODECOMM_local_i, &
+                                               NODECOMM_local_i_offset, &
+                                               ci%SUBCOMM, &
+                                               ci%topology%node_id, &
+                                               ci%topology%n_nodes, &
+                                               active_device_local_i=device_local_i, &
+                                               cpu_numa_node=ci%topology%cpu_numa_node)
+
+        ci%device_local_i = device_local_i
+        ci%device_local_i_offset = device_local_i_offset
+        ci%local_i = NODECOMM_local_i
+        ci%local_i_offset = DEVCOMM_NODE_rank_0_offset + NODECOMM_local_i_offset
+
+        if (device_local_i > 0_int64) then
+            has_data = 1
+        else
+            has_data = 0
+        end if
+        call MPI_Allreduce(has_data, node_ranks_with_data, 1, MPI_INTEGER, &
+                           MPI_SUM, ci%NODECOMM, ierr)
+        ci%device_n_processes = int(node_ranks_with_data, int64)
+    end subroutine sync_layout_from_device_partition
+
     subroutine device_block_distribute(ci)
         !! Block-distribute system_size over DEVCOMM ranks, then derive
         !! host-level fields bottom-up via DEVCOMM_NODE and NODECOMM.
@@ -1853,11 +2101,8 @@ contains
         type(quop_mpi_layout_t), intent(inout) :: ci
 
         integer(int32) :: ierr, devcomm_size, devcomm_rank
-        integer(int32) :: has_data, node_ranks_with_data
         integer(int64) :: base_size, remainder
         integer(int64) :: dev_li, dev_li_off
-        integer(int64) :: DEVCOMM_NODE_total_local_i, DEVCOMM_NODE_rank_0_offset
-        integer(int64) :: NODECOMM_local_i, NODECOMM_local_i_offset
 
         ! Block-distribute over DEVCOMM
         dev_li = 0
@@ -1878,37 +2123,10 @@ contains
         end if
 
         ! Set device fields
-        ci%device_local_i = dev_li
-        ci%device_local_i_offset = dev_li_off
         ci%device_alloc_local = dev_li
 
-        ! Derive host-level fields bottom-up
-        call DEVCOMM_NODE_layout_from_DEVCOMM(dev_li, dev_li_off, &
-                                              ci%DEVCOMM_NODE, &
-                                              ci%DEVCOMM, &
-                                              DEVCOMM_NODE_total_local_i, &
-                                              DEVCOMM_NODE_rank_0_offset)
-
-        call NODECOMM_layout_from_DEVCOMM_NODE(DEVCOMM_NODE_total_local_i, &
-                                               DEVCOMM_NODE_rank_0_offset, &
-                                               ci%DEVCOMM_NODE, &
-                                               ci%NODECOMM, &
-                                               NODECOMM_local_i, &
-                                               NODECOMM_local_i_offset)
-
-        ci%local_i = NODECOMM_local_i
-        ci%local_i_offset = DEVCOMM_NODE_rank_0_offset + NODECOMM_local_i_offset
+        call sync_layout_from_device_partition(ci, dev_li, dev_li_off)
         ci%alloc_local = ci%local_i
-
-        ! Count how many ranks on this node have non-zero data
-        if (dev_li > 0) then
-            has_data = 1
-        else
-            has_data = 0
-        end if
-        call MPI_Allreduce(has_data, node_ranks_with_data, 1, MPI_INTEGER, &
-                           MPI_SUM, ci%NODECOMM, ierr)
-        ci%device_n_processes = int(node_ranks_with_data, int64)
 
     end subroutine device_block_distribute
 #endif

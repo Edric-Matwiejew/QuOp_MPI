@@ -103,7 +103,9 @@ program test_array_transfer
     end if
 
     call NODECOMM_layout_from_DEVCOMM_NODE(devcomm_node_local_i, devcomm_node_rank_0_offset, &
-                                           DEVCOMM_NODE, NODECOMM, my_local_i, my_local_i_offset)
+                                           DEVCOMM_NODE, NODECOMM, my_local_i, my_local_i_offset, &
+                                           active_device_local_i=my_device_local_i, &
+                                           cpu_numa_node=topology%cpu_numa_node)
 
     call layout%set_partitioning(my_local_i, my_local_i_offset, &
                                  my_device_local_i, my_device_local_i_offset, setter_err)

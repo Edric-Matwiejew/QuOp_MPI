@@ -178,6 +178,54 @@ program test_comm_info
     end if
 
     ! ================================================================
+    ! T1.8b: filter_active_ranks (n >= 2 only, skip on 1 proc)
+    ! ================================================================
+    if (nprocs >= 2) then
+        block
+            type(quop_mpi_layout_t), pointer :: ci_filter
+            integer(int32) :: filter_rank
+            integer(int32) :: dup_comm
+
+            allocate (ci_filter)
+            call ci_filter%set_MPI_COMM(MPI_COMM_WORLD, setter_err)
+            call MPI_Comm_dup(MPI_COMM_WORLD, dup_comm, ierr_int)
+            call ci_filter%set_SUBCOMM(dup_comm, setter_err)
+            call MPI_Comm_size(ci_filter%get_SUBCOMM(), subcomm_size, ierr_int)
+            call ci_filter%set_n_processes(int(subcomm_size, int64), setter_err)
+            call ci_filter%set_system_size(system_size, setter_err)
+
+            if (rank == 0) then
+                call ci_filter%set_partitioning(system_size, 0_int64, error_code=setter_err)
+            else
+                call ci_filter%set_partitioning(0_int64, system_size, error_code=setter_err)
+            end if
+
+            call ci_filter%filter_active_ranks(setter_err)
+            call MPI_Comm_rank(MPI_COMM_WORLD, filter_rank, ierr_int)
+
+            if (filter_rank == 0) then
+                if (ci_filter%get_SUBCOMM() /= MPI_COMM_NULL .and. &
+                    ci_filter%get_local_i() == system_size) then
+                    passed = passed + 1
+                else
+                    failed = failed + 1
+                    write (*, '(A)') "FAIL T1.8c: active rank not preserved correctly after filter_active_ranks"
+                end if
+            else
+                if (ci_filter%get_SUBCOMM() == MPI_COMM_NULL) then
+                    passed = passed + 1
+                else
+                    failed = failed + 1
+                    write (*, '(A,I0,A)') "FAIL T1.8d: rank ", filter_rank, " not excluded by filter_active_ranks"
+                end if
+            end if
+
+            call ci_filter%destroy()
+            deallocate (ci_filter)
+        end block
+    end if
+
+    ! ================================================================
     ! T1.9: validate on a good partition -> no abort
     ! ================================================================
     ! Restore correct partitioning (undone by T1.6 round-trip test)

@@ -240,7 +240,9 @@ contains
         ! Step 3: Use production function to compute NODECOMM layout
         ! This distributes the node's data across all NODECOMM ranks for I/O
         call NODECOMM_layout_from_DEVCOMM_NODE(DEVCOMM_NODE_total_i, DEVCOMM_NODE_rank_0_offset, &
-                                               DEVCOMM_NODE, NODECOMM, NODECOMM_local_i, NODECOMM_local_i_offset)
+                                               DEVCOMM_NODE, NODECOMM, NODECOMM_local_i, NODECOMM_local_i_offset, &
+                                               active_device_local_i=DEVCOMM_local_i, &
+                                               cpu_numa_node=topology%cpu_numa_node)
 
         ! Step 4: Build distribution arrays via MPI_Allgather (production pattern)
         ! This replaces the old counts_and_displs() call. Each rank contributes

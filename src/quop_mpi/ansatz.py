@@ -894,7 +894,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self._layout = None
 
         if status == -1:
-            # Rank excluded during negotiate (communicator shrunk)
+            # Rank excluded during negotiate (communicator shrunk/filtered)
             # Still keep the Fortran layout handle so collectives like
             # dump_comm_info can run without deadlock and so we can free it.
             self._layout.set_layout_ptr(layout_ptr)
@@ -909,6 +909,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 raise RuntimeError("Fortran negotiate failed to converge")
             if status == 4:
                 raise RuntimeError("Fortran negotiate failed while finalizing communicator shrink")
+            if status == 6:
+                raise RuntimeError("Fortran negotiate failed while rebuilding device communicators")
+            if status == 7:
+                raise RuntimeError("Fortran negotiate failed while filtering zero-host-data ranks")
             if status == 5:
                 raise RuntimeError(
                     "Fortran negotiate failed while computing initial block distribution"
