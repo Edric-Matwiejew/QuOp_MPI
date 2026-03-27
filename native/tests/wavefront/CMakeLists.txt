@@ -184,7 +184,6 @@ target_include_directories(test_gpu_transfer PRIVATE
 target_link_libraries(test_gpu_transfer PRIVATE
     wavefront_test_lib
     comm_info_mod
-    MPI::MPI_CXX
 )
 
 # Standard tests with default settings
@@ -333,7 +332,6 @@ if(HIP_PLATFORM STREQUAL nvidia)
         ${CUDA_PATH}/lib64/libcudart.so
         hipfort::hipfort
         MPI::MPI_Fortran
-        MPI::MPI_CXX
         ${NUMA_LIBRARY}
     )
 else()
@@ -341,7 +339,6 @@ else()
         ${ROCM_PATH}/lib/libamdhip64.so
         hipfort::hipfort
         MPI::MPI_Fortran
-        MPI::MPI_CXX
         ${NUMA_LIBRARY}
     )
 endif()
