@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable
 
 import numpy as np
+from mpi4py import MPI
 
 from ._scope import scope
 from ._utils._filenames import ensure_path_and_extension
@@ -27,19 +29,19 @@ class Benchmark:
 
     # Type hints for attributes provided by Ansatz
     if TYPE_CHECKING:
-        MPI_COMM_WORLD: object
+        MPI_COMM_WORLD: MPI.Intracomm
         subcomms: QuopMpiLayout | None
-        variational_parameters: np.ndarray
+        variational_parameters: np.ndarray | None
         ansatz_depth: int
         total_params: int
         seed: int
         benchmarking: bool
         repeat: int
-        result: dict
-        quop_result: dict
-        tracker: JobTracker
+        result: dict[str, Any] | None
+        quop_result: dict[str, Any]
+        tracker: JobTracker | None
         _has_param_map: bool
-        _n_free_params: int
+        _n_free_params: int | None
 
         def destroy(self) -> None: ...
         def setup(self) -> None: ...
@@ -51,7 +53,7 @@ class Benchmark:
         def _Ansatz__pre(self) -> None: ...  # noqa: N802
         def _Ansatz__gen_initial_params(self, depth: int = None) -> np.ndarray: ...  # noqa: N802
 
-    def _init_benchmark(self):
+    def _init_benchmark(self) -> None:
         """Initialize benchmark-related instance variables.
 
         Called by :meth:`Ansatz.__init__`.
@@ -65,15 +67,15 @@ class Benchmark:
         self,
         ansatz_depths: Iterable[int],
         repeats: int,
-        initial_parameters: list[float] | np.ndarray[float] = None,
+        initial_parameters: list[float] | np.ndarray[float] | None = None,
         param_persist: bool = False,
         verbose: bool = True,
-        filename: str = None,
+        filename: str | None = None,
         label: str = "test",
         save_action: str = "a",
-        time_limit: int = None,
-        suspend_path: str = None,
-    ):
+        time_limit: float | None = None,
+        suspend_path: str | None = None,
+    ) -> None:
         """A method by which to study how a QVA performs as the number
         of ansatz iterations<ansatz depth> increases.
 

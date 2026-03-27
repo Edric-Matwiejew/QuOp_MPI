@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from copy import copy
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from mpi4py import MPI
@@ -13,7 +14,13 @@ from ._scope import scope
 from ._utils._interface import Interface
 
 if TYPE_CHECKING:
-    pass
+    from ._lib.context import Context
+    from ._utils._comm_size import QuopMpiLayout
+
+    from quop_mpi import UnitaryBase
+
+
+ParsedFunctionDict = dict[str, list[Any] | dict[str, Any]]
 
 
 class Sampling:
@@ -26,34 +33,37 @@ class Sampling:
 
     # Type hints for attributes provided by Ansatz
     if TYPE_CHECKING:
-        subcomms: object
-        observables: np.ndarray
+        subcomms: QuopMpiLayout | None
+        local_observables: np.ndarray
+        local_probabilities: np.ndarray
         local_i: int
         local_i_offset: int
-        context: object
-        variational_parameters: np.ndarray
-        quop_result: dict
-        pre_execution_methods: list
-        post_execution_methods: list
-        unitaries: list
+        context: Context | None
+        variational_parameters: np.ndarray | None
+        quop_result: dict[str, Any]
+        pre_execution_methods: list[Callable[[], None]]
+        post_execution_methods: list[Callable[[], None]]
+        unitaries: list[UnitaryBase] | None
         MPI_COMM_WORLD: MPI.Intracomm
+
+        def __parse_function_dict__(self, function_dict: dict[str, Any] | None, attribute_name: str) -> None: ...
 
     def _init_sampling(self):
         """Initialize sampling-related instance variables.
 
         Called by :meth:`Ansatz.__init__`.
         """
-        self.sampling_dict: dict = {}
-        self.sample_indexes: list = []
-        self.sample_minimum_indexes: list = []
-        self.variational_parameter_history: list = []
+        self.sampling_dict: ParsedFunctionDict = {"args": [], "kwargs": {}}
+        self.sample_indexes: list[np.ndarray[np.int32] | None] = []
+        self.sample_minimum_indexes: list[int] = []
+        self.variational_parameter_history: list[np.ndarray | None] = []
 
         # sampling variables
-        self.samples: list | None = None
+        self.samples: list[np.ndarray[np.float64] | None] | None = None
         self.sample_block_size: int | None = None
         self.max_sample_iterations: int | None = None
-        self.sampling_function: Callable | None = None
-        self.sampling_function_input: Callable | None = None
+        self.sampling_function: Interface | None = None
+        self.sampling_function_input: Callable[..., Any] | None = None
         self.sampling: bool = False
         self.global_minimum: float | None = None
         self.minimum_sampled: float = np.inf
@@ -65,10 +75,10 @@ class Sampling:
     def set_sampling(
         self,
         sample_block_size: int,
-        function: Callable = None,
+        function: Callable[..., Any] | None = None,
         max_sample_iterations: int = 100,
-        sampling_dict: dict = None,
-    ):
+        sampling_dict: dict[str, Any] | None = None,
+    ) -> None:
         """Compute the :term:`objective function` using simulated sampling.
 
         Samples are taken in blocks of `sample_block_size`. These are passed as
@@ -113,7 +123,7 @@ class Sampling:
         self.setup_sampling = True
 
     @scope("world")
-    def unset_sampling(self):
+    def unset_sampling(self) -> None:
         """Revert to simulation using exact computation of the
         :term:`objective function`.
         """
@@ -123,7 +133,7 @@ class Sampling:
         self.post_execution_methods.remove(self._post_sampling)
 
     @scope("world")
-    def _pre_sampling(self):
+    def _pre_sampling(self) -> None:
         """Preparation for simulated sampling."""
 
         self.minimum_sampled = np.inf
@@ -135,7 +145,7 @@ class Sampling:
             print("Executing with simulated sampling.")
 
     @scope("world")
-    def _post_sampling(self):
+    def _post_sampling(self) -> None:
         """Post simulation steps for simulated sampling."""
 
         if self.MPI_COMM_WORLD.Get_rank() == 0:
@@ -146,7 +156,7 @@ class Sampling:
             self.quop_result["observables global minimum"] = self.global_minimum
 
     @scope("subcomm")
-    def _gen_sampling(self):
+    def _gen_sampling(self) -> None:
         """Setup for simulated sampling."""
 
         self.sampling = True
@@ -158,7 +168,7 @@ class Sampling:
         )
 
     @scope("subcomm")
-    def _parse_sampling_function(self):
+    def _parse_sampling_function(self) -> None:
         """Bind the arguments of a QuOp Sampling Function to the attributes of
         and :class:`~quop_mpi.ansatz` instance.
         """

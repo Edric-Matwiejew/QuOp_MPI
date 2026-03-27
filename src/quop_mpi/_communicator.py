@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
 from mpi4py import MPI
 
 from . import config
@@ -27,8 +28,9 @@ class Communicator:
     # Type hints for attributes provided by Ansatz
     if TYPE_CHECKING:
         MPI_COMM_WORLD: MPI.Intracomm
+        _layout: QuopMpiLayout | None
 
-    def _init_communicator(self):
+    def _init_communicator(self) -> None:
         """Initialize communicator-related instance variables.
 
         Called by :meth:`Ansatz.__init__`.
@@ -42,12 +44,12 @@ class Communicator:
     # -- Read-only properties backed by QuopMpiLayout ----------------
 
     @property
-    def subcomms(self):
+    def subcomms(self) -> QuopMpiLayout | None:
         """Alias for ``_layout`` (backward compatibility)."""
         return self._layout
 
     @property
-    def local_i(self):
+    def local_i(self) -> int:
         """Number of elements in this rank's partition."""
         layout = self._layout
         if layout is None:
@@ -55,11 +57,11 @@ class Communicator:
         return layout.local_i
 
     @local_i.setter
-    def local_i(self, _val):
+    def local_i(self, _val: int) -> None:
         raise AttributeError("local_i is read-only on Ansatz; value comes from QuopMpiLayout")
 
     @property
-    def local_i_offset(self):
+    def local_i_offset(self) -> int:
         """Global index offset for this rank's partition."""
         layout = self._layout
         if layout is None:
@@ -67,13 +69,13 @@ class Communicator:
         return layout.local_i_offset
 
     @local_i_offset.setter
-    def local_i_offset(self, _val):
+    def local_i_offset(self, _val: int) -> None:
         raise AttributeError(
             "local_i_offset is read-only on Ansatz; " "value comes from QuopMpiLayout"
         )
 
     @property
-    def alloc_local(self):
+    def alloc_local(self) -> int:
         """Size of the local allocation (may exceed ``local_i`` for padding)."""
         layout = self._layout
         if layout is None:
@@ -81,13 +83,13 @@ class Communicator:
         return layout.alloc_local
 
     @alloc_local.setter
-    def alloc_local(self, _val):
+    def alloc_local(self, _val: int) -> None:
         raise AttributeError(
             "alloc_local is read-only on Ansatz; " "value comes from QuopMpiLayout"
         )
 
     @property
-    def partition_table(self):
+    def partition_table(self) -> np.ndarray | None:
         """1-D integer array describing the global partitioning scheme."""
         layout = self._layout
         if layout is None:
@@ -95,13 +97,13 @@ class Communicator:
         return layout.partition_table
 
     @partition_table.setter
-    def partition_table(self, _val):
+    def partition_table(self, _val: np.ndarray | None) -> None:
         raise AttributeError(
             "partition_table is read-only on Ansatz; " "value comes from QuopMpiLayout"
         )
 
     @property
-    def MPI_COMM(self):  # noqa: N802
+    def MPI_COMM(self) -> MPI.Intracomm:  # noqa: N802
         """MPI subcommunicator for the active worker group."""
         layout = self._layout
         if layout is not None:
@@ -111,7 +113,7 @@ class Communicator:
         return self.MPI_COMM_WORLD
 
     @MPI_COMM.setter
-    def MPI_COMM(self, _val):  # noqa: N802
+    def MPI_COMM(self, _val: MPI.Intracomm) -> None:  # noqa: N802
         raise AttributeError(
             "MPI_COMM is read-only on Ansatz; " "value comes from QuopMpiLayout.SUBCOMM"
         )
@@ -119,7 +121,7 @@ class Communicator:
     # -- Lifecycle ---------------------------------------------------
 
     @scope("world")
-    def _gen_parallel(self):
+    def _gen_parallel(self) -> None:
         """Creates MPI subcommunicators via Fortran split_workers.
 
         Uses topology-aware splitting from Fortran:
@@ -155,7 +157,7 @@ class Communicator:
         )
 
     @scope("world")
-    def _post_parallel(self):
+    def _post_parallel(self) -> None:
         """Free subcommunicators associated with the :class:`~quop_mpi.ansatz` instance.
 
         Called on simulation completion or when destroying the Ansatz instance.

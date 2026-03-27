@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from mpi4py import MPI
@@ -14,6 +15,9 @@ from .finite_differences import central, forward_differences
 
 if TYPE_CHECKING:
     from .._utils._comm_size import QuopMpiLayout
+
+
+JacobianMethod = str | Callable[..., Any]
 
 
 class Jacobian:
@@ -32,36 +36,35 @@ class Jacobian:
         MPI_COMM_WORLD: MPI.Intracomm
         MPI_COMM: MPI.Intracomm
         subcomms: QuopMpiLayout | None
-        variational_parameters: np.ndarray
+        variational_parameters: np.ndarray | None
         n_free_params: int
         record_objective: bool
         n_evolutions: int
         stop: bool
-        optimiser_args: dict
-        reset: bool
+        optimiser_args: dict[str, Any] | None
         # From Communicator mixin
         n_jacobian_workers: int
 
-    def _init_jacobian(self):
+    def _init_jacobian(self) -> None:
         """Initialize jacobian-related instance variables.
 
         Called by :meth:`Ansatz.__init__`.
         """
-        self.jacobian_input: list | None = None
-        self.jacobian: object = None
-        self.jac_ranks: list | None = None
+        self.jacobian_input: list[JacobianMethod] | None = None
+        self.jacobian: Interface | None = None
+        self.jac_ranks: list[int] | None = None
         self.h: float = np.sqrt(np.finfo(float).eps)
         self.neval_mpi_jac: int = 0
-        self.var : int = -999  # Placeholder value to detect if it's not being set correctly
-        self.var_map: list | None = None
+        self.var: int = -999  # Placeholder value to detect if it's not being set correctly
+        self.var_map: list[list[int]] | None = None
 
     @scope("world")
     def set_parallel_jacobian(
         self,
         n_workers: int,
-        method: str | Callable = "forward",
-        h: float = None,
-    ):
+        method: JacobianMethod = "forward",
+        h: float | None = None,
+    ) -> None:
         """Specify :term:`optimisation<optimiser>` of the :term:`variational
         parameters` using parallel computation of the jacobian.
 
@@ -99,7 +102,7 @@ class Jacobian:
         self.n_jacobian_workers = n_workers
 
     @scope("world")
-    def _update_var_map(self):
+    def _update_var_map(self) -> None:
         """Queries :literal:`Unitary` instances passed to the
         :class:`~quop_mpi.ansatz` instance via the
         :meth:`~quop_mpi.ansatz.set_unitaries` methods to determine the
@@ -115,14 +118,14 @@ class Jacobian:
             self.var_map = None
 
     @scope("subcomm")
-    def _parse_jacobian(self):
+    def _parse_jacobian(self) -> None:
         """Bind a QuOp Jacobian Function to the attributes of an instantiated
         :class:`~quop_mpi.ansatz` instance.
         """
         self.jacobian = Interface([self], self.jacobian_input[0], "jacobian", self.subcomms.SUBCOMM)
 
     @scope("subcomm")
-    def _configure_parallel_jacobian(self):
+    def _configure_parallel_jacobian(self) -> bool:
         """Configure parallel jacobian in __gen_optimiser if requested.
 
         Called from __gen_optimiser in Ansatz.
@@ -136,6 +139,8 @@ class Jacobian:
 
             self._parse_jacobian()
 
+            if self.optimiser_args is None:
+                raise RuntimeError("optimiser_args must be configured before enabling jacobian.")
             self.optimiser_args["jac"] = self._mpi_jacobian
             return True
         elif self.jacobian_input is not None:
@@ -153,18 +158,19 @@ class Jacobian:
         return False
 
     @scope("jaccomm")
-    def _mpi_jacobian(self, x: np.ndarray[float]) -> float | None:
+    def _mpi_jacobian(self, x: np.ndarray[float] | None) -> np.ndarray[np.float64] | None:
         """Compute the objective function gradient with parallel
         instances of the :class:`~quop_mpi.ansatz` class.
 
         Parameters
         ----------
-        x : ndarray[float]
-            1-D real array of free variational parameters
+        x : ndarray[float] or None
+            1-D real array of free variational parameters. Non-root workers may
+            pass ``None`` before the broadcast supplies the root value.
 
         Returns
         -------
-        float or None
+        ndarray[float64] or None
             returns the objective function gradient to rank 0 in
             :attr:`~quop_mpi.ansatz.MPI_COMM_WORLD`, None otherwise
         """
@@ -179,9 +185,14 @@ class Jacobian:
             self.subcomms.JACCOMM.barrier()
             return
 
-        self.variational_parameters = self.subcomms.JACCOMM.bcast(self.variational_parameters, 0)
+        broadcast_parameters = self.subcomms.JACCOMM.bcast(self.variational_parameters, 0)
+        self.variational_parameters = (
+            None
+            if broadcast_parameters is None
+            else np.asarray(broadcast_parameters, dtype=np.float64)
+        )
 
-        x = self.subcomms.JACCOMM.bcast(x, 0)
+        x = np.asarray(self.subcomms.JACCOMM.bcast(x, 0), dtype=np.float64)
 
         if self.subcomms.JACCOMM.Get_rank() != 0:
             # When a parameter map is set, x contains the free parameters.
@@ -194,7 +205,6 @@ class Jacobian:
         if self.subcomms.JACCOMM.Get_rank() != 0:
             for var in self.var_map[self.subcomms.get_subcomm_index()]:
                 self.var = var
-                print(self.var, flush = True)  # Debug print to check if var is being set correctly
                 self.jacobian.update_parameters()
                 # Pass the parameter index - jacobian.call computes partial derivative
                 partials.append(self.jacobian.call())

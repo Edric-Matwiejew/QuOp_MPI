@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Callable
 from copy import copy, deepcopy
 from enum import IntFlag, auto
 from importlib import import_module
 from time import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from mpi4py import MPI
@@ -30,11 +31,13 @@ from ._utils._mpi import gather_array
 
 if TYPE_CHECKING:
     from types import ModuleType, TracebackType
-    from typing import Callable
 
     from quop_mpi import UnitaryBase
 
     Intracomm = MPI.Intracomm
+
+
+ParsedFunctionDict = dict[str, list[Any] | dict[str, Any]]
 
 # -- Dirty-flag invalidation model ----------------------------------
 # Every mutable subsystem has a corresponding _Dirty bit.  Setters OR
@@ -160,13 +163,13 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             MPI communicator, by default ``MPI.COMM_WORLD``.
         """
 
-        self.system_size = system_size
-        self.MPI_COMM_WORLD = MPI_communicator
+        self.system_size: int = system_size
+        self.MPI_COMM_WORLD: Intracomm = MPI_communicator
 
         # -- Dirty-flag lifecycle state --------------------------
         # _dirty tracks what has changed since the last setup().
         # _setup_done is True after the first successful setup().
-        self._dirty = (
+        self._dirty: _Dirty = (
             _Dirty.NEGOTIATION
             | _Dirty.CONTEXT
             | _Dirty.PLANS
@@ -175,64 +178,66 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             | _Dirty.DEPTH
             | _Dirty.OPTIMISER
         )
-        self._setup_done = False
-        self.setup_called = False
+        self._setup_done: bool = False
+        self.setup_called: bool = False
 
         # variables that must be set by the 'pre' method of the child class
-        self.local_observables = None
-        self.observable_dict = None
-        self.observable_function = None
-        self.variational_parameters = None
-        self.initial_state_dict = None
-        self.objective_dict = None
+        self.local_observables: np.ndarray = np.empty(0, dtype=np.float64)
+        self.local_probabilities: np.ndarray = np.empty(0, dtype=np.float64)
+        self.observable_dict: ParsedFunctionDict | None = None
+        self.observable_function: Callable[..., Any] | int | None = None
+        self.variational_parameters: np.ndarray | None = None
+        self.initial_state_dict: ParsedFunctionDict | None = None
+        self.objective_dict: ParsedFunctionDict | None = None
 
-        self.objective_function = None
-        self._objective_function_raw = None
-        self._initial_state_function_raw = None
+        self.objective_function: Callable[..., Any] | Interface | None = None
+        self._objective_function_raw: Callable[..., Any] | None = None
+        self._initial_state_function_raw: Callable[..., Any] | None = None
 
         # can be set using methods in the system class
         # but default values are used if not set
-        self.ansatz_depth = 1  # ansatz circuit depth
-        self.total_params = None
-        self.initial_state_type = None
-        self.optimiser = None  # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
+        self.ansatz_depth: int = 1  # ansatz circuit depth
+        self.total_params: int | None = None
+        self.initial_state_type: object | None = None
+        self.optimiser: Callable[..., Any] | None = None
+        # optimiser: sp_minimize, sp_basin_hopping or nlopt_minimize
 
         # variables managed by the 'system' class
-        self.stop = False  # synchronise ranks during optimisation
+        self.stop: bool = False  # synchronise ranks during optimisation
 
-        self.expectation = None  # expectation value of the system
-        self.initial_state_input = None
-        self.ansatz_initial_state = None  # initial state before algorithm evolution
-        self.final_state = None  # quantum state during and after simulation
-        self.last_evaluated = np.empty(
-            0
+        self.expectation: float | None = None  # expectation value of the system
+        self.initial_state_input: object | None = None
+        self.ansatz_initial_state: np.ndarray | None = None
+        self.final_state: np.ndarray | None = None
+        self.last_evaluated: np.ndarray = np.empty(
+            0, dtype=np.float64
         )  # last set of variational parameters passed to 'evolve_state'.
-        self.state_norm = None
+        self.state_norm: float | None = None
 
-        self.verbose_objective = False
-        self.objective_cnt = 0
-        self.record_objective = False
-        self.objective_history = []
+        self.verbose_objective: bool = False
+        self.objective_cnt: int = 0
+        self.record_objective: bool = False
+        self.objective_history: list[float] = []
 
-        self.n_evolutions = 0
-        self.total_n_evolutions = []
+        self.n_evolutions: int = 0
+        self.total_n_evolutions: list[int] = []
 
-        self.time_limit = None
-        self.suspend_path = None
-        self.available_time = None
+        self.time_limit: float | None = None
+        self.suspend_path: str | None = None
+        self.available_time: float | None = None
 
-        self.result = None
+        self.result: dict[str, Any] | None = None
 
-        self.seed = 0
+        self.seed: int = 0
 
         # -- Attributes set later by setup / configuration methods --
         self.unitaries: list[UnitaryBase] | None = None
         self.param_map: np.ndarray | None = None
         self.backend: ModuleType | None = None
         self.context: Context | None = None
-        self.initial_state_function: Callable | Interface | None = None
+        self.initial_state_function: Callable[..., Any] | Interface | None = None
         self.n_variational_parameters: int | None = None
-        self.optimiser_args: dict | None = None
+        self.optimiser_args: dict[str, Any] | None = None
         self.optimiser_log: list[str] | None = None
         self.parsed_observable_function: Interface | None = None
         self.time: float | None = None
@@ -247,23 +252,19 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self._init_jacobian()
         # Initialize benchmark subsystem
         self._init_benchmark()
-        self.pre_execution_methods = []
-        self.post_execution_methods = []
-        self.quop_result = {}
+        self.pre_execution_methods: list[Callable[[], None]] = []
+        self.post_execution_methods: list[Callable[[], None]] = []
+        self.quop_result: dict[str, Any] = {}
 
-        self._has_param_map = False  # flag
-        self._param_map_raw = lambda x, *a, **k: x  # identity fallback
-        self._param_map_parsed = None  # interface-wrapped fn
-        self.param_map_dict = {"args": [], "kwargs": {}}
-        self._n_free_params = None  # set when param map is configured
+        self._has_param_map: bool = False  # flag
+        self._param_map_raw: Callable[..., Any] = lambda x, *a, **k: x
+        self._param_map_parsed: Interface | None = None
+        self.param_map_dict: ParsedFunctionDict = {"args": [], "kwargs": {}}
+        self._n_free_params: int | None = None  # set when param map is configured
         self.free_vec: np.ndarray | None = None  # bound by Interface for param map
 
         # -- Scope-nesting validation stack ----------------------
         self._scope_stack: list[tuple[int, str]] = []
-
-        # Attributes that can be bound by user-defined QuOp Functions (not exhaustive).
-        self.local_observables : np.ndarray = np.empty(0)  # set in __gen_observables
-        self.local_probabilities : np.ndarray = np.empty(0)  # set in evolve_state
 
     # -- Layout property (canonical partitioning source of truth) ----
 
@@ -386,7 +387,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             )
         return full_vec
 
-    def __parse_function_dict__(self, function_dict: dict | None, attribute_name: str) -> None:
+    def __parse_function_dict__(
+        self, function_dict: dict[str, Any] | None, attribute_name: str
+    ) -> None:
         """Takes a user specified :literal:`FunctionDict` and sets :literal:`attribute_name`
         to a :literal:`ParsedFunctionDict` containing the values associated with the
         "args" and "kwargs" keys of the input :literal:`FunctionDict`. If either of these
@@ -405,7 +408,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         """
 
         function_dict = {} if function_dict is None else function_dict
-        parsed_dict = {"args": [], "kwargs": {}}
+        parsed_dict: ParsedFunctionDict = {"args": [], "kwargs": {}}
 
         for key in function_dict:
             if function_dict[key] is not None:
@@ -536,7 +539,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         for i, unitary in enumerate(self.unitaries):
             self.param_map[i + 1] = unitary.n_params
 
-        self.total_params = np.sum(self.param_map)
+        self.total_params = int(np.sum(self.param_map))
         self.param_map = np.cumsum(self.param_map)
 
         self._dirty |= _Dirty.NEGOTIATION | _Dirty.CONTEXT | _Dirty.PLANS
@@ -683,7 +686,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     # Bindable attributes for QuOp Functions - used for documentation and validation.
     # Subclasses can extend this by defining their own BINDABLE_ATTRIBUTES dict.
-    BINDABLE_ATTRIBUTES = {
+    BINDABLE_ATTRIBUTES: dict[str, str] = {
         # Core partitioning
         "system_size": "Total number of quantum basis states",
         "local_i": "Number of elements in this rank's partition",
@@ -959,6 +962,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         """
         if self._has_param_map and self._n_free_params is not None:
             return self._n_free_params
+        if self.n_variational_parameters is None:
+            raise RuntimeError("n_variational_parameters is not available before setup.")
         return self.n_variational_parameters
 
     # __update_var_map is inherited from Jacobian mixin
@@ -1004,8 +1009,11 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.__parse_initial_state_function()
         self.initial_state_function.update_parameters()
 
-        self.ansatz_initial_state = self.initial_state_function.call(
-            *self.initial_state_dict["args"], **self.initial_state_dict["kwargs"]
+        self.ansatz_initial_state = np.asarray(
+            self.initial_state_function.call(
+                *self.initial_state_dict["args"], **self.initial_state_dict["kwargs"]
+            ),
+            dtype=np.complex128,
         )
 
     @scope("subcomm")
@@ -1025,8 +1033,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             )
             self.parsed_observable_function.update_parameters()
 
-            self.local_observables = self.parsed_observable_function.call(
-                *self.observable_dict["args"], **self.observable_dict["kwargs"]
+            self.local_observables = np.asarray(
+                self.parsed_observable_function.call(
+                    *self.observable_dict["args"], **self.observable_dict["kwargs"]
+                )
             )
 
             if self.local_observables.shape[0] != self.local_i:
@@ -1037,7 +1047,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             unitary = self.unitaries[self.observable_function]
 
             if unitary.unitary_type == "diagonal":
-                self.local_observables = unitary.operator
+                self.local_observables = np.asarray(unitary.operator)
             else:
                 raise RuntimeError(
                     f"Rank {self.subcomms.SUBCOMM.Get_rank()}:"
@@ -1347,7 +1357,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                     unitary.gen_operator()
 
                     if isinstance(self.observable_function, int) and i == self.observable_function:
-                        self.local_observables = unitary.operator
+                        self.local_observables = np.asarray(unitary.operator)
 
                 else:
                     evolution_parameter = param_slice
@@ -1356,6 +1366,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.SUBCOMM.Get_rank() == 0:
             self.n_evolutions += 1
+        self.final_state = self.context.state
         self.last_evaluated = copy(x)
 
     @scope("subcomm", returns="all")
@@ -1418,8 +1429,13 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
             # Broadcast parameters over SUBCOMM only (excluded ranks skip)
             if self.subcomms.in_subcomm():
-                self.variational_parameters = self.subcomms.SUBCOMM.bcast(
+                broadcast_parameters = self.subcomms.SUBCOMM.bcast(
                     variational_parameters, root=0
+                )
+                self.variational_parameters = (
+                    None
+                    if broadcast_parameters is None
+                    else np.asarray(broadcast_parameters, dtype=np.float64)
                 )
             else:
                 self.variational_parameters = None
@@ -1711,9 +1727,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if not self.stop:
 
-            self.variational_parameters = self.subcomms.SUBCOMM.bcast(
+            broadcast_parameters = self.subcomms.SUBCOMM.bcast(
                 variational_parameters, root=0
             )
+            self.variational_parameters = np.asarray(broadcast_parameters, dtype=np.float64)
 
             self.__evolve_state(self.variational_parameters)
 

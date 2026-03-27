@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import csv
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TextIO
 
 import numpy as np
 from mpi4py import MPI
@@ -14,7 +14,8 @@ from ._scope import scope
 from ._utils._filenames import ensure_path_and_extension
 
 if TYPE_CHECKING:
-    pass
+    from ._lib.context import Context
+    from ._utils._comm_size import QuopMpiLayout
 
 
 class Logging:
@@ -26,26 +27,28 @@ class Logging:
 
     # Type hints for attributes provided by Ansatz
     if TYPE_CHECKING:
-        subcomms: object
+        subcomms: QuopMpiLayout | None
         MPI_COMM_WORLD: MPI.Intracomm
         system_size: int
         ansatz_depth: int
         local_i: int
         local_i_offset: int
-        context: object
-        observables: np.ndarray
-        ansatz_initial_state: np.ndarray
-        variational_parameters: np.ndarray
-        result: dict
-        quop_result: dict
-        optimiser_log: list
+        context: Context | None
+        local_observables: np.ndarray
+        ansatz_initial_state: np.ndarray | None
+        variational_parameters: np.ndarray | None
+        result: dict[str, Any] | None
+        quop_result: dict[str, Any]
+        optimiser_log: list[str] | None
         sampling: bool
         total_shots: int
         minimum_sampled: float
         shots_to_global_minimum: int | str
-        state_norm: float
-        time: float
+        state_norm: float | None
+        time: float | None
         neval_mpi_jac: int
+
+        def get_state_norm(self) -> float | None: ...
 
     def _init_logging(self):
         """Initialize logging-related instance variables.
@@ -56,14 +59,14 @@ class Logging:
         self.filename: str | None = None
         self.label: str | None = None
         self.log_action: str = "a"
-        self.logfile = None
-        self.logfile_csv = None
+        self.logfile: TextIO | None = None
+        self.logfile_csv: Any | None = None
         self.n_log_fields: int = 6
         self.repeat: int = 1
         self.config_name: str | None = None
 
     @scope("world")
-    def set_log(self, filename: str, label: str, action: str = "a"):
+    def set_log(self, filename: str, label: str, action: str = "a") -> None:
         """Creates a CSV in which to save simulation results after a call to
         :meth:`~quop_mpi.ansatz.execute`.
 
@@ -86,7 +89,7 @@ class Logging:
         self.setup_log = True
 
     @scope("world")
-    def _gen_log(self):
+    def _gen_log(self) -> None:
         """Create or open a log file."""
 
         self.n_log_fields = 6
@@ -103,7 +106,7 @@ class Logging:
         self.log = True
 
     @scope("world")
-    def _create_new_logfile(self):
+    def _create_new_logfile(self) -> None:
         """Create a new log file, called by rank 0 at :attr:`~quop_mpi.ansatz.MPI_COMM_WORLD`
         only."""
 
@@ -129,7 +132,7 @@ class Logging:
         self.logfile_csv.writerow(headings)
 
     @scope("world")
-    def _log_update(self):
+    def _log_update(self) -> None:
         """Write simulation information to an active log file."""
 
         state_norm = self.get_state_norm()
@@ -164,14 +167,14 @@ class Logging:
         self.logfile.flush()
 
     @scope("world")
-    def _post_log(self):
+    def _post_log(self) -> None:
         """Close the results log file on simulation completion."""
 
         if self.MPI_COMM_WORLD.Get_rank() == 0 and self.log:
             self.logfile.close()
 
     @scope("subcomm", returns="none")
-    def save(self, file_name: str, config_name: str, action: str = "a"):
+    def save(self, file_name: str, config_name: str, action: str = "a") -> None:
         """Write the :term:`final state`, :term:`observables` and results
         summary to a HDf5 file.
 

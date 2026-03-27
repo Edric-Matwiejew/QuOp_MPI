@@ -6,6 +6,8 @@ binding between QuOp Functions and class attributes.
 
 from __future__ import annotations
 
+from typing import Any
+
 
 class Bindable:
     """Base class providing bindable attribute discovery for QuOp Functions.
@@ -63,7 +65,7 @@ class Bindable:
                 result.update(attrs)
         return result
 
-    def get_bindable_attributes(self) -> dict[str, tuple]:
+    def get_bindable_attributes(self) -> dict[str, tuple[Any | None, str]]:
         """Return a dictionary of attributes available for binding to QuOp Functions.
 
         QuOp Functions can have their positional parameters automatically bound
@@ -91,13 +93,13 @@ class Bindable:
         print_bindable_attributes : Print formatted table
         """
         all_attrs = self._collect_bindable_attributes()
-        result = {}
+        result: dict[str, tuple[Any | None, str]] = {}
         for attr, description in all_attrs.items():
             value = getattr(self, attr, None)
             result[attr] = (value, description)
         return result
 
-    def print_bindable_attributes(self):
+    def print_bindable_attributes(self) -> None:
         """Print a formatted table of attributes available for binding to QuOp Functions.
 
         This is a convenience method for interactive use to discover which
