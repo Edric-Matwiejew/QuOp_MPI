@@ -43,7 +43,6 @@ class Benchmark:
         _has_param_map: bool
         _n_free_params: int | None
 
-        def destroy(self) -> None: ...
         def setup(self) -> None: ...
         def set_seed(self, seed: int) -> None: ...
         def set_depth(self, depth: int) -> None: ...
@@ -123,7 +122,6 @@ class Benchmark:
         if initial_parameters is not None:
             self.variational_parameters = np.asarray(initial_parameters, dtype=np.float64)
 
-        self.destroy()
         self.setup()
         ansatz_depth_temp = deepcopy(self.ansatz_depth)
         self.benchmarking = True
