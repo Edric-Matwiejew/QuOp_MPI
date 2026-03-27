@@ -41,6 +41,11 @@ With ``N = 256`` and ``|NODECOMM| = 16``:
 
 So rank ``r`` owns ``[16*r, 16*r + 15]`` on the host view.
 
+For uneven node-local totals, the host partition is still derived bottom-up
+from the device layout, but the node-local assignment is topology-aware:
+active GPU-owning ranks are seeded first and same-CPU-NUMA helpers are
+preferred before falling back to plain ``NODECOMM`` rank order.
+
 Transfer Metadata Built in ``context_setup``
 --------------------------------------------
 
@@ -72,6 +77,13 @@ The two GPU ranks do not have to be ``NODECOMM`` ranks 0 and 1. Their positions
 are determined by topology assignment (binding mode, NUMA policy,
 ``QUOP_RANKS_PER_GPU``). The layout math above is unchanged; only which ranks
 carry the non-zero ``DEVCOMM_NODE_*`` entries changes.
+
+After ``negotiate()`` locks the layout, the communicator-derived topology cached
+in ``quop_mpi_layout_t`` is refreshed to match the active communicator tree.
+That means fields such as ``node_rank``, ``node_size``, ``node_id``,
+``n_nodes``, and ``devcomm_node_size`` describe the locked execution layout,
+while hardware-assignment fields (for example GPU visibility and device
+assignment) still come from the original topology discovery step.
 
 When This Example Does Not Apply
 --------------------------------

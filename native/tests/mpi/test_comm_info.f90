@@ -7,6 +7,7 @@ program test_comm_info
     use, intrinsic :: iso_fortran_env, only: int32, int64, error_unit
     use mpi
     use comm_info_module, only: quop_mpi_layout_t, split_info_t
+    use gpu_topology, only: gpu_topology_t
     implicit none
 
     integer(int32) :: rank, nprocs, ierr_int
@@ -185,6 +186,7 @@ program test_comm_info
             type(quop_mpi_layout_t), pointer :: ci_filter
             integer(int32) :: filter_rank
             integer(int32) :: dup_comm
+            type(gpu_topology_t) :: filter_topology
 
             allocate (ci_filter)
             call ci_filter%set_MPI_COMM(MPI_COMM_WORLD, setter_err)
@@ -204,12 +206,18 @@ program test_comm_info
             call MPI_Comm_rank(MPI_COMM_WORLD, filter_rank, ierr_int)
 
             if (filter_rank == 0) then
+                filter_topology = ci_filter%get_topology()
                 if (ci_filter%get_SUBCOMM() /= MPI_COMM_NULL .and. &
-                    ci_filter%get_local_i() == system_size) then
+                    ci_filter%get_local_i() == system_size .and. &
+                    filter_topology%node_rank == 0 .and. &
+                    filter_topology%node_size == 1 .and. &
+                    filter_topology%node_id == 0 .and. &
+                    filter_topology%n_nodes == 1) then
                     passed = passed + 1
                 else
                     failed = failed + 1
-                    write (*, '(A)') "FAIL T1.8c: active rank not preserved correctly after filter_active_ranks"
+                    write (*, '(A)') &
+                        "FAIL T1.8c: active rank/topology not preserved correctly after filter_active_ranks"
                 end if
             else
                 if (ci_filter%get_SUBCOMM() == MPI_COMM_NULL) then

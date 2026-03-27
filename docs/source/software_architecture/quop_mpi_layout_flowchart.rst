@@ -53,10 +53,13 @@ Phase 1: create
 ~~~~~~~~~~~~~~~
 
 - Allocate ``quop_mpi_layout_t``.
-- Copy ``MPI_COMM``, ``system_size``, backend flag, and topology.
+- Copy ``MPI_COMM``, ``system_size``, backend flag, and topology invariants.
 - Transfer ``SUBCOMM`` ownership from ``split_info_t``.
 - Create ``NODECOMM`` (all backends).
 - Wavefront: create ``DEVCOMM``/``DEVCOMM_NODE`` from topology.
+- Refresh communicator-derived topology fields (for example active
+  ``node_rank``, ``node_size``, ``node_id``, ``n_nodes``, and
+  ``devcomm_node_size``) from the current communicator tree.
 
 Phase 2: negotiate loop
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,7 +69,11 @@ Phase 2: negotiate loop
   ``(prop_ptr, ci_ptr, error_code)``.
 - Callback may request smaller communicator (by lowering ``ci%n_processes``)
   or modify partition fields.
+- If any rank ends up with ``local_i == 0``: ``filter_active_ranks`` +
+  redistribute + continue loop.
 - If ``n_processes`` shrinks: ``layout_shrink`` + redistribute + continue loop.
+- Wavefront may also rebuild ``DEVCOMM``/``DEVCOMM_NODE`` when device-data
+  ownership changes, then restart the loop.
 - Stability uses a collective check and a confirmation pass before convergence.
 
 Phase 3: finalise
@@ -98,7 +105,7 @@ Status Codes from ``negotiate``
    * - ``0``
      - Success, rank is active, layout locked.
    * - ``-1``
-     - Rank excluded (``SUBCOMM`` became ``MPI_COMM_NULL`` after shrink).
+     - Rank excluded (``SUBCOMM`` became ``MPI_COMM_NULL`` after shrink/filter).
    * - ``1``
      - Invalid ``system_size`` (<= 0).
    * - ``3``
@@ -107,6 +114,10 @@ Status Codes from ``negotiate``
      - Shrink/finalization failure during negotiate.
    * - ``5``
      - Block distribution failure.
+   * - ``6``
+     - Device-communicator rebuild failure during negotiate.
+   * - ``7``
+     - Zero-host-data rank filtering failure during negotiate.
    * - ``100 + x``
      - Validation failure.
    * - ``200 + x``

@@ -691,7 +691,11 @@ class QuopMpiLayout:
         return self._topo_ptr
 
     def get_topology_info(self):
-        """Return key GPU topology fields from the Fortran topology handle.
+        """Return key GPU topology fields.
+
+        When a negotiated layout exists, this returns the current topology
+        cached on the Fortran ``quop_mpi_layout_t``. Before negotiate, it
+        falls back to the original discovery-time topology handle.
 
         Returns
         -------
@@ -703,11 +707,16 @@ class QuopMpiLayout:
             ``node_size`` : int
                 Number of MPI ranks on this rank's node.
         """
-        if self._topo_ptr is None or self._topo_ptr == 0:
+        if self._ptr is not None and self._ptr != 0:
+            n_physical_gpus, ranks_per_gpu, node_size = _ciw.wrapper_get_layout_topology_info(
+                self._ptr
+            )
+        elif self._topo_ptr is not None and self._topo_ptr != 0:
+            n_physical_gpus, ranks_per_gpu, node_size = _ciw.wrapper_get_topology_info(
+                self._topo_ptr
+            )
+        else:
             return {"n_physical_gpus": 0, "ranks_per_gpu": 1, "node_size": 0}
-        n_physical_gpus, ranks_per_gpu, node_size = _ciw.wrapper_get_topology_info(
-            self._topo_ptr
-        )
         return {
             "n_physical_gpus": int(n_physical_gpus),
             "ranks_per_gpu": int(ranks_per_gpu),

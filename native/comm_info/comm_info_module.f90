@@ -107,11 +107,13 @@ module comm_info_module
         integer(int32) :: DEVCOMM = MPI_COMM_NULL
         integer(int32) :: DEVCOMM_NODE = MPI_COMM_NULL
 
-        ! -- GPU topology (cached from discover_topology) ----------
-        ! Detected ONCE on MPI_COMM by discover_topology() and passed
-        ! as topo_ptr to negotiate().  negotiate() copies the hw-intrinsic
-        ! fields into this member.  For the MPI backend, all GPU fields
-        ! stay at zero/false defaults.
+        ! -- GPU topology -----------------------------------------
+        ! discover_topology() provides the hardware-intrinsic fields on
+        ! MPI_COMM. negotiate() copies those invariants here, then refreshes
+        ! communicator-derived fields (node rank/size, active node id/count,
+        ! devcomm-node size, and local rank indices) whenever SUBCOMM or its
+        ! children are rebuilt. For the MPI backend, GPU-specific fields stay
+        ! at zero/false defaults.
         type(gpu_topology_t) :: topology
 
         ! -- Partition table (computed once, shared everywhere) ------
@@ -232,6 +234,86 @@ contains
         error_code = synced_error
     end subroutine layout_sync_precondition_error
 
+    subroutine refresh_layout_topology(self)
+        class(quop_mpi_layout_t), intent(inout) :: self
+
+        integer(int32) :: ierr
+        integer(int32) :: sub_rank, node_rank, node_size
+        integer(int32) :: is_leader, active_node_id, active_n_nodes
+        integer(int32) :: local_active_gpu_rank
+        integer(int32) :: i
+        integer(int32), allocatable :: rank_numa_nodes(:), rank_gpu_indices(:)
+
+        if (self%SUBCOMM == MPI_COMM_NULL .or. self%NODECOMM == MPI_COMM_NULL) then
+            self%topology%node_rank = -1
+            self%topology%node_size = 0
+            self%topology%devcomm_node_size = 0
+            self%topology%rank_within_cpu_numa = 0
+            self%topology%rank_within_gpu = 0
+            self%topology%node_id = -1
+            self%topology%n_nodes = 0
+            return
+        end if
+
+        call MPI_Comm_rank(self%SUBCOMM, sub_rank, ierr)
+        call MPI_Comm_rank(self%NODECOMM, node_rank, ierr)
+        call MPI_Comm_size(self%NODECOMM, node_size, ierr)
+
+        self%topology%node_rank = node_rank
+        self%topology%node_size = node_size
+
+        is_leader = merge(1, 0, node_rank == 0)
+        call MPI_Exscan(is_leader, active_node_id, 1, MPI_INTEGER, &
+                        MPI_SUM, self%SUBCOMM, ierr)
+        if (sub_rank == 0) active_node_id = 0
+        call MPI_Bcast(active_node_id, 1, MPI_INTEGER, 0, self%NODECOMM, ierr)
+        self%topology%node_id = active_node_id
+
+        call MPI_Allreduce(is_leader, active_n_nodes, 1, MPI_INTEGER, &
+                           MPI_SUM, self%SUBCOMM, ierr)
+        self%topology%n_nodes = active_n_nodes
+
+#ifdef WAVEFRONT_BACKEND
+        if (self%backend_flag == 1) then
+            local_active_gpu_rank = merge(1, 0, self%DEVCOMM_NODE /= MPI_COMM_NULL)
+            call MPI_Allreduce(local_active_gpu_rank, self%topology%devcomm_node_size, 1, &
+                               MPI_INTEGER, MPI_SUM, self%NODECOMM, ierr)
+        else
+            self%topology%devcomm_node_size = 0
+        end if
+#else
+        self%topology%devcomm_node_size = 0
+#endif
+
+        allocate (rank_numa_nodes(node_size))
+        call MPI_Allgather(self%topology%cpu_numa_node, 1, MPI_INTEGER, &
+                           rank_numa_nodes, 1, MPI_INTEGER, self%NODECOMM, ierr)
+        self%topology%rank_within_cpu_numa = 0
+        if (self%topology%cpu_numa_node >= 0) then
+            do i = 1, node_rank
+                if (rank_numa_nodes(i) == self%topology%cpu_numa_node) then
+                    self%topology%rank_within_cpu_numa = self%topology%rank_within_cpu_numa + 1
+                end if
+            end do
+        end if
+        deallocate (rank_numa_nodes)
+
+        self%topology%rank_within_gpu = 0
+#ifdef WAVEFRONT_BACKEND
+        if (self%backend_flag == 1 .and. self%topology%my_gpu_index >= 0) then
+            allocate (rank_gpu_indices(node_size))
+            call MPI_Allgather(self%topology%my_gpu_index, 1, MPI_INTEGER, &
+                               rank_gpu_indices, 1, MPI_INTEGER, self%NODECOMM, ierr)
+            do i = 1, node_rank
+                if (rank_gpu_indices(i) == self%topology%my_gpu_index) then
+                    self%topology%rank_within_gpu = self%topology%rank_within_gpu + 1
+                end if
+            end do
+            deallocate (rank_gpu_indices)
+        end if
+#endif
+    end subroutine refresh_layout_topology
+
     ! ====================================================================
     ! split_info_t methods
     ! ====================================================================
@@ -341,6 +423,7 @@ contains
         self%device_local_i_offset = 0
         self%device_alloc_local = 0
         self%MPI_COMM = MPI_COMM_NULL
+        call refresh_layout_topology(self)
     end subroutine layout_destroy
 
     ! ====================================================================
@@ -1065,6 +1148,7 @@ contains
             call MPI_Comm_rank(self%SUBCOMM, rank, ierr)
             self%n_processes = int(comm_size, int64)
             call create_layout_nodecomm(self%SUBCOMM, self%NODECOMM)
+            call refresh_layout_topology(self)
 #ifdef WAVEFRONT_BACKEND
             if (self%backend_flag == 1) then
                 ! Zero host fields; device_block_distribute derives them
@@ -1076,6 +1160,7 @@ contains
                 call create_devcomm_with_topology(self%SUBCOMM, self%NODECOMM, &
                                                   self%topology, &
                                                   self%DEVCOMM, self%DEVCOMM_NODE)
+                call refresh_layout_topology(self)
                 call device_block_distribute(self)
             else
                 call block_distribute(self, comm_size, rank, bd_err)
@@ -1117,6 +1202,7 @@ contains
             if (allocated(self%partition_table)) then
                 deallocate (self%partition_table)
             end if
+            call refresh_layout_topology(self)
         end if
     end subroutine layout_shrink
 
@@ -1194,6 +1280,7 @@ contains
             call MPI_Comm_rank(self%SUBCOMM, rank, ierr)
             self%n_processes = int(comm_size, int64)
             call create_layout_nodecomm(self%SUBCOMM, self%NODECOMM)
+            call refresh_layout_topology(self)
 #ifdef WAVEFRONT_BACKEND
             if (self%backend_flag == 1) then
                 ! Zero host fields; device_block_distribute derives them
@@ -1205,6 +1292,7 @@ contains
                 call create_devcomm_with_topology(self%SUBCOMM, self%NODECOMM, &
                                                   self%topology, &
                                                   self%DEVCOMM, self%DEVCOMM_NODE)
+                call refresh_layout_topology(self)
                 call device_block_distribute(self)
             else
                 call block_distribute(self, comm_size, rank, bd_err)
@@ -1246,6 +1334,7 @@ contains
             if (allocated(self%partition_table)) then
                 deallocate (self%partition_table)
             end if
+            call refresh_layout_topology(self)
         end if
     end subroutine layout_filter_active_ranks
 
@@ -1303,13 +1392,9 @@ contains
                                       self%topology, &
                                       self%device_local_i > 0, &
                                       self%DEVCOMM, self%DEVCOMM_NODE)
-
-        if (self%DEVCOMM_NODE /= MPI_COMM_NULL) then
-            call MPI_Comm_size(self%DEVCOMM_NODE, dn_size, ierr)
-            self%device_n_processes = int(dn_size, int64)
-        else
-            self%device_n_processes = 0
-        end if
+        call refresh_layout_topology(self)
+        dn_size = self%topology%devcomm_node_size
+        self%device_n_processes = int(dn_size, int64)
 #else
         ! MPI backend: nothing to rebuild.
         continue
@@ -1711,6 +1796,7 @@ contains
 
         ! If SUBCOMM is null, this rank was excluded
         if (ci%SUBCOMM == MPI_COMM_NULL) then
+            call refresh_layout_topology(ci)
             status = -1
             layout_ptr = c_loc(ci)
             return
@@ -1724,6 +1810,7 @@ contains
 #ifdef WAVEFRONT_BACKEND
         ! Create a node-local communicator for all active ranks.
         call create_layout_nodecomm(ci%SUBCOMM, ci%NODECOMM)
+        call refresh_layout_topology(ci)
 
         ! Wavefront backend: create per-worker device communicator hierarchy.
         ! DEVCOMM and DEVCOMM_NODE are derived from SUBCOMM/NODECOMM and the
@@ -1732,22 +1819,13 @@ contains
             call create_devcomm_with_topology(ci%SUBCOMM, ci%NODECOMM, &
                                               ci%topology, &
                                               ci%DEVCOMM, ci%DEVCOMM_NODE)
-
-            ! Populate device_n_processes from DEVCOMM_NODE size.
-            if (ci%DEVCOMM_NODE /= MPI_COMM_NULL) then
-                block
-                    integer(int32) :: dn_size
-                    call MPI_Comm_size(ci%DEVCOMM_NODE, dn_size, ierr)
-                    ci%device_n_processes = int(dn_size, int64)
-                end block
-            else
-                ci%device_n_processes = 0
-            end if
         end if
 #else
         ! MPI backend: create a node-local communicator for all active ranks.
         call create_layout_nodecomm(ci%SUBCOMM, ci%NODECOMM)
 #endif
+        call refresh_layout_topology(ci)
+        ci%device_n_processes = int(ci%topology%devcomm_node_size, int64)
 
         ! Phase 2: NEGOTIATE loop
         ! Block distribute initial partitioning
@@ -2338,12 +2416,13 @@ contains
         integer(int32) :: mpi_rank, mpi_size, ierr
         integer(int32) :: sc_rank, sc_size, nc_rank, nc_size
         integer(int32) :: dc_rank, dc_size, dn_rank, dn_size
-        integer(int32) :: funit, i
+        integer(int32) :: funit, i, ref_idx, active_sc_size
         integer(int32) :: date_values(8)
         character(len=15)  :: timestamp
         character(len=1024) :: filepath
         logical :: dir_exists
         logical :: dump_enabled, env_is_logical
+        logical :: header_locked
 
         ! -- 1. Check environment variable --------------------------
         call GET_ENVIRONMENT_VARIABLE("QUOP_DUMP_COMM_INFO", &
@@ -2399,7 +2478,7 @@ contains
         send_i32(9) = self%topology%n_physical_gpus
         send_i32(10) = self%topology%visible_device_count
         send_i32(11) = self%topology%assigned_device_id
-        if (self%topology%is_gpu_rank) then
+        if (self%DEVCOMM /= MPI_COMM_NULL) then
             send_i32(12) = 1
         else
             send_i32(12) = 0
@@ -2440,6 +2519,29 @@ contains
 
         ! -- 5. Rank 0 writes the file -----------------------------
         if (mpi_rank == 0) then
+            ref_idx = 0
+            do i = 1, mpi_size
+                if (recv_i32(1, i) == 0) then
+                    ref_idx = i
+                    exit
+                end if
+            end do
+            if (ref_idx == 0) then
+                do i = 1, mpi_size
+                    if (recv_i32(1, i) >= 0) then
+                        ref_idx = i
+                        exit
+                    end if
+                end do
+            end if
+
+            active_sc_size = 0
+            header_locked = .false.
+            if (ref_idx > 0) then
+                active_sc_size = recv_i32(2, ref_idx)
+                header_locked = (recv_i64(10, ref_idx) /= 0)
+            end if
+
             ! Build timestamp: YYYYMMDD_HHMMSS
             call DATE_AND_TIME(VALUES=date_values)
             write (timestamp, '(I4.4,I2.2,I2.2,"_",I2.2,I2.2,I2.2)') &
@@ -2475,10 +2577,14 @@ contains
                 'QuOp_MPI quop_mpi_layout_t dump (', trim(phase), ')'
             write (funit, '(A)') repeat('=', 70)
             write (funit, '(A,I0)') 'system_size     = ', self%system_size
-            write (funit, '(A,I0)') 'n_processes     = ', self%n_processes
+            write (funit, '(A,I0)') 'n_processes     = ', active_sc_size
             write (funit, '(A,I0)') 'MPI_COMM size   = ', mpi_size
-            write (funit, '(A,I0)') 'topology n_nodes = ', self%topology%n_nodes
-            if (self%locked) then
+            if (ref_idx > 0) then
+                write (funit, '(A,I0)') 'active topology n_nodes = ', recv_i32(13, ref_idx)
+            else
+                write (funit, '(A,I0)') 'active topology n_nodes = ', 0
+            end if
+            if (header_locked) then
                 write (funit, '(A)') 'locked          = True'
             else
                 write (funit, '(A)') 'locked          = False'
@@ -2514,15 +2620,37 @@ contains
             write (funit, '(A)') ''
 
             ! -- Partition table (locked phase only) ----------------
-            if (trim(phase) == 'locked' .and. allocated(self%partition_table)) then
-                write (funit, '(A)') 'Partition table (1-based cumulative):'
-                write (funit, '(A)', advance='no') '  ['
-                do i = 1, size(self%partition_table)
-                    if (i > 1) write (funit, '(A)', advance='no') ', '
-                    write (funit, '(I0)', advance='no') self%partition_table(i)
-                end do
-                write (funit, '(A)') ']'
-                write (funit, '(A)') ''
+            if (trim(phase) == 'locked' .and. active_sc_size > 0) then
+                block
+                    integer(int32) :: active_rank, pt_idx
+                    integer(int64), allocatable :: active_local_i(:), partition_table(:)
+
+                    allocate (active_local_i(active_sc_size))
+                    active_local_i = 0_int64
+                    do i = 1, mpi_size
+                        active_rank = recv_i32(1, i)
+                        if (active_rank >= 0 .and. active_rank < active_sc_size) then
+                            active_local_i(active_rank + 1) = recv_i64(1, i)
+                        end if
+                    end do
+
+                    allocate (partition_table(active_sc_size + 1))
+                    partition_table(1) = 1_int64
+                    do pt_idx = 1, active_sc_size
+                        partition_table(pt_idx + 1) = partition_table(pt_idx) + active_local_i(pt_idx)
+                    end do
+
+                    write (funit, '(A)') 'Partition table (1-based cumulative):'
+                    write (funit, '(A)', advance='no') '  ['
+                    do i = 1, size(partition_table)
+                        if (i > 1) write (funit, '(A)', advance='no') ', '
+                        write (funit, '(I0)', advance='no') partition_table(i)
+                    end do
+                    write (funit, '(A)') ']'
+                    write (funit, '(A)') ''
+
+                    deallocate (active_local_i, partition_table)
+                end block
             end if
 
             ! -- Footer / column legend -----------------------------
@@ -2541,11 +2669,11 @@ contains
             write (funit, '(A)') '  DN_r/DN_s     : DEVCOMM_NODE rank/size'
             write (funit, '(A)') '  GPU           : assigned_device_id (GPU device id for this rank)'
             write (funit, '(A)') '  phys          : my_gpu_index (physical GPU index on this node)'
-            write (funit, '(A)') '  gpu?          : is_gpu_rank (1 if rank joins DEVCOMM)'
+            write (funit, '(A)') '  gpu?          : current DEVCOMM membership (1 if DEVCOMM /= MPI_COMM_NULL)'
             write (funit, '(A)') '  cpuNm         : cpu_numa_node (best NUMA match for this rank''s CPU affinity)'
             write (funit, '(A)') '  rCpuN         : rank_within_cpu_numa (lower NODECOMM ranks on same CPU NUMA node)'
             write (funit, '(A)') '  rGpu          : rank_within_gpu (lower NODECOMM ranks sharing this GPU)'
-            write (funit, '(A)') '  node          : node_id (0-based sequential node index)'
+            write (funit, '(A)') '  node          : active node_id (0-based within current SUBCOMM; -1 if excluded)'
             write (funit, '(A)') '  mode          : GPU binding mode used by topology assignment'
             write (funit, '(A)') '  hostname      : MPI processor name (often the hostname)'
             write (funit, '(A)') '  Note: *_r=-1 and *_s=0 indicates MPI_COMM_NULL.'

@@ -34,7 +34,7 @@ module gpu_topology
         type(visible_gpu_info_t), allocatable :: visible_gpus(:) !< Per-visible-device metadata
         integer(int32) :: cpu_numa_node = -1 !< NUMA node for this rank's CPU affinity, or -1
         integer(int32) :: rank_within_cpu_numa = 0 !< Ranks with lower node_rank on the same CPU NUMA node
-        logical :: is_gpu_rank !< Do I join DEVCOMM?
+        logical :: is_gpu_rank !< Am I assigned a topology-defined GPU rank on this node?
 
         ! Node info (for reference)
         integer(int32) :: node_rank !< Rank within NODECOMM

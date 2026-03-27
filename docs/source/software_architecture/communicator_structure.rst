@@ -81,7 +81,8 @@ Lifecycle
    subcomm leaders, and stores ``worker_id``/``n_workers`` in ``split_info_t``.
 3. ``negotiate(...)`` allocates ``quop_mpi_layout_t``, transfers ``SUBCOMM``
    ownership from ``split_info_t``, creates ``NODECOMM`` (all backends), creates
-   ``DEVCOMM``/``DEVCOMM_NODE`` on wavefront, and may shrink ``SUBCOMM`` with
+   ``DEVCOMM``/``DEVCOMM_NODE`` on wavefront, refreshes communicator-derived
+   topology fields in the layout, and may filter or shrink ``SUBCOMM`` with
    child-communicator rebuilds.
 4. ``create_rootcomm(MPI_COMM, split_ptr, layout_ptr)`` rebuilds ``ROOTCOMM``
    from rank 0 of each post-negotiate ``SUBCOMM``.
@@ -111,6 +112,9 @@ Backend-Specific Notes
 
 - ``layout_shrink`` always rebuilds ``SUBCOMM`` and ``NODECOMM``; wavefront
   also rebuilds ``DEVCOMM`` and ``DEVCOMM_NODE``.
+- ``layout_filter_active_ranks`` rebuilds ``SUBCOMM`` by predicate
+  ``local_i > 0`` instead of prefix size and then refreshes child
+  communicators/topology from the filtered active set.
 - ``layout_rebuild_communicators`` is wavefront-only in practice (MPI backend
   is a no-op for device communicators).
 - ``device_n_processes`` in the layout tracks active device ranks on
