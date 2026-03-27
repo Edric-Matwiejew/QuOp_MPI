@@ -81,7 +81,7 @@ class Interface:
         self._validate_explicit_args_trail_bindable_params()
         self._validate_bindable_keyword_only_params()
         self._validate_explicit_kwargs()
-        self.update_parameters(strict_none=True)
+        self.update_parameters(strict_none=False)
 
     def _has_bindable_attribute(self, param_name):
         return self._get_bindable_value(param_name) is not _BINDABLE_MISSING
