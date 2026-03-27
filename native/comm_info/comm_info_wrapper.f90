@@ -9,7 +9,6 @@ module comm_info_wrapper
     use iso_fortran_env, only: real64, int32, int64
     use iso_c_binding, only: c_loc, c_f_pointer, c_ptr, c_null_ptr, c_associated
     use MPI, only: MPI_SUCCESS, MPI_Comm_dup, MPI_Comm_size, MPI_Comm_free
-    use gpu_topology, only: gpu_topology_t
     use comm_info_module, only: quop_mpi_layout_t, split_info_t, &
                                 discover_topology_impl => discover_topology, &
                                 destroy_topology_impl => destroy_topology, &
@@ -682,7 +681,6 @@ contains
         integer(int32), intent(out) :: node_size
 
         type(quop_mpi_layout_t), pointer :: ci
-        type(gpu_topology_t) :: topo
 
         n_physical_gpus = 0
         ranks_per_gpu = 1
@@ -693,10 +691,9 @@ contains
         call c_f_pointer(ci_ptr, ci)
         if (.not. associated(ci)) return
 
-        topo = ci%get_topology()
-        n_physical_gpus = topo%n_physical_gpus
-        ranks_per_gpu = topo%ranks_per_gpu
-        node_size = topo%node_size
+        n_physical_gpus = ci%get_topology()%n_physical_gpus
+        ranks_per_gpu = ci%get_topology()%ranks_per_gpu
+        node_size = ci%get_topology()%node_size
     end subroutine wrapper_get_layout_topology_info
 
 end module comm_info_wrapper
