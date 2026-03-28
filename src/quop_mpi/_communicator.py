@@ -150,11 +150,14 @@ class Communicator:
             self.n_jacobian_workers = n_workers
 
         # Create layout with worker splitting
+        # create_workers may further clamp n_workers on wavefront (GPU limit).
         self._layout = QuopMpiLayout.create_workers(
             n_workers,
             self.MPI_COMM_WORLD,
             backend_flag,
         )
+        # Sync back the effective worker count (may have been GPU-clamped).
+        self.n_jacobian_workers = self._layout.get_n_subcomms()
 
     @scope("world")
     def _post_parallel(self) -> None:

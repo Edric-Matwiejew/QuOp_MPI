@@ -163,6 +163,11 @@ class QuopMpiLayout:
         (which requires negotiate). The layout_ptr will be set later after
         negotiate completes.
 
+        On the wavefront backend, ``n_workers`` is clamped to the total
+        number of device-rank slots so that every subcomm is guaranteed
+        at least one GPU.  The effective (possibly clamped) worker count
+        is available via ``get_n_subcomms()``.
+
         Parameters
         ----------
         n_workers : int
@@ -192,6 +197,30 @@ class QuopMpiLayout:
         )
 
         try:
+            # On wavefront, cap workers to total device-rank slots so every
+            # subcomm is guaranteed at least one GPU.  Use Allreduce to handle
+            # heterogeneous nodes (different GPU counts per node).
+            if backend_flag == 1 and n_workers > 1:
+                n_gpus, rpg, node_size = _ciw.wrapper_get_topology_info(topo_ptr)
+                n_gpus = int(n_gpus)
+                rpg = int(rpg)
+                node_size = int(node_size)
+                # Each of the node_size co-located ranks contributes
+                # (device_slots / node_size) so the sum across all ranks
+                # equals the sum of per-node device slots.  Nodes without
+                # GPUs contribute 0.
+                if n_gpus > 0 and node_size > 0:
+                    local_slots = np.array(
+                        [float(n_gpus * max(rpg, 1)) / node_size], dtype=np.float64
+                    )
+                else:
+                    local_slots = np.zeros(1, dtype=np.float64)
+                total_slots = np.zeros(1, dtype=np.float64)
+                MPI_COMM.Allreduce(local_slots, total_slots, op=MPI.SUM)
+                max_workers = int(total_slots[0] + 0.5)
+                if max_workers > 0 and n_workers > max_workers:
+                    n_workers = max_workers
+
             # Phase 0b: Split into worker groups
             split_ptr, worker_id, status = _ciw.wrapper_split_workers(
                 MPI_COMM.py2f(),
