@@ -55,7 +55,7 @@ contains
         best_used = 1
         nranks64 = int(nranks, int64)
 
-        do d = 1, ndim - 1
+        do d = 1, min(1, ndim - 1)
             nca = ndim - d
             comm = 1
             valid = .true.
