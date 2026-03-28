@@ -168,6 +168,9 @@ class QuopMpiLayout:
         at least one GPU.  The effective (possibly clamped) worker count
         is available via ``get_n_subcomms()``.
 
+        Raises ``RuntimeError`` if a heterogeneous GPU topology is
+        detected (different device-slot counts across nodes).
+
         Parameters
         ----------
         n_workers : int
@@ -198,20 +201,36 @@ class QuopMpiLayout:
 
         try:
             # On wavefront, cap workers to total device-rank slots so every
-            # subcomm is guaranteed at least one GPU.  Use Allreduce to handle
-            # heterogeneous nodes (different GPU counts per node).
+            # subcomm is guaranteed at least one GPU.
             if backend_flag == 1 and n_workers > 1:
                 n_gpus, rpg, node_size = _ciw.wrapper_get_topology_info(topo_ptr)
                 n_gpus = int(n_gpus)
                 rpg = int(rpg)
                 node_size = int(node_size)
+                device_slots = n_gpus * max(rpg, 1)
+
+                # Reject heterogeneous GPU topology — the GPU-aware
+                # worker split assumes every node has the same number
+                # of device slots.
+                ds = np.array([device_slots], dtype=np.int32)
+                min_ds = np.zeros(1, dtype=np.int32)
+                max_ds = np.zeros(1, dtype=np.int32)
+                MPI_COMM.Allreduce(ds, min_ds, op=MPI.MIN)
+                MPI_COMM.Allreduce(ds, max_ds, op=MPI.MAX)
+                if min_ds[0] != max_ds[0]:
+                    raise RuntimeError(
+                        f"Heterogeneous GPU topology detected: device "
+                        f"slots per node range from {min_ds[0]} to "
+                        f"{max_ds[0]}. The wavefront backend requires "
+                        f"uniform GPU configuration across all nodes."
+                    )
+
                 # Each of the node_size co-located ranks contributes
                 # (device_slots / node_size) so the sum across all ranks
-                # equals the sum of per-node device slots.  Nodes without
-                # GPUs contribute 0.
-                if n_gpus > 0 and node_size > 0:
+                # equals the total device slots cluster-wide.
+                if device_slots > 0 and node_size > 0:
                     local_slots = np.array(
-                        [float(n_gpus * max(rpg, 1)) / node_size], dtype=np.float64
+                        [float(device_slots) / node_size], dtype=np.float64
                     )
                 else:
                     local_slots = np.zeros(1, dtype=np.float64)

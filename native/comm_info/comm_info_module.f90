@@ -1655,6 +1655,9 @@ contains
         integer(int32) :: nodes_per_worker, node_remainder
         integer(int32) :: ranks_per_worker, rank_remainder
         integer(int32) :: subcomm_rank
+        integer(int32) :: wpn_base, wpn_extra
+        integer(int32) :: my_node_nw, my_node_w0
+        integer(int32) :: total_node_slots, slot
 
         status = 0
         allocate (si)
@@ -1703,7 +1706,46 @@ contains
                             / nodes_per_worker
                 end if
             else
-                ! -- Rank-based fallback -----------------------------
+#ifdef WAVEFRONT_BACKEND
+                ! -- GPU-aware intra-node split ----------------------
+                ! Distribute workers across nodes (even, with remainder),
+                ! then assign GPU ranks to workers based on their device
+                ! slot index.  Non-GPU ranks round-robin among their
+                ! node's workers so every worker has at least one GPU.
+                !
+                ! Heterogeneous GPU topology (nodes with different GPU
+                ! counts) is rejected by Python create_workers().
+                wpn_base = n_jacobian_workers / n_nodes
+                wpn_extra = mod(n_jacobian_workers, n_nodes)
+
+                if (my_node_id < wpn_extra) then
+                    my_node_nw = wpn_base + 1
+                    my_node_w0 = my_node_id * (wpn_base + 1)
+                else
+                    my_node_nw = wpn_base
+                    my_node_w0 = wpn_extra * (wpn_base + 1) + &
+                                 (my_node_id - wpn_extra) * wpn_base
+                end if
+
+                total_node_slots = topo%n_physical_gpus * max(topo%ranks_per_gpu, 1)
+
+                ! Defence-in-depth: clamp in case n_workers exceeds
+                ! the node's device slots (Python rejects heterogeneous
+                ! topology, so this should not trigger in practice).
+                if (total_node_slots > 0 .and. my_node_nw > total_node_slots) then
+                    my_node_nw = total_node_slots
+                end if
+
+                if (topo%is_gpu_rank .and. total_node_slots > 0) then
+                    slot = topo%my_gpu_index * max(topo%ranks_per_gpu, 1) &
+                           + topo%rank_within_gpu
+                    color = my_node_w0 + slot * my_node_nw / total_node_slots
+                else
+                    ! Non-GPU rank: round-robin among this node's workers.
+                    color = my_node_w0 + mod(topo%node_rank, my_node_nw)
+                end if
+#else
+                ! -- Rank-based fallback (MPI backend) ---------------
                 ! More workers than nodes: must split intra-node.
                 ranks_per_worker = nprocs / n_jacobian_workers
                 rank_remainder = mod(nprocs, n_jacobian_workers)
@@ -1715,6 +1757,7 @@ contains
                             (rank - rank_remainder * (ranks_per_worker + 1)) &
                             / ranks_per_worker
                 end if
+#endif
             end if
 
             si%worker_id = color
