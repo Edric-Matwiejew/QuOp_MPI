@@ -1,6 +1,26 @@
 #!/usr/bin/env bash
 
-COMMON_SH_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+quop_shell_source_path() {
+    if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+        printf '%s\n' "${BASH_SOURCE[0]}"
+        return 0
+    fi
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        eval 'printf "%s\n" "${(%):-%x}"'
+        return 0
+    fi
+    printf '%s\n' "$0"
+}
+
+quop_shell_name() {
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        printf '%s\n' "zsh"
+        return 0
+    fi
+    printf '%s\n' "bash"
+}
+
+COMMON_SH_DIR="$(cd -- "$(dirname -- "$(quop_shell_source_path)")" && pwd)"
 CONFIG_RENDERER="${CONFIG_RENDERER:-$COMMON_SH_DIR/render_config.py}"
 PATH_HELPER="${PATH_HELPER:-$COMMON_SH_DIR/path_helper.py}"
 
@@ -119,31 +139,12 @@ apply_profile_defaults() {
 
 available_profile_names() {
     local profiles_dir="${PROFILES_DIR:-${SITES_DIR:-}}"
-    local profile_dir
-    local nullglob_was_set=0
-    local -a profile_names=()
 
     if [[ -z "$profiles_dir" || ! -d "$profiles_dir" ]]; then
         return 0
     fi
 
-    if shopt -q nullglob; then
-        nullglob_was_set=1
-    fi
-    shopt -s nullglob
-    for profile_dir in "$profiles_dir"/*; do
-        [[ -d "$profile_dir" ]] || continue
-        profile_names+=("$(basename "$profile_dir")")
-    done
-    if ((nullglob_was_set == 0)); then
-        shopt -u nullglob
-    fi
-
-    if ((${#profile_names[@]} == 0)); then
-        return 0
-    fi
-
-    printf '%s\n' "${profile_names[@]}" | sort
+    find "$profiles_dir" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
 }
 
 list_available_profiles() {
@@ -184,11 +185,21 @@ print_available_sites() {
 }
 
 ensure_module_command() {
+    local shell_name
+
     if command -v module >/dev/null 2>&1; then
         return 0
     fi
 
-    if [[ -n "${MODULESHOME:-}" && -f "${MODULESHOME}/init/bash" ]]; then
+    shell_name="$(quop_shell_name)"
+
+    if [[ -n "${MODULESHOME:-}" && -f "${MODULESHOME}/init/${shell_name}" ]]; then
+        # shellcheck disable=SC1090
+        source "${MODULESHOME}/init/${shell_name}"
+    elif [[ -n "${MODULESHOME:-}" && -f "${MODULESHOME}/init/profile" ]]; then
+        # shellcheck disable=SC1090
+        source "${MODULESHOME}/init/profile"
+    elif [[ -n "${MODULESHOME:-}" && -f "${MODULESHOME}/init/bash" ]]; then
         # shellcheck disable=SC1090
         source "${MODULESHOME}/init/bash"
     elif [[ -f /etc/profile.d/modules.sh ]]; then
@@ -197,6 +208,12 @@ ensure_module_command() {
     elif [[ -f /etc/profile.d/lmod.sh ]]; then
         # shellcheck disable=SC1091
         source /etc/profile.d/lmod.sh
+    elif [[ -f "/usr/share/lmod/lmod/init/${shell_name}" ]]; then
+        # shellcheck disable=SC1091
+        source "/usr/share/lmod/lmod/init/${shell_name}"
+    elif [[ -f /usr/share/lmod/lmod/init/profile ]]; then
+        # shellcheck disable=SC1091
+        source /usr/share/lmod/lmod/init/profile
     elif [[ -f /usr/share/lmod/lmod/init/bash ]]; then
         # shellcheck disable=SC1091
         source /usr/share/lmod/lmod/init/bash

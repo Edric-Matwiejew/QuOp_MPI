@@ -10,9 +10,21 @@
 # =============================================================================
 set -euo pipefail
 
+quop_shell_source_path() {
+    if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+        printf '%s\n' "${BASH_SOURCE[0]}"
+        return 0
+    fi
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        eval 'printf "%s\n" "${(%):-%x}"'
+        return 0
+    fi
+    printf '%s\n' "$0"
+}
+
 # ---- Resolve project root (one level above this script) --------------------
 CALLER_CWD="$(pwd)"
-PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd -- "$(dirname -- "$(quop_shell_source_path)")/.." && pwd)"
 ENVIRONMENTS_DIR="$PROJECT_ROOT/environments"
 LIB_DIR="$ENVIRONMENTS_DIR/lib"
 PROFILES_DIR="$ENVIRONMENTS_DIR/profiles"

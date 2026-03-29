@@ -2,6 +2,7 @@ import importlib.util
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -33,6 +34,7 @@ PAWSEY_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / 
 MACOS_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "macos" / "mpi" / "config.toml"
 UBUNTU_24_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "mpi" / "config.toml"
 GENERIC_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "generic" / "mpi" / "config.toml"
+ZSH = shutil.which("zsh")
 
 
 def load_module(path: Path, module_name: str):
@@ -44,13 +46,18 @@ def load_module(path: Path, module_name: str):
     return module
 
 
-def run_shell(script: str, *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def run_shell(
+    script: str,
+    *,
+    env: dict[str, str] | None = None,
+    shell: str = "bash",
+) -> subprocess.CompletedProcess[str]:
     merged_env = os.environ.copy()
     if env:
         merged_env.update(env)
 
     return subprocess.run(
-        ["bash", "-lc", script],
+        [shell, "-lc", script],
         cwd=PROJECT_ROOT,
         env=merged_env,
         capture_output=True,
@@ -483,18 +490,23 @@ def test_install_script_help_mentions_prefix_option():
 
 
 def test_install_script_help_works_from_outside_repo():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        result = subprocess.run(
-            ["bash", str(INSTALL_SH), "--help"],
-            cwd=tmpdir,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+    shells = ["bash"]
+    if ZSH is not None:
+        shells.append(ZSH)
 
-    assert result.returncode == 0, result.stderr or result.stdout
-    assert "--prefix DIR" in result.stdout
-    assert "--veryclean" in result.stdout
+    for shell in shells:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = subprocess.run(
+                [shell, str(INSTALL_SH), "--help"],
+                cwd=tmpdir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        assert result.returncode == 0, (shell, result.stderr or result.stdout)
+        assert "--prefix DIR" in result.stdout
+        assert "--veryclean" in result.stdout
 
 
 def test_install_script_clean_modes_only_remove_cache_and_deps():
@@ -513,7 +525,9 @@ def test_install_script_stages_activation_runtime_inside_prefix():
     assert 'cp "$COMMON_LIB" "$ACTIVATION_COMMON_LIB"' in activation_text
     assert 'cp "$CONFIG_RENDERER" "$ACTIVATION_CONFIG_RENDERER"' in activation_text
     assert 'cp "$PATH_HELPER" "$ACTIVATION_PATH_HELPER"' in activation_text
-    assert 'INSTALL_ROOT="\\$(cd -- "\\$(dirname -- "\\${BASH_SOURCE[0]}")" && pwd)"' in activation_text
+    assert 'quop_shell_source_path() {' in activation_text
+    assert 'if ! quop_shell_is_sourced; then' in activation_text
+    assert 'INSTALL_ROOT="\\$(cd -- "\\$(dirname -- "\\$(quop_shell_source_path)")" && pwd)"' in activation_text
     assert 'CONFIG_PYTHON="\\$VENV_DIR/bin/python"' in activation_text
 
 
@@ -685,6 +699,65 @@ def test_activation_script_rehydrates_profile_cmake_args():
     assert 'source "\\$COMMON_LIB" || return 1' in activation_text
     assert 'source "\\$VENV_DIR/bin/activate" || return 1' in activation_text
     assert 'export_profile_cmake_args || return 1' in activation_text
+
+
+def test_generated_activation_script_works_in_zsh():
+    if ZSH is None:
+        return
+
+    script = f"""
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+mkdir -p "$tmpdir/.venv_generic_mpi/bin" "$tmpdir/.cache/quop/generic/mpi/deps" "$tmpdir/.cache/quop/generic/mpi/skbuild"
+printf '%s\\n' 'export VIRTUAL_ENV="$VENV_DIR"' >"$tmpdir/.venv_generic_mpi/bin/activate"
+source {shlex.quote(str(COMMON_SH))}
+source {shlex.quote(str(ACTIVATION_LIB))}
+INSTALL_ROOT="$tmpdir"
+ACTIVATION_RUNTIME_DIR="$tmpdir/.environments-runtime/generic/mpi"
+ACTIVATION_COMMON_LIB="$ACTIVATION_RUNTIME_DIR/common.sh"
+ACTIVATION_CONFIG_RENDERER="$ACTIVATION_RUNTIME_DIR/render_config.py"
+ACTIVATION_PATH_HELPER="$ACTIVATION_RUNTIME_DIR/path_helper.py"
+PROFILE_FILE={shlex.quote(str(GENERIC_HOOKS))}
+ACTIVATION_PROFILE_FILE="$ACTIVATION_RUNTIME_DIR/hooks.sh"
+COMMON_LIB={shlex.quote(str(COMMON_SH))}
+CONFIG_RENDERER={shlex.quote(str(PROJECT_ROOT / "environments" / "lib" / "render_config.py"))}
+PATH_HELPER={shlex.quote(str(PROJECT_ROOT / "environments" / "lib" / "path_helper.py"))}
+PROFILE=generic
+PROFILE_ID=generic
+BACKEND=mpi
+VENV_DIR="$tmpdir/.venv_generic_mpi"
+CONFIG_PYTHON={shlex.quote(sys.executable)}
+PROFILE_WORK_DIR="$tmpdir/.cache/quop/generic/mpi"
+BUILD_DEPS_DIR="$PROFILE_WORK_DIR/deps"
+FETCHCONTENT_BASE_DIR="$tmpdir/.deps/generic/mpi"
+SKBUILD_BUILD_DIR="$PROFILE_WORK_DIR/skbuild"
+ACTIVATION_CONFIG_FILE=""
+prepare_activation_runtime
+write_activation_script "$tmpdir/activate-generic-mpi.sh"
+cd /
+source "$tmpdir/activate-generic-mpi.sh"
+printf 'install=%s\\n' "$QUOP_INSTALL_ROOT"
+printf 'venv=%s\\n' "$QUOP_VENV_DIR"
+printf 'backend=%s\\n' "$QUOP_BACKEND"
+printf 'cmake=%s\\n' "$CMAKE_ARGS"
+"""
+
+    result = run_shell(script, shell=ZSH)
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    lines = result.stdout.splitlines()
+    assert len(lines) == 4
+    install_root = lines[0].split("=", 1)[1]
+    venv_dir = lines[1].split("=", 1)[1]
+    assert install_root
+    assert lines[0] == f"install={install_root}"
+    assert lines[1] == f"venv={venv_dir}"
+    assert venv_dir == f"{install_root}/.venv_generic_mpi"
+    assert lines[2] == "backend=mpi"
+    assert lines[3] == (
+        "cmake=-DBUILD_TESTING=ON -DWAVEFRONT_BACKEND=OFF "
+        "-DWITH_SHAFFT=OFF -DGPU_AWARE_MPI=OFF -DCMAKE_BUILD_TYPE=Release"
+    )
 
 
 def test_readme_docs_build_instructions_use_python_module_invocation():

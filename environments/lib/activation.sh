@@ -38,13 +38,38 @@ write_activation_script() {
     cat >"$activation_script" <<EOF
 #!/usr/bin/env bash
 
-if [[ "\${BASH_SOURCE[0]}" == "\$0" ]]; then
+quop_shell_is_sourced() {
+    if [[ -n "\${BASH_VERSION:-}" ]]; then
+        [[ "\${BASH_SOURCE[0]}" != "\$0" ]]
+        return \$?
+    fi
+    if [[ -n "\${ZSH_VERSION:-}" ]]; then
+        case "\${ZSH_EVAL_CONTEXT:-}" in
+            *:file|*:file:*) return 0 ;;
+        esac
+    fi
+    return 1
+}
+
+quop_shell_source_path() {
+    if [[ -n "\${BASH_SOURCE[0]:-}" ]]; then
+        printf '%s\n' "\${BASH_SOURCE[0]}"
+        return 0
+    fi
+    if [[ -n "\${ZSH_VERSION:-}" ]]; then
+        eval 'printf "%s\n" "\${(%):-%x}"'
+        return 0
+    fi
+    printf '%s\n' "\$0"
+}
+
+if ! quop_shell_is_sourced; then
     echo "Error: source this script instead of executing it:"
     echo "  source $(printf '%q' "$activation_script")"
     exit 1
 fi
 
-INSTALL_ROOT="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_ROOT="\$(cd -- "\$(dirname -- "\$(quop_shell_source_path)")" && pwd)"
 PROJECT_ROOT="\$INSTALL_ROOT"
 ENVIRONMENTS_DIR="\$INSTALL_ROOT/$(printf '%q' "$runtime_rel")"
 # Legacy aliases are kept so older helper scripts continue to work.
