@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
-Integration test runner for QuOp_MPI examples.
+Helper utilities for running QuOp_MPI example scripts.
 
-Runs the actual example scripts and validates that the optimization
-results fall within expected bounds.
+Provides functions to launch examples via MPI, parse their output and
+validate results against expected bounds.  The actual test orchestration
+(temp-dir copying, parametrisation) lives in test_examples.py.
 
 Usage:
-    python run_integration_tests.py
+    python run_example_tests.py [nprocs] [launcher]
 """
 
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
@@ -27,9 +30,9 @@ def load_expected_results():
         return json.load(f)
 
 
-def _integration_env():
+def _example_test_env():
     env = dict(os.environ)
-    # Keep integration tests deterministic and independent of live market APIs.
+    # Keep example tests deterministic and independent of live market APIs.
     env["QUOP_PORTFOLIO_USE_SAMPLE_DATA"] = "1"
     return env
 
@@ -37,7 +40,10 @@ def _integration_env():
 def _build_launch_cmd(nprocs, launcher="mpiexec"):
     """Return the MPI launcher command prefix as a list."""
     if launcher == "srun":
-        return ["srun", "-N", "1", "-n", str(nprocs), "--gpus=" + str(nprocs)]
+        cmd = ["srun", "-N", "1", "-n", str(nprocs)]
+        if os.environ.get("QUOP_BACKEND") == "wavefront":
+            cmd.append("--gpus=" + str(min(nprocs, 8)))
+        return cmd
     return ["mpiexec", "-n", str(nprocs)]
 
 
@@ -47,7 +53,7 @@ def run_example(script_path, cwd, nprocs=4, timeout=300, launcher="mpiexec"):
     result = subprocess.run(
         cmd,
         cwd=str(cwd),
-        env=_integration_env(),
+        env=_example_test_env(),
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -95,14 +101,14 @@ def validate_result(result, config):
 
 
 def main():
-    # Usage: run_integration_tests.py [nprocs] [launcher]
+    # Standalone usage: run_example_tests.py [nprocs] [launcher]
     #   launcher: "mpiexec" (default) or "srun" (Cray)
     nprocs = int(sys.argv[1]) if len(sys.argv) > 1 else 4
     launcher = sys.argv[2] if len(sys.argv) > 2 else "mpiexec"
 
     expected = load_expected_results()
 
-    print(f"Running {len(expected)} integration tests with {nprocs} MPI processes ({launcher})...")
+    print(f"Running {len(expected)} example tests with {nprocs} MPI processes ({launcher})...")
     print("=" * 60)
 
     passed = 0
@@ -122,7 +128,7 @@ def main():
                 setup_result = subprocess.run(
                     ["python", setup_script],
                     cwd=str(example_dir),
-                    env=_integration_env(),
+                    env=_example_test_env(),
                     capture_output=True,
                     text=True,
                     timeout=60,

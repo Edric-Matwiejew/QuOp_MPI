@@ -60,7 +60,8 @@ def _probe_devcomm_size():
     from quop_mpi._utils._comm_size import QuopMpiLayout
 
     comm = MPI.COMM_WORLD
-    system_size = 64  # arbitrary; just needs to be > 0
+    # Keep every rank eligible for the temporary layout, even on larger runs.
+    system_size = max(64, comm.Get_size())
     backend_flag = 1  # wavefront
 
     layout = QuopMpiLayout.create_workers(1, comm, backend_flag=backend_flag)
@@ -116,9 +117,9 @@ def skip_wavefront_parallel_jacobian(n_workers=2):
 
 
 @pytest.fixture
-def jacobian_system_size():
-    """System size suitable for jacobian testing - needs to be divisible."""
-    return 64  # 2^6, works well with power-of-2 process counts
+def jacobian_system_size(small_system_size):
+    """Smaller power-of-two size suited to split-worker jacobian tests."""
+    return small_system_size
 
 
 @pytest.fixture
@@ -141,11 +142,11 @@ def jacobian_qualities(jacobian_system_size):
 class TestSubcommunicatorCreation:
     """Test that parallel jacobian subcommunicators are created correctly."""
 
-    def test_single_subcomm_no_jacobian(self, mpi_comm):
+    def test_single_subcomm_no_jacobian(self, mpi_comm, jacobian_system_size):
         """When only 1 subcomm, no jacobian parallelism is possible."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -164,7 +165,7 @@ class TestSubcommunicatorCreation:
                 n == 1 for n in all_n_subcomms
             ), f"Without parallel jacobian, should have 1 subcomm: {all_n_subcomms}"
 
-    def test_parallel_jacobian_creates_multiple_subcomms(self, mpi_comm):
+    def test_parallel_jacobian_creates_multiple_subcomms(self, mpi_comm, jacobian_system_size):
         """set_parallel_jacobian should create multiple subcommunicators."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -176,7 +177,7 @@ class TestSubcommunicatorCreation:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -197,7 +198,7 @@ class TestSubcommunicatorCreation:
             # Should have created 2 subcomms (or possibly fewer if size is small)
             assert all_n_subcomms[0] >= 1, f"Should have at least 1 subcomm: {all_n_subcomms}"
 
-    def test_jaccomm_created_with_multiple_subcomms(self, mpi_comm):
+    def test_jaccomm_created_with_multiple_subcomms(self, mpi_comm, jacobian_system_size):
         """JACCOMM should be created when multiple subcomms exist."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -208,7 +209,7 @@ class TestSubcommunicatorCreation:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -241,7 +242,7 @@ class TestSubcommunicatorCreation:
 class TestJacobianMethods:
     """Test forward and central difference jacobian methods."""
 
-    def test_forward_difference_method_accepted(self, mpi_comm):
+    def test_forward_difference_method_accepted(self, mpi_comm, jacobian_system_size):
         """Forward difference method should be accepted."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -251,7 +252,7 @@ class TestJacobianMethods:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -262,7 +263,7 @@ class TestJacobianMethods:
 
         assert alg.jacobian_input == ["forward"]
 
-    def test_central_difference_method_accepted(self, mpi_comm):
+    def test_central_difference_method_accepted(self, mpi_comm, jacobian_system_size):
         """Central difference method should be accepted."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -272,7 +273,7 @@ class TestJacobianMethods:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -282,7 +283,7 @@ class TestJacobianMethods:
 
         assert alg.jacobian_input == ["central"]
 
-    def test_custom_step_size(self, mpi_comm):
+    def test_custom_step_size(self, mpi_comm, jacobian_system_size):
         """Custom step size h should be stored."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -292,7 +293,7 @@ class TestJacobianMethods:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
         custom_h = 1e-6
 
         alg = QWOA(system_size, mpi_comm)
@@ -317,7 +318,7 @@ class TestJacobianMethods:
 class TestParallelJacobianExecution:
     """Test that optimization with parallel jacobian completes correctly."""
 
-    def test_execute_with_parallel_jacobian_completes(self, mpi_comm):
+    def test_execute_with_parallel_jacobian_completes(self, mpi_comm, jacobian_system_size):
         """Execute with parallel jacobian should complete without deadlock."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -327,7 +328,7 @@ class TestParallelJacobianExecution:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -356,7 +357,9 @@ class TestParallelJacobianExecution:
         if mpi_comm.Get_rank() == 0:
             assert all(all_completed), "All ranks should complete execution"
 
-    def test_execute_with_parallel_jacobian_produces_result(self, mpi_comm):
+    def test_execute_with_parallel_jacobian_produces_result(
+        self, mpi_comm, jacobian_system_size
+    ):
         """Execute with parallel jacobian should produce optimization result."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -366,7 +369,7 @@ class TestParallelJacobianExecution:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -387,7 +390,9 @@ class TestParallelJacobianExecution:
             assert alg.result is not None, "Rank 0 should have optimization result"
             assert hasattr(alg.result, "fun"), "Result should have 'fun' attribute"
 
-    def test_multiple_executions_with_parallel_jacobian(self, mpi_comm):
+    def test_multiple_executions_with_parallel_jacobian(
+        self, mpi_comm, jacobian_system_size
+    ):
         """Multiple executions with parallel jacobian should all complete."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -397,7 +402,7 @@ class TestParallelJacobianExecution:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -432,7 +437,7 @@ class TestParallelJacobianExecution:
 class TestParallelJacobianEdgeCases:
     """Test edge cases and potential failure modes."""
 
-    def test_depth_greater_than_one(self, mpi_comm):
+    def test_depth_greater_than_one(self, mpi_comm, jacobian_system_size):
         """Parallel jacobian with depth > 1 should work correctly."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -442,7 +447,7 @@ class TestParallelJacobianEdgeCases:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -465,7 +470,7 @@ class TestParallelJacobianEdgeCases:
         if mpi_comm.Get_rank() == 0:
             assert all(all_completed), "Should complete with depth > 1"
 
-    def test_uneven_parameter_distribution(self, mpi_comm):
+    def test_uneven_parameter_distribution(self, mpi_comm, jacobian_system_size):
         """Test when parameters don't divide evenly among subcomms."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -475,7 +480,7 @@ class TestParallelJacobianEdgeCases:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -548,7 +553,7 @@ class TestParallelJacobianEdgeCases:
 class TestVarMapDistribution:
     """Test that variational parameters are correctly distributed."""
 
-    def test_var_map_created_during_execute(self, mpi_comm):
+    def test_var_map_created_during_execute(self, mpi_comm, jacobian_system_size):
         """var_map should be created during execute when multiple subcomms exist."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -558,7 +563,7 @@ class TestVarMapDistribution:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -582,7 +587,7 @@ class TestVarMapDistribution:
             ), "var_map should exist with multiple subcomms after execute"
             assert isinstance(alg.var_map, list), "var_map should be a list"
 
-    def test_var_map_covers_all_parameters(self, mpi_comm):
+    def test_var_map_covers_all_parameters(self, mpi_comm, jacobian_system_size):
         """var_map should cover all variational parameters."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -592,7 +597,7 @@ class TestVarMapDistribution:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
         depth = 3
         n_params = depth * 2  # 2 params per depth for QWOA
 
@@ -640,7 +645,7 @@ class TestVarMapDistribution:
 class TestJacobianSynchronization:
     """Test that jacobian computation properly synchronizes across ranks."""
 
-    def test_stop_flag_propagates_to_all_ranks(self, mpi_comm):
+    def test_stop_flag_propagates_to_all_ranks(self, mpi_comm, jacobian_system_size):
         """Stop flag should propagate to all ranks when optimization completes."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -650,7 +655,7 @@ class TestJacobianSynchronization:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -673,7 +678,7 @@ class TestJacobianSynchronization:
             # All ranks that participated should have stop=True
             assert all(all_stop), f"All ranks should have stop=True after execute: {all_stop}"
 
-    def test_no_deadlock_with_early_termination(self, mpi_comm):
+    def test_no_deadlock_with_early_termination(self, mpi_comm, jacobian_system_size):
         """Optimization that terminates early should not deadlock."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -683,7 +688,7 @@ class TestJacobianSynchronization:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -723,7 +728,7 @@ class TestJacobianCorrectness:
     Both should converge to the same result.
     """
 
-    def test_parallel_jacobian_matches_serial_forward(self, mpi_comm):
+    def test_parallel_jacobian_matches_serial_forward(self, mpi_comm, jacobian_system_size):
         """Parallel forward-difference jacobian should match serial optimization."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -733,7 +738,7 @@ class TestJacobianCorrectness:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
         depth = 2
         seed = 42
 
@@ -801,7 +806,7 @@ class TestJacobianCorrectness:
                 f"serial={serial_result_x}\nparallel={parallel_result_x}"
             )
 
-    def test_parallel_jacobian_matches_serial_central(self, mpi_comm):
+    def test_parallel_jacobian_matches_serial_central(self, mpi_comm, jacobian_system_size):
         """Parallel central-difference jacobian should match serial optimization."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -811,7 +816,7 @@ class TestJacobianCorrectness:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
         depth = 2
         seed = 123
 
@@ -864,7 +869,9 @@ class TestJacobianCorrectness:
                 f"serial={serial_result_fun}, parallel={parallel_result_fun}"
             )
 
-    def test_parallel_jacobian_convergence_deeper_circuit(self, mpi_comm):
+    def test_parallel_jacobian_convergence_deeper_circuit(
+        self, mpi_comm, jacobian_system_size
+    ):
         """Parallel jacobian should work correctly with deeper circuits."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -874,7 +881,7 @@ class TestJacobianCorrectness:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
         depth = 4  # More parameters = more work for jacobian
         seed = 456
 
@@ -926,13 +933,10 @@ class TestJacobianCorrectness:
                 f"serial={serial_result_fun}, parallel={parallel_result_fun}"
             )
 
-    def test_parallel_jacobian_gradient_accuracy(self, mpi_comm):
-        """Test that parallel jacobian computes accurate gradients.
+    def test_parallel_jacobian_gradient_accuracy(self, mpi_comm, jacobian_system_size):
+        """Parallel jacobian should match a collective finite-difference reference."""
 
-        Compare gradients at a fixed point computed by parallel jacobian
-        vs scipy's approx_fprime.
-        """
-
+        from scipy.optimize import approx_fprime
         from quop_mpi.algorithm.combinatorial import QWOA
 
         size = mpi_comm.Get_size()
@@ -941,39 +945,41 @@ class TestJacobianCorrectness:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
         depth = 2
 
         # Fixed test point
-        np.random.seed(789)
-        test_params = np.random.uniform(-np.pi, np.pi, depth * 2)
+        rng = np.random.default_rng(789)
+        test_params = rng.uniform(-np.pi, np.pi, depth * 2)
 
-        # Create algorithm and setup for gradient evaluation
+        # Prepare the duplicated ansatz instances without running an optimizer
+        # so we can compare the jacobian call directly to a finite-difference
+        # reference evaluated collectively on each subcommunicator.
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
         alg.set_depth(depth)
-
         alg.set_parallel_jacobian(n_workers=2, method="forward")
+        alg.prepare()
 
-        # Use just 1 iteration to get gradient at initial point
-        alg.set_optimiser(
-            "scipy",
-            {"method": "BFGS", "options": {"maxiter": 1, "gtol": 1e-10}},
-            ["fun", "jac", "nfev"],
-        )
+        def objective_for_approx_fprime(x):
+            value = alg.objective(np.asarray(x, dtype=np.float64))
+            return 0.0 if value is None else float(value)
 
-        alg.execute(test_params.copy())
+        parallel_gradient = alg._mpi_jacobian(test_params.copy())
+        reference_gradient = approx_fprime(test_params, objective_for_approx_fprime, alg.h)
+        alg.destroy()
 
         if mpi_comm.Get_rank() == 0:
-            # The optimization should have computed at least one gradient
-            # Check that the result exists and has reasonable properties
-            assert alg.result is not None, "Should have optimization result"
-            assert hasattr(alg.result, "fun"), "Result should have objective value"
-
-            # The objective value should be a reasonable number (not NaN or Inf)
-            assert np.isfinite(
-                alg.result.fun
-            ), f"Objective value should be finite, got {alg.result.fun}"
+            assert parallel_gradient is not None, "Rank 0 should receive the gathered jacobian"
+            assert np.all(np.isfinite(parallel_gradient)), parallel_gradient
+            assert np.all(np.isfinite(reference_gradient)), reference_gradient
+            np.testing.assert_allclose(
+                parallel_gradient,
+                reference_gradient,
+                rtol=1e-4,
+                atol=1e-6,
+                err_msg="Parallel jacobian should match the finite-difference reference",
+            )
 
 
 # =============================================================================
@@ -985,7 +991,7 @@ class TestJacobianCorrectness:
 class TestParallelJacobianInputValidation:
     """Test input validation for set_parallel_jacobian."""
 
-    def test_invalid_method_string_raises_or_handled(self, mpi_comm):
+    def test_invalid_method_string_raises_or_handled(self, mpi_comm, jacobian_system_size):
         """Invalid method string should be handled gracefully."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -995,7 +1001,7 @@ class TestParallelJacobianInputValidation:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -1014,7 +1020,7 @@ class TestParallelJacobianInputValidation:
         # Note: The actual error would occur during execute when
         # the jacobian function is called
 
-    def test_reconfiguration_overwrites_previous(self, mpi_comm):
+    def test_reconfiguration_overwrites_previous(self, mpi_comm, jacobian_system_size):
         """Calling set_parallel_jacobian twice should overwrite previous config."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -1024,7 +1030,7 @@ class TestParallelJacobianInputValidation:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -1051,7 +1057,7 @@ class TestParallelJacobianInputValidation:
         assert alg.h == 1e-8
         assert alg.n_jacobian_workers == 4
 
-    def test_default_step_size(self, mpi_comm):
+    def test_default_step_size(self, mpi_comm, jacobian_system_size):
         """When h is not specified, default should be sqrt(machine epsilon)."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -1061,7 +1067,7 @@ class TestParallelJacobianInputValidation:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -1073,7 +1079,7 @@ class TestParallelJacobianInputValidation:
         expected_h = np.sqrt(np.finfo(float).eps)
         assert alg.h == expected_h, f"Expected h={expected_h}, got h={alg.h}"
 
-    def test_maxcomm_larger_than_ranks(self, mpi_comm):
+    def test_maxcomm_larger_than_ranks(self, mpi_comm, jacobian_system_size):
         """n_workers larger than available ranks should be handled gracefully."""
         import warnings
 
@@ -1085,7 +1091,7 @@ class TestParallelJacobianInputValidation:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -1135,7 +1141,7 @@ class TestParallelJacobianInputValidation:
 class TestParallelJacobianWithQAOA:
     """Test parallel jacobian with QAOA algorithm (not just QWOA)."""
 
-    def test_qaoa_with_parallel_jacobian_completes(self, mpi_comm):
+    def test_qaoa_with_parallel_jacobian_completes(self, mpi_comm, jacobian_system_size):
         """QAOA should work with parallel jacobian."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
@@ -1145,7 +1151,7 @@ class TestParallelJacobianWithQAOA:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -1168,7 +1174,7 @@ class TestParallelJacobianWithQAOA:
         if mpi_comm.Get_rank() == 0:
             assert all(all_completed), "QAOA with parallel jacobian should complete"
 
-    def test_qaoa_parallel_jacobian_produces_result(self, mpi_comm):
+    def test_qaoa_parallel_jacobian_produces_result(self, mpi_comm, jacobian_system_size):
         """QAOA with parallel jacobian should produce valid result."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
@@ -1178,7 +1184,7 @@ class TestParallelJacobianWithQAOA:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -1208,7 +1214,7 @@ class TestParallelJacobianWithQAOA:
 class TestParallelJacobianCleanup:
     """Test cleanup and resource management with parallel jacobian."""
 
-    def test_destroy_after_parallel_jacobian(self, mpi_comm):
+    def test_destroy_after_parallel_jacobian(self, mpi_comm, jacobian_system_size):
         """destroy() should work after using parallel jacobian."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -1218,7 +1224,7 @@ class TestParallelJacobianCleanup:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
@@ -1245,7 +1251,7 @@ class TestParallelJacobianCleanup:
         if mpi_comm.Get_rank() == 0:
             assert all(all_completed), "destroy() should complete without error"
 
-    def test_reexecute_after_destroy(self, mpi_comm):
+    def test_reexecute_after_destroy(self, mpi_comm, jacobian_system_size):
         """Should be able to execute again after destroy with parallel jacobian."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -1255,7 +1261,7 @@ class TestParallelJacobianCleanup:
 
         skip_wavefront_parallel_jacobian()
 
-        system_size = 64
+        system_size = jacobian_system_size
 
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})

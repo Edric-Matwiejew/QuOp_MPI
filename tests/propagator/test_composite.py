@@ -16,25 +16,6 @@ Run with wavefront backend:
 
 import numpy as np
 import pytest
-from mpi4py import MPI
-
-from quop_mpi import config
-
-# =============================================================================
-# Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-def backend_name():
-    """Return the current backend name for test reporting."""
-    return config.backend
-
-
-@pytest.fixture
-def mpi_comm():
-    """MPI COMM_WORLD fixture."""
-    return MPI.COMM_WORLD
 
 
 # =============================================================================
@@ -46,14 +27,14 @@ def mpi_comm():
 class TestCompositeViaQMOA:
     """Tests for composite propagator through QMOA algorithm."""
 
-    def test_identity_evolution(self, mpi_comm, backend_name):
+    def test_identity_evolution(self, mpi_comm, backend_name, composite_grid_ns_2d):
         """Test that zero parameters give identity evolution."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def sphere(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = composite_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -79,14 +60,14 @@ class TestCompositeViaQMOA:
 
         alg.destroy()
 
-    def test_preserves_normalization(self, mpi_comm, backend_name):
+    def test_preserves_normalization(self, mpi_comm, backend_name, composite_grid_ns_2d):
         """Test that evolution preserves state normalization."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def sphere(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = composite_grid_ns_2d  # noqa: N806
         bounds = [[-2.0, 2.0], [-2.0, 2.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -109,14 +90,14 @@ class TestCompositeViaQMOA:
 
         alg.destroy()
 
-    def test_deterministic_evolution(self, mpi_comm, backend_name):
+    def test_deterministic_evolution(self, mpi_comm, backend_name, composite_grid_ns_2d):
         """Test that same parameters produce same results."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def sphere(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = composite_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -156,14 +137,14 @@ class TestCompositeViaQMOA:
 class TestCompleteGraphMixing:
     """Tests for complete graph mixing via composite propagator."""
 
-    def test_mixing_from_localized_state(self, mpi_comm, backend_name):
+    def test_mixing_from_localized_state(self, mpi_comm, backend_name, composite_grid_ns_2d):
         """Test mixing spreads amplitude from localized initial state."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def zero_qualities(x):
             return np.zeros(x.shape[0])
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = composite_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -178,9 +159,8 @@ class TestCompleteGraphMixing:
         n_params = alg.total_params * alg.ansatz_depth
         params = np.zeros(n_params)
         # Set mixer parameters (second set of params for depth=1)
-        # For QMOA, params are [gamma, t1, t2, ...] per layer
-        # Actually for QMOA: n_params = total_params * depth = (1 + n_dim) * depth
-        # For Ns=[2,2]: n_dim=2, so 3 params per layer
+        # For QMOA, params are [gamma, t1, t2, ...] per layer.
+        # In the 2D case there are 3 params per layer.
         params[1] = t  # First mixer dimension
         params[2] = t  # Second mixer dimension
 
@@ -206,7 +186,7 @@ class TestCompleteGraphMixing:
 class TestMultiDepthEvolution:
     """Tests for multiple layers of evolution."""
 
-    def test_depth_2_evolution(self, mpi_comm, backend_name):
+    def test_depth_2_evolution(self, mpi_comm, backend_name, composite_grid_ns_2d):
         """Test evolution with depth=2."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
@@ -214,7 +194,7 @@ class TestMultiDepthEvolution:
             n = x.shape[1]
             return n * 10 + np.sum(x**2 - 10 * np.cos(2 * np.pi * x), axis=1)
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = composite_grid_ns_2d  # noqa: N806
         bounds = [[-2.0, 2.0], [-2.0, 2.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -234,14 +214,14 @@ class TestMultiDepthEvolution:
 
         alg.destroy()
 
-    def test_depth_3_evolution(self, mpi_comm, backend_name):
+    def test_depth_3_evolution(self, mpi_comm, backend_name, composite_grid_ns_2d):
         """Test evolution with depth=3."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def sphere(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = composite_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -271,14 +251,14 @@ class TestMultiDepthEvolution:
 class TestGridSizes:
     """Tests for various grid sizes and dimensions."""
 
-    def test_1d_grid(self, mpi_comm, backend_name):
+    def test_1d_grid(self, mpi_comm, backend_name, composite_grid_ns_1d):
         """Test 1D grid (single dimension)."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def f1d(x):
             return x[:, 0] ** 2
 
-        Ns = [5]  # 32 points -- must exceed rank count for FFTW partitioning  # noqa: N806
+        Ns = composite_grid_ns_1d  # noqa: N806
         bounds = [[-2.0, 2.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -297,14 +277,14 @@ class TestGridSizes:
 
         alg.destroy()
 
-    def test_3d_grid(self, mpi_comm, backend_name):
+    def test_3d_grid(self, mpi_comm, backend_name, composite_grid_ns_3d):
         """Test 3D grid."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def f3d(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2, 2]  # 4x4x4 = 64 points  # noqa: N806
+        Ns = composite_grid_ns_3d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -322,13 +302,13 @@ class TestGridSizes:
 
         alg.destroy()
 
-    def test_large_grid_multi_rank(self, mpi_comm, backend_name):
+    def test_large_grid_multi_rank(self, mpi_comm, backend_name, composite_grid_ns_2d_large):
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def sphere(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [3, 3]  # 8x8 = 64 points  # noqa: N806
+        Ns = composite_grid_ns_2d_large  # noqa: N806
         bounds = [[-2.0, 2.0], [-2.0, 2.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)
@@ -361,14 +341,16 @@ class TestBackendConsistency:
         """Verify backend configuration is accessible."""
         assert backend_name in ["mpi", "wavefront"], f"Unknown backend: {backend_name}"
 
-    def test_evolution_produces_valid_probabilities(self, mpi_comm, backend_name):
+    def test_evolution_produces_valid_probabilities(
+        self, mpi_comm, backend_name, composite_grid_ns_2d
+    ):
         """Test that evolution produces valid probability distribution."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
         def sphere(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = composite_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
 
         deltas, mins = setup_cartesian(Ns, bounds)

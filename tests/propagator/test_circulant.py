@@ -16,25 +16,6 @@ Run with wavefront backend:
 
 import numpy as np
 import pytest
-from mpi4py import MPI
-
-from quop_mpi import config
-
-# =============================================================================
-# Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-def backend_name():
-    """Return the current backend name for test reporting."""
-    return config.backend
-
-
-@pytest.fixture
-def mpi_comm():
-    """MPI COMM_WORLD fixture."""
-    return MPI.COMM_WORLD
 
 
 # =============================================================================
@@ -46,11 +27,11 @@ def mpi_comm():
 class TestCirculantViaQWOA:
     """Tests for circulant propagator through QWOA algorithm."""
 
-    def test_identity_evolution(self, mpi_comm, backend_name):
+    def test_identity_evolution(self, mpi_comm, backend_name, circulant_small_system_size):
         """Test that zero parameters give identity evolution."""
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = 16
+        system_size = circulant_small_system_size
 
         def qualities_func():
             return np.ones(system_size, dtype=np.float64)
@@ -77,11 +58,11 @@ class TestCirculantViaQWOA:
 
         alg.destroy()
 
-    def test_preserves_normalization(self, mpi_comm, backend_name):
+    def test_preserves_normalization(self, mpi_comm, backend_name, circulant_medium_system_size):
         """Test that evolution preserves state normalization."""
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = 32
+        system_size = circulant_medium_system_size
 
         def random_qualities():
             rng = np.random.default_rng(42)
@@ -107,11 +88,11 @@ class TestCirculantViaQWOA:
 
         alg.destroy()
 
-    def test_deterministic_evolution(self, mpi_comm, backend_name):
+    def test_deterministic_evolution(self, mpi_comm, backend_name, circulant_small_system_size):
         """Test that same parameters produce same results."""
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = 16
+        system_size = circulant_small_system_size
 
         def qualities_func():
             return np.arange(system_size, dtype=np.float64)
@@ -142,11 +123,13 @@ class TestCirculantViaQWOA:
                 probs1, probs2, rtol=1e-12, err_msg=f"[{backend_name}] Evolution not deterministic"
             )
 
-    def test_destroy_is_idempotent_after_prepare(self, mpi_comm, backend_name):
+    def test_destroy_is_idempotent_after_prepare(
+        self, mpi_comm, backend_name, circulant_small_system_size
+    ):
         """Destroying a planned QWOA multiple times should stay safe."""
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = max(16, mpi_comm.Get_size())
+        system_size = circulant_small_system_size
 
         def qualities_func():
             return np.ones(system_size, dtype=np.float64)
@@ -170,11 +153,11 @@ class TestCirculantViaQWOA:
 class TestCirculantOperators:
     """Tests for different circulant operator types."""
 
-    def test_complete_graph_operator(self, mpi_comm, backend_name):
+    def test_complete_graph_operator(self, mpi_comm, backend_name, circulant_small_system_size):
         """Test evolution with complete graph operator."""
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = 16
+        system_size = circulant_small_system_size
 
         def qualities_func():
             return np.ones(system_size, dtype=np.float64)
@@ -194,13 +177,13 @@ class TestCirculantOperators:
 
         alg.destroy()
 
-    def test_cycle_graph_operator(self, mpi_comm, backend_name):
+    def test_cycle_graph_operator(self, mpi_comm, backend_name, circulant_small_system_size):
         """Test evolution with cycle graph operator (i=1)."""
         from quop_mpi.ansatz import Ansatz
         from quop_mpi.propagator import diagonal
         from quop_mpi.propagator.circulant import operator, unitary
 
-        system_size = 16
+        system_size = circulant_small_system_size
 
         def qualities_func(local_i, local_i_offset, system_size):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -225,13 +208,13 @@ class TestCirculantOperators:
 
         ansatz.destroy()
 
-    def test_general_circulant_operator(self, mpi_comm, backend_name):
+    def test_general_circulant_operator(self, mpi_comm, backend_name, circulant_small_system_size):
         """Test evolution with general circulant graph operator."""
         from quop_mpi.ansatz import Ansatz
         from quop_mpi.propagator import diagonal
         from quop_mpi.propagator.circulant import operator, unitary
 
-        system_size = 16
+        system_size = circulant_small_system_size
 
         def qualities_func(local_i, local_i_offset, system_size):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -256,13 +239,15 @@ class TestCirculantOperators:
 
         ansatz.destroy()
 
-    def test_replanning_same_circulant_unitary_is_safe(self, mpi_comm, backend_name):
+    def test_replanning_same_circulant_unitary_is_safe(
+        self, mpi_comm, backend_name, circulant_small_system_size
+    ):
         """Repeated gen_operator() calls should replace old FFTW plans safely."""
         from quop_mpi.ansatz import Ansatz
         from quop_mpi.propagator import diagonal
         from quop_mpi.propagator.circulant import operator, unitary
 
-        system_size = max(16, mpi_comm.Get_size())
+        system_size = circulant_small_system_size
 
         def qualities_func(local_i, local_i_offset, system_size):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -301,11 +286,13 @@ class TestMultiRankConsistency:
     """Tests that verify consistent results across MPI ranks."""
 
     @pytest.mark.requires_nprocs(2)
-    def test_all_ranks_same_probabilities(self, mpi_comm, backend_name):
+    def test_all_ranks_same_probabilities(
+        self, mpi_comm, backend_name, circulant_medium_system_size
+    ):
         """Test that all ranks compute the same probabilities."""
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = 32
+        system_size = circulant_medium_system_size
 
         def qualities_func():
             return np.arange(system_size, dtype=np.float64)
@@ -409,22 +396,20 @@ class TestMaxCutProblem:
                         C += 0.5 * (I(n) - (Z(i, n) @ Z(j, n)))  # noqa: N806
             return -C.diagonal()
 
+        uniform_expectation = float(np.mean(maxcut_qualities(A)))
+
         alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(serial, {"args": [maxcut_qualities, A]})
         alg.set_depth(3)
+        alg.set_seed(123)
+        alg.execute()
 
-        # Use optimized parameters (precomputed for this problem)
-        # These should give better than random sampling
-        params = np.array([0.5, 0.785, 0.3, 0.6, 0.2, 0.4])
-        alg.evolve_state(params)
-
-        expectation = alg.objective(params)
-
-        # The expectation should be better than -3 (which is the MaxCut value
-        # divided by 2 for a triangle - optimal is 2 edges cut)
+        # Better-than-random here means lower cost than the uniform superposition
+        # baseline for this fixed triangle instance.
         if mpi_comm.Get_rank() == 0:
-            # Just check the algorithm runs and produces a valid expectation
+            expectation = float(alg.result["fun"])
             assert np.isfinite(expectation)
+            assert expectation < uniform_expectation
 
         alg.destroy()
 
@@ -438,7 +423,7 @@ class TestMaxCutProblem:
 class TestBackendConsistency:
     """Tests that can be used to compare MPI and wavefront backends."""
 
-    def test_known_evolution(self, mpi_comm, backend_name):
+    def test_known_evolution(self, mpi_comm, backend_name, circulant_small_system_size):
         """Test evolution against known analytical results.
 
         For a complete graph with uniform initial state and uniform qualities,
@@ -446,7 +431,7 @@ class TestBackendConsistency:
         """
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = 8
+        system_size = circulant_small_system_size
 
         # Uniform qualities - all same
         def uniform_qualities():
@@ -463,19 +448,22 @@ class TestBackendConsistency:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            # Check normalization
-            assert np.sum(probs) == pytest.approx(1.0, rel=1e-10)
-            # With gamma=0, the phase unitary is identity
-            # The mixing unitary should still preserve uniform superposition
-            # symmetry for uniform qualities
+            expected = np.full(system_size, 1.0 / system_size, dtype=np.float64)
+            np.testing.assert_allclose(
+                probs,
+                expected,
+                rtol=1e-10,
+                atol=1e-12,
+                err_msg=f"[{backend_name}] Uniform state should remain invariant",
+            )
 
         alg.destroy()
 
-    def test_gradient_consistency(self, mpi_comm, backend_name):
+    def test_gradient_consistency(self, mpi_comm, backend_name, circulant_small_system_size):
         """Test that numerical gradients are consistent."""
         from quop_mpi.algorithm.combinatorial import QWOA, serial
 
-        system_size = 16
+        system_size = circulant_small_system_size
 
         def qualities_func():
             return np.arange(system_size, dtype=np.float64)
@@ -489,14 +477,23 @@ class TestBackendConsistency:
         alg.evolve_state(params)
         obj1 = alg.objective(params)
 
-        # Perturb and compute again
-        eps = 1e-8
-        params_perturbed = params + np.array([eps, 0])
-        obj2 = alg.objective(params_perturbed)
+        eps = 1e-6
+        forward_obj = alg.objective(params + np.array([eps, 0.0]))
+        backward_obj = alg.objective(params - np.array([eps, 0.0]))
+        half_eps = eps / 2
+        forward_half = alg.objective(params + np.array([half_eps, 0.0]))
+        backward_half = alg.objective(params - np.array([half_eps, 0.0]))
 
-        # Numerical gradient should be reasonable
         if mpi_comm.Get_rank() == 0:
-            grad = (obj2 - obj1) / eps
-            assert np.isfinite(grad)
+            grad_eps = (forward_obj - backward_obj) / (2 * eps)
+            grad_half_eps = (forward_half - backward_half) / (2 * half_eps)
+            assert np.isfinite(grad_eps)
+            assert np.isfinite(grad_half_eps)
+            assert np.isclose(
+                grad_eps,
+                grad_half_eps,
+                rtol=1e-3,
+                atol=1e-5,
+            ), f"[{backend_name}] Gradient estimates drift: {grad_eps} vs {grad_half_eps}"
 
         alg.destroy()

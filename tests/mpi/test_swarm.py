@@ -25,16 +25,39 @@ import pytest
 # =============================================================================
 
 
+def _scaled_grid_exponents(mpi_sizing, base_exponents):
+    """Scale multivariable swarm grids while preserving their dimensions."""
+    exponents = [int(exponent) for exponent in base_exponents]
+    extra_bits = max(0, (mpi_sizing.topology.world_size - 1).bit_length() - 1)
+    for _ in range(extra_bits):
+        smallest = min(exponents)
+        index = exponents.index(smallest)
+        exponents[index] += 1
+    return exponents
+
+
+@pytest.fixture
+def swarm_system_size(small_system_size):
+    """Small power-of-two size for swarm algorithm tests."""
+    return small_system_size
+
+
+@pytest.fixture
+def swarm_grid_ns_2d(mpi_sizing):
+    """2D multivariable swarm grid that scales with MPI size."""
+    return _scaled_grid_exponents(mpi_sizing, [2, 2])
+
+
 @pytest.mark.mpi
 class TestSwarmInitialization:
     """Tests for swarm initialization and subcommunicator creation."""
 
-    def test_swarm_creates_subcommunicators(self, mpi_comm):
+    def test_swarm_creates_subcommunicators(self, mpi_comm, swarm_system_size):
         """Test that swarm creates subcommunicators correctly."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -53,12 +76,12 @@ class TestSwarmInitialization:
 
         s.destroy()
 
-    def test_swarm_inherits_ansatz_methods(self, mpi_comm):
+    def test_swarm_inherits_ansatz_methods(self, mpi_comm, swarm_system_size):
         """Test that swarm provides access to Ansatz methods."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -73,12 +96,12 @@ class TestSwarmInitialization:
 
         s.destroy()
 
-    def test_swarm_with_qwoa(self, mpi_comm):
+    def test_swarm_with_qwoa(self, mpi_comm, swarm_system_size):
         """Test swarm initialization with QWOA algorithm."""
         from quop_mpi.algorithm.combinatorial import QWOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -105,12 +128,12 @@ class TestSwarmInitialization:
 class TestSwarmExecution:
     """Tests for swarm execution and optimization."""
 
-    def test_swarm_execute_single(self, mpi_comm):
+    def test_swarm_execute_single(self, mpi_comm, swarm_system_size):
         """Test executing a single optimization through swarm."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             # Quality with clear minimum at index 0
@@ -135,12 +158,12 @@ class TestSwarmExecution:
 
         s.destroy()
 
-    def test_swarm_get_optimal_result(self, mpi_comm):
+    def test_swarm_get_optimal_result(self, mpi_comm, swarm_system_size):
         """Test retrieving optimal result across swarm."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -166,12 +189,12 @@ class TestSwarmExecution:
 
         s.destroy()
 
-    def test_swarm_evolve_state(self, mpi_comm):
+    def test_swarm_evolve_state(self, mpi_comm, swarm_system_size):
         """Test evolving state through swarm."""
         from quop_mpi.algorithm.combinatorial import QWOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -204,18 +227,20 @@ class TestSwarmExecution:
 class TestSwarmMultipleSubcomms:
     """Tests for swarm with multiple subcommunicators (when ranks > 1)."""
 
-    def test_swarm_deterministic_across_subcomms(self, mpi_comm):
+    def test_swarm_deterministic_across_subcomms(self, mpi_comm, swarm_system_size):
         """Test that same parameters give same results in different subcomms."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        if mpi_comm.Get_size() < 2:
+            pytest.skip("Need at least 2 MPI ranks for multiple swarm subcommunicators")
+
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        # With nodes_per_subcomm=None, all ranks form one subcommunicator
-        s = Swarm(1, mpi_comm, QAOA, system_size)
+        s = Swarm(2, mpi_comm, QAOA, system_size)
 
         s.set_qualities(qualities)
         s.set_depth(1)
@@ -224,12 +249,20 @@ class TestSwarmMultipleSubcomms:
         params = np.array([0.3, 0.4])
         s.evolve_state(params)
 
-        # All subcomms should get same expectation value
+        local_result = None
         if s.swarm_comms.in_subcomm():
             exp_val = s.ansatz.get_expectation_value()
+            if s.swarm_comms.in_rootcomm():
+                local_result = (s.swarm_comms.get_subcomm_index(), float(exp_val))
 
-            if mpi_comm.Get_rank() == 0:
-                assert exp_val is not None
+        gathered = mpi_comm.gather(local_result, root=0)
+
+        if mpi_comm.Get_rank() == 0:
+            subcomm_results = {idx: value for item in gathered if item is not None for idx, value in [item]}
+            assert len(subcomm_results) == 2
+            reference = next(iter(subcomm_results.values()))
+            for value in subcomm_results.values():
+                assert np.isclose(value, reference), subcomm_results
 
         s.destroy()
 
@@ -243,12 +276,12 @@ class TestSwarmMultipleSubcomms:
 class TestExecuteSwarm:
     """Tests for execute_swarm parallel task distribution."""
 
-    def test_execute_swarm_runs_multiple_tasks(self, mpi_comm):
+    def test_execute_swarm_runs_multiple_tasks(self, mpi_comm, swarm_system_size):
         """Test that execute_swarm can run multiple optimization tasks."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -292,12 +325,12 @@ class TestExecuteSwarm:
 class TestSwarmUtilities:
     """Tests for swarm utility methods."""
 
-    def test_swarm_destroy_tears_down_ansatz(self, mpi_comm):
+    def test_swarm_destroy_tears_down_ansatz(self, mpi_comm, swarm_system_size):
         """Destroy should release the owned Ansatz before freeing subcomms."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -315,12 +348,12 @@ class TestSwarmUtilities:
         if mpi_comm.Get_size() >= 1:
             assert s.ansatz is None
 
-    def test_swarm_set_seed(self, mpi_comm):
+    def test_swarm_set_seed(self, mpi_comm, swarm_system_size):
         """Test that set_seed is properly forwarded to ansatz."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -338,12 +371,12 @@ class TestSwarmUtilities:
 
         s.destroy()
 
-    def test_swarm_gen_initial_params(self, mpi_comm):
+    def test_swarm_gen_initial_params(self, mpi_comm, swarm_system_size):
         """Test generating initial parameters through swarm."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -363,7 +396,7 @@ class TestSwarmUtilities:
 
         s.destroy()
 
-    def test_swarm_print_result(self, mpi_comm):
+    def test_swarm_print_result(self, mpi_comm, swarm_system_size):
         """Test that print_result works through swarm."""
         import io
         import sys
@@ -371,7 +404,7 @@ class TestSwarmUtilities:
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
-        system_size = 8
+        system_size = swarm_system_size
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -410,7 +443,7 @@ class TestSwarmUtilities:
 class TestSwarmMultivariable:
     """Tests for swarm with multivariable algorithms."""
 
-    def test_swarm_with_qmoa(self, mpi_comm):
+    def test_swarm_with_qmoa(self, mpi_comm, swarm_grid_ns_2d):
         """Test swarm initialization with QMOA algorithm."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
         from quop_mpi.meta import Swarm
@@ -418,7 +451,7 @@ class TestSwarmMultivariable:
         def sphere(x):
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]  # noqa: N806
+        Ns = swarm_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 

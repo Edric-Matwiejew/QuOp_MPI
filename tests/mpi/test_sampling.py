@@ -12,6 +12,29 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
+from tests.conftest import TestOracle
+
+
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two size that keeps sampling tests multi-rank aware."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1, min_per_node=16)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density while allowing larger systems."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the sampling oracle while preserving M/N = 1/16."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
+
 
 @pytest.mark.mpi
 class TestSetSamplingBasic:
@@ -367,17 +390,27 @@ class TestCustomSamplingFunction:
             max_sample_iterations=max_iters,
         )
 
-        alg.execute()
+        alg.prepare()
+        alg.evaluate(np.array([0.1, 0.2]))
 
-        # The function should be called max_iterations times per objective call
-        # since it always returns False
+        total_iterations = mpi_comm.reduce(iteration_count[0], op=MPI.SUM, root=0)
+
+        # The function should be called max_iterations times for the single
+        # sampled objective evaluation, since it always returns False.
+        if mpi_comm.Get_rank() == 0:
+            assert total_iterations == max_iters
+            assert alg.total_shots == alg.sample_block_size * max_iters
+
         alg.destroy()
 
     def test_custom_sampling_function_early_accept(self, mpi_comm, simple_oracle):
         """Verify custom function returning True stops sampling early."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
+        iteration_count = [0]
+
         def always_accept(samples):
+            iteration_count[0] += 1
             return np.mean(samples), True
 
         alg = QAOA(simple_oracle.system_size, mpi_comm)
@@ -385,11 +418,14 @@ class TestCustomSamplingFunction:
         alg.set_depth(1)
         alg.set_sampling(sample_block_size=10, function=always_accept, max_sample_iterations=100)
 
-        alg.execute()
+        alg.prepare()
+        alg.evaluate(np.array([0.1, 0.2]))
 
-        # Should complete quickly since it accepts after first block
+        total_iterations = mpi_comm.reduce(iteration_count[0], op=MPI.SUM, root=0)
+
         if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
+            assert total_iterations == 1
+            assert alg.total_shots == alg.sample_block_size
 
         alg.destroy()
 

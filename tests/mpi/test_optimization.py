@@ -15,6 +15,34 @@ import pytest
 from tests.conftest import TestOracle
 
 
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two size that keeps all active ranks in play."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density when scaling the system."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the default optimization oracle while preserving M/N = 1/16."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
+
+
+@pytest.fixture
+def single_solution_oracle(mpi_sizing):
+    """Scale the single-solution optimization oracle with MPI world size."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(system_size=system_size, n_marked=1, seed=123)
+
+
 @pytest.mark.mpi
 class TestExecuteBasic:
     """Test basic execute() functionality."""
@@ -101,12 +129,17 @@ class TestOptimizationQuality:
 
         alg.destroy()
 
-    def test_optimization_finds_low_expectation(self, mpi_comm):
+    def test_optimization_finds_low_expectation(self, mpi_comm, mpi_sizing):
         """Verify optimization can find solutions with low objective value."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
         # Use oracle with multiple solutions (easier to optimize)
-        oracle = TestOracle(system_size=64, n_marked=8, seed=789)
+        system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+        oracle = TestOracle(
+            system_size=system_size,
+            n_marked=_marked_count_from_ratio(system_size, denominator=8, minimum=8),
+            seed=789,
+        )
 
         alg = QAOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
@@ -127,11 +160,16 @@ class TestOptimizationQuality:
 
         alg.destroy()
 
-    def test_deeper_circuit_can_achieve_better_result(self, mpi_comm):
+    def test_deeper_circuit_can_achieve_better_result(self, mpi_comm, mpi_sizing):
         """Verify increasing depth allows better optimization."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        oracle = TestOracle(system_size=64, n_marked=4, seed=999)
+        system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+        oracle = TestOracle(
+            system_size=system_size,
+            n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+            seed=999,
+        )
 
         results = {}
 
@@ -195,11 +233,16 @@ class TestOptimizationConvergence:
 
         alg.destroy()
 
-    def test_multiple_executions_give_consistent_results(self, mpi_comm):
+    def test_multiple_executions_give_consistent_results(self, mpi_comm, mpi_sizing):
         """Verify repeated optimization gives similar results."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        oracle = TestOracle(system_size=32, n_marked=4, seed=111)
+        system_size = _scaled_power_of_two_system_size(mpi_sizing, base=32)
+        oracle = TestOracle(
+            system_size=system_size,
+            n_marked=_marked_count_from_ratio(system_size, denominator=8, minimum=4),
+            seed=111,
+        )
 
         expectations = []
 

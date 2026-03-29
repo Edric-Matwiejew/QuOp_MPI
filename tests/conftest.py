@@ -111,6 +111,21 @@ def pytest_configure(config):
     )
 
 
+# Directories that should never be collected under MPI.
+_SERIAL_ONLY_DIRS = ["environments", "benchmarks", "examples"]
+
+
+def pytest_ignore_collect(collection_path, config):
+    """Exclude serial-only test directories when running under MPI."""
+    if config.getoption("--with-mpi", default=False):
+        p = Path(collection_path)
+        tests_dir = Path(__file__).parent
+        for dirname in _SERIAL_ONLY_DIRS:
+            if p == tests_dir / dirname or (tests_dir / dirname) in p.parents:
+                return True
+    return False
+
+
 def pytest_report_header(config):
     """Add backend information to pytest header."""
     from quop_mpi import config as quop_config
@@ -144,6 +159,141 @@ class GroverResult:
     k_opt: int  # Optimal number of iterations
     theta: float  # Rotation angle per iteration
     success_prob: float  # Probability of measuring a marked state
+
+
+@dataclass(frozen=True)
+class MpiTopology:
+    """Cluster topology details that are useful when sizing MPI tests."""
+
+    world_size: int
+    world_rank: int
+    node_size: int
+    node_rank: int
+    node_count: int
+    n_physical_gpus: int
+    ranks_per_gpu: int
+    gpu_slots_per_node: int
+    total_gpu_slots: int
+
+    @property
+    def has_gpus(self) -> bool:
+        """True when the backend reports at least one physical GPU."""
+        return self.n_physical_gpus > 0
+
+
+@dataclass(frozen=True)
+class MpiSystemSizer:
+    """Intent-driven helpers for choosing topology-aware system sizes."""
+
+    topology: MpiTopology
+
+    def power_of_two(
+        self,
+        *,
+        base: int,
+        min_per_rank: int = 0,
+        min_per_node: int = 0,
+        min_per_gpu: int = 0,
+    ) -> int:
+        """Return a power-of-two size that scales with the active topology."""
+        target = max(1, int(base))
+        if min_per_rank:
+            target = max(target, self.topology.world_size * int(min_per_rank))
+        if min_per_node:
+            target = max(target, self.topology.node_count * int(min_per_node))
+        if min_per_gpu and self.topology.total_gpu_slots > 0:
+            target = max(target, self.topology.total_gpu_slots * int(min_per_gpu))
+        return _next_power_of_two(target)
+
+    def multiple(
+        self,
+        *,
+        base: int = 0,
+        per_rank: int = 0,
+        per_node: int = 0,
+        per_gpu: int = 0,
+        remainder: int = 0,
+    ) -> int:
+        """Return a size that preserves a remainder-based partitioning intent."""
+        target = max(1, int(base))
+        if per_rank:
+            target = max(target, self.topology.world_size * int(per_rank))
+        if per_node:
+            target = max(target, self.topology.node_count * int(per_node))
+        if per_gpu and self.topology.total_gpu_slots > 0:
+            target = max(target, self.topology.total_gpu_slots * int(per_gpu))
+        return target + int(remainder)
+
+    def prime(
+        self,
+        *,
+        base: int,
+        min_per_rank: int = 0,
+        min_per_node: int = 0,
+        min_per_gpu: int = 0,
+    ) -> int:
+        """Return a prime size at or above the requested topology-scaled floor."""
+        target = max(2, int(base))
+        if min_per_rank:
+            target = max(target, self.topology.world_size * int(min_per_rank))
+        if min_per_node:
+            target = max(target, self.topology.node_count * int(min_per_node))
+        if min_per_gpu and self.topology.total_gpu_slots > 0:
+            target = max(target, self.topology.total_gpu_slots * int(min_per_gpu))
+        return _next_prime(target)
+
+    def below_world_power_of_two(self, *, minimum: int = 2) -> int:
+        """Return the largest power of two below COMM_WORLD size."""
+        minimum = max(1, int(minimum))
+        world_size = self.topology.world_size
+        if world_size <= minimum:
+            return minimum
+        value = 1 << (world_size.bit_length() - 1)
+        if value >= world_size:
+            value //= 2
+        return max(value, minimum)
+
+    def world_fraction(
+        self,
+        numerator: int,
+        denominator: int,
+        *,
+        minimum: int = 1,
+    ) -> int:
+        """Return ceil(world_size * numerator / denominator)."""
+        if denominator <= 0:
+            raise ValueError("denominator must be positive")
+        scaled = math.ceil(self.topology.world_size * int(numerator) / int(denominator))
+        return max(int(minimum), scaled)
+
+
+def _next_power_of_two(value: int) -> int:
+    """Return the smallest power of two that is at least *value*."""
+    value = max(1, int(value))
+    return 1 << (value - 1).bit_length()
+
+
+def _is_prime(value: int) -> bool:
+    """Return True when *value* is prime."""
+    if value < 2:
+        return False
+    if value in (2, 3):
+        return True
+    if value % 2 == 0:
+        return False
+    limit = int(math.isqrt(value))
+    for factor in range(3, limit + 1, 2):
+        if value % factor == 0:
+            return False
+    return True
+
+
+def _next_prime(value: int) -> int:
+    """Return the smallest prime that is at least *value*."""
+    candidate = max(2, int(value))
+    while not _is_prime(candidate):
+        candidate += 1
+    return candidate
 
 
 def grover_params(n_marked: int, system_size: int) -> GroverResult:
@@ -197,6 +347,57 @@ def mpi_comm():
 
 
 @pytest.fixture(scope="session")
+def mpi_topology(mpi_comm):
+    """Discover the world/node/GPU topology visible to the MPI test job."""
+    node_comm = mpi_comm.Split_type(MPI.COMM_TYPE_SHARED)
+    try:
+        node_size = node_comm.Get_size()
+        node_rank = node_comm.Get_rank()
+        node_roots = mpi_comm.allreduce(1 if node_rank == 0 else 0, op=MPI.SUM)
+
+        topo_info = {
+            "n_physical_gpus": 0,
+            "ranks_per_gpu": 1,
+            "node_size": node_size,
+        }
+        try:
+            from quop_mpi._utils._comm_size import QuopMpiLayout
+
+            layout = QuopMpiLayout.create_workers(1, mpi_comm)
+            try:
+                topo_info.update(layout.get_topology_info())
+            finally:
+                layout.destroy()
+        except Exception:
+            # Tests should still be able to size by ranks/nodes even when
+            # GPU topology discovery is unavailable in the current backend.
+            pass
+
+        gpu_slots_per_node = topo_info["n_physical_gpus"] * max(topo_info["ranks_per_gpu"], 1)
+        total_gpu_slots = gpu_slots_per_node * node_roots if gpu_slots_per_node > 0 else 0
+
+        return MpiTopology(
+            world_size=mpi_comm.Get_size(),
+            world_rank=mpi_comm.Get_rank(),
+            node_size=node_size,
+            node_rank=node_rank,
+            node_count=node_roots,
+            n_physical_gpus=int(topo_info["n_physical_gpus"]),
+            ranks_per_gpu=int(topo_info["ranks_per_gpu"]),
+            gpu_slots_per_node=int(gpu_slots_per_node),
+            total_gpu_slots=int(total_gpu_slots),
+        )
+    finally:
+        node_comm.Free()
+
+
+@pytest.fixture(scope="session")
+def mpi_sizing(mpi_topology):
+    """Provide reusable, intent-driven system-size calculations."""
+    return MpiSystemSizer(mpi_topology)
+
+
+@pytest.fixture(scope="session")
 def mpi_rank(mpi_comm):
     """Current MPI rank."""
     return mpi_comm.Get_rank()
@@ -220,15 +421,15 @@ def is_root(mpi_rank):
 
 
 @pytest.fixture
-def small_system_size():
-    """Small system size for quick tests (4 qubits)."""
-    return 16
+def small_system_size(mpi_sizing):
+    """Small system size for quick tests with enough room for active ranks."""
+    return mpi_sizing.power_of_two(base=16, min_per_rank=1)
 
 
 @pytest.fixture
-def medium_system_size():
-    """Medium system size (6 qubits)."""
-    return 64
+def medium_system_size(mpi_sizing):
+    """Medium system size that scales to keep multi-rank tests active."""
+    return mpi_sizing.power_of_two(base=64, min_per_rank=1, min_per_node=16)
 
 
 # =============================================================================

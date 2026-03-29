@@ -13,6 +13,29 @@ Tests include:
 import numpy as np
 import pytest
 
+from tests.conftest import TestOracle
+
+
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two size that keeps parameter-map tests multi-rank aware."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1, min_per_node=16)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density while allowing larger systems."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the parameter-map oracle while preserving M/N = 1/16."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
+
 
 @pytest.mark.mpi
 class TestParameterMapWithExecute:

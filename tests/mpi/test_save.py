@@ -13,6 +13,59 @@ import tempfile
 import numpy as np
 import pytest
 
+from tests.conftest import TestOracle
+
+
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two size that keeps save tests multi-rank aware."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1, min_per_node=16)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density while allowing larger systems."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the save-test oracle while preserving M/N = 1/16."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
+
+
+@pytest.fixture
+def save_small_system_size(mpi_sizing):
+    """Small save-test size for quick distributed round-trip checks."""
+    return mpi_sizing.power_of_two(base=16, min_per_rank=1)
+
+
+@pytest.fixture
+def save_medium_system_size(mpi_sizing):
+    """Moderate save-test size that keeps multiple ranks active."""
+    return mpi_sizing.power_of_two(base=32, min_per_rank=1, min_per_node=16)
+
+
+@pytest.fixture
+def save_partition_system_size(mpi_sizing):
+    """Non-power-of-two size for partition-boundary coverage."""
+    return mpi_sizing.multiple(base=24, per_rank=3, per_node=12)
+
+
+@pytest.fixture
+def save_uneven_system_size(mpi_sizing):
+    """Prime size that preserves the uneven-partition contract."""
+    return mpi_sizing.prime(base=17, min_per_rank=1, min_per_node=8)
+
+
+@pytest.fixture
+def save_large_system_size(mpi_sizing):
+    """Larger save-test size for stress-style coverage."""
+    return mpi_sizing.power_of_two(base=256, min_per_rank=8, min_per_node=64)
+
 
 @pytest.fixture
 def temp_h5_file(mpi_comm):
@@ -451,13 +504,15 @@ class TestSaveDataIntegrity:
 class TestParallelIODataIntegrity:
     """Tests verifying data integrity when saved in parallel across MPI ranks."""
 
-    def test_distributed_state_assembled_correctly(self, mpi_comm, temp_h5_file):
+    def test_distributed_state_assembled_correctly(
+        self, mpi_comm, temp_h5_file, save_small_system_size
+    ):
         """Verify that distributed state pieces are correctly assembled in HDF5."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = save_small_system_size
 
         def qualities(local_i, local_i_offset):
             # Each rank has unique observable values for identification
@@ -494,14 +549,16 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_distributed_observables_assembled_correctly(self, mpi_comm, temp_h5_file):
+    def test_distributed_observables_assembled_correctly(
+        self, mpi_comm, temp_h5_file, save_medium_system_size
+    ):
         """Verify that distributed observables are correctly assembled in HDF5."""
         import h5py
 
         from quop_mpi._utils._mpi import gather_array
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 32
+        system_size = save_medium_system_size
 
         def qualities(local_i, local_i_offset):
             # Unique pattern: offset squared to identify rank contributions
@@ -545,13 +602,15 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_partition_contributions_are_contiguous(self, mpi_comm, temp_h5_file):
+    def test_partition_contributions_are_contiguous(
+        self, mpi_comm, temp_h5_file, save_partition_system_size
+    ):
         """Verify each rank's partition appears at correct offset in saved file."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 24
+        system_size = save_partition_system_size
 
         # Use rank-identifiable values
         def qualities(local_i, local_i_offset):
@@ -592,13 +651,15 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_complex_data_real_imag_preserved(self, mpi_comm, temp_h5_file):
+    def test_complex_data_real_imag_preserved(
+        self, mpi_comm, temp_h5_file, save_small_system_size
+    ):
         """Verify complex state data preserves both real and imaginary parts."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = save_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -641,15 +702,14 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_uneven_partition_sizes(self, mpi_comm, temp_h5_file):
+    def test_uneven_partition_sizes(self, mpi_comm, temp_h5_file, save_uneven_system_size):
         """Verify correct saving with uneven partition sizes across ranks."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        # Use a system size that doesn't divide evenly by common rank counts
-        # 17 is prime, guarantees uneven partitioning
-        system_size = 17
+        # Use a prime size so partitioning stays uneven as the MPI layout scales.
+        system_size = save_uneven_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -689,13 +749,13 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_large_system_parallel_save(self, mpi_comm, temp_h5_file):
+    def test_large_system_parallel_save(self, mpi_comm, temp_h5_file, save_large_system_size):
         """Test parallel save with larger system size for stress testing."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 256  # Larger system
+        system_size = save_large_system_size
 
         def qualities(local_i, local_i_offset):
             return np.sin(np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64))
@@ -733,13 +793,15 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_initial_state_parallel_save(self, mpi_comm, temp_h5_file):
+    def test_initial_state_parallel_save(
+        self, mpi_comm, temp_h5_file, save_medium_system_size
+    ):
         """Verify initial_state is correctly saved in parallel."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 32
+        system_size = save_medium_system_size
 
         def qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -768,13 +830,15 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_multiple_configs_independent(self, mpi_comm, temp_h5_file):
+    def test_multiple_configs_independent(
+        self, mpi_comm, temp_h5_file, save_small_system_size
+    ):
         """Verify multiple saved configs don't interfere with each other."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = save_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)

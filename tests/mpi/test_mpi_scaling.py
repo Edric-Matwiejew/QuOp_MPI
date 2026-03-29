@@ -23,6 +23,20 @@ def get_mpi_info():
     return comm.Get_rank(), comm.Get_size()
 
 
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the default oracle with topology while preserving problem density."""
+    system_size = mpi_sizing.power_of_two(
+        base=64,
+        min_per_rank=1,
+        min_per_node=16,
+        min_per_gpu=8,
+    )
+    # Preserve the original 1/16 marked-state density from N=64, M=4.
+    n_marked = max(4, system_size // 16)
+    return TestOracle(system_size=system_size, n_marked=n_marked, seed=42)
+
+
 @pytest.mark.mpi
 class TestMPIBasicOperations:
     """Test basic MPI operations to ensure environment is working."""
@@ -62,36 +76,32 @@ class TestMPIBasicOperations:
 class TestAnsatzInitialization:
     """Test Ansatz initialization with various process counts."""
 
-    def test_ansatz_creation(self, mpi_comm):
+    def test_ansatz_creation(self, mpi_comm, medium_system_size):
         """Verify Ansatz can be created."""
         from quop_mpi import Ansatz
 
-        system_size = 64
-
         # All ranks should be able to create an Ansatz
-        alg = Ansatz(system_size, mpi_comm)
+        alg = Ansatz(medium_system_size, mpi_comm)
 
-        assert alg.system_size == system_size
+        assert alg.system_size == medium_system_size
         alg.destroy()
 
-    def test_qaoa_creation(self, mpi_comm):
+    def test_qaoa_creation(self, mpi_comm, medium_system_size):
         """Verify QAOA can be created."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        system_size = 64
-        alg = QAOA(system_size, mpi_comm)
+        alg = QAOA(medium_system_size, mpi_comm)
 
-        assert alg.system_size == system_size
+        assert alg.system_size == medium_system_size
         alg.destroy()
 
-    def test_qwoa_creation(self, mpi_comm):
+    def test_qwoa_creation(self, mpi_comm, medium_system_size):
         """Verify QWOA can be created."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 64
-        alg = QWOA(system_size, mpi_comm)
+        alg = QWOA(medium_system_size, mpi_comm)
 
-        assert alg.system_size == system_size
+        assert alg.system_size == medium_system_size
         alg.destroy()
 
 
@@ -271,13 +281,11 @@ class TestGatherPhase:
 class TestSystemSizeScaling:
     """Test with various system sizes relative to process count."""
 
-    def test_system_size_equal_to_nprocs(self, mpi_comm):
+    def test_system_size_equal_to_nprocs(self, mpi_comm, mpi_sizing):
         """Test when system_size equals number of processes."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        size = mpi_comm.Get_size()
-        # System size must be power of 2
-        system_size = 2 ** max(1, (size - 1).bit_length())
+        system_size = mpi_sizing.power_of_two(base=2, min_per_rank=1)
 
         oracle = TestOracle(system_size=system_size, n_marked=1, seed=42)
 
@@ -292,7 +300,7 @@ class TestSystemSizeScaling:
             assert len(alg.result["x"]) == alg.n_free_params
         alg.destroy()
 
-    def test_system_size_less_than_nprocs(self, mpi_comm):
+    def test_system_size_less_than_nprocs(self, mpi_comm, mpi_sizing):
         """Test when system_size is less than number of processes."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
@@ -300,8 +308,8 @@ class TestSystemSizeScaling:
         if size <= 2:
             pytest.skip("Need more than 2 processes for this test")
 
-        # Use system size smaller than process count
-        system_size = 2  # Minimum power of 2
+        # Use the largest power of two below the world size to force exclusion.
+        system_size = mpi_sizing.below_world_power_of_two(minimum=2)
 
         oracle = TestOracle(system_size=system_size, n_marked=1, seed=42)
 
@@ -311,11 +319,11 @@ class TestSystemSizeScaling:
         alg.execute()
         alg.destroy()
 
-    def test_system_size_much_larger_than_nprocs(self, mpi_comm):
+    def test_system_size_much_larger_than_nprocs(self, mpi_comm, mpi_sizing):
         """Test when system_size is much larger than number of processes."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        system_size = 32  # Much larger than nprocs but small enough for fast tests
+        system_size = mpi_sizing.power_of_two(base=32, min_per_rank=4, min_per_node=16)
 
         oracle = TestOracle(system_size=system_size, n_marked=4, seed=42)
 
@@ -417,12 +425,11 @@ class TestPartitionTable:
 class TestEdgeCaseSizes:
     """Test edge cases with unusual system sizes and process configurations."""
 
-    def test_prime_system_size_qwoa(self, mpi_comm):
+    def test_prime_system_size_qwoa(self, mpi_comm, mpi_sizing):
         """Test QWOA with prime system size (circulant supports any size)."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        # Prime number - only QWOA supports non-power-of-2 sizes
-        system_size = 17
+        system_size = mpi_sizing.prime(base=17, min_per_rank=1, min_per_node=8)
 
         def qualities(local_i, local_i_offset):
             return np.random.RandomState(42 + local_i_offset).random(local_i)
@@ -443,11 +450,11 @@ class TestEdgeCaseSizes:
 
         alg.destroy()
 
-    def test_larger_prime_system_size_qwoa(self, mpi_comm):
+    def test_larger_prime_system_size_qwoa(self, mpi_comm, mpi_sizing):
         """Test QWOA with larger prime system size."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 23
+        system_size = mpi_sizing.prime(base=23, min_per_rank=2, min_per_node=12)
 
         def qualities(local_i, local_i_offset):
             return np.random.RandomState(42 + local_i_offset).random(local_i)
@@ -500,7 +507,7 @@ class TestEdgeCaseSizes:
 
         alg.destroy()
 
-    def test_system_size_smaller_than_nprocs(self, mpi_comm):
+    def test_system_size_smaller_than_nprocs(self, mpi_comm, mpi_sizing):
         """Test when system size is smaller than number of processes.
 
         This tests that ranks are correctly excluded when system_size < nprocs,
@@ -513,7 +520,7 @@ class TestEdgeCaseSizes:
             pytest.skip("Need more than 1 process for this test")
 
         # System smaller than processes - tests the shrinking logic
-        system_size = max(1, size // 2)
+        system_size = mpi_sizing.world_fraction(1, 2, minimum=1)
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -553,13 +560,12 @@ class TestEdgeCaseSizes:
 
         alg.destroy()
 
-    def test_highly_uneven_partition_qwoa(self, mpi_comm):
+    def test_highly_uneven_partition_qwoa(self, mpi_comm, mpi_sizing):
         """Test with system size that leads to very uneven partition."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        size = mpi_comm.Get_size()
-        # Use size that's just slightly over a multiple of nprocs
-        system_size = size * 3 + 1  # Last rank gets 1 extra element
+        # Force a remainder so the final partition is uneven across ranks.
+        system_size = mpi_sizing.multiple(base=4, per_rank=3, per_node=8, remainder=1)
 
         def qualities(local_i, local_i_offset):
             return np.random.RandomState(42 + local_i_offset).random(local_i)
@@ -580,12 +586,11 @@ class TestEdgeCaseSizes:
 
         alg.destroy()
 
-    def test_large_prime_system_size(self, mpi_comm):
+    def test_large_prime_system_size(self, mpi_comm, mpi_sizing):
         """Test with larger prime system size."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        # Larger prime - only QWOA supports this
-        system_size = 127
+        system_size = mpi_sizing.prime(base=127, min_per_rank=4, min_per_node=32)
 
         def qualities(local_i, local_i_offset):
             return np.random.RandomState(42 + local_i_offset).random(local_i)
@@ -615,7 +620,7 @@ class TestEmptyPartitionHandling:
     Tests in this class verify behavior under valid configurations.
     """
 
-    def test_all_ranks_participate_in_collective(self, mpi_comm):
+    def test_all_ranks_participate_in_collective(self, mpi_comm, mpi_sizing):
         """Verify all ranks can participate in collective operations.
 
         Note: The circulant propagator requires system_size >= nprocs, so we
@@ -623,9 +628,7 @@ class TestEmptyPartitionHandling:
         """
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        size = mpi_comm.Get_size()
-        # Ensure system_size >= nprocs for circulant propagator
-        system_size = size * 2
+        system_size = mpi_sizing.multiple(base=2, per_rank=2, per_node=16)
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -650,11 +653,11 @@ class TestEmptyPartitionHandling:
 class TestPartitionConsistency:
     """Test partition table consistency across edge cases."""
 
-    def test_partition_sums_to_system_size_prime(self, mpi_comm):
+    def test_partition_sums_to_system_size_prime(self, mpi_comm, mpi_sizing):
         """Verify partition table sums correctly for prime system size."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 31  # Prime
+        system_size = mpi_sizing.prime(base=31, min_per_rank=1, min_per_node=8)
 
         def qualities(local_i, local_i_offset):
             return np.random.RandomState(42 + local_i_offset).random(local_i)
@@ -673,11 +676,11 @@ class TestPartitionConsistency:
 
         alg.destroy()
 
-    def test_partition_offsets_are_correct(self, mpi_comm):
+    def test_partition_offsets_are_correct(self, mpi_comm, mpi_sizing):
         """Verify partition offsets are correctly computed."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 19  # Prime
+        system_size = mpi_sizing.prime(base=19, min_per_rank=1, min_per_node=8)
 
         def qualities(local_i, local_i_offset):
             return np.random.RandomState(42 + local_i_offset).random(local_i)
@@ -712,11 +715,11 @@ class TestPartitionConsistency:
 
         alg.destroy()
 
-    def test_state_correctness_with_prime_size(self, mpi_comm):
+    def test_state_correctness_with_prime_size(self, mpi_comm, mpi_sizing):
         """Verify state evolution is correct with prime system size."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 13
+        system_size = mpi_sizing.prime(base=13, min_per_rank=1, min_per_node=4)
 
         # Use simple qualities with known structure
         def qualities(local_i, local_i_offset):
@@ -790,12 +793,19 @@ class TestSubcommManagement:
 
             alg.destroy()
 
-    def test_sequential_algorithms_mixed_sizes_qwoa(self, mpi_comm):
+    def test_sequential_algorithms_mixed_sizes_qwoa(self, mpi_comm, mpi_sizing):
         """Test creating QWOA algorithms with mixed sizes sequentially."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        # QWOA supports any size (circulant mixer)
-        for system_size in [8, 16, 7, 13]:
+        system_sizes = [
+            mpi_sizing.power_of_two(base=8, min_per_rank=1),
+            mpi_sizing.power_of_two(base=16, min_per_rank=2, min_per_node=16),
+            mpi_sizing.prime(base=7, min_per_rank=1),
+            mpi_sizing.prime(base=13, min_per_rank=2, min_per_node=8),
+        ]
+
+        # QWOA supports both power-of-two and prime-sized state spaces.
+        for system_size in system_sizes:
 
             def qualities(local_i, local_i_offset):
                 return np.random.RandomState(42 + local_i_offset).random(local_i)

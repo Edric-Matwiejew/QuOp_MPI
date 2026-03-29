@@ -18,7 +18,13 @@ from quop_mpi._utils._comm_size import QuopMpiLayout
 # -- Helpers ----------------------------------------------------------
 
 
-def _make_good_layout(comm, system_size=100):
+@pytest.fixture
+def validator_system_size(mpi_sizing):
+    """Scale validator tests while keeping enough local_i for mismatch corruption."""
+    return mpi_sizing.multiple(base=100, per_rank=16)
+
+
+def _make_good_layout(comm, system_size):
     """Create a correctly-partitioned QuopMpiLayout on *comm*.
 
     Splits *system_size* evenly (with remainder on last rank).
@@ -43,11 +49,11 @@ def _make_good_layout(comm, system_size=100):
 
 @pytest.mark.mpi
 class TestGoodPartition:
-    def test_good_partition_passes(self, mpi_comm):
+    def test_good_partition_passes(self, mpi_comm, validator_system_size):
         """T7.1 -- A correct, evenly-distributed partition validates."""
-        layout = _make_good_layout(mpi_comm, system_size=100)
+        layout = _make_good_layout(mpi_comm, system_size=validator_system_size)
         # Should not raise
-        layout.validate(100)
+        layout.validate(validator_system_size)
         layout.destroy()
 
 
@@ -56,9 +62,9 @@ class TestGoodPartition:
 
 @pytest.mark.mpi
 class TestNegativeLocalI:
-    def test_negative_local_i(self, mpi_comm):
+    def test_negative_local_i(self, mpi_comm, validator_system_size):
         """T7.2 -- A negative local_i triggers ValueError on ALL ranks."""
-        layout = _make_good_layout(mpi_comm, system_size=100)
+        layout = _make_good_layout(mpi_comm, system_size=validator_system_size)
         # Inject negative local_i on rank 0 only -- but allreduce
         # guarantees all ranks raise.
         if mpi_comm.Get_rank() == 0:
@@ -66,7 +72,7 @@ class TestNegativeLocalI:
         with pytest.raises(
             ValueError, match="non-negative check|completeness|rank_ordering|validation failed"
         ):
-            layout.validate(100)
+            layout.validate(validator_system_size)
         layout.destroy()
 
 
@@ -75,15 +81,15 @@ class TestNegativeLocalI:
 
 @pytest.mark.mpi
 class TestSumMismatch:
-    def test_sum_not_equal_system_size(self, mpi_comm):
+    def test_sum_not_equal_system_size(self, mpi_comm, validator_system_size):
         """T7.3 -- When sum(local_i) != system_size, all ranks raise."""
-        layout = _make_good_layout(mpi_comm, system_size=100)
-        # Reduce rank 0's local_i by 10 so the total is 90 != 100.
+        layout = _make_good_layout(mpi_comm, system_size=validator_system_size)
+        # Reduce rank 0's local_i so the total no longer matches system_size.
         if mpi_comm.Get_rank() == 0:
             old_li = layout.local_i
             _ciw.set_partitioning(layout.handle, np.int64(old_li - 10), np.int64(0))
         with pytest.raises(ValueError, match="completeness|validation failed"):
-            layout.validate(100)
+            layout.validate(validator_system_size)
         layout.destroy()
 
 
@@ -92,9 +98,9 @@ class TestSumMismatch:
 
 @pytest.mark.mpi
 class TestNonMonotoneOffsets:
-    def test_offsets_not_monotone(self, mpi_comm):
+    def test_offsets_not_monotone(self, mpi_comm, validator_system_size):
         """T7.4 -- Non-monotone offsets (not matching cumsum) raise ValueError."""
-        layout = _make_good_layout(mpi_comm, system_size=100)
+        layout = _make_good_layout(mpi_comm, system_size=validator_system_size)
         # Corrupt the offset on rank 1 (if it exists) to be wrong.
         rank = mpi_comm.Get_rank()
         if rank == 1:
@@ -105,9 +111,9 @@ class TestNonMonotoneOffsets:
         # only makes sense with >= 2 ranks.
         if mpi_comm.Get_size() >= 2:
             with pytest.raises(ValueError, match="rank_ordering|validation failed"):
-                layout.validate(100)
+                layout.validate(validator_system_size)
         else:
-            layout.validate(100)  # trivially passes with 1 rank
+            layout.validate(validator_system_size)  # trivially passes with 1 rank
         layout.destroy()
 
 
@@ -116,9 +122,9 @@ class TestNonMonotoneOffsets:
 
 @pytest.mark.mpi
 class TestGapInPartition:
-    def test_gap_between_ranks(self, mpi_comm):
+    def test_gap_between_ranks(self, mpi_comm, validator_system_size):
         """T7.5 -- A gap in the partition (offset > expected) raises ValueError."""
-        layout = _make_good_layout(mpi_comm, system_size=100)
+        layout = _make_good_layout(mpi_comm, system_size=validator_system_size)
         rank = mpi_comm.Get_rank()
         if rank == 1:
             # Move offset forward, creating a gap between rank 0 and rank 1
@@ -129,7 +135,7 @@ class TestGapInPartition:
             )
         if mpi_comm.Get_size() >= 2:
             with pytest.raises(ValueError, match="rank_ordering|validation failed"):
-                layout.validate(100)
+                layout.validate(validator_system_size)
         else:
-            layout.validate(100)
+            layout.validate(validator_system_size)
         layout.destroy()

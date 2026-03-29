@@ -159,15 +159,15 @@ Install test dependencies with ``python -m pip install '.[test]'``, then:
 
 .. code-block:: bash
 
-    ./run_tests.sh              # all tests (unit + MPI + integration), 2 MPI processes
+    ./run_tests.sh              # all tests (unit + MPI + examples), 2 MPI processes
     ./run_tests.sh 4            # same, with 4 MPI processes
     ./run_tests.sh 1 unit       # unit tests only (serial)
     ./run_tests.sh 2 mpi        # MPI tests only
     ./run_tests.sh 2 mpi-full   # MPI + parallel-Jacobian tests (12 processes)
 
-The ``all`` mode (default) also runs integration tests, which execute the
+The ``all`` mode (default) also runs example tests, which execute the
 example scripts and check that optimisation results match the expected bounds
-in ``tests/integration/expected_results.json``.
+in ``tests/examples/expected_results.json``.
 
 To select the wavefront backend, set ``QUOP_BACKEND=wavefront`` before
 running.  On Cray systems the script auto-detects ``srun``.

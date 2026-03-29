@@ -34,6 +34,18 @@ def _make_layout(comm, system_size, local_i, offset, alloc_local=None):
     )
 
 
+@pytest.fixture
+def layout_prime_system_size(mpi_sizing):
+    """Prime size that keeps partition-table tests uneven across larger MPI jobs."""
+    return mpi_sizing.prime(base=97, min_per_rank=8)
+
+
+@pytest.fixture
+def layout_validation_system_size(mpi_sizing):
+    """Moderate layout size that scales enough to keep validation tests representative."""
+    return mpi_sizing.multiple(base=200, per_rank=16)
+
+
 # =============================================================================
 # T2.7 -- Collective partition_table on multiple ranks
 # =============================================================================
@@ -43,8 +55,8 @@ def _make_layout(comm, system_size, local_i, offset, alloc_local=None):
 class TestPartitionTableCollective:
     """T2.7: Create QuopMpiLayout on N ranks, verify partition_table collectively."""
 
-    def test_uniform_partition(self, mpi_comm, mpi_rank, mpi_size):
-        system_size = 97
+    def test_uniform_partition(self, mpi_comm, mpi_rank, mpi_size, layout_prime_system_size):
+        system_size = layout_prime_system_size
         local_i, offset = _block_partition(system_size, mpi_size, mpi_rank)
         layout = _make_layout(mpi_comm, system_size, local_i, offset)
         layout.build_partition_table()
@@ -132,8 +144,8 @@ class TestAssertMatchesComm:
 class TestValidate:
     """T2.9: validate on good partition -> no error; bad -> ValueError."""
 
-    def test_good_partition(self, mpi_comm, mpi_rank, mpi_size):
-        system_size = 200
+    def test_good_partition(self, mpi_comm, mpi_rank, mpi_size, layout_validation_system_size):
+        system_size = layout_validation_system_size
         local_i, offset = _block_partition(system_size, mpi_size, mpi_rank)
         layout = _make_layout(mpi_comm, system_size, local_i, offset)
 
@@ -145,9 +157,9 @@ class TestValidate:
 
         layout.destroy()
 
-    def test_bad_completeness(self, mpi_comm, mpi_rank, mpi_size):
+    def test_bad_completeness(self, mpi_comm, mpi_rank, mpi_size, layout_validation_system_size):
         """sum(local_i) != system_size -> ValueError on all ranks."""
-        system_size = 200
+        system_size = layout_validation_system_size
         # Intentionally give everyone 1 too many
         local_i, offset = _block_partition(system_size, mpi_size, mpi_rank)
         bad_local_i = local_i + 1  # sum will exceed system_size
@@ -159,9 +171,9 @@ class TestValidate:
 
         layout.destroy()
 
-    def test_bad_offset(self, mpi_comm, mpi_rank, mpi_size):
+    def test_bad_offset(self, mpi_comm, mpi_rank, mpi_size, layout_validation_system_size):
         """Wrong offsets -> ValueError on all ranks."""
-        system_size = 200
+        system_size = layout_validation_system_size
         local_i, _ = _block_partition(system_size, mpi_size, mpi_rank)
         bad_offset = 999  # deliberately wrong
         layout = _make_layout(mpi_comm, system_size, local_i, bad_offset)

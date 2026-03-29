@@ -22,6 +22,36 @@ from quop_mpi._utils._comm_size import QuopMpiLayout
 # -- helpers ------------------------------------------------------------
 
 
+@pytest.fixture
+def context_nodecomm_system_size(mpi_sizing):
+    """Power-of-two size large enough to activate all ranks for nodecomm checks."""
+    return mpi_sizing.power_of_two(base=32, min_per_rank=1)
+
+
+@pytest.fixture
+def context_regular_system_size(mpi_sizing):
+    """Representative successful system size for state and observable buffers."""
+    return mpi_sizing.multiple(base=100, per_rank=16)
+
+
+@pytest.fixture
+def context_alloc_contract_system_size(mpi_sizing):
+    """Non-power-of-two size for alloc_local and offset contract checks."""
+    return mpi_sizing.multiple(base=50, per_rank=8, remainder=2)
+
+
+@pytest.fixture
+def context_lifecycle_system_size(mpi_sizing):
+    """Lifecycle size that keeps the layout active without oversizing buffers."""
+    return mpi_sizing.power_of_two(base=64, min_per_rank=1)
+
+
+@pytest.fixture
+def context_small_system_size(mpi_sizing):
+    """Small power-of-two size for destroy/idempotence checks."""
+    return mpi_sizing.power_of_two(base=32, min_per_rank=1)
+
+
 def _get_backend():
     """Load the backend module from the current config."""
     return import_module(f"quop_mpi._lib.{config.backend}")
@@ -78,10 +108,11 @@ def _make_layout(system_size, mpi_comm):
 class TestContextFromLayout:
     """T3.1: Create context from locked QuopMpiLayout -> state has correct size."""
 
-    def test_layout_nodecomm_matches_shared_memory_group(self, mpi_comm):
+    def test_layout_nodecomm_matches_shared_memory_group(
+        self, mpi_comm, context_nodecomm_system_size
+    ):
         """Negotiated layouts expose the node-local communicator on all backends."""
-        system_size = max(32, mpi_comm.Get_size())
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_nodecomm_system_size, mpi_comm)
         expected_nodecomm = mpi_comm.Split_type(MPI.COMM_TYPE_SHARED)
 
         try:
@@ -92,10 +123,9 @@ class TestContextFromLayout:
             expected_nodecomm.Free()
             layout.destroy()
 
-    def test_state_size_matches_alloc_local(self, mpi_comm):
+    def test_state_size_matches_alloc_local(self, mpi_comm, context_regular_system_size):
         """Context state array length equals alloc_local from the layout."""
-        system_size = 100
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_regular_system_size, mpi_comm)
 
         expected_alloc_local = layout.alloc_local
 
@@ -108,10 +138,9 @@ class TestContextFromLayout:
         ctx.destroy()
         layout.destroy()
 
-    def test_observables_size_matches_local_i(self, mpi_comm):
+    def test_observables_size_matches_local_i(self, mpi_comm, context_regular_system_size):
         """Context observables array length equals local_i from the layout."""
-        system_size = 100
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_regular_system_size, mpi_comm)
 
         expected_local_i = layout.local_i
 
@@ -124,10 +153,11 @@ class TestContextFromLayout:
         ctx.destroy()
         layout.destroy()
 
-    def test_host_alloc_local_matches_layout_contract(self, mpi_comm):
+    def test_host_alloc_local_matches_layout_contract(
+        self, mpi_comm, context_alloc_contract_system_size
+    ):
         """Context reads alloc_local from the negotiated layout."""
-        system_size = 50
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_alloc_contract_system_size, mpi_comm)
 
         ctx = Context(_get_backend(), comm_info=layout)
 
@@ -182,40 +212,37 @@ class TestContextFromLayout:
 class TestContextDestroyLayoutSurvives:
     """T3.2: Context destroy succeeds; QuopMpiLayout still valid after."""
 
-    def test_layout_valid_after_context_destroy(self, mpi_comm):
+    def test_layout_valid_after_context_destroy(self, mpi_comm, context_lifecycle_system_size):
         """After context.destroy(), layout fields are still accessible."""
-        system_size = 64
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_lifecycle_system_size, mpi_comm)
 
         ctx = Context(_get_backend(), comm_info=layout)
         ctx.destroy()
 
         # Layout should still be usable
-        assert layout.system_size == system_size
+        assert layout.system_size == context_lifecycle_system_size
         assert layout.local_i > 0
         assert layout.subcomm is not None
 
         layout.destroy()
 
-    def test_context_manager_destroys_context_only(self, mpi_comm):
+    def test_context_manager_destroys_context_only(self, mpi_comm, context_lifecycle_system_size):
         """Context-manager exit destroys the context but preserves the layout."""
-        system_size = 64
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_lifecycle_system_size, mpi_comm)
 
         with Context(_get_backend(), comm_info=layout) as ctx:
             assert ctx.initialised is True
             assert layout.subcomm is not None
 
         assert ctx.initialised is False
-        assert layout.system_size == system_size
+        assert layout.system_size == context_lifecycle_system_size
         assert layout.subcomm is not None
 
         layout.destroy()
 
-    def test_double_destroy_context(self, mpi_comm):
+    def test_double_destroy_context(self, mpi_comm, context_small_system_size):
         """Calling context.destroy() twice does not crash."""
-        system_size = 32
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_small_system_size, mpi_comm)
 
         ctx = Context(_get_backend(), comm_info=layout)
         ctx.destroy()
@@ -228,10 +255,9 @@ class TestContextDestroyLayoutSurvives:
 class TestContextStateRoundTrip:
     """T3.3: Set state -> get state -> values match."""
 
-    def test_set_get_state(self, mpi_comm):
+    def test_set_get_state(self, mpi_comm, context_regular_system_size):
         """State round-trip through Fortran context preserves values."""
-        system_size = 100
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_regular_system_size, mpi_comm)
 
         ctx = Context(_get_backend(), comm_info=layout)
 
@@ -247,10 +273,9 @@ class TestContextStateRoundTrip:
         ctx.destroy()
         layout.destroy()
 
-    def test_set_get_observables(self, mpi_comm):
+    def test_set_get_observables(self, mpi_comm, context_regular_system_size):
         """Observables round-trip through Fortran context preserves values."""
-        system_size = 100
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_regular_system_size, mpi_comm)
 
         ctx = Context(_get_backend(), comm_info=layout)
 
@@ -265,14 +290,13 @@ class TestContextStateRoundTrip:
         ctx.destroy()
         layout.destroy()
 
-    def test_expectation_value(self, mpi_comm):
+    def test_expectation_value(self, mpi_comm, context_regular_system_size):
         """Expectation value computes correctly across ranks.
 
         Uses uniform state |psi_i|^2 = 1/N and obs_i = i,
         so <obs> = sum(i for i in 0..N-1) / N = (N-1)/2.
         """
-        system_size = 100
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_regular_system_size, mpi_comm)
 
         ctx = Context(_get_backend(), comm_info=layout)
 
@@ -280,7 +304,7 @@ class TestContextStateRoundTrip:
         offset = ctx.host_local_i_offset
 
         # Uniform probability state: |psi_i| = 1/sqrt(N)
-        amplitude = 1.0 / np.sqrt(system_size)
+        amplitude = 1.0 / np.sqrt(context_regular_system_size)
         state = np.full(local_i, amplitude + 0j, dtype=np.complex128)
         ctx.state = state
 
@@ -290,21 +314,20 @@ class TestContextStateRoundTrip:
 
         exp_val = ctx.get_expectation_value()
 
-        expected = (system_size - 1) / 2.0
+        expected = (context_regular_system_size - 1) / 2.0
         assert exp_val == pytest.approx(expected, rel=1e-10)
 
         ctx.destroy()
         layout.destroy()
 
-    def test_state_norm(self, mpi_comm):
+    def test_state_norm(self, mpi_comm, context_regular_system_size):
         """State norm is 1.0 for a properly normalized state."""
-        system_size = 100
-        layout = _make_layout(system_size, mpi_comm)
+        layout = _make_layout(context_regular_system_size, mpi_comm)
 
         ctx = Context(_get_backend(), comm_info=layout)
 
         local_i = ctx.host_local_i
-        amplitude = 1.0 / np.sqrt(system_size)
+        amplitude = 1.0 / np.sqrt(context_regular_system_size)
         state = np.full(local_i, amplitude + 0j, dtype=np.complex128)
         ctx.state = state
 

@@ -15,32 +15,32 @@ import pytest
 class TestQAOA:
     """Test the QAOA algorithm class."""
 
-    def test_qaoa_creation(self, mpi_comm):
+    def test_qaoa_creation(self, mpi_comm, small_system_size):
         """Test that QAOA can be instantiated."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        system_size = 16
-        alg = QAOA(system_size, mpi_comm)
+        alg = QAOA(small_system_size, mpi_comm)
 
         assert alg is not None
-        assert alg.system_size == system_size
+        assert alg.system_size == small_system_size
 
         alg.destroy()
 
-    def test_qaoa_with_qualities(self, mpi_comm):
+    def test_qaoa_with_qualities(self, mpi_comm, medium_system_size):
         """Test QAOA with quality function defined."""
         import networkx as nx
 
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        # Create a simple graph
-        G = nx.complete_graph(4)  # noqa: N806
+        # Keep the graph-derived system size aligned with the active MPI test size.
+        n_vertices = max(4, medium_system_size.bit_length() - 1)
+        G = nx.complete_graph(n_vertices)  # noqa: N806
         n_vertices = len(G.nodes)
         system_size = 2**n_vertices
 
         # Simple quality function
         def qualities(local_i, local_i_offset):
-            return np.random.rand(local_i)
+            return np.random.RandomState(42 + local_i_offset).random(local_i)
 
         alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
@@ -55,7 +55,7 @@ class TestQAOA:
 
         alg.destroy()
 
-    def test_qaoa_error_message_formatting(self, mpi_comm):
+    def test_qaoa_error_message_formatting(self, mpi_comm, small_system_size):
         """
         Bug #3: QAOA uses self.rank in error message but it's not defined.
 
@@ -63,8 +63,7 @@ class TestQAOA:
         """
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        system_size = 16
-        alg = QAOA(system_size, mpi_comm)
+        alg = QAOA(small_system_size, mpi_comm)
 
         # Don't set qualities - this should trigger the error path
         # The error message uses self.rank which may not be defined
@@ -86,28 +85,25 @@ class TestQAOA:
 class TestQWOA:
     """Test the QWOA algorithm class."""
 
-    def test_qwoa_creation(self, mpi_comm):
+    def test_qwoa_creation(self, mpi_comm, small_system_size):
         """Test that QWOA can be instantiated."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
-        alg = QWOA(system_size, mpi_comm)
+        alg = QWOA(small_system_size, mpi_comm)
 
         assert alg is not None
-        assert alg.system_size == system_size
+        assert alg.system_size == small_system_size
 
         alg.destroy()
 
-    def test_qwoa_with_qualities(self, mpi_comm):
+    def test_qwoa_with_qualities(self, mpi_comm, medium_system_size):
         """Test QWOA with quality function defined."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
-
         def qualities(local_i, local_i_offset):
-            return np.random.rand(local_i)
+            return np.random.RandomState(42 + local_i_offset).random(local_i)
 
-        alg = QWOA(system_size, mpi_comm)
+        alg = QWOA(medium_system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -120,14 +116,13 @@ class TestQWOA:
 
         alg.destroy()
 
-    def test_qwoa_error_message_formatting(self, mpi_comm):
+    def test_qwoa_error_message_formatting(self, mpi_comm, small_system_size):
         """
         Bug #3: QWOA uses self.rank in error message but it's not defined.
         """
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
-        alg = QWOA(system_size, mpi_comm)
+        alg = QWOA(small_system_size, mpi_comm)
 
         # Don't set qualities - should trigger error
         with pytest.raises(RuntimeError) as excinfo:

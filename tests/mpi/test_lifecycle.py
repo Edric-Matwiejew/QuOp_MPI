@@ -16,6 +16,27 @@ from mpi4py import MPI
 from tests.conftest import TestOracle
 
 
+def _marked_count(system_size, minimum):
+    """Preserve roughly the same marked-state density as the shared oracle."""
+    return max(minimum, system_size // 16)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale lifecycle tests to keep more ranks active without growing too much."""
+    system_size = mpi_sizing.power_of_two(
+        base=32,
+        min_per_rank=1,
+        min_per_node=8,
+        min_per_gpu=4,
+    )
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count(system_size, minimum=2),
+        seed=42,
+    )
+
+
 @pytest.mark.mpi
 class TestSetup:
     """Test the setup() method and related initialization."""
@@ -333,12 +354,22 @@ class TestDestroyFunctionality:
 class TestResourceManagement:
     """Test that resources are properly managed."""
 
-    def test_multiple_instances_independent(self, mpi_comm):
+    def test_multiple_instances_independent(self, mpi_comm, mpi_sizing):
         """Verify multiple Ansatz instances are independent."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        oracle1 = TestOracle(system_size=32, n_marked=2, seed=111)
-        oracle2 = TestOracle(system_size=64, n_marked=4, seed=222)
+        system_size1 = mpi_sizing.power_of_two(base=32, min_per_rank=1, min_per_node=4)
+        system_size2 = mpi_sizing.power_of_two(base=64, min_per_rank=2, min_per_node=8)
+        oracle1 = TestOracle(
+            system_size=system_size1,
+            n_marked=_marked_count(system_size1, minimum=2),
+            seed=111,
+        )
+        oracle2 = TestOracle(
+            system_size=system_size2,
+            n_marked=_marked_count(system_size2, minimum=4),
+            seed=222,
+        )
 
         alg1 = QAOA(oracle1.system_size, mpi_comm)
         alg1.set_qualities(oracle1.qualities_function())
@@ -352,8 +383,8 @@ class TestResourceManagement:
         alg1.setup()
         alg2.setup()
 
-        assert alg1.system_size == 32
-        assert alg2.system_size == 64
+        assert alg1.system_size == system_size1
+        assert alg2.system_size == system_size2
 
         alg1.destroy()
         alg2.destroy()

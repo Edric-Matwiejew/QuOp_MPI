@@ -17,11 +17,17 @@ import pytest
 from tests.conftest import TestOracle
 
 
+@pytest.fixture
+def persistent_system_size(small_system_size):
+    """Small representative size for communicator-persistence checks."""
+    return small_system_size
+
+
 @pytest.mark.mpi
 class TestPersistentComms:
     """Verify dirty flags and idempotent setup()."""
 
-    def _make_alg(self, comm, system_size=16):
+    def _make_alg(self, comm, system_size):
         from quop_mpi.algorithm.combinatorial import QAOA
 
         oracle = TestOracle(system_size, n_marked=1)
@@ -30,9 +36,9 @@ class TestPersistentComms:
         alg.set_depth(1)
         return alg
 
-    def test_double_setup_is_noop(self, mpi_comm):
+    def test_double_setup_is_noop(self, mpi_comm, persistent_system_size):
         """T6.9: Two consecutive setup() calls -- second is a no-op."""
-        alg = self._make_alg(mpi_comm)
+        alg = self._make_alg(mpi_comm, persistent_system_size)
         alg.setup()
 
         layout_1 = alg.layout
@@ -47,11 +53,11 @@ class TestPersistentComms:
 
         alg.destroy()
 
-    def test_set_depth_no_renegotiate(self, mpi_comm):
+    def test_set_depth_no_renegotiate(self, mpi_comm, persistent_system_size):
         """T6.10: set_depth() does NOT trigger re-negotiation."""
         from quop_mpi.ansatz import _Dirty
 
-        alg = self._make_alg(mpi_comm)
+        alg = self._make_alg(mpi_comm, persistent_system_size)
         alg.setup()
 
         layout_before = alg.layout
@@ -73,13 +79,13 @@ class TestPersistentComms:
 
         alg.destroy()
 
-    def test_set_unitaries_triggers_renegotiate(self, mpi_comm):
+    def test_set_unitaries_triggers_renegotiate(self, mpi_comm, persistent_system_size):
         """T6.11: set_unitaries() triggers re-negotiation."""
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.ansatz import _Dirty
 
-        oracle = TestOracle(16, n_marked=1)
-        alg = QAOA(16, mpi_comm)
+        oracle = TestOracle(persistent_system_size, n_marked=1)
+        alg = QAOA(persistent_system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -106,9 +112,9 @@ class TestPersistentComms:
 
         alg.destroy()
 
-    def test_execute_without_destroy(self, mpi_comm):
+    def test_execute_without_destroy(self, mpi_comm, persistent_system_size):
         """Verify execute() no longer calls destroy() internally."""
-        alg = self._make_alg(mpi_comm)
+        alg = self._make_alg(mpi_comm, persistent_system_size)
 
         # First execute
         alg.execute()

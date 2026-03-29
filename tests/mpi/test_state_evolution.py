@@ -22,6 +22,34 @@ from tests.conftest import (
 )
 
 
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two state size large enough for the active MPI world."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density while allowing larger systems."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the multi-solution Grover oracle while preserving M/N = 1/16."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
+
+
+@pytest.fixture
+def single_solution_oracle(mpi_sizing):
+    """Scale the single-solution oracle with the active MPI world size."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(system_size=system_size, n_marked=1, seed=123)
+
+
 @pytest.mark.mpi
 class TestEvolveStateBasic:
     """Test basic evolve_state functionality."""
@@ -351,7 +379,7 @@ class TestEvolveStateCorrectness:
 
         alg.destroy()
 
-    def test_increasing_depth_improves_concentration(self, mpi_comm):
+    def test_increasing_depth_improves_concentration(self, mpi_comm, mpi_sizing):
         """
         Verify deeper circuits can achieve better probability concentration.
 
@@ -360,7 +388,11 @@ class TestEvolveStateCorrectness:
         """
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        oracle = TestOracle(system_size=64, n_marked=1, seed=456)
+        oracle = TestOracle(
+            system_size=_scaled_power_of_two_system_size(mpi_sizing, base=64),
+            n_marked=1,
+            seed=456,
+        )
         complete_op = make_complete_graph_operator(oracle.system_size)
 
         concentrations = []

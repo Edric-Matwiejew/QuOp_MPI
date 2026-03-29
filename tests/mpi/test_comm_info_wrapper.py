@@ -23,6 +23,54 @@ from quop_mpi._lib import comm_info_wrapper
 _ciw = comm_info_wrapper.comm_info_wrapper
 
 
+@pytest.fixture
+def wrapper_regular_system_size(mpi_sizing):
+    """Representative successful system size for partition-table workflows."""
+    return mpi_sizing.multiple(base=100, per_rank=16)
+
+
+@pytest.fixture
+def wrapper_prime_system_size(mpi_sizing):
+    """Prime size to preserve uneven partitioning coverage."""
+    return mpi_sizing.prime(base=97, min_per_rank=8)
+
+
+@pytest.fixture
+def wrapper_large_power_two_system_size(mpi_sizing):
+    """Large power-of-two size for accessor and repartition tests."""
+    return mpi_sizing.power_of_two(base=256, min_per_rank=16)
+
+
+@pytest.fixture
+def wrapper_full_workflow_system_size(mpi_sizing):
+    """Larger representative size for full lifecycle coverage."""
+    return mpi_sizing.multiple(base=200, per_rank=16)
+
+
+@pytest.fixture
+def wrapper_repartition_system_size(mpi_sizing):
+    """Moderate power-of-two size for setter-driven repartition checks."""
+    return mpi_sizing.power_of_two(base=64, min_per_rank=8)
+
+
+@pytest.fixture
+def wrapper_system_size_ladder(
+    mpi_sizing,
+    wrapper_regular_system_size,
+    wrapper_prime_system_size,
+    wrapper_large_power_two_system_size,
+):
+    """Mixed sizes covering regular, prime, power-of-two, and minimal cases."""
+    regular_smaller = mpi_sizing.multiple(base=50, per_rank=8)
+    return [
+        regular_smaller,
+        wrapper_regular_system_size,
+        wrapper_prime_system_size,
+        wrapper_large_power_two_system_size,
+        1,
+    ]
+
+
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -177,10 +225,10 @@ class TestLockUnlock:
 class TestScalarAccessors:
     """Verify get/set for scalar partitioning fields."""
 
-    def test_set_system_size(self, mpi_comm):
+    def test_set_system_size(self, mpi_comm, wrapper_large_power_two_system_size):
         ci = _create_layout_handle()
-        assert _ciw.set_system_size(ci, 256) == 0
-        assert _ciw.get_system_size(ci) == 256
+        assert _ciw.set_system_size(ci, wrapper_large_power_two_system_size) == 0
+        assert _ciw.get_system_size(ci) == wrapper_large_power_two_system_size
         _ciw.destroy(ci)
 
     def test_set_n_processes_matches_subcomm_size(self, mpi_comm, mpi_size):
@@ -195,13 +243,14 @@ class TestScalarAccessors:
         assert _ciw.get_n_processes(ci) == mpi_size
         _ciw.destroy(ci)
 
-    def test_set_partitioning_readback(self, mpi_comm, mpi_rank, mpi_size):
+    def test_set_partitioning_readback(
+        self, mpi_comm, mpi_rank, mpi_size, wrapper_regular_system_size
+    ):
         """set_partitioning stores local_i and local_i_offset correctly."""
         ci = _create_layout_handle()
-        system_size = 100
-        assert _ciw.set_system_size(ci, system_size) == 0
+        assert _ciw.set_system_size(ci, wrapper_regular_system_size) == 0
 
-        local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
+        local_i, offset = _compute_partition(wrapper_regular_system_size, mpi_rank, mpi_size)
         assert _ciw.set_partitioning(ci, local_i, offset) == 0
 
         assert _ciw.get_local_i(ci) == local_i
@@ -246,27 +295,26 @@ class TestPartitionTable:
         assert _ciw.build_partition_table(ci) == 0
         return ci
 
-    def test_partition_table_size(self, mpi_comm, mpi_size):
+    def test_partition_table_size(self, mpi_comm, mpi_size, wrapper_regular_system_size):
         """Partition table has nprocs + 1 entries."""
-        ci = self._setup_partitioned(100)
+        ci = self._setup_partitioned(wrapper_regular_system_size)
         n = _ciw.get_partition_table_size(ci)
         assert n == mpi_size + 1
         _ciw.destroy(ci)
 
-    def test_partition_table_boundaries(self, mpi_comm, mpi_size):
+    def test_partition_table_boundaries(self, mpi_comm, mpi_size, wrapper_regular_system_size):
         """First element = 1, last element = system_size + 1 (1-based)."""
-        system_size = 100
-        ci = self._setup_partitioned(system_size)
+        ci = self._setup_partitioned(wrapper_regular_system_size)
         n = _ciw.get_partition_table_size(ci)
         table = _ciw.get_partition_table(ci, n)
 
         assert table[0] == 1
-        assert table[-1] == system_size + 1
+        assert table[-1] == wrapper_regular_system_size + 1
         _ciw.destroy(ci)
 
-    def test_partition_table_monotonic(self, mpi_comm, mpi_size):
+    def test_partition_table_monotonic(self, mpi_comm, mpi_size, wrapper_regular_system_size):
         """Partition table entries are strictly increasing."""
-        ci = self._setup_partitioned(100)
+        ci = self._setup_partitioned(wrapper_regular_system_size)
         n = _ciw.get_partition_table_size(ci)
         table = _ciw.get_partition_table(ci, n)
 
@@ -276,9 +324,9 @@ class TestPartitionTable:
             )
         _ciw.destroy(ci)
 
-    def test_partition_table_returns_numpy_array(self, mpi_comm):
+    def test_partition_table_returns_numpy_array(self, mpi_comm, wrapper_regular_system_size):
         """get_partition_table returns an int64 numpy array."""
-        ci = self._setup_partitioned(100)
+        ci = self._setup_partitioned(wrapper_regular_system_size)
         n = _ciw.get_partition_table_size(ci)
         table = _ciw.get_partition_table(ci, n)
 
@@ -302,33 +350,35 @@ class TestPartitionTable:
 class TestValidate:
     """validate() on a well-formed partition should not abort."""
 
-    def test_validate_good_partition(self, mpi_comm, mpi_rank, mpi_size):
+    def test_validate_good_partition(
+        self, mpi_comm, mpi_rank, mpi_size, wrapper_regular_system_size
+    ):
         """A correct even partition passes validation."""
-        system_size = 100
         ci = _create_layout_handle()
-        assert _ciw.set_system_size(ci, system_size) == 0
+        assert _ciw.set_system_size(ci, wrapper_regular_system_size) == 0
 
-        local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
+        local_i, offset = _compute_partition(wrapper_regular_system_size, mpi_rank, mpi_size)
         assert _ciw.set_partitioning(ci, local_i, offset) == 0
         assert _ciw.set_alloc_local(ci, local_i) == 0
         assert _ciw.build_partition_table(ci) == 0
 
         # Should not raise / abort
-        assert _ciw.validate(ci, system_size) == 0
+        assert _ciw.validate(ci, wrapper_regular_system_size) == 0
         _ciw.destroy(ci)
 
-    def test_validate_prime_system_size(self, mpi_comm, mpi_rank, mpi_size):
+    def test_validate_prime_system_size(
+        self, mpi_comm, mpi_rank, mpi_size, wrapper_prime_system_size
+    ):
         """Validation works for a prime system_size (uneven distribution)."""
-        system_size = 97
         ci = _create_layout_handle()
-        assert _ciw.set_system_size(ci, system_size) == 0
+        assert _ciw.set_system_size(ci, wrapper_prime_system_size) == 0
 
-        local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
+        local_i, offset = _compute_partition(wrapper_prime_system_size, mpi_rank, mpi_size)
         assert _ciw.set_partitioning(ci, local_i, offset) == 0
         assert _ciw.set_alloc_local(ci, local_i) == 0
         assert _ciw.build_partition_table(ci) == 0
 
-        assert _ciw.validate(ci, system_size) == 0
+        assert _ciw.validate(ci, wrapper_prime_system_size) == 0
         _ciw.destroy(ci)
 
 
@@ -499,11 +549,10 @@ class TestCommHandles:
 class TestRebuildCommunicators:
     """rebuild_communicators follows the unlocked layout lifecycle."""
 
-    def test_rebuild_is_callable(self, mpi_comm, mpi_rank, mpi_size):
-        system_size = 100
+    def test_rebuild_is_callable(self, mpi_comm, mpi_rank, mpi_size, wrapper_regular_system_size):
         ci = _create_layout_handle()
-        _ciw.set_system_size(ci, system_size)
-        local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
+        _ciw.set_system_size(ci, wrapper_regular_system_size)
+        local_i, offset = _compute_partition(wrapper_regular_system_size, mpi_rank, mpi_size)
         _ciw.set_partitioning(ci, local_i, offset)
 
         assert _ciw.rebuild_communicators(ci) == 0
@@ -536,12 +585,13 @@ class TestLockedMutationGuards:
 
         _ciw.destroy(ci)
 
-    def test_build_partition_table_locked_layout_returns_error(self, mpi_comm, mpi_rank, mpi_size):
+    def test_build_partition_table_locked_layout_returns_error(
+        self, mpi_comm, mpi_rank, mpi_size, wrapper_regular_system_size
+    ):
         ci = _create_layout_handle()
-        system_size = 100
-        local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
+        local_i, offset = _compute_partition(wrapper_regular_system_size, mpi_rank, mpi_size)
 
-        assert _ciw.set_system_size(ci, system_size) == 0
+        assert _ciw.set_system_size(ci, wrapper_regular_system_size) == 0
         assert _ciw.set_partitioning(ci, local_i, offset) == 0
         _ciw.lock(ci)
 
@@ -559,17 +609,17 @@ class TestLockedMutationGuards:
 class TestFullWorkflow:
     """End-to-end workflow: create -> partition -> build -> validate -> destroy."""
 
-    def test_complete_lifecycle(self, mpi_comm, mpi_rank, mpi_size):
+    def test_complete_lifecycle(
+        self, mpi_comm, mpi_rank, mpi_size, wrapper_full_workflow_system_size
+    ):
         """Exercise the full typical usage pattern."""
-        system_size = 200
-
         # 1. Create
         ci = _create_layout_handle()
         assert _ciw.is_locked(ci) == 0
 
         # 2. Set system size and partitioning
-        assert _ciw.set_system_size(ci, system_size) == 0
-        local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
+        assert _ciw.set_system_size(ci, wrapper_full_workflow_system_size) == 0
+        local_i, offset = _compute_partition(wrapper_full_workflow_system_size, mpi_rank, mpi_size)
         assert _ciw.set_partitioning(ci, local_i, offset) == 0
         assert _ciw.set_alloc_local(ci, local_i) == 0
 
@@ -579,10 +629,10 @@ class TestFullWorkflow:
         assert n == mpi_size + 1
         table = _ciw.get_partition_table(ci, n)
         assert table[0] == 1
-        assert table[-1] == system_size + 1
+        assert table[-1] == wrapper_full_workflow_system_size + 1
 
         # 4. Validate
-        assert _ciw.validate(ci, system_size) == 0
+        assert _ciw.validate(ci, wrapper_full_workflow_system_size) == 0
 
         # 5. Verify fields via getters
         assert _ciw.get_n_processes(ci) == mpi_size
@@ -598,13 +648,14 @@ class TestFullWorkflow:
         # 7. Destroy
         _ciw.destroy(ci)
 
-    def test_repartition_via_setters(self, mpi_comm, mpi_rank, mpi_size):
+    def test_repartition_via_setters(
+        self, mpi_comm, mpi_rank, mpi_size, wrapper_repartition_system_size
+    ):
         """After setting fields via setters, rebuild and re-validate succeeds."""
-        system_size = 64
         ci = _create_layout_handle()
-        assert _ciw.set_system_size(ci, system_size) == 0
+        assert _ciw.set_system_size(ci, wrapper_repartition_system_size) == 0
 
-        local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
+        local_i, offset = _compute_partition(wrapper_repartition_system_size, mpi_rank, mpi_size)
         assert _ciw.set_partitioning(ci, local_i, offset) == 0
         assert _ciw.set_alloc_local(ci, local_i) == 0
         assert _ciw.build_partition_table(ci) == 0
@@ -616,27 +667,29 @@ class TestFullWorkflow:
 
         # Create a second layout and populate via setters
         ci2 = _create_layout_handle()
-        assert _ciw.set_system_size(ci2, system_size) == 0
+        assert _ciw.set_system_size(ci2, wrapper_repartition_system_size) == 0
         assert _ciw.set_n_processes(ci2, n_procs) == 0
         assert _ciw.set_partitioning(ci2, li, lio) == 0
         assert _ciw.set_alloc_local(ci2, li) == 0
         assert _ciw.build_partition_table(ci2) == 0
-        assert _ciw.validate(ci2, system_size) == 0
+        assert _ciw.validate(ci2, wrapper_repartition_system_size) == 0
 
         # Fields should match
         assert _ciw.get_local_i(ci2) == local_i
         assert _ciw.get_local_i_offset(ci2) == offset
-        assert _ciw.get_system_size(ci2) == system_size
+        assert _ciw.get_system_size(ci2) == wrapper_repartition_system_size
 
         _ciw.destroy(ci)
         _ciw.destroy(ci2)
 
     @pytest.mark.requires_nprocs(2)
-    def test_multiple_system_sizes(self, mpi_comm, mpi_rank, mpi_size):
+    def test_multiple_system_sizes(
+        self, mpi_comm, mpi_rank, mpi_size, wrapper_system_size_ladder
+    ):
         """Re-use a layout with different system sizes (re-partition)."""
         ci = _create_layout_handle()
 
-        for system_size in [50, 100, 97, 256, 1]:
+        for system_size in wrapper_system_size_ladder:
             assert _ciw.set_system_size(ci, system_size) == 0
             local_i, offset = _compute_partition(system_size, mpi_rank, mpi_size)
             assert _ciw.set_partitioning(ci, local_i, offset) == 0

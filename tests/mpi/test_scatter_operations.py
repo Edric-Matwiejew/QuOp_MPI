@@ -66,6 +66,46 @@ def create_test_csr_matrix(n_rows, n_cols, density=0.3, seed=42):
     return matrix
 
 
+def _is_prime(value):
+    """Return True when *value* is prime."""
+    if value < 2:
+        return False
+    if value in (2, 3):
+        return True
+    if value % 2 == 0:
+        return False
+    limit = int(np.sqrt(value))
+    for factor in range(3, limit + 1, 2):
+        if value % factor == 0:
+            return False
+    return True
+
+
+def _next_prime(value):
+    """Return the smallest prime that is at least *value*."""
+    candidate = max(2, int(value))
+    while not _is_prime(candidate):
+        candidate += 1
+    return candidate
+
+
+@pytest.fixture
+def scatter_large_system_size(mpi_sizing):
+    """Representative larger system size for scatter/gather round-trip checks."""
+    return mpi_sizing.multiple(base=1000, per_rank=128, per_node=256)
+
+
+@pytest.fixture
+def scatter_prime_system_sizes(mpi_sizing, mpi_size):
+    """Several increasing prime sizes with enough work per active rank."""
+    sizes = []
+    candidate = mpi_sizing.prime(base=max(7, mpi_size + 1), min_per_rank=2)
+    while len(sizes) < 4:
+        sizes.append(candidate)
+        candidate = _next_prime(candidate + 1)
+    return sizes
+
+
 # =============================================================================
 # Tests for scatter_1d_array
 # =============================================================================
@@ -555,18 +595,18 @@ class TestEdgeCases:
         assert len(local_array) == 1
         assert local_array[0] == rank * 10.0
 
-    def test_large_array(self, mpi_comm):
+    def test_large_array(self, mpi_comm, scatter_large_system_size):
         """Test scattering a larger array."""
         # using module-level imports
 
-        size = mpi_comm.Get_size()
         rank = mpi_comm.Get_rank()
 
-        system_size = 1000
-        partition_table = create_partition_table(system_size, size)
+        partition_table = create_partition_table(scatter_large_system_size, mpi_comm.Get_size())
 
         if rank == 0:
-            full_array = np.random.default_rng(42).random(system_size).astype(np.float64)
+            full_array = np.random.default_rng(42).random(scatter_large_system_size).astype(
+                np.float64
+            )
         else:
             full_array = None
 
@@ -582,18 +622,14 @@ class TestEdgeCases:
         if rank == 0:
             np.testing.assert_allclose(gathered, full_array, rtol=1e-14)
 
-    def test_prime_system_size(self, mpi_comm):
+    def test_prime_system_size(self, mpi_comm, scatter_prime_system_sizes):
         """Test with prime system sizes that don't divide evenly."""
         # using module-level imports
 
         size = mpi_comm.Get_size()
         rank = mpi_comm.Get_rank()
 
-        # Test several prime sizes
-        for system_size in [7, 11, 13, 17, 23]:
-            if system_size < size:
-                continue  # Skip if smaller than rank count
-
+        for system_size in scatter_prime_system_sizes:
             partition_table = create_partition_table(system_size, size)
 
             if rank == 0:

@@ -19,6 +19,49 @@ import tempfile
 import numpy as np
 import pytest
 
+from tests.conftest import TestOracle
+
+
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two size that keeps benchmark tests multi-rank aware."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1, min_per_node=16)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density while allowing larger systems."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the benchmark oracle while preserving M/N = 1/16."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
+
+
+@pytest.fixture
+def benchmark_param_map_system_size(mpi_sizing):
+    """Keep parameter-map benchmark tests small while allowing extra ranks to participate."""
+    return mpi_sizing.power_of_two(base=8, min_per_rank=1)
+
+
+def _make_single_marked_oracle(marked_state):
+    """Return a Grover-style oracle with one marked state."""
+
+    def grover_oracle(local_i, local_i_offset):
+        qualities = np.ones(local_i, dtype=np.float64)
+        local_marked = marked_state - local_i_offset
+        if 0 <= local_marked < local_i:
+            qualities[local_marked] = 0.0
+        return qualities
+
+    return grover_oracle
+
+
 @pytest.mark.mpi
 class TestBenchmarkBasic:
     """Basic tests for benchmark() functionality."""
@@ -672,26 +715,12 @@ class TestBenchmarkWithParameterMap:
     to each ansatz iteration.
     """
 
-    def test_benchmark_with_parameter_map_simple(self, mpi_comm):
+    def test_benchmark_with_parameter_map_simple(self, mpi_comm, benchmark_param_map_system_size):
         """Verify benchmark works with a simple parameter map."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        # Create a Grover-like oracle: one marked state
-        system_size = 8  # 2^3 = 8 states
+        system_size = benchmark_param_map_system_size
         marked_state = 3
-
-        # Use closure to capture marked_state
-        def make_grover_oracle(marked):
-            def grover_oracle(local_i, local_i_offset):
-                """Oracle that marks one state with value 0, others with 1."""
-                qualities = np.ones(local_i, dtype=np.float64)
-                for i in range(local_i):
-                    global_i = local_i_offset + i
-                    if global_i == marked:
-                        qualities[i] = 0.0  # Marked state has lowest quality
-                return qualities
-
-            return grover_oracle
 
         # Bound parameters (ansatz_depth, total_params) come first, matching Ansatz attrs.
         # free_vec is passed at call time via __to_full(vec, ...).
@@ -709,7 +738,7 @@ class TestBenchmarkWithParameterMap:
             return full_params
 
         alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(make_grover_oracle(marked_state))
+        alg.set_qualities(_make_single_marked_oracle(marked_state))
 
         # Set up parameter map - n_free_params=2 for [gamma, t]
         alg.set_parameter_map(2, parameter_map)
@@ -732,23 +761,14 @@ class TestBenchmarkWithParameterMap:
 
         alg.destroy()
 
-    def test_benchmark_parameter_map_multiple_depths(self, mpi_comm):
+    def test_benchmark_parameter_map_multiple_depths(
+        self, mpi_comm, benchmark_param_map_system_size
+    ):
         """Verify benchmark with parameter map works across multiple depths."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 8
+        system_size = benchmark_param_map_system_size
         marked_state = 5
-
-        def make_grover_oracle(marked):
-            def grover_oracle(local_i, local_i_offset):
-                qualities = np.ones(local_i, dtype=np.float64)
-                for i in range(local_i):
-                    global_i = local_i_offset + i
-                    if global_i == marked:
-                        qualities[i] = 0.0
-                return qualities
-
-            return grover_oracle
 
         # Bound params first (ansatz_depth, total_params), then free_vec
         def parameter_map(ansatz_depth, total_params, free_vec):
@@ -761,7 +781,7 @@ class TestBenchmarkWithParameterMap:
             return full_params
 
         alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(make_grover_oracle(marked_state))
+        alg.set_qualities(_make_single_marked_oracle(marked_state))
 
         # ansatz_depth is automatically bound from Ansatz.ansatz_depth
         alg.set_parameter_map(2, parameter_map)
@@ -788,7 +808,9 @@ class TestBenchmarkWithParameterMap:
 
         alg.destroy()
 
-    def test_benchmark_parameter_map_finds_optimal(self, mpi_comm):
+    def test_benchmark_parameter_map_finds_optimal(
+        self, mpi_comm, benchmark_param_map_system_size
+    ):
         """Verify benchmark with parameter map can optimize toward the marked state.
 
         For Grover search, the optimal gamma is near pi (phase flip)
@@ -796,19 +818,8 @@ class TestBenchmarkWithParameterMap:
         """
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 8
+        system_size = benchmark_param_map_system_size
         marked_state = 0  # Mark state |0>
-
-        def make_grover_oracle(marked):
-            def grover_oracle(local_i, local_i_offset):
-                qualities = np.ones(local_i, dtype=np.float64)
-                for i in range(local_i):
-                    global_i = local_i_offset + i
-                    if global_i == marked:
-                        qualities[i] = 0.0
-                return qualities
-
-            return grover_oracle
 
         def parameter_map(ansatz_depth, total_params, free_vec):
             gamma, t = free_vec
@@ -819,7 +830,7 @@ class TestBenchmarkWithParameterMap:
             return full_params
 
         alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(make_grover_oracle(marked_state))
+        alg.set_qualities(_make_single_marked_oracle(marked_state))
 
         alg.set_parameter_map(2, parameter_map)
 
@@ -835,19 +846,20 @@ class TestBenchmarkWithParameterMap:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result is not None
-            # The optimized gamma should be near pi for phase inversion
             optimized_gamma = alg.result["x"][0]
-            # Allow some tolerance - the optimizer should move toward pi
-            # (exact value depends on system size and walk time interaction)
-            assert 0 < optimized_gamma < 2 * np.pi  # Valid range
+            assert 0 < optimized_gamma < 2 * np.pi
+            uniform_expectation = (system_size - 1) / system_size
+            assert alg.result["fun"] < uniform_expectation
 
         alg.destroy()
 
-    def test_benchmark_param_map_auto_generates_initial_params(self, mpi_comm):
+    def test_benchmark_param_map_auto_generates_initial_params(
+        self, mpi_comm, benchmark_param_map_system_size
+    ):
         """Verify benchmark auto-generates initial params when n_free_params is set."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 8
+        system_size = benchmark_param_map_system_size
 
         def grover_oracle(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
@@ -1072,8 +1084,7 @@ class TestBenchmarkWithParallelJacobian:
         # Optimal is approximately (gamma=pi, t=pi/N), start at (1.0, 0.1)
         initial_params = np.array([1.0, 0.1])
 
-        # Uniform superposition expectation: (N-M)/N where M=1 marked state
-        # For N=8, M=1: uniform_E = 7/8 = 0.875
+        # Uniform superposition expectation comes from the active oracle ratio.
         uniform_expectation = oracle.uniform_expectation()
 
         alg.benchmark(
@@ -1097,9 +1108,7 @@ class TestBenchmarkWithParallelJacobian:
             # The objective should have decreased from initial evaluation
             # (can't easily get initial objective, but we know uniform is the baseline)
 
-            # For a well-optimized Grover search, we should get close to
-            # theoretical success probability. With 1 iteration on N=8, M=1:
-            # P_success ~= 0.78, so expectation ~= 0.22 (since E = 1 - P_marked)
+            # Compare against the active oracle's one-step Grover prediction.
             theoretical_success = oracle.theoretical_success_probability(1)
             theoretical_expectation = 1 - theoretical_success
 
@@ -1120,23 +1129,14 @@ class TestBenchmarkWithSamplingAndParameterMap:
     a parameter map for Grover-like search optimization.
     """
 
-    def test_benchmark_sampling_with_parameter_map(self, mpi_comm):
+    def test_benchmark_sampling_with_parameter_map(
+        self, mpi_comm, benchmark_param_map_system_size
+    ):
         """Verify benchmark works with both sampling and parameter map enabled."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 8
+        system_size = benchmark_param_map_system_size
         marked_state = 3
-
-        def make_grover_oracle(marked):
-            def grover_oracle(local_i, local_i_offset):
-                qualities = np.ones(local_i, dtype=np.float64)
-                for i in range(local_i):
-                    global_i = local_i_offset + i
-                    if global_i == marked:
-                        qualities[i] = 0.0
-                return qualities
-
-            return grover_oracle
 
         def parameter_map(ansatz_depth, total_params, free_vec):
             """Map 2 parameters [gamma, t] to all ansatz layers."""
@@ -1148,7 +1148,7 @@ class TestBenchmarkWithSamplingAndParameterMap:
             return full_params
 
         alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(make_grover_oracle(marked_state))
+        alg.set_qualities(_make_single_marked_oracle(marked_state))
 
         # Enable sampling with 100 shots per block
         alg.set_sampling(sample_block_size=100)
@@ -1172,14 +1172,17 @@ class TestBenchmarkWithSamplingAndParameterMap:
 
         alg.destroy()
 
-    def test_benchmark_sampling_param_map_multiple_depths(self, mpi_comm):
+    def test_benchmark_sampling_param_map_multiple_depths(
+        self, mpi_comm, benchmark_param_map_system_size
+    ):
         """Verify sampling + parameter map works across multiple depths."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 8
+        system_size = benchmark_param_map_system_size
 
         def qualities(local_i, local_i_offset):
-            return np.random.rand(local_i)
+            values = np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
+            return np.sin(values)
 
         def parameter_map(ansatz_depth, total_params, free_vec):
             gamma, t = free_vec
@@ -1208,11 +1211,13 @@ class TestBenchmarkWithSamplingAndParameterMap:
 
         alg.destroy()
 
-    def test_benchmark_sampling_param_map_custom_sampling_fn(self, mpi_comm):
+    def test_benchmark_sampling_param_map_custom_sampling_fn(
+        self, mpi_comm, benchmark_param_map_system_size
+    ):
         """Verify sampling + parameter map works with custom sampling function."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 8
+        system_size = benchmark_param_map_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)

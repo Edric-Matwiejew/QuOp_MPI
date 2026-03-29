@@ -21,6 +21,25 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def sparse_small_system_size(mpi_sizing):
+    """Small power-of-two size for sparse-plan correctness checks."""
+    return mpi_sizing.power_of_two(base=16, min_per_rank=1)
+
+
+@pytest.fixture
+def sparse_medium_system_size(mpi_sizing):
+    """Moderate power-of-two size for partition-table checks."""
+    return mpi_sizing.power_of_two(base=32, min_per_rank=1)
+
+
+@pytest.fixture
+def sparse_system_size_ladder(mpi_sizing):
+    """Three increasing power-of-two sizes for cross-size sanity checks."""
+    smallest = mpi_sizing.power_of_two(base=8, min_per_rank=1)
+    return [smallest, smallest * 2, smallest * 4]
+
+
 def _create_qaoa(system_size, mpi_comm, depth=1):
     """Create and configure a QAOA instance with a deterministic cost."""
     from quop_mpi.algorithm.combinatorial import QAOA
@@ -44,19 +63,18 @@ def _create_qaoa(system_size, mpi_comm, depth=1):
 class TestSparsePartitionCorrectness:
     """T5.1: sparse plan/propagate via the shared layout partition table."""
 
-    def test_sparse_plan_succeeds(self, mpi_comm):
+    def test_sparse_plan_succeeds(self, mpi_comm, sparse_small_system_size):
         """plan() must complete without error on all ranks."""
-        alg = _create_qaoa(16, mpi_comm)
+        alg = _create_qaoa(sparse_small_system_size, mpi_comm)
 
         # evolve_state triggers setup (negotiate -> plan -> gen_operator)
         params = np.array([0.0, 0.0])  # identity-like params
         alg.evolve_state(params)  # should not raise
         alg.destroy()
 
-    def test_sparse_preserves_normalisation(self, mpi_comm):
+    def test_sparse_preserves_normalisation(self, mpi_comm, sparse_medium_system_size):
         """Probability must sum to 1 after sparse state evolution."""
-        system_size = 32
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_medium_system_size, mpi_comm)
 
         params = np.array([0.3, 0.7])
         alg.evolve_state(params)
@@ -67,12 +85,11 @@ class TestSparsePartitionCorrectness:
             assert abs(total - 1.0) < 1e-10, f"Total probability = {total}"
         alg.destroy()
 
-    def test_sparse_determinism(self, mpi_comm):
+    def test_sparse_determinism(self, mpi_comm, sparse_small_system_size):
         """Same parameters -> identical final state (bit-exact)."""
-        system_size = 16
         params = np.array([0.25, 0.50])
 
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_small_system_size, mpi_comm)
         alg.evolve_state(params)
         state1 = alg.get_final_state()
 
@@ -86,10 +103,9 @@ class TestSparsePartitionCorrectness:
             ), "Identical parameters must produce identical states"
         alg.destroy()
 
-    def test_sparse_expectation_value_finite(self, mpi_comm):
+    def test_sparse_expectation_value_finite(self, mpi_comm, sparse_small_system_size):
         """execute() must produce a finite expectation value."""
-        system_size = 16
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_small_system_size, mpi_comm)
         alg.execute()
 
         if mpi_comm.Get_rank() == 0:
@@ -97,11 +113,10 @@ class TestSparsePartitionCorrectness:
             assert np.isfinite(alg.result["fun"]), f"E[cost] = {alg.result['fun']} is not finite"
         alg.destroy()
 
-    def test_sparse_multi_depth_normalisation(self, mpi_comm):
+    def test_sparse_multi_depth_normalisation(self, mpi_comm, sparse_small_system_size):
         """Multiple QAOA layers still preserve normalisation."""
-        system_size = 16
         depth = 3
-        alg = _create_qaoa(system_size, mpi_comm, depth=depth)
+        alg = _create_qaoa(sparse_small_system_size, mpi_comm, depth=depth)
 
         params = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
         alg.evolve_state(params)
@@ -123,10 +138,9 @@ class TestSparsePartitionCorrectness:
 class TestPartitionTableAgreement:
     """T5.2: the layout partition table is consistent with the sparse propagator."""
 
-    def test_partition_table_covers_system_size(self, mpi_comm):
+    def test_partition_table_covers_system_size(self, mpi_comm, sparse_medium_system_size):
         """partition_table[end] - partition_table[0] == system_size."""
-        system_size = 32
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_medium_system_size, mpi_comm)
 
         # trigger negotiate so the layout is populated
         params = np.array([0.0, 0.0])
@@ -136,13 +150,14 @@ class TestPartitionTableAgreement:
             pt = alg.partition_table
             # 1-based convention: pt[0]=1, pt[-1]=system_size+1
             span = int(pt[-1]) - int(pt[0])
-            assert span == system_size, f"partition_table spans {span}, expected {system_size}"
+            assert span == sparse_medium_system_size, (
+                f"partition_table spans {span}, expected {sparse_medium_system_size}"
+            )
         alg.destroy()
 
-    def test_partition_table_matches_local_i(self, mpi_comm):
+    def test_partition_table_matches_local_i(self, mpi_comm, sparse_medium_system_size):
         """local_i on each rank == partition_table[rank+1] - partition_table[rank]."""
-        system_size = 32
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_medium_system_size, mpi_comm)
 
         params = np.array([0.0, 0.0])
         alg.evolve_state(params)
@@ -156,10 +171,9 @@ class TestPartitionTableAgreement:
             )
         alg.destroy()
 
-    def test_partition_table_dtype_is_int64(self, mpi_comm):
+    def test_partition_table_dtype_is_int64(self, mpi_comm, sparse_small_system_size):
         """Layout partition table must be int64 (supports large system_size)."""
-        system_size = 16
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_small_system_size, mpi_comm)
 
         params = np.array([0.0, 0.0])
         alg.evolve_state(params)
@@ -170,10 +184,11 @@ class TestPartitionTableAgreement:
             )
         alg.destroy()
 
-    def test_partition_table_monotonically_increasing(self, mpi_comm):
+    def test_partition_table_monotonically_increasing(
+        self, mpi_comm, sparse_medium_system_size
+    ):
         """partition_table values must be strictly increasing."""
-        system_size = 32
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_medium_system_size, mpi_comm)
 
         params = np.array([0.0, 0.0])
         alg.evolve_state(params)
@@ -186,10 +201,9 @@ class TestPartitionTableAgreement:
                 )
         alg.destroy()
 
-    def test_partition_table_has_correct_length(self, mpi_comm):
+    def test_partition_table_has_correct_length(self, mpi_comm, sparse_medium_system_size):
         """partition_table length == n_procs_in_subcomm + 1."""
-        system_size = 32
-        alg = _create_qaoa(system_size, mpi_comm)
+        alg = _create_qaoa(sparse_medium_system_size, mpi_comm)
 
         params = np.array([0.0, 0.0])
         alg.evolve_state(params)
@@ -210,7 +224,7 @@ class TestPartitionTableAgreement:
                 )
         alg.destroy()
 
-    def test_sparse_evolution_consistent_across_sizes(self, mpi_comm):
+    def test_sparse_evolution_consistent_across_sizes(self, mpi_comm, sparse_system_size_ladder):
         """
         State evolution with the shared partition table produces the same
         expectation value for different system sizes (sanity check that
@@ -218,7 +232,7 @@ class TestPartitionTableAgreement:
         """
         params = np.array([0.3, 0.7])
 
-        for system_size in [8, 16, 32]:
+        for system_size in sparse_system_size_ladder:
             alg = _create_qaoa(system_size, mpi_comm)
             alg.evolve_state(params)
 

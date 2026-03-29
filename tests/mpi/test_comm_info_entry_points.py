@@ -21,6 +21,24 @@ from quop_mpi._lib import comm_info_wrapper
 _ciw = comm_info_wrapper.comm_info_wrapper
 
 
+@pytest.fixture
+def entrypoint_success_system_size(mpi_sizing):
+    """Moderate successful system size for negotiate/jaccomm entry points."""
+    return mpi_sizing.multiple(base=100, per_rank=16)
+
+
+@pytest.fixture
+def entrypoint_prime_system_size(mpi_sizing):
+    """Prime system size to preserve uneven partition-table coverage."""
+    return mpi_sizing.prime(base=97, min_per_rank=8)
+
+
+@pytest.fixture
+def entrypoint_pipeline_system_size(mpi_sizing):
+    """Larger successful system size for end-to-end entry-point coverage."""
+    return mpi_sizing.multiple(base=200, per_rank=16)
+
+
 def _world_handle():
     return MPI.COMM_WORLD.py2f()
 
@@ -145,12 +163,14 @@ class TestNegotiate:
         )
         return topo, split
 
-    def test_success(self, mpi_comm, mpi_rank, mpi_size):
+    def test_success(self, mpi_comm, mpi_rank, mpi_size, entrypoint_success_system_size):
         """negotiate with valid system_size -> status=0, locked layout."""
         topo, split = self._setup_split()
         props = np.array([], dtype=np.int64)
         cbs = np.array([], dtype=np.int64)
-        layout, status = _ciw.wrapper_negotiate(split, topo, 100, _backend_flag(), props, cbs)
+        layout, status = _ciw.wrapper_negotiate(
+            split, topo, entrypoint_success_system_size, _backend_flag(), props, cbs
+        )
         assert status == 0
         assert layout != 0
 
@@ -165,7 +185,7 @@ class TestNegotiate:
         assert _ciw.get_alloc_local(layout) > 0
 
         # system_size correct
-        assert _ciw.get_system_size(layout) == 100
+        assert _ciw.get_system_size(layout) == entrypoint_success_system_size
 
         _ciw.destroy(layout)
         _ciw.destroy_split(split)
@@ -195,14 +215,15 @@ class TestNegotiate:
         _ciw.destroy_split(split)
         topo = _ciw.wrapper_destroy_topology(topo)
 
-    def test_partition_table_correct(self, mpi_comm, mpi_rank, mpi_size):
+    def test_partition_table_correct(
+        self, mpi_comm, mpi_rank, mpi_size, entrypoint_prime_system_size
+    ):
         """After negotiate, partition table matches block distribution."""
-        system_size = 97
         topo, split = self._setup_split()
         props = np.array([], dtype=np.int64)
         cbs = np.array([], dtype=np.int64)
         layout, status = _ciw.wrapper_negotiate(
-            split, topo, system_size, _backend_flag(), props, cbs
+            split, topo, entrypoint_prime_system_size, _backend_flag(), props, cbs
         )
         assert status == 0
 
@@ -210,7 +231,7 @@ class TestNegotiate:
         assert n == mpi_size + 1
         table = _ciw.get_partition_table(layout, n)
         assert table[0] == 1
-        assert table[-1] == system_size + 1
+        assert table[-1] == entrypoint_prime_system_size + 1
 
         _ciw.destroy(layout)
         _ciw.destroy_split(split)
@@ -257,13 +278,17 @@ class TestNegotiate:
 @pytest.mark.mpi
 class TestCreateJaccomm:
 
-    def test_single_worker_jaccomm(self, mpi_comm, mpi_rank, mpi_size):
+    def test_single_worker_jaccomm(
+        self, mpi_comm, mpi_rank, mpi_size, entrypoint_success_system_size
+    ):
         """With 1 worker, JACCOMM has size 1 for rank 0, null for others."""
         topo = _discover_topology_handle()
         split, wid, status = _ciw.wrapper_split_workers(_world_handle(), topo, 1, _backend_flag())
         props = np.array([], dtype=np.int64)
         cbs = np.array([], dtype=np.int64)
-        layout, status = _ciw.wrapper_negotiate(split, topo, 100, _backend_flag(), props, cbs)
+        layout, status = _ciw.wrapper_negotiate(
+            split, topo, entrypoint_success_system_size, _backend_flag(), props, cbs
+        )
 
         _ciw.wrapper_create_jaccomm(_world_handle(), split, layout)
 
@@ -281,13 +306,17 @@ class TestCreateJaccomm:
         topo = _ciw.wrapper_destroy_topology(topo)
 
     @pytest.mark.requires_nprocs(2)
-    def test_two_workers_jaccomm(self, mpi_comm, mpi_rank, mpi_size):
+    def test_two_workers_jaccomm(
+        self, mpi_comm, mpi_rank, mpi_size, entrypoint_success_system_size
+    ):
         """With 2 workers, JACCOMM includes all worker ranks + optimizer root."""
         topo = _discover_topology_handle()
         split, wid, status = _ciw.wrapper_split_workers(_world_handle(), topo, 2, _backend_flag())
         props = np.array([], dtype=np.int64)
         cbs = np.array([], dtype=np.int64)
-        layout, status = _ciw.wrapper_negotiate(split, topo, 100, _backend_flag(), props, cbs)
+        layout, status = _ciw.wrapper_negotiate(
+            split, topo, entrypoint_success_system_size, _backend_flag(), props, cbs
+        )
 
         _ciw.wrapper_create_jaccomm(_world_handle(), split, layout)
 
@@ -344,10 +373,10 @@ class TestCreateJaccomm:
 @pytest.mark.mpi
 class TestFullPipeline:
 
-    def test_discover_split_negotiate_jaccomm_destroy(self, mpi_comm, mpi_rank, mpi_size):
+    def test_discover_split_negotiate_jaccomm_destroy(
+        self, mpi_comm, mpi_rank, mpi_size, entrypoint_pipeline_system_size
+    ):
         """Full lifecycle: discover -> split -> negotiate -> jaccomm -> destroy all."""
-        system_size = 200
-
         # Phase 0: discover
         topo = _discover_topology_handle()
         assert topo != 0
@@ -360,17 +389,17 @@ class TestFullPipeline:
         props = np.array([], dtype=np.int64)
         cbs = np.array([], dtype=np.int64)
         layout, status = _ciw.wrapper_negotiate(
-            split, topo, system_size, _backend_flag(), props, cbs
+            split, topo, entrypoint_pipeline_system_size, _backend_flag(), props, cbs
         )
         assert status == 0
         assert _ciw.is_locked(layout) == 1
 
         # Verify partitioning
-        assert _ciw.get_system_size(layout) == system_size
+        assert _ciw.get_system_size(layout) == entrypoint_pipeline_system_size
         n = _ciw.get_partition_table_size(layout)
         table = _ciw.get_partition_table(layout, n)
         assert table[0] == 1
-        assert table[-1] == system_size + 1
+        assert table[-1] == entrypoint_pipeline_system_size + 1
 
         # Phase 6: jaccomm
         _ciw.wrapper_create_jaccomm(_world_handle(), split, layout)

@@ -12,6 +12,29 @@ Run with: mpiexec -n 2 python -m pytest tests/mpi/test_evaluation.py -v --with-m
 import numpy as np
 import pytest
 
+from tests.conftest import TestOracle
+
+
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two size that keeps evaluation tests multi-rank aware."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1, min_per_node=16)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density while allowing larger systems."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the shared evaluation oracle while preserving M/N = 1/16."""
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
+
 
 @pytest.mark.mpi
 class TestEvaluateMethod:
@@ -235,31 +258,34 @@ class TestGetExpectationValue:
 class TestEvaluationCorrectness:
     """Tests for correctness of evaluation methods."""
 
-    def test_optimal_params_give_lower_expectation(self, mpi_comm, simple_oracle):
-        """Verify optimal parameters give lower expectation than random params."""
-        from quop_mpi.algorithm.combinatorial import QAOA
+    def test_optimal_params_beat_random_baseline(self, mpi_comm, simple_oracle):
+        """Verify known-good parameters beat a deterministic random baseline."""
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg = QWOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(2)  # More depth for better optimization
         alg.prepare()
 
         optimal_params = simple_oracle.optimal_params(depth=2)
 
-        # Generate random params on rank 0 and broadcast to ensure consistency
+        # Use a fixed batch of random candidates so the comparison is reproducible
+        # across ranks and across test runs.
         if mpi_comm.Get_rank() == 0:
-            random_params = np.random.uniform(0, np.pi, size=optimal_params.shape)
+            rng = np.random.default_rng(12345)
+            random_params = rng.uniform(0, np.pi, size=(5, optimal_params.size))
         else:
-            random_params = np.empty(optimal_params.shape)
+            random_params = np.empty((5, optimal_params.size))
         mpi_comm.Bcast(random_params, root=0)
 
         optimal_result = alg.evaluate(optimal_params)
-        random_result = alg.evaluate(random_params)
+        random_results = [alg.evaluate(candidate) for candidate in random_params]
 
         if alg.subcomms.in_subcomm():
-            # Both should be valid finite values
             assert np.isfinite(optimal_result)
-            assert np.isfinite(random_result)
+            assert np.all(np.isfinite(random_results))
+            assert optimal_result < simple_oracle.uniform_expectation()
+            assert optimal_result < float(np.mean(random_results))
 
         alg.destroy()
 

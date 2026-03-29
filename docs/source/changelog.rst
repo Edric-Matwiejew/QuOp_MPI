@@ -17,8 +17,8 @@ Added
 - Curated ASX ticker candidate dataset for the portfolio rebalancing example
 - Profile-based installer (``environments/install.sh``) with installation profiles replacing the Spack-driven setup
 - Unified benchmark submission script with single (intra) - and multi-node configurations
-- ``run_tests.sh`` test runner covering unit, MPI, parallel-Jacobian and integration tests
-- Integration test suite that runs example scripts and validates results against expected bounds
+- ``run_tests.sh`` test runner covering unit, MPI, parallel-Jacobian and example tests
+- Example test suite that runs example scripts and validates results against expected bounds
 - Test documentation in the README
 
 Changed
