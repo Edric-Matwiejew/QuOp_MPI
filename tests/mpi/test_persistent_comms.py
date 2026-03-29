@@ -12,6 +12,7 @@ Run with:
     mpiexec -n 2 python -m pytest tests/mpi/test_persistent_comms.py -v --with-mpi --backend mpi
 """
 
+import numpy as np
 import pytest
 
 from tests.conftest import TestOracle
@@ -90,8 +91,9 @@ class TestPersistentComms:
         alg.set_depth(1)
 
         alg.setup()
-        layout_before = alg.layout
-        assert layout_before is not None
+        seed_before = alg.seed
+        assert alg.layout is not None
+        assert alg.context is not None
 
         # Re-set unitaries (re-using the same qaoa defaults)
         # set_unitaries sets NEGOTIATION flag
@@ -103,12 +105,24 @@ class TestPersistentComms:
 
         # Re-setup should re-negotiate
         alg.setup()
+        layout_after = alg.layout
+        context_after = alg.context
 
-        # Different layout object -- re-negotiated
-        # (may or may not be a different pointer, but _setup_done should
-        # have gone through the NEGOTIATION path)
+        assert layout_after is not None
+        assert context_after is not None
+        assert alg.seed == seed_before + 1
         assert alg._setup_done is True
         assert not (alg._dirty & _Dirty.NEGOTIATION)
+        assert layout_after.system_size == persistent_system_size
+        assert context_after.system_size == persistent_system_size
+        assert context_after.host_local_i == layout_after.local_i
+        assert context_after.host_alloc_local == layout_after.alloc_local
+
+        # A renegotiated setup should leave the rebuilt layout/context usable.
+        alg.evolve_state(oracle.optimal_params(depth=1))
+        expectation = alg.get_expectation_value()
+        if alg.subcomms.in_rootcomm():
+            assert np.isfinite(expectation)
 
         alg.destroy()
 

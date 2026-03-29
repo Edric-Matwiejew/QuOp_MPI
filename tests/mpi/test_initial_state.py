@@ -24,6 +24,18 @@ def _marked_count_from_ratio(system_size, denominator, minimum):
     return max(minimum, system_size // denominator)
 
 
+def _single_eval_optimiser(fun, x0, **_kwargs):
+    """Evaluate exactly one parameter vector so execute() becomes deterministic."""
+    x = np.asarray(x0, dtype=np.float64)
+    return {
+        "x": x.copy(),
+        "fun": float(fun(x)),
+        "nfev": 1,
+        "nit": 0,
+        "success": True,
+    }
+
+
 @pytest.fixture
 def simple_oracle(mpi_sizing):
     """Scale the initial-state oracle while preserving M/N = 1/16."""
@@ -382,35 +394,36 @@ class TestInitialStateEvolution:
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.state import basis, equal
 
+        marked_state = min(simple_oracle.marked_states)
+        params = np.zeros(2, dtype=np.float64)
+
         # Test with equal superposition
         alg_equal = QAOA(simple_oracle.system_size, mpi_comm)
         alg_equal.set_qualities(simple_oracle.qualities_function())
         alg_equal.set_depth(1)
         alg_equal.set_initial_state(equal)
 
-        params = np.array([0.5, 0.5])
         alg_equal.evolve_state(params)
         exp_equal = alg_equal.get_expectation_value()
 
         alg_equal.destroy()
 
-        # Test with single basis state
+        # Test with a marked basis state so the expected value is known exactly.
         alg_basis = QAOA(simple_oracle.system_size, mpi_comm)
         alg_basis.set_qualities(simple_oracle.qualities_function())
         alg_basis.set_depth(1)
         alg_basis.set_initial_state(
-            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
+            basis,
+            initial_state_dict={"args": [], "kwargs": {"basis_states": [marked_state]}},
         )
 
         alg_basis.evolve_state(params)
         exp_basis = alg_basis.get_expectation_value()
 
-        # Expectation values should generally be different
-        # (depending on the oracle, index 0 might or might not be marked)
-        # We just verify both are valid numbers
         if alg_basis.subcomms.in_rootcomm():
-            assert np.isfinite(exp_equal)
-            assert np.isfinite(exp_basis)
+            assert np.isclose(exp_equal, simple_oracle.uniform_expectation(), atol=1e-10)
+            assert np.isclose(exp_basis, 0.0, atol=1e-10)
+            assert not np.isclose(exp_equal, exp_basis, atol=1e-10)
 
         alg_basis.destroy()
 
@@ -491,30 +504,35 @@ class TestInitialStateEdgeCases:
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.state import basis, equal
 
+        marked_state = min(simple_oracle.marked_states)
+        params = np.zeros(2, dtype=np.float64)
+
         alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.set_initial_state(equal)
+        alg.set_optimiser(_single_eval_optimiser, {}, ["fun", "x", "nfev", "success"])
 
-        alg.execute()
+        alg.execute(params)
 
-        if mpi_comm.Get_rank() == 0:
+        if alg.subcomms.in_rootcomm():
             result1 = alg.result["fun"]
-        else:
-            result1 = None
-        result1 = mpi_comm.bcast(result1, root=0)
 
         # Change initial state
         alg.set_initial_state(
-            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
+            basis,
+            initial_state_dict={"args": [], "kwargs": {"basis_states": [marked_state]}},
         )
 
         # Re-execute
-        alg.execute()
+        alg.execute(params)
 
-        if mpi_comm.Get_rank() == 0:
+        if alg.subcomms.in_rootcomm():
             result2 = alg.result["fun"]
-            assert result2 is not None
+            assert np.isclose(result1, simple_oracle.uniform_expectation(), atol=1e-10)
+            assert np.isclose(result2, 0.0, atol=1e-10)
+            assert not np.isclose(result1, result2, atol=1e-10)
+            assert alg.result["nfev"] == 1
 
         alg.destroy()
 

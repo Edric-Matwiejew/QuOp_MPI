@@ -140,6 +140,7 @@ class TestCompleteGraphMixing:
     def test_mixing_from_localized_state(self, mpi_comm, backend_name, composite_grid_ns_2d):
         """Test mixing spreads amplitude from localized initial state."""
         from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
+        from quop_mpi.state import basis
 
         def zero_qualities(x):
             return np.zeros(x.shape[0])
@@ -151,16 +152,14 @@ class TestCompleteGraphMixing:
         alg = QMOA(Ns, mpi_comm)
         alg.set_qualities(cartesian, {"args": [deltas, mins, zero_qualities]})
         alg.set_depth(1)
+        alg.set_initial_state(
+            basis, initial_state_dict={"args": [], "kwargs": {"basis_states": [0]}}
+        )
         alg.setup()
 
-        # With zero qualities, only mixer acts
-        # Apply mixing for time t
         t = 0.5
         n_params = alg.total_params * alg.ansatz_depth
         params = np.zeros(n_params)
-        # Set mixer parameters (second set of params for depth=1)
-        # For QMOA, params are [gamma, t1, t2, ...] per layer.
-        # In the 2D case there are 3 params per layer.
         params[1] = t  # First mixer dimension
         params[2] = t  # Second mixer dimension
 
@@ -168,11 +167,14 @@ class TestCompleteGraphMixing:
         probs = alg.get_probabilities()
 
         if mpi_comm.Get_rank() == 0:
-            # With mixing applied, probabilities should no longer be uniform
-            # (unless t is specifically chosen to return to uniform)
-            # Just verify sum is still 1
-            total = np.sum(probs)
-            assert abs(total - 1.0) < 1e-10, f"[{backend_name}] Normalization lost after mixing"
+            total = np.sum(probs, dtype=np.float64)
+            assert np.isclose(total, 1.0, atol=1e-8), (
+                f"[{backend_name}] Normalization lost after mixing"
+            )
+            assert probs[0] < 1.0 - 1e-6, f"[{backend_name}] Mixer left the state fully localized"
+            assert np.count_nonzero(probs > 1e-8) > 1, (
+                f"[{backend_name}] Mixer failed to spread amplitude beyond one basis state"
+            )
 
         alg.destroy()
 

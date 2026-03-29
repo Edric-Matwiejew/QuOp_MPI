@@ -385,14 +385,19 @@ class TestSwarmUtilities:
 
         s.set_qualities(qualities)
         s.set_depth(2)
+        s.set_seed(123)
+        s.prepare()
 
-        # Setup needs to be called to initialize params properly
         if s.swarm_comms.in_subcomm():
-            s.ansatz.setup()
-            # total_params should be set after setup
-            # QAOA has 2 params per depth (gamma + t)
-            expected_n_params = s.ansatz.total_params * 2
-            assert expected_n_params == 4  # 2 params * depth 2
+            params = s.gen_initial_params()
+            assert params is not None
+            assert params.shape == (4,)
+            assert np.all(np.isfinite(params))
+
+            all_params = s.swarm_comms.SUBCOMM.gather(params, root=0)
+            if s.swarm_comms.SUBCOMM.Get_rank() == 0:
+                for other in all_params:
+                    np.testing.assert_allclose(other, all_params[0])
 
         s.destroy()
 
