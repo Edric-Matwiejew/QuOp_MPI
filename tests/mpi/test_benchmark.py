@@ -18,7 +18,9 @@ import tempfile
 
 import numpy as np
 import pytest
+from mpi4py import MPI
 
+from quop_mpi import config
 from tests.conftest import TestOracle
 
 
@@ -60,6 +62,47 @@ def _make_single_marked_oracle(marked_state):
         return qualities
 
     return grover_oracle
+
+
+_cached_wavefront_devcomm_size = None
+
+
+def _probe_wavefront_devcomm_size(mpi_comm):
+    """Return the global DEVCOMM size for wavefront worker-layout checks."""
+    global _cached_wavefront_devcomm_size
+    if _cached_wavefront_devcomm_size is not None:
+        return _cached_wavefront_devcomm_size
+
+    from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+    from quop_mpi._utils._comm_size import QuopMpiLayout
+
+    backend_flag = 1  # wavefront
+    system_size = max(64, mpi_comm.Get_size())
+
+    layout = QuopMpiLayout.create_workers(1, mpi_comm, backend_flag=backend_flag)
+
+    prop_ptrs = np.array([], dtype=np.int64)
+    cb_ptrs = np.array([], dtype=np.int64)
+    layout_ptr, status = _ciw.wrapper_negotiate(
+        layout.split_ptr,
+        layout.topo_ptr,
+        np.int64(system_size),
+        np.int32(backend_flag),
+        prop_ptrs,
+        cb_ptrs,
+    )
+    layout.set_layout_ptr(int(layout_ptr))
+    if status == -1:
+        layout.mark_excluded()
+
+    devcomm = layout.devcomm
+    local_size = devcomm.Get_size() if devcomm is not None else 0
+    global_size = mpi_comm.allreduce(local_size, op=MPI.MAX)
+
+    layout.destroy()
+
+    _cached_wavefront_devcomm_size = global_size
+    return global_size
 
 
 @pytest.mark.mpi
@@ -425,20 +468,45 @@ class TestBenchmarkSeed:
 
     def test_benchmark_uses_algorithm_seed(self, mpi_comm, simple_oracle):
         """Verify benchmark uses the algorithm's seed."""
-        from quop_mpi.algorithm.combinatorial import QAOA
+        import quop_mpi._benchmark as benchmark_module
 
+        from quop_mpi.algorithm.combinatorial import QAOA
+        from quop_mpi._utils._tracker import JobTracker as BaseJobTracker
+
+        initial_seed = 12345
         alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_seed(12345)
+        alg.setup()
+        alg.set_seed(initial_seed)
+        init_seeds = []
+        requested_seeds = []
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+        class RecordingJobTracker(BaseJobTracker):
+            def __init__(self, *args, **kwargs):
+                init_seeds.append(kwargs.get("seed", args[4] if len(args) > 4 else None))
+                super().__init__(*args, **kwargs)
 
-        # Tracker should start with algorithm's seed
-        # (seed increments with each job)
+            def get_seed(self):
+                seed = super().get_seed()
+                requested_seeds.append(seed)
+                return seed
+
+        original_tracker = benchmark_module.JobTracker
+        benchmark_module.JobTracker = RecordingJobTracker
+        try:
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=2,
+                verbose=False,
+            )
+        finally:
+            benchmark_module.JobTracker = original_tracker
+
+        expected_calls = list(range(initial_seed, initial_seed + 4))
+        assert init_seeds == [initial_seed]
+        assert requested_seeds == expected_calls
+        assert alg.tracker.seed == initial_seed + len(expected_calls)
+
         alg.destroy()
 
     def test_benchmark_reproducible_with_seed(self, mpi_comm, simple_oracle):
@@ -583,7 +651,7 @@ class TestBenchmarkMPIConsistency:
     """Tests for MPI consistency during benchmark."""
 
     def test_benchmark_result_consistent(self, mpi_comm, simple_oracle):
-        """Verify final result is consistent on rank 0."""
+        """Verify the final benchmark result is consistent across active ranks."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
         alg = QAOA(simple_oracle.system_size, mpi_comm)
@@ -595,11 +663,23 @@ class TestBenchmarkMPIConsistency:
             verbose=False,
         )
 
-        # Only rank 0 should have result
-        if mpi_comm.Get_rank() == 0:
+        local_result = None
+        if alg.subcomms.in_subcomm():
             assert alg.result is not None
-            assert "fun" in alg.result
-            assert "x" in alg.result
+            local_result = (
+                float(alg.result["fun"]),
+                np.asarray(alg.result["x"], dtype=np.float64),
+            )
+
+        gathered = mpi_comm.gather(local_result, root=0)
+
+        if mpi_comm.Get_rank() == 0:
+            active_results = [result for result in gathered if result is not None]
+            assert active_results
+            reference_fun, reference_x = active_results[0]
+            for fun, x in active_results[1:]:
+                assert np.isclose(fun, reference_fun)
+                np.testing.assert_allclose(x, reference_x)
 
         alg.destroy()
 
@@ -939,6 +1019,12 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm):
     old_val = os.environ.get("QUOP_RANKS_PER_GPU")
     os.environ["QUOP_RANKS_PER_GPU"] = str(rpg)
     try:
+        devcomm_size = _probe_wavefront_devcomm_size(mpi_comm)
+        if devcomm_size < n_workers:
+            pytest.skip(
+                f"Parallel jacobian benchmark tests require at least {n_workers} "
+                f"wavefront GPU-capable ranks, but only {devcomm_size} are available"
+            )
         yield
     finally:
         if old_val is None:
