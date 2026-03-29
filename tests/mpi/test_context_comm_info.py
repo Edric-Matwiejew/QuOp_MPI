@@ -140,10 +140,7 @@ class TestContextFromLayout:
         layout.destroy()
 
     def test_padded_alloc_local_controls_state_buffer(self, mpi_comm, mpi_rank, mpi_size):
-        """MPI contexts honor alloc_local even when it exceeds local_i."""
-        if config.backend != "mpi":
-            pytest.skip("MPI backend-specific allocation padding regression")
-
+        """Contexts honor alloc_local even when it exceeds local_i."""
         system_size = max(8, mpi_size * 4)
         local_i, offset = _block_partition(system_size, mpi_size, mpi_rank)
         layout = QuopMpiLayout.from_partition(
