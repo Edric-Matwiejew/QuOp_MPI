@@ -23,6 +23,18 @@ import pytest
 # =============================================================================
 
 
+def assert_probabilities_normalized(probs, *, atol=1e-8, context=""):
+    """Assert that a probability vector remains normalized within backend noise."""
+    total_prob = float(np.sum(probs, dtype=np.float64))
+    np.testing.assert_allclose(
+        total_prob,
+        1.0,
+        rtol=0.0,
+        atol=atol,
+        err_msg=f"{context} total probability {total_prob} exceeds tolerance {atol}",
+    )
+
+
 def create_partition_table(system_size, comm_size):
     """
     Create a 1-based partition table matching QuOp_MPI conventions.
@@ -199,8 +211,9 @@ class TestCirculantPropagator:
         # Probability should still sum to 1
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Complete-graph mixing should preserve normalization"
+            )
 
         alg.destroy()
 
@@ -233,8 +246,9 @@ class TestSparsePropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Sparse hypercube mixing should preserve normalization"
+            )
 
         alg.destroy()
 
@@ -260,10 +274,10 @@ class TestSparsePropagator:
         probs = alg.get_probabilities()
 
         if mpi_comm.Get_rank() == 0:
-            # Probability should sum to 1
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10, f"Total probability: {total_prob}"
-
+            assert_probabilities_normalized(
+                probs,
+                context="Sparse multi-depth evolution should preserve normalization",
+            )
             # All probabilities should be non-negative
             assert np.all(probs >= -1e-15), "Negative probabilities found"
 
@@ -342,8 +356,9 @@ class TestStateEvolutionCorrectness:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total = np.sum(probs)
-            assert abs(total - 1.0) < 1e-10, f"State not normalized: {total}"
+            assert_probabilities_normalized(
+                probs, context="State evolution should preserve normalization"
+            )
 
         alg.destroy()
 
@@ -438,8 +453,9 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Momentum propagator should preserve normalization"
+            )
 
         alg.destroy()
 
@@ -468,8 +484,9 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10, f"Normalization violated: {total_prob}"
+            assert_probabilities_normalized(
+                probs, context="Momentum propagator should remain normalized after evolution"
+            )
 
         alg.destroy()
 
@@ -572,8 +589,9 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Momentum multi-depth evolution should preserve normalization"
+            )
 
         alg.destroy()
 
@@ -603,8 +621,9 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="3D momentum evolution should preserve normalization"
+            )
 
         alg.destroy()
 

@@ -209,18 +209,17 @@ class TestPartitionTableAgreement:
         alg.evolve_state(params)
 
         if alg.partition_table is not None:
-            # SUBCOMM may be smaller than WORLD if ranks were excluded
-            comm_size = mpi_comm.Get_size()
-            # partition_table has comm_size + 1 entries (or fewer if shrunken)
+            # partition_table has SUBCOMM_size + 1 entries, which may be
+            # smaller than WORLD when negotiate excludes ranks.
             assert (
                 len(alg.partition_table) >= 2
             ), f"partition_table too short: {len(alg.partition_table)}"
-            # If no ranks excluded, length == comm_size + 1
             if alg.local_i > 0:
-                expected_len = comm_size + 1
+                subcomm_size = alg.layout.subcomm.Get_size()
+                expected_len = subcomm_size + 1
                 assert len(alg.partition_table) == expected_len, (
                     f"partition_table length = {len(alg.partition_table)}, "
-                    f"expected {expected_len} for {comm_size} ranks"
+                    f"expected {expected_len} for {subcomm_size} SUBCOMM ranks"
                 )
         alg.destroy()
 

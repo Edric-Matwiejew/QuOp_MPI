@@ -186,12 +186,17 @@ class TestSetupPhase:
         all_subcomm_index = mpi_comm.gather(subcomm_index, root=0)
 
         if rank == 0:
-            # All ranks should be in a subcomm for simple cases
-            assert all(all_in_subcomm), f"Not all ranks in subcomm: {all_in_subcomm}"
-            # All should be in subcomm index 0
+            # Rank 0 must always be active
+            assert all_in_subcomm[0], "Rank 0 should always be in a subcomm"
+            # At least one rank is active
+            assert any(all_in_subcomm), f"No ranks in subcomm: {all_in_subcomm}"
+            # All active ranks should be in subcomm index 0
+            active_indices = [
+                idx for idx, active in zip(all_subcomm_index, all_in_subcomm) if active
+            ]
             assert all(
-                idx == 0 for idx in all_subcomm_index
-            ), f"Ranks in different subcomm indices: {all_subcomm_index}"
+                idx == 0 for idx in active_indices
+            ), f"Active ranks in different subcomm indices: {active_indices}"
         alg.destroy()
 
 
