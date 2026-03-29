@@ -126,8 +126,8 @@ contains
                                              self%local_o, &
                                              self%local_o_offset)
 
-        ! Allocate enough for the local input and output sizes.
-        alloc_local = max(local_i, self%local_o)
+
+        alloc_local = max(alloc_local, ci%get_alloc_local())
 
         ! Count how many ranks have local_i > 0
         if (local_i > 0) then
