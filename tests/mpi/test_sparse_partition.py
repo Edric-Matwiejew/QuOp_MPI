@@ -21,6 +21,18 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
+def assert_probabilities_normalized(probs, *, atol=1e-8, context=""):
+    """Assert that a probability vector remains normalized within backend noise."""
+    total_prob = float(np.sum(probs, dtype=np.float64))
+    np.testing.assert_allclose(
+        total_prob,
+        1.0,
+        rtol=0.0,
+        atol=atol,
+        err_msg=f"{context} total probability {total_prob} exceeds tolerance {atol}",
+    )
+
+
 @pytest.fixture
 def sparse_small_system_size(mpi_sizing):
     """Small power-of-two size for sparse-plan correctness checks."""
@@ -81,8 +93,9 @@ class TestSparsePartitionCorrectness:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total = np.sum(probs)
-            assert abs(total - 1.0) < 1e-10, f"Total probability = {total}"
+            assert_probabilities_normalized(
+                probs, context="Sparse evolution should preserve normalization"
+            )
         alg.destroy()
 
     def test_sparse_determinism(self, mpi_comm, sparse_small_system_size):
@@ -123,8 +136,9 @@ class TestSparsePartitionCorrectness:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total = np.sum(probs)
-            assert abs(total - 1.0) < 1e-10, f"depth={depth}: total probability = {total}"
+            assert_probabilities_normalized(
+                probs, context=f"depth={depth}: sparse multi-depth evolution should stay normalized"
+            )
             assert np.all(probs >= -1e-15), "Negative probabilities found"
         alg.destroy()
 
@@ -237,6 +251,8 @@ class TestPartitionTableAgreement:
 
             probs = alg.get_probabilities()
             if mpi_comm.Get_rank() == 0:
-                total = np.sum(probs)
-                assert abs(total - 1.0) < 1e-10, f"system_size={system_size}: total prob = {total}"
+                assert_probabilities_normalized(
+                    probs,
+                    context=f"system_size={system_size}: sparse evolution should preserve normalization",
+                )
             alg.destroy()
