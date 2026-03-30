@@ -135,7 +135,7 @@ if(WAVEFRONT_BACKEND)
   endif()
 endif()
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 include(CMakePrintHelpers)
 

@@ -282,6 +282,9 @@ collect_profile_cmake_args() {
     local line
 
     CMAKE_ARGS_ARRAY=(-DBUILD_TESTING=ON)
+    if [[ "${VERBOSE:-false}" == "true" ]]; then
+        CMAKE_ARGS_ARRAY+=(-DCMAKE_VERBOSE_MAKEFILE=ON)
+    fi
     if declare -f profile_cmake_args >/dev/null 2>&1; then
         while IFS= read -r line; do
             [[ "$line" =~ ^[[:space:]]*$ ]] && continue

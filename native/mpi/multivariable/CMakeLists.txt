@@ -14,8 +14,6 @@ target_include_directories(
     PUBLIC
   ${FFTW_INCLUDE_DIRS}
   ${CMAKE_Fortran_MODULE_DIRECTORY}/cartesian
-    ${CMAKE_Fortran_MODULE_DIRECTORY}/mpi_circulant_operators
-    ${CMAKE_Fortran_MODULE_DIRECTORY}/mpi_context
 )
 
 add_library(cartesian_obj OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/../../cartesian/cartesian.f90)
@@ -50,7 +48,6 @@ target_include_directories(
     PUBLIC
     ${FFTW_INCLUDE_DIRS}
     ${CMAKE_Fortran_MODULE_DIRECTORY}/cartesian
-    ${CMAKE_Fortran_MODULE_DIRECTORY}/mpi_context
 )
 
 add_dependencies(mpi_momentum cartesian_obj comm_info_mod)

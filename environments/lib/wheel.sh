@@ -259,7 +259,9 @@ build_and_inspect_wheel() {
 
     (
         cd "$PROJECT_ROOT"
-        SKBUILD_LOGGING_LEVEL=DEBUG \
+        local _skbuild_log="WARNING"
+        if [[ "${VERBOSE:-false}" == "true" ]]; then _skbuild_log="DEBUG"; fi
+        SKBUILD_LOGGING_LEVEL="$_skbuild_log" \
             python -m build --wheel --no-isolation --outdir "$wheel_dir" >&2
     )
 

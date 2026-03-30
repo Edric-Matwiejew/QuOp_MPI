@@ -13,6 +13,12 @@ Provides
 include_guard(GLOBAL)
 
 function(add_f2py_library)
+
+  # Suppress f2py chatter unless verbose build is requested.
+  set(_f2py_quiet_flag "--quiet")
+  if(CMAKE_VERBOSE_MAKEFILE)
+    set(_f2py_quiet_flag "")
+  endif()
   set(options "")
   set(oneValueArgs MODULE_NAME SRC INSTALL_SUBDIR)
   set(multiValueArgs DEPENDS DEFINITIONS INCLUDE_DIRS LIBRARIES)
@@ -43,7 +49,7 @@ function(add_f2py_library)
 
   add_custom_command(
     OUTPUT "${module_pyf}"
-    COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py -h "${module_pyf}" -m "${F2PY_LIBRARY_MODULE_NAME}"
+    COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py ${_f2py_quiet_flag} -h "${module_pyf}" -m "${F2PY_LIBRARY_MODULE_NAME}"
             "${PREPROCESSED_SRC}" --overwrite-signature
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     DEPENDS "${PREPROCESSED_SRC}"
@@ -53,7 +59,7 @@ function(add_f2py_library)
 
   add_custom_command(
     OUTPUT "${module_f2py_wrapper}" "${module_f2py_c}"
-    COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py --f2cmap "${f2py_cmap}" "${module_pyf}"
+    COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py ${_f2py_quiet_flag} --f2cmap "${f2py_cmap}" "${module_pyf}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     DEPENDS "${module_pyf}"
     COMMENT "Generating Fortran f2py wrapper and C module"
@@ -151,6 +157,9 @@ function(add_f2py_library)
     "${f2py_target_name}" PUBLIC ${Python3_INCLUDE_DIRS} "${F2PY_INCLUDE_DIR}" ${Python3_NumPy_INCLUDE_DIRS}
                                  ${F2PY_LIBRARY_INCLUDE_DIRS} "${CMAKE_Fortran_MODULE_DIRECTORY}"
   )
+
+  # Suppress -Wformat in f2py-generated C code (uses %ld for long long).
+  target_compile_options("${f2py_target_name}" PRIVATE $<$<COMPILE_LANGUAGE:C>:-Wno-format>)
 
   target_link_libraries(
     "${f2py_target_name}" PRIVATE "${F2PY_LIBRARY_MODULE_NAME}module" "${F2PY_LIBRARY_MODULE_NAME}wrapper"

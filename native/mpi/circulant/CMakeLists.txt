@@ -16,9 +16,6 @@ target_include_directories(
     mpi_circulant
     PUBLIC
   ${FFTW_INCLUDE_DIRS}
-    ${CMAKE_Fortran_MODULE_DIRECTORY}/mpi_circulant_operators
-    ${CMAKE_Fortran_MODULE_DIRECTORY}/sparse_vector
-    ${CMAKE_Fortran_MODULE_DIRECTORY}/mpi_context
 )
 
 set(_depends mpi_circulant_operators mpi_context mpi_circulant sparse_vector comm_info_mod fftw_mpi_init_guard ${_COMM_INFO_EXTRA})

@@ -36,6 +36,7 @@ build-backend = "scikit_build_core.build"
 minimum-version = "build-system.requires"
 cmake.version = ">=3.25,<4"
 ninja.version = ">=1.11"
+cmake.build-type = "Release"
 build.tool-args = ["-j1"]
 # scikit-build-core builds each listed target separately. The wavefront targets
 # are real extension targets when WAVEFRONT_BACKEND=ON and no-op placeholders
