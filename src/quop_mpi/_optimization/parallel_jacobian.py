@@ -94,12 +94,23 @@ class Jacobian:
         if n_workers < 1:
             raise ValueError(f"n_workers must be >= 1, got {n_workers}")
 
+        from ..ansatz import _Dirty
+
+        previous_workers = self.n_jacobian_workers
+
         # Jacobian-specific attributes
         self.jacobian_input = [method]
         self.h = h if h is not None else np.sqrt(np.finfo(float).eps)
 
         # Communicator attribute (from Communicator mixin)
         self.n_jacobian_workers = n_workers
+
+        # Reconfigure the optimiser on the next setup/__pre cycle so the jacobian
+        # callback matches the latest method/step size. If the worker count changed,
+        # also force communicator re-splitting.
+        self._dirty |= _Dirty.OPTIMISER
+        if previous_workers != n_workers:
+            self._dirty |= _Dirty.WORKER_SPLIT
 
     @scope("world")
     def _update_var_map(self) -> None:
