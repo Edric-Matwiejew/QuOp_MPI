@@ -93,8 +93,23 @@ contains
         call MPI_Comm_size(ci%get_SUBCOMM(), comm_size, ierr)
         call MPI_Comm_rank(ci%get_SUBCOMM(), comm_rank, ierr)
 
-        ! FFTW MPI cannot handle size-1 DFTs; for system_size <= 1 just keep
-        ! a single active rank and avoid querying FFTW.
+        ! Avoid the distributed FFTW query when a singleton communicator is
+        ! already forced. Some MPI/FFTW combinations report a zero-rank
+        ! distribution here, which incorrectly drives negotiate() into a
+        ! shrink-to-zero path.
+        if (comm_size == 1) then
+            call ci%set_n_processes(1_int64, error_code)
+            if (error_code /= 0) return
+            call ci%set_partitioning(ci%get_system_size(), 0_int64, error_code=error_code)
+            if (error_code /= 0) return
+            call ci%set_alloc_local(max(ci%get_system_size(), ci%get_alloc_local()), error_code)
+            self%local_o = int(ci%get_system_size(), C_INTPTR_T)
+            self%local_o_offset = 0
+            return
+        end if
+
+        ! FFTW MPI cannot handle size-1 DFTs; for system_size <= 1 keep only
+        ! rank 0 active and avoid querying FFTW entirely.
         if (ci%get_system_size() <= 1) then
             call ci%set_n_processes(1_int64, error_code)
             if (error_code /= 0) return
