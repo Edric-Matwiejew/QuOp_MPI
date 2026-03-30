@@ -3,12 +3,14 @@
 # cspell:words jacobian scipy nlopt BFGS gtol maxcomm wavefunction nfev subcomm dtype
 from __future__ import annotations
 
+import os
 import textwrap
 from collections.abc import Callable
 from copy import copy, deepcopy
 from enum import IntFlag, auto
 from importlib import import_module
-from time import time
+from pathlib import Path
+from time import perf_counter, time
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -265,6 +267,49 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         # -- Scope-nesting validation stack ----------------------
         self._scope_stack: list[tuple[int, str]] = []
+
+        self._trace_ansatz: bool = False
+        self._trace_ansatz_path: Path | None = None
+        self._trace_ansatz_counter: int = 0
+
+        trace_setting = os.getenv("QUOP_TRACE_ANSATZ", "").strip()
+        if trace_setting:
+            self._trace_ansatz = True
+            if trace_setting == "1":
+                trace_dir = Path.cwd()
+            else:
+                trace_dir = Path(trace_setting)
+            trace_dir.mkdir(parents=True, exist_ok=True)
+            self._trace_ansatz_path = trace_dir / "ansatz_trace.rank-pending.log"
+
+    def _trace_ansatz_event(self, event: str, **fields: Any) -> None:
+        """Append an opt-in per-rank trace line for objective-path diagnostics."""
+        if not self._trace_ansatz:
+            return
+
+        trace_path = self._trace_ansatz_path
+        if trace_path is None:
+            return
+
+        if trace_path.name.endswith("rank-pending.log"):
+            world_rank = self.MPI_COMM_WORLD.Get_rank()
+            trace_path = trace_path.with_name(f"ansatz_trace.rank-{world_rank}.log")
+            self._trace_ansatz_path = trace_path
+
+        subcomm = self.subcomms.SUBCOMM if self.subcomms is not None else None
+        metadata = {
+            "event": event,
+            "counter": self._trace_ansatz_counter,
+            "world_rank": self.MPI_COMM_WORLD.Get_rank(),
+            "subcomm_index": -1 if self.subcomms is None else self.subcomms.get_subcomm_index(),
+            "subcomm_rank": subcomm.Get_rank() if subcomm is not None else -1,
+            "stop": int(bool(self.stop)),
+        }
+        metadata.update(fields)
+        line = " ".join(f"{key}={value}" for key, value in metadata.items())
+
+        with trace_path.open("a", encoding="ascii") as handle:
+            handle.write(f"{perf_counter():.9f} {line}\n")
 
     # -- Layout property (canonical partitioning source of truth) ----
 
@@ -1341,7 +1386,20 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if isinstance(x, list):
             x = np.array(x, dtype=np.float64)
 
+        self._trace_ansatz_counter += 1
+        evolve_call = self._trace_ansatz_counter
+        self._trace_ansatz_event(
+            "evolve.enter",
+            evolve_call=evolve_call,
+            x_size=len(x),
+        )
+
         x = self.__to_full(x)  # apply parameter mapping if present
+        self._trace_ansatz_event(
+            "evolve.mapped",
+            evolve_call=evolve_call,
+            mapped_size=len(x),
+        )
 
         self.context.state = self.ansatz_initial_state.astype(np.complex128)
         params_split = np.split(x, self.ansatz_depth)
@@ -1372,6 +1430,11 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self.n_evolutions += 1
         self.final_state = self.context.state
         self.last_evaluated = copy(x)
+        self._trace_ansatz_event(
+            "evolve.exit",
+            evolve_call=evolve_call,
+            n_evolutions=self.n_evolutions,
+        )
 
     @scope("subcomm", returns="all")
     def evaluate(self, variational_parameters: list[float] | np.ndarray[float]) -> float:
@@ -1395,9 +1458,23 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             objective function value, or None on excluded ranks
         """
 
+        self._trace_ansatz_counter += 1
+        eval_call = self._trace_ansatz_counter
+        self._trace_ansatz_event(
+            "evaluate.enter",
+            eval_call=eval_call,
+            x_size=len(variational_parameters),
+        )
+
         if not np.array_equal(self.last_evaluated, variational_parameters):
             self.__evolve_state(variational_parameters)
         expectation_value = self.__get_expectation_value()
+
+        self._trace_ansatz_event(
+            "evaluate.expectation",
+            eval_call=eval_call,
+            expectation=f"{expectation_value:.16g}",
+        )
 
         return self.subcomms.SUBCOMM.bcast(expectation_value, root=0)
 
@@ -1492,11 +1569,28 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         self.time = time()
 
+        self._trace_ansatz_counter += 1
+        optimiser_call = self._trace_ansatz_counter
+        self._trace_ansatz_event(
+            "optimiser.enter",
+            optimiser_call=optimiser_call,
+            optimiser=getattr(self.optimiser, "__name__", type(self.optimiser).__name__),
+            x_size=len(self.variational_parameters),
+        )
+
         self.result = self.optimiser(
             self.__objective, self.variational_parameters, **self.optimiser_args
         )
 
+        self._trace_ansatz_event(
+            "optimiser.exit",
+            optimiser_call=optimiser_call,
+            success=getattr(self.result, "success", "na"),
+            fun=getattr(self.result, "fun", "na"),
+        )
+
         self.stop = True
+        self._trace_ansatz_event("optimiser.stop-set", optimiser_call=optimiser_call)
 
         self.__objective(None)
 
@@ -1504,6 +1598,11 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             self._mpi_jacobian(None)
 
         self.time = time() - self.time
+        self._trace_ansatz_event(
+            "optimiser.post",
+            optimiser_call=optimiser_call,
+            elapsed_s=f"{self.time:.6f}",
+        )
 
     @scope("world")
     def print_result(self) -> None:
@@ -1727,12 +1826,33 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             returns the objective function value at rank 0 in
             :attr:`~quop_mpi.ansatz.MPI_COMM_WORLD`, None otherwise
         """
+        self._trace_ansatz_counter += 1
+        objective_call = self._trace_ansatz_counter
+        self._trace_ansatz_event(
+            "objective.enter",
+            objective_call=objective_call,
+            x_is_none=int(variational_parameters is None),
+        )
+
+        stop_bcast_start = perf_counter()
         self.stop = self.subcomms.SUBCOMM.bcast(self.stop, root=0)
+        self._trace_ansatz_event(
+            "objective.bcast.stop",
+            objective_call=objective_call,
+            duration_s=f"{perf_counter() - stop_bcast_start:.6f}",
+        )
 
         if not self.stop:
 
+            param_bcast_start = perf_counter()
             broadcast_parameters = self.subcomms.SUBCOMM.bcast(
                 variational_parameters, root=0
+            )
+            self._trace_ansatz_event(
+                "objective.bcast.parameters",
+                objective_call=objective_call,
+                duration_s=f"{perf_counter() - param_bcast_start:.6f}",
+                x_size=-1 if broadcast_parameters is None else len(broadcast_parameters),
             )
             self.variational_parameters = np.asarray(broadcast_parameters, dtype=np.float64)
 
@@ -1746,6 +1866,12 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 )
             else:
                 self.expectation = self.get_expectation_value()
+
+            self._trace_ansatz_event(
+                "objective.expectation",
+                objective_call=objective_call,
+                expectation=f"{self.expectation:.16g}",
+            )
 
             if self.subcomms.SUBCOMM.Get_rank() == 0:
 
@@ -1764,4 +1890,21 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
                 if self.record_objective:
                     self.total_n_evolutions.append(self.n_evolutions)
+                self._trace_ansatz_event(
+                    "objective.exit",
+                    objective_call=objective_call,
+                    result="root",
+                )
                 return self.expectation
+
+            self._trace_ansatz_event(
+                "objective.exit",
+                objective_call=objective_call,
+                result="worker",
+            )
+        else:
+            self._trace_ansatz_event(
+                "objective.exit",
+                objective_call=objective_call,
+                result="stop",
+            )
