@@ -613,11 +613,14 @@ class TestParallelIODataIntegrity:
         system_size = save_partition_system_size
 
         # Use rank-identifiable values
+        # Encode as rank * system_size + global_index so modular decode works
+        # for any system_size (the old hardcoded 1000 broke when system_size > 1000).
+        stride = system_size
+
         def qualities(local_i, local_i_offset):
             rank = mpi_comm.Get_rank()
-            # Mark with rank * 1000 + position for easy identification
             return np.array(
-                [rank * 1000 + local_i_offset + i for i in range(local_i)],
+                [rank * stride + local_i_offset + i for i in range(local_i)],
                 dtype=np.float64,
             )
 
@@ -639,11 +642,10 @@ class TestParallelIODataIntegrity:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
                 saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
 
-                # Verify the structure matches expected rank contributions
-                # Each element should encode: rank * 1000 + global_index
+                # Each element encodes: rank * system_size + global_index
                 for i in range(system_size):
                     val = saved_obs[i]
-                    encoded_index = int(val) % 1000
+                    encoded_index = int(val) % stride
 
                     assert (
                         encoded_index == i
