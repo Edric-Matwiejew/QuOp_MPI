@@ -1002,14 +1002,31 @@ def _ranks_per_gpu_for_workers(mpi_comm, n_workers):
 
 
 @pytest.fixture
-def ensure_ranks_per_gpu_for_workers(mpi_comm):
+def benchmark_parallel_jacobian_workers(mpi_topology):
+    """Choose a worker count that preserves intent without stressing large wavefront splits.
+
+    These benchmark tests only need multiple subcommunicators plus at least one
+    derivative worker. With two free parameters, at most three subcommunicators
+    are useful. On multi-node wavefront runs, prefer not to exceed the node
+    count so worker splits stay node-aligned instead of round-robin.
+    """
+    max_useful_workers = 3  # one root worker + up to two derivative workers
+
+    if config.backend != "wavefront":
+        return max_useful_workers
+
+    return max(2, min(max_useful_workers, mpi_topology.node_count))
+
+
+@pytest.fixture
+def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_workers):
     """Fixture that sets QUOP_RANKS_PER_GPU high enough for parallel jacobian tests.
 
     On the wavefront backend, each worker subcommunicator needs at least one
     GPU rank.  This fixture temporarily raises QUOP_RANKS_PER_GPU so that
     all MPI ranks become GPU ranks, ensuring every subcomm has coverage.
     """
-    n_workers = 3  # matches the n_workers used in the test class
+    n_workers = benchmark_parallel_jacobian_workers
     rpg = _ranks_per_gpu_for_workers(mpi_comm, n_workers)
     if rpg is None:
         # MPI backend — no env var needed
@@ -1039,7 +1056,7 @@ class TestBenchmarkWithParallelJacobian:
     """Tests for benchmark with parallel jacobian evaluation.
 
     Note: Parallel jacobian requires multiple MPI subcommunicators.
-    With n_workers=3, we get 3 subcomms when run with 12 MPI ranks.
+    These execution tests choose a topology-aware worker count between 2 and 3.
     Run tests with: mpiexec -n 12 pytest ...
 
     These tests are skipped when run with fewer than 12 MPI processes.
@@ -1101,12 +1118,16 @@ class TestBenchmarkWithParallelJacobian:
         mpi_comm.barrier()  # Sync before test
 
     def test_benchmark_with_param_map_and_parallel_jacobian(
-        self, mpi_comm, simple_oracle, ensure_ranks_per_gpu_for_workers
+        self,
+        mpi_comm,
+        simple_oracle,
+        ensure_ranks_per_gpu_for_workers,
+        benchmark_parallel_jacobian_workers,
     ):
         """Verify benchmark runs with both parameter map and parallel jacobian.
 
         This test requires sufficient MPI ranks to create multiple subcommunicators.
-        With n_workers=3, we get 3 subcomms when run with 12 ranks.
+        Worker count is topology-aware: at least 2, and at most 3.
         """
         from quop_mpi.algorithm.combinatorial import QAOA
 
@@ -1119,7 +1140,7 @@ class TestBenchmarkWithParallelJacobian:
 
         alg.set_parameter_map(2, parameter_map)
         alg.set_parallel_jacobian(
-            n_workers=3,
+            n_workers=benchmark_parallel_jacobian_workers,
             method="forward",
         )
 
@@ -1138,7 +1159,11 @@ class TestBenchmarkWithParallelJacobian:
         alg.destroy()
 
     def test_parallel_jacobian_with_param_map_convergence(
-        self, mpi_comm, simple_oracle, ensure_ranks_per_gpu_for_workers
+        self,
+        mpi_comm,
+        simple_oracle,
+        ensure_ranks_per_gpu_for_workers,
+        benchmark_parallel_jacobian_workers,
     ):
         """Verify benchmark with parallel jacobian + param map converges to low-cost state.
 
@@ -1162,7 +1187,7 @@ class TestBenchmarkWithParallelJacobian:
 
         alg.set_parameter_map(2, parameter_map)
         alg.set_parallel_jacobian(
-            n_workers=3,
+            n_workers=benchmark_parallel_jacobian_workers,
             method="forward",
         )
 
