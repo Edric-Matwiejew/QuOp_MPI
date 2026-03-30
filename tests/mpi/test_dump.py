@@ -55,6 +55,12 @@ class TestDumpEnabled:
             dump_dir = None
         dump_dir = mpi_comm.bcast(dump_dir, root=0)
 
+        # Ensure the directory exists from every rank's filesystem view before
+        # chdir; otherwise one rank can fail locally and the rest will hang in
+        # later MPI collectives.
+        os.makedirs(dump_dir, exist_ok=True)
+        mpi_comm.Barrier()
+
         monkeypatch.setenv("QUOP_DUMP_COMM_INFO", "1")
         monkeypatch.chdir(dump_dir)
 
@@ -117,6 +123,11 @@ class TestDumpDisabled:
         else:
             work_dir = None
         work_dir = mpi_comm.bcast(work_dir, root=0)
+
+        # Mirror the enabled-path setup: every rank should see the working
+        # directory before changing into it.
+        os.makedirs(work_dir, exist_ok=True)
+        mpi_comm.Barrier()
 
         monkeypatch.delenv("QUOP_DUMP_COMM_INFO", raising=False)
         monkeypatch.chdir(work_dir)
