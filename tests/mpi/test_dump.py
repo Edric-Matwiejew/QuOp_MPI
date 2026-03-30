@@ -10,6 +10,9 @@ Run with:
 
 import glob
 import os
+import shutil
+import uuid
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -21,6 +24,30 @@ import pytest
 def dump_system_size(small_system_size):
     """Small representative system size for dump smoke tests."""
     return small_system_size
+
+
+@pytest.fixture
+def mpi_shared_work_dir(mpi_comm, request):
+    """Create one shared work directory per test without using pytest tmp fixtures."""
+    if mpi_comm.Get_rank() == 0:
+        root = Path.cwd() / ".quop_pytest_tmp" / "mpi_dump"
+        root.mkdir(parents=True, exist_ok=True)
+        node_name = request.node.name.replace(os.sep, "_")
+        work_dir = root / f"{node_name}_{uuid.uuid4().hex}"
+    else:
+        work_dir = None
+
+    work_dir = Path(mpi_comm.bcast(str(work_dir) if work_dir is not None else None, root=0))
+
+    os.makedirs(work_dir, exist_ok=True)
+    mpi_comm.Barrier()
+
+    yield work_dir
+
+    mpi_comm.Barrier()
+    if mpi_comm.Get_rank() == 0:
+        shutil.rmtree(work_dir, ignore_errors=True)
+    mpi_comm.Barrier()
 
 
 def _run_qaoa(comm, system_size, depth=1):
@@ -45,21 +72,11 @@ def _run_qaoa(comm, system_size, depth=1):
 
 @pytest.mark.mpi
 class TestDumpEnabled:
-    def test_dump_creates_files_in_cwd(self, mpi_comm, tmp_path, monkeypatch, dump_system_size):
+    def test_dump_creates_files_in_cwd(
+        self, mpi_comm, mpi_shared_work_dir, monkeypatch, dump_system_size
+    ):
         """T7.6 -- With QUOP_DUMP_COMM_INFO=1, dump files appear in CWD."""
-        # Use a temp directory as the working directory to avoid polluting
-        # the repo.  Broadcast the path so all ranks use the same dir.
-        if mpi_comm.Get_rank() == 0:
-            dump_dir = str(tmp_path)
-        else:
-            dump_dir = None
-        dump_dir = mpi_comm.bcast(dump_dir, root=0)
-
-        # Ensure the directory exists from every rank's filesystem view before
-        # chdir; otherwise one rank can fail locally and the rest will hang in
-        # later MPI collectives.
-        os.makedirs(dump_dir, exist_ok=True)
-        mpi_comm.Barrier()
+        dump_dir = str(mpi_shared_work_dir)
 
         monkeypatch.setenv("QUOP_DUMP_COMM_INFO", "1")
         monkeypatch.chdir(dump_dir)
@@ -85,14 +102,12 @@ class TestDumpEnabled:
 @pytest.mark.mpi
 class TestDumpToDirectory:
     def test_dump_to_custom_directory(
-        self, mpi_comm, tmp_path, monkeypatch, dump_system_size
+        self, mpi_comm, mpi_shared_work_dir, monkeypatch, dump_system_size
     ):
         """T7.7 -- With QUOP_DUMP_COMM_INFO=<dir>, files go to that dir."""
-        if mpi_comm.Get_rank() == 0:
-            dump_dir = str(tmp_path / "quop_ci_dump")
-        else:
-            dump_dir = None
-        dump_dir = mpi_comm.bcast(dump_dir, root=0)
+        dump_dir = str(mpi_shared_work_dir / "quop_ci_dump")
+        os.makedirs(dump_dir, exist_ok=True)
+        mpi_comm.Barrier()
 
         monkeypatch.setenv("QUOP_DUMP_COMM_INFO", dump_dir)
 
@@ -116,18 +131,11 @@ class TestDumpToDirectory:
 
 @pytest.mark.mpi
 class TestDumpDisabled:
-    def test_no_dump_when_unset(self, mpi_comm, tmp_path, monkeypatch, dump_system_size):
+    def test_no_dump_when_unset(
+        self, mpi_comm, mpi_shared_work_dir, monkeypatch, dump_system_size
+    ):
         """T7.8 -- With QUOP_DUMP_COMM_INFO unset, no dump files are created."""
-        if mpi_comm.Get_rank() == 0:
-            work_dir = str(tmp_path)
-        else:
-            work_dir = None
-        work_dir = mpi_comm.bcast(work_dir, root=0)
-
-        # Mirror the enabled-path setup: every rank should see the working
-        # directory before changing into it.
-        os.makedirs(work_dir, exist_ok=True)
-        mpi_comm.Barrier()
+        work_dir = str(mpi_shared_work_dir)
 
         monkeypatch.delenv("QUOP_DUMP_COMM_INFO", raising=False)
         monkeypatch.chdir(work_dir)
