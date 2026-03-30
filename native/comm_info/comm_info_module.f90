@@ -212,7 +212,6 @@ contains
         integer(int32), intent(out) :: error_code
         character(len=*), intent(in) :: message
 
-        write (error_unit, '(A)') trim(message)
         error_code = code
     end subroutine layout_note_error
 
@@ -761,42 +760,15 @@ contains
         integer(int32), intent(out) :: error_code
 
         error_code = 0
-        if (self%system_size < 0) then
-            write (error_unit, '(A,I0)') "ERROR: system_size is negative: ", self%system_size
-            error_code = 1
-        end if
-        if (self%n_processes < 0) then
-            write (error_unit, '(A,I0)') "ERROR: n_processes is negative: ", self%n_processes
-            error_code = 1
-        end if
-        if (self%local_i < 0) then
-            write (error_unit, '(A,I0)') "ERROR: local_i is negative: ", self%local_i
-            error_code = 1
-        end if
-        if (self%local_i_offset < 0) then
-            write (error_unit, '(A,I0)') "ERROR: local_i_offset is negative: ", self%local_i_offset
-            error_code = 1
-        end if
-        if (self%alloc_local < 0) then
-            write (error_unit, '(A,I0)') "ERROR: alloc_local is negative: ", self%alloc_local
-            error_code = 1
-        end if
-        if (self%device_n_processes < 0) then
-            write (error_unit, '(A,I0)') "ERROR: device_n_processes is negative: ", self%device_n_processes
-            error_code = 1
-        end if
-        if (self%device_local_i < 0) then
-            write (error_unit, '(A,I0)') "ERROR: device_local_i is negative: ", self%device_local_i
-            error_code = 1
-        end if
-        if (self%device_local_i_offset < 0) then
-            write (error_unit, '(A,I0)') "ERROR: device_local_i_offset is negative: ", self%device_local_i_offset
-            error_code = 1
-        end if
-        if (self%device_alloc_local < 0) then
-            write (error_unit, '(A,I0)') "ERROR: device_alloc_local is negative: ", self%device_alloc_local
-            error_code = 1
-        end if
+        if (self%system_size < 0) error_code = 1
+        if (self%n_processes < 0) error_code = 1
+        if (self%local_i < 0) error_code = 1
+        if (self%local_i_offset < 0) error_code = 1
+        if (self%alloc_local < 0) error_code = 1
+        if (self%device_n_processes < 0) error_code = 1
+        if (self%device_local_i < 0) error_code = 1
+        if (self%device_local_i_offset < 0) error_code = 1
+        if (self%device_alloc_local < 0) error_code = 1
     end subroutine layout_validate_non_negative
 
     subroutine layout_validate_completeness(self, system_size, error_code)
@@ -813,25 +785,9 @@ contains
         call MPI_Allreduce(self%local_i, total, 1, MPI_INTEGER8, &
                            MPI_SUM, self%SUBCOMM, ierr)
 
-        if (self%n_processes /= int(comm_size, int64)) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: n_processes=", self%n_processes, &
-                " does not match SUBCOMM size=", comm_size
-            error_code = 1
-        end if
-
-        if (total /= system_size) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: sum(local_i)=", total, " /= system_size=", system_size
-            error_code = 1
-        end if
-
-        if (self%alloc_local < self%local_i) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: alloc_local=", self%alloc_local, &
-                " is smaller than local_i=", self%local_i
-            error_code = 1
-        end if
+        if (self%n_processes /= int(comm_size, int64)) error_code = 1
+        if (total /= system_size) error_code = 1
+        if (self%alloc_local < self%local_i) error_code = 1
     end subroutine layout_validate_completeness
 
     subroutine layout_validate_rank_ordering(self, error_code)
@@ -856,25 +812,14 @@ contains
         ! Check: offset[r] == sum(local_i[0..r-1])
         expected_offset = 0
         do i = 1, comm_size
-            if (all_offsets(i) /= expected_offset) then
-                write (error_unit, '(A,I0,A,I0,A,I0)') &
-                    "ERROR: rank ", i - 1, " offset=", all_offsets(i), &
-                    " but expected=", expected_offset
-                error_code = 1
-            end if
+            if (all_offsets(i) /= expected_offset) error_code = 1
             expected_offset = expected_offset + all_local_i(i)
         end do
 
         ! Strict monotonicity for consecutive non-zero ranks
         do i = 2, comm_size
             if (all_local_i(i) > 0 .and. all_local_i(i - 1) > 0) then
-                if (all_offsets(i) <= all_offsets(i - 1)) then
-                    write (error_unit, '(A,I0,A,I0,A,I0,A,I0)') &
-                        "ERROR: SUBCOMM rank ordering violated: rank ", i - 2, &
-                        " offset=", all_offsets(i - 1), &
-                        " >= rank ", i - 1, " offset=", all_offsets(i)
-                    error_code = 1
-                end if
+                if (all_offsets(i) <= all_offsets(i - 1)) error_code = 1
             end if
         end do
 
@@ -897,25 +842,13 @@ contains
         call MPI_Comm_size(self%SUBCOMM, comm_size, ierr)
 
         if (size(self%partition_table) /= comm_size + 1) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: partition_table size=", size(self%partition_table), &
-                " does not match SUBCOMM size + 1=", comm_size + 1
             error_code = 1
             return
         end if
 
-        if (self%partition_table(1) /= 1_int64) then
-            write (error_unit, '(A,I0)') &
-                "ERROR: partition_table(1) must equal 1, got ", self%partition_table(1)
-            error_code = 1
-        end if
+        if (self%partition_table(1) /= 1_int64) error_code = 1
 
-        if (self%partition_table(comm_size + 1) /= self%system_size + 1_int64) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: partition_table(end)=", self%partition_table(comm_size + 1), &
-                " does not match system_size + 1=", self%system_size + 1_int64
-            error_code = 1
-        end if
+        if (self%partition_table(comm_size + 1) /= self%system_size + 1_int64) error_code = 1
 
         allocate (all_local_i(comm_size))
 
@@ -925,10 +858,6 @@ contains
         ! Check: partition_table(i+1) - partition_table(i) == local_i(i)
         do i = 1, comm_size
             if (self%partition_table(i + 1) - self%partition_table(i) /= all_local_i(i)) then
-                write (error_unit, '(A,I0,A,I0,A,I0)') &
-                    "ERROR: partition_table inconsistency at rank ", i - 1, &
-                    ": table_diff=", self%partition_table(i + 1) - self%partition_table(i), &
-                    " local_i=", all_local_i(i)
                 error_code = 1
             end if
         end do
@@ -963,16 +892,7 @@ contains
 
         expected_span = node_hi - node_lo
 
-        if (expected_span /= sum_local_i) then
-            write (error_unit, '(A,I0,A,I0,A,I0,A,I0)') &
-                "ERROR: node-level contiguity violated (NODECOMM rank ", &
-                node_rank, "): span=", expected_span, &
-                " but sum(local_i)=", sum_local_i, &
-                " (node_lo=", node_lo
-            write (error_unit, '(A,I0,A)') &
-                "  node_hi=", node_hi, ")"
-            error_code = 1
-        end if
+        if (expected_span /= sum_local_i) error_code = 1
     end subroutine layout_validate_node_contiguity
 
     subroutine layout_validate_device_ordering(self, error_code)
@@ -998,24 +918,13 @@ contains
 
         expected_offset = 0
         do i = 1, comm_size
-            if (all_dev_offsets(i) /= expected_offset) then
-                write (error_unit, '(A,I0,A,I0,A,I0)') &
-                    "ERROR: DEVCOMM rank ", i - 1, " device_offset=", all_dev_offsets(i), &
-                    " but expected=", expected_offset
-                error_code = 1
-            end if
+            if (all_dev_offsets(i) /= expected_offset) error_code = 1
             expected_offset = expected_offset + all_dev_local_i(i)
         end do
 
         do i = 2, comm_size
             if (all_dev_local_i(i) > 0 .and. all_dev_local_i(i - 1) > 0) then
-                if (all_dev_offsets(i) <= all_dev_offsets(i - 1)) then
-                    write (error_unit, '(A,I0,A,I0,A,I0,A,I0)') &
-                        "ERROR: DEVCOMM rank ordering violated: rank ", i - 2, &
-                        " device_offset=", all_dev_offsets(i - 1), &
-                        " >= rank ", i - 1, " device_offset=", all_dev_offsets(i)
-                    error_code = 1
-                end if
+                if (all_dev_offsets(i) <= all_dev_offsets(i - 1)) error_code = 1
             end if
         end do
 
@@ -1033,12 +942,7 @@ contains
 
         error_code = 0
 
-        if (self%device_alloc_local < self%device_local_i) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: device_alloc_local=", self%device_alloc_local, &
-                " is smaller than device_local_i=", self%device_local_i
-            error_code = 1
-        end if
+        if (self%device_alloc_local < self%device_local_i) error_code = 1
 
         if (self%NODECOMM /= MPI_COMM_NULL) then
             active_device_rank = 0
@@ -1047,12 +951,7 @@ contains
             call MPI_Allreduce(active_device_rank, active_device_ranks, 1, &
                                MPI_INTEGER4, MPI_SUM, self%NODECOMM, ierr)
 
-            if (self%device_n_processes /= int(active_device_ranks, int64)) then
-                write (error_unit, '(A,I0,A,I0)') &
-                    "ERROR: device_n_processes=", self%device_n_processes, &
-                    " does not match active NODECOMM device ranks=", active_device_ranks
-                error_code = 1
-            end if
+            if (self%device_n_processes /= int(active_device_ranks, int64)) error_code = 1
         end if
 
         if (self%DEVCOMM == MPI_COMM_NULL) return
@@ -1060,11 +959,7 @@ contains
         call MPI_Allreduce(self%device_local_i, total, 1, MPI_INTEGER8, &
                            MPI_SUM, self%DEVCOMM, ierr)
 
-        if (total /= system_size) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: sum(device_local_i)=", total, " /= system_size=", system_size
-            error_code = 1
-        end if
+        if (total /= system_size) error_code = 1
     end subroutine layout_validate_device_completeness
 
     ! ====================================================================
