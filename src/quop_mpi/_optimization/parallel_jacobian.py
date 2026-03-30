@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import os
+from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -57,6 +60,50 @@ class Jacobian:
         self.neval_mpi_jac: int = 0
         self.var: int = -999  # Placeholder value to detect if it's not being set correctly
         self.var_map: list[list[int]] | None = None
+        self._trace_parallel_jacobian: bool = False
+        self._trace_parallel_jacobian_path: Path | None = None
+        self._trace_parallel_jacobian_counter: int = 0
+
+        trace_setting = os.getenv("QUOP_TRACE_PARALLEL_JACOBIAN", "").strip()
+        if trace_setting:
+            self._trace_parallel_jacobian = True
+            if trace_setting == "1":
+                trace_dir = Path.cwd()
+            else:
+                trace_dir = Path(trace_setting)
+            trace_dir.mkdir(parents=True, exist_ok=True)
+            self._trace_parallel_jacobian_path = trace_dir / "parallel_jacobian_trace.rank-pending.log"
+
+    def _trace_jacobian_event(self, event: str, **fields: Any) -> None:
+        """Append an opt-in trace line for MPI Jacobian progress diagnostics."""
+        if not self._trace_parallel_jacobian:
+            return
+
+        trace_path = self._trace_parallel_jacobian_path
+        if trace_path is None:
+            return
+
+        if trace_path.name.endswith("rank-pending.log"):
+            world_rank = self.MPI_COMM_WORLD.Get_rank()
+            trace_path = trace_path.with_name(f"parallel_jacobian_trace.rank-{world_rank}.log")
+            self._trace_parallel_jacobian_path = trace_path
+
+        jaccomm = self.subcomms.JACCOMM
+        subcomm = self.subcomms.SUBCOMM
+        metadata = {
+            "event": event,
+            "counter": self._trace_parallel_jacobian_counter,
+            "world_rank": self.MPI_COMM_WORLD.Get_rank(),
+            "subcomm_index": self.subcomms.get_subcomm_index(),
+            "subcomm_rank": subcomm.Get_rank() if subcomm is not None else -1,
+            "jac_rank": jaccomm.Get_rank() if jaccomm is not None else -1,
+            "stop": int(bool(self.stop)),
+        }
+        metadata.update(fields)
+        line = " ".join(f"{key}={value}" for key, value in metadata.items())
+
+        with trace_path.open("a", encoding="ascii") as handle:
+            handle.write(f"{perf_counter():.9f} {line}\n")
 
     @scope("world")
     def set_parallel_jacobian(
@@ -178,21 +225,71 @@ class Jacobian:
         if self.subcomms.JACCOMM is None:
             return None
 
+        self._trace_parallel_jacobian_counter += 1
+        jac_call = self._trace_parallel_jacobian_counter
+        self._trace_jacobian_event(
+            "jacobian.enter",
+            jac_call=jac_call,
+            x_size=-1 if x is None else len(x),
+        )
+
+        barrier_start = perf_counter()
+        self._trace_jacobian_event("jacobian.barrier.enter", jac_call=jac_call, phase="start")
         self.subcomms.JACCOMM.barrier()
+        self._trace_jacobian_event(
+            "jacobian.barrier.exit",
+            jac_call=jac_call,
+            phase="start",
+            wait_s=f"{perf_counter() - barrier_start:.6f}",
+        )
+
+        bcast_start = perf_counter()
         self.stop = self.subcomms.JACCOMM.bcast(self.stop, 0)
+        self._trace_jacobian_event(
+            "jacobian.bcast.stop",
+            jac_call=jac_call,
+            duration_s=f"{perf_counter() - bcast_start:.6f}",
+        )
 
         if self.stop:
+            stop_barrier_start = perf_counter()
+            self._trace_jacobian_event(
+                "jacobian.barrier.enter",
+                jac_call=jac_call,
+                phase="stop",
+            )
             self.subcomms.JACCOMM.barrier()
+            self._trace_jacobian_event(
+                "jacobian.barrier.exit",
+                jac_call=jac_call,
+                phase="stop",
+                wait_s=f"{perf_counter() - stop_barrier_start:.6f}",
+            )
+            self._trace_jacobian_event("jacobian.exit", jac_call=jac_call, reason="stop")
             return
 
+        params_bcast_start = perf_counter()
         broadcast_parameters = self.subcomms.JACCOMM.bcast(self.variational_parameters, 0)
         self.variational_parameters = (
             None
             if broadcast_parameters is None
             else np.asarray(broadcast_parameters, dtype=np.float64)
         )
+        self._trace_jacobian_event(
+            "jacobian.bcast.parameters",
+            jac_call=jac_call,
+            duration_s=f"{perf_counter() - params_bcast_start:.6f}",
+            params_size=-1 if broadcast_parameters is None else len(broadcast_parameters),
+        )
 
+        x_bcast_start = perf_counter()
         x = np.asarray(self.subcomms.JACCOMM.bcast(x, 0), dtype=np.float64)
+        self._trace_jacobian_event(
+            "jacobian.bcast.x",
+            jac_call=jac_call,
+            duration_s=f"{perf_counter() - x_bcast_start:.6f}",
+            x_size=len(x),
+        )
 
         if self.subcomms.JACCOMM.Get_rank() != 0:
             # When a parameter map is set, x contains the free parameters.
@@ -207,7 +304,19 @@ class Jacobian:
                 self.var = var
                 self.jacobian.update_parameters()
                 # Pass the parameter index - jacobian.call computes partial derivative
+                eval_start = perf_counter()
+                self._trace_jacobian_event(
+                    "jacobian.partial.enter",
+                    jac_call=jac_call,
+                    var=var,
+                )
                 partials.append(self.jacobian.call())
+                self._trace_jacobian_event(
+                    "jacobian.partial.exit",
+                    jac_call=jac_call,
+                    var=var,
+                    duration_s=f"{perf_counter() - eval_start:.6f}",
+                )
 
         if self.subcomms.JACCOMM.Get_rank() == 0:
             jacobian = np.zeros(self.n_free_params, dtype=np.float64)
@@ -215,8 +324,22 @@ class Jacobian:
             for root, mapping in zip(roots, self.var_map, strict=True):
                 if root > 0:
                     for var in mapping:
+                        recv_start = perf_counter()
+                        self._trace_jacobian_event(
+                            "jacobian.recv.enter",
+                            jac_call=jac_call,
+                            source=root,
+                            var=var,
+                        )
                         self.MPI_COMM_WORLD.Recv(
                             [jacobian[var : var + 1], MPI.DOUBLE], source=root, tag=var
+                        )
+                        self._trace_jacobian_event(
+                            "jacobian.recv.exit",
+                            jac_call=jac_call,
+                            source=root,
+                            var=var,
+                            duration_s=f"{perf_counter() - recv_start:.6f}",
                         )
 
         elif self.subcomms.SUBCOMM.Get_rank() == 0:
@@ -224,13 +347,36 @@ class Jacobian:
             for part, mapping in zip(
                 partials, self.var_map[self.subcomms.get_subcomm_index()], strict=True
             ):
+                send_start = perf_counter()
+                self._trace_jacobian_event(
+                    "jacobian.send.enter",
+                    jac_call=jac_call,
+                    dest=0,
+                    var=mapping,
+                )
                 self.MPI_COMM_WORLD.Send([np.array([part]), MPI.DOUBLE], dest=0, tag=mapping)
+                self._trace_jacobian_event(
+                    "jacobian.send.exit",
+                    jac_call=jac_call,
+                    dest=0,
+                    var=mapping,
+                    duration_s=f"{perf_counter() - send_start:.6f}",
+                )
         else:
             jacobian = None
 
+        end_barrier_start = perf_counter()
+        self._trace_jacobian_event("jacobian.barrier.enter", jac_call=jac_call, phase="end")
         self.subcomms.JACCOMM.barrier()
+        self._trace_jacobian_event(
+            "jacobian.barrier.exit",
+            jac_call=jac_call,
+            phase="end",
+            wait_s=f"{perf_counter() - end_barrier_start:.6f}",
+        )
 
         if self.record_objective:
+            reduce_start = perf_counter()
             if self.subcomms.JACCOMM.Get_rank() == 0:
                 self.n_evolutions = self.subcomms.JACCOMM.reduce(
                     self.n_evolutions, op=MPI.SUM, root=0
@@ -238,11 +384,23 @@ class Jacobian:
             else:
                 self.subcomms.JACCOMM.reduce(self.n_evolutions, op=MPI.SUM, root=0)
                 self.n_evolutions = 0
+            self._trace_jacobian_event(
+                "jacobian.reduce.n_evolutions",
+                jac_call=jac_call,
+                duration_s=f"{perf_counter() - reduce_start:.6f}",
+            )
 
         if self.subcomms.JACCOMM.Get_rank() == 0:
 
             self.neval_mpi_jac += 1
+            self._trace_jacobian_event(
+                "jacobian.exit",
+                jac_call=jac_call,
+                result="root",
+                neval_mpi_jac=self.neval_mpi_jac,
+            )
             return jacobian
 
         else:
+            self._trace_jacobian_event("jacobian.exit", jac_call=jac_call, result="worker")
             return None
