@@ -312,6 +312,7 @@ def test_pyproject_build_targets_are_backend_aware_without_install_sh():
 
     assert "comm_info_wrapper_f2py" in targets
     assert "mpi_context_f2py" in targets
+    assert "mpi_transverse_field_propagator_f2py" in targets
     assert "wavefront_context_f2py" in targets
     assert "quop_f2py_targets" not in targets
 
@@ -823,6 +824,7 @@ def test_validate_install_reports_missing_required_extensions():
             assert "mpi_circulant_propagator" in str(exc)
             assert "mpi_composite_propagator" in str(exc)
             assert "mpi_momentum_propagator" in str(exc)
+            assert "mpi_transverse_field_propagator" in str(exc)
         else:
             raise AssertionError("expected missing extension validation to fail")
 
@@ -843,6 +845,7 @@ def test_validate_install_requires_full_mpi_backend():
         "quop_mpi/_lib/mpi/mpi_circulant_propagator",
         "quop_mpi/_lib/mpi/mpi_composite_propagator",
         "quop_mpi/_lib/mpi/mpi_momentum_propagator",
+        "quop_mpi/_lib/mpi/mpi_transverse_field_propagator",
     )
 
 

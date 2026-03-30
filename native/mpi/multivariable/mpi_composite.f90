@@ -295,8 +295,8 @@ contains
                                                        1_C_INTPTR_T, &
                                                        self%local_n0, &
                                                        self%local_n0, &
-                                                       self%context%initial_state, &
-                                                       self%context%initial_state, &
+                                                       self%context%state, &
+                                                       self%context%state, &
                                                        ci_subcomm, &
                                                        FFTW_FORWARD, &
                                                        FFTW_MEASURE)
@@ -306,8 +306,8 @@ contains
                                                         1_C_INTPTR_T, &
                                                         self%local_n0, &
                                                         self%local_n0, &
-                                                        self%context%initial_state, &
-                                                        self%context%initial_state, &
+                                                        self%context%state, &
+                                                        self%context%state, &
                                                         ci_subcomm, &
                                                         FFTW_BACKWARD, &
                                                         FFTW_MEASURE)
@@ -375,7 +375,7 @@ contains
             t_temp = t
         end if
 
-        call fftw_mpi_execute_dft(self%plan_forward, self%context%initial_state, self%context%initial_state)
+        call fftw_mpi_execute_dft(self%plan_forward, self%context%state, self%context%state)
 
         self%mixer = 0
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
@@ -387,13 +387,13 @@ contains
             end do
         end do
 
-        self%context%initial_state(1:ci_local_i) = &
-            exp(cmplx(0.0_real64, -self%mixer, real64)) * self%context%initial_state(1:ci_local_i)
+        self%context%state(1:ci_local_i) = &
+            exp(cmplx(0.0_real64, -self%mixer, real64)) * self%context%state(1:ci_local_i)
 
-        call fftw_mpi_execute_dft(self%plan_backward, self%context%initial_state, self%context%initial_state)
+        call fftw_mpi_execute_dft(self%plan_backward, self%context%state, self%context%state)
 
-        self%context%initial_state(1:ci_local_i) = &
-            self%context%initial_state(1:ci_local_i) / ci_system_size
+        self%context%state(1:ci_local_i) = &
+            self%context%state(1:ci_local_i) / ci_system_size
 
     end subroutine mpi_composite_propagate
 

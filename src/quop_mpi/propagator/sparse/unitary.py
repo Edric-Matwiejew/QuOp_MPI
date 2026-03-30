@@ -99,10 +99,8 @@ class Unitary(UnitaryBase):
 
     def propagate(self, ts: np.ndarray) -> None:
         """Apply sparse propagators with parameters ``ts``."""
-        for i, (t, propagator) in enumerate(zip(ts, self.propagators, strict=True)):
+        for t, propagator in zip(ts, self.propagators, strict=True):
             propagator.propagate(np.abs(t))
-            if i < len(ts) - 1:
-                propagator.context.initial_state = propagator.context.final_state
 
     def destroy(self) -> None:
         """Free sparse propagator resources."""

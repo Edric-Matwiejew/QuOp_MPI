@@ -11,12 +11,14 @@ Propagator types tested:
 - circulant: Complete graph mixing (used by QWOA)
 - sparse: Sparse matrix exponential (used by QAOA hypercube mixer)
 - composite: Multi-dimensional grid operators (used by qmoa)
+- transverse_field: aligned MPI layer of identical single-qubit RX rotations
 
 Run with: mpiexec -n <N> python -m pytest tests/mpi/test_propagators.py -v --with-mpi
 """
 
 import numpy as np
 import pytest
+from mpi4py import MPI
 
 # =============================================================================
 # Helper Functions
@@ -68,6 +70,21 @@ def _scaled_grid_exponents(mpi_sizing, base_exponents):
         index = exponents.index(smallest)
         exponents[index] += 1
     return exponents
+
+
+def transverse_field_reference_state(theta, n_qubits):
+    """Exact state after applying RX(theta) to every qubit of |0...0>."""
+    c = np.cos(theta / 2.0)
+    a = -1j * np.sin(theta / 2.0)
+
+    system_size = 1 << n_qubits
+    state = np.empty(system_size, dtype=np.complex128)
+
+    for basis_index in range(system_size):
+        weight = basis_index.bit_count()
+        state[basis_index] = (c ** (n_qubits - weight)) * (a**weight)
+
+    return state
 
 
 @pytest.fixture
@@ -301,6 +318,167 @@ class TestCompositePropagator:
         u = unitary(Ns, operator.ith)
 
         assert u.planner
+
+
+# =============================================================================
+# Tests for Transverse-Field Propagator
+# =============================================================================
+
+
+@pytest.mark.mpi
+class TestTransverseFieldPropagator:
+    """Tests for the MPI transverse-field propagator."""
+
+    @staticmethod
+    def _create_ansatz(system_size, mpi_comm):
+        from quop_mpi import Ansatz
+        from quop_mpi.propagator import transverse_field
+        from quop_mpi.state import basis
+
+        alg = Ansatz(system_size, mpi_comm)
+        alg.set_unitaries([transverse_field.Unitary()])
+        alg.set_depth(1)
+        alg.set_initial_state(basis, {"kwargs": {"basis_states": [0]}})
+        alg.set_observables(lambda local_i: np.zeros(local_i, dtype=np.float64))
+        return alg
+
+    @staticmethod
+    def _create_statevector_ansatz(system_size, mpi_comm, unitary, initial_state):
+        from quop_mpi import Ansatz
+        from quop_mpi.state import array as array_state
+
+        alg = Ansatz(system_size, mpi_comm)
+        alg.set_unitaries([unitary])
+        alg.set_depth(1)
+        alg.set_initial_state(
+            array_state,
+            {"kwargs": {"state": initial_state, "normalize": False}},
+        )
+        alg.set_observables(lambda local_i: np.zeros(local_i, dtype=np.float64))
+        return alg
+
+    def test_transverse_field_identity(self, mpi_comm, propagator_small_system_size):
+        """Theta=0 should leave the basis state unchanged."""
+        system_size = propagator_small_system_size
+
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.evolve_state(np.array([0.0]))
+        state = alg.get_final_state()
+
+        if alg.subcomms.in_rootcomm():
+            expected = np.zeros(system_size, dtype=np.complex128)
+            expected[0] = 1.0
+            np.testing.assert_allclose(state, expected, rtol=1e-12, atol=1e-12)
+
+        alg.destroy()
+
+    def test_transverse_field_matches_exact_product_state(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """Compare against the exact RX(theta)^⊗n action on |0...0>."""
+        system_size = propagator_small_system_size
+        n_qubits = int(np.log2(system_size))
+        theta = np.pi / 3.0
+
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.evolve_state(np.array([theta]))
+        state = alg.get_final_state()
+
+        if alg.subcomms.in_rootcomm():
+            expected = transverse_field_reference_state(theta, n_qubits)
+            np.testing.assert_allclose(state, expected, rtol=1e-11, atol=1e-11)
+
+        alg.destroy()
+
+    def test_transverse_field_preserves_normalization(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """The transverse-field layer should remain unitary."""
+        system_size = propagator_small_system_size
+
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.evolve_state(np.array([0.71]))
+        probs = alg.get_probabilities()
+
+        if alg.subcomms.in_rootcomm():
+            assert_probabilities_normalized(
+                probs, context="Transverse-field propagation should preserve normalization"
+            )
+
+        alg.destroy()
+
+    def test_transverse_field_negotiates_power_of_two_subcomm(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """The aligned MVP should shrink to a power-of-two active communicator."""
+        system_size = propagator_small_system_size
+
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.prepare()
+
+        if alg.subcomms.in_subcomm():
+            subcomm_size = alg.subcomms.SUBCOMM.Get_size()
+            assert subcomm_size > 0
+            assert subcomm_size & (subcomm_size - 1) == 0
+            assert subcomm_size <= min(mpi_comm.Get_size(), system_size)
+
+        alg.destroy()
+
+    def test_transverse_field_matches_sparse_hypercube_probabilities(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """Sparse hypercube evolution should match the transverse-field layer."""
+        from quop_mpi.propagator import sparse, transverse_field
+
+        system_size = propagator_small_system_size
+        rng = np.random.default_rng(314159)
+        initial_state = rng.standard_normal(system_size) + 1j * rng.standard_normal(system_size)
+        initial_state = np.asarray(initial_state, dtype=np.complex128)
+        initial_state /= np.linalg.norm(initial_state)
+
+        sparse_time = 0.37
+        theta = 2.0 * sparse_time
+
+        sparse_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            sparse.Unitary(sparse.operator.hypercube),
+            initial_state,
+        )
+        transverse_field_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            transverse_field.Unitary(),
+            initial_state,
+        )
+
+        sparse_alg.evolve_state(np.array([sparse_time], dtype=np.float64))
+        transverse_field_alg.evolve_state(np.array([theta], dtype=np.float64))
+
+        sparse_probs = sparse_alg.get_probabilities()
+        transverse_field_probs = transverse_field_alg.get_probabilities()
+        did_compare = int(sparse_probs is not None and transverse_field_probs is not None)
+
+        if sparse_probs is not None and transverse_field_probs is not None:
+            assert_probabilities_normalized(
+                sparse_probs,
+                context="Sparse hypercube propagation should preserve normalization",
+            )
+            assert_probabilities_normalized(
+                transverse_field_probs,
+                context="Transverse-field propagation should preserve normalization",
+            )
+            np.testing.assert_allclose(
+                transverse_field_probs,
+                sparse_probs,
+                rtol=1e-8,
+                atol=1e-10,
+            )
+
+        assert mpi_comm.allreduce(did_compare, op=MPI.SUM) == 1
+
+        sparse_alg.destroy()
+        transverse_field_alg.destroy()
 
 
 # =============================================================================

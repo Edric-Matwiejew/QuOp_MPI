@@ -49,12 +49,16 @@ class UnitaryBase(Bindable):
     ----------
 
     final_state
-        The :term:`system state` after the action of the unitary.
+        Legacy Python output buffer for custom ``unitary`` subclasses.
+        Built-in propagators evolve through backend-owned native context
+        buffers instead.
     initial_parameters
         Initial :term:`variational parameters` returned from the user-defined
         :term:`Parameter Function`.
     initial_state
-        The :term:`initial state` of the quantum system.
+        Legacy Python input buffer for custom ``unitary`` subclasses.
+        Built-in propagators evolve through backend-owned native context
+        buffers instead.
     n_params
         The total number of :term:`unitary <unitary parameter>` and
         :term:`operator <operator parameter>` parameterising the
@@ -196,8 +200,8 @@ class UnitaryBase(Bindable):
         "unitary_n_params": "Number of unitary variational parameters",
         # State and operator
         "variational_parameters": "Operator variational parameters (for parameterised operators)",
-        "initial_state": "Local partition of input state to this unitary",
-        "final_state": "Local partition of output state from this unitary",
+        "initial_state": "Legacy explicit Python input buffer for custom Unitary subclasses",
+        "final_state": "Legacy explicit Python output buffer for custom Unitary subclasses",
         "operator": "The operator object (after gen_operator called)",
     }
 
@@ -319,20 +323,19 @@ class UnitaryBase(Bindable):
 
         self.parse_operator_function()
         self.parse_parameter_function()
-
-        self.final_state = np.empty(self.alloc_local, dtype=np.complex128)
-        self.initial_state = np.empty(self.alloc_local, dtype=np.complex128)
+        self.initial_state = None
+        self.final_state = None
 
     def propagate(self, x: np.ndarray[np.float64]) -> None:
         """Simulation of the action of a :term:`unitary`.
 
-        When implemented, ``propagate`` contains a call to a method (typically a
-        contained in a complied Python extension module) that takes the class
-        attributes ``initial_state``, ``final_state`` and ``MPI_COMM``, together
-        with attributes describing the parallel partitioning scheme and
-        :term:`variational parameters` ``x``, as input. The action of the unitary
-        is computed in MPI parallel, with the computed result written to
-        ``final_state``.
+        When implemented, ``propagate`` typically calls into a compiled Python
+        extension module using the class attributes that describe the
+        parallel partitioning scheme and
+        :term:`variational parameters` ``x`` as input. Built-in propagators
+        evolve through backend-owned native context buffers; custom subclasses
+        that still rely on Python ``initial_state`` / ``final_state`` arrays
+        must install those buffers explicitly.
 
         .. warning::
 
@@ -343,6 +346,7 @@ class UnitaryBase(Bindable):
 
         .. code-block:: python
 
+            # Legacy custom-subclass pattern only.
             def propagate(self, x):
 
                 external_propagator(

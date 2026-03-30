@@ -52,6 +52,7 @@ build.targets = [
     "mpi_composite_propagator_f2py",
     "mpi_momentum_propagator_f2py",
     "mpi_sparse_propagator_f2py",
+    "mpi_transverse_field_propagator_f2py",
     "wavefront_circulant_propagator_f2py",
     "wavefront_context_f2py",
     "wavefront_diagonal_propagator_f2py",

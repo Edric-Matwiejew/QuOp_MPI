@@ -82,6 +82,75 @@ class TestQAOA:
 
 
 @pytest.mark.mpi
+class TestQAOAVariants:
+    """Test the sparse and transverse-field QAOA variants."""
+
+    def test_qaoa_sparse_creation(self, mpi_comm, small_system_size):
+        """Test that QAOASparse can be instantiated."""
+        from quop_mpi.algorithm.combinatorial import QAOASparse
+
+        alg = QAOASparse(small_system_size, mpi_comm)
+
+        assert alg is not None
+        assert alg.system_size == small_system_size
+
+        alg.destroy()
+
+    def test_qaoa_transverse_field_creation(self, mpi_comm, small_system_size):
+        """Test that QAOATransverseField can be instantiated."""
+        from quop_mpi.algorithm.combinatorial import QAOATransverseField
+
+        alg = QAOATransverseField(small_system_size, mpi_comm)
+
+        assert alg is not None
+        assert alg.system_size == small_system_size
+
+        alg.destroy()
+
+    def test_qaoa_transverse_field_matches_sparse_probabilities(
+        self, mpi_comm, small_system_size
+    ):
+        """The transverse-field QAOA variant should preserve QAOA parameter semantics."""
+        from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QAOASparse, QAOATransverseField
+
+        def qualities(local_i, local_i_offset):
+            return np.cos(np.arange(local_i, dtype=np.float64) + local_i_offset)
+
+        params = np.array([0.23, 0.41], dtype=np.float64)
+
+        sparse_alg = QAOASparse(small_system_size, mpi_comm)
+        sparse_alg.set_qualities(qualities)
+        sparse_alg.set_depth(1)
+        sparse_alg.evolve_state(params)
+        sparse_probs = sparse_alg.get_probabilities()
+
+        transverse_field_alg = QAOATransverseField(small_system_size, mpi_comm)
+        transverse_field_alg.set_qualities(qualities)
+        transverse_field_alg.set_depth(1)
+        transverse_field_alg.evolve_state(params)
+        transverse_field_probs = transverse_field_alg.get_probabilities()
+
+        did_compare = int(
+            sparse_probs is not None and transverse_field_probs is not None
+        )
+
+        if sparse_probs is not None and transverse_field_probs is not None:
+            np.testing.assert_allclose(
+                transverse_field_probs,
+                sparse_probs,
+                rtol=1e-8,
+                atol=1e-10,
+            )
+
+        assert mpi_comm.allreduce(did_compare, op=MPI.SUM) == 1
+
+        sparse_alg.destroy()
+        transverse_field_alg.destroy()
+
+
+@pytest.mark.mpi
 class TestQWOA:
     """Test the QWOA algorithm class."""
 

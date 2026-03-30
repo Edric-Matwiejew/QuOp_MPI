@@ -19,8 +19,33 @@ from ...observable import hdf5 as hdf5
 from ...observable import serial as serial
 from ...observable.rand import uniform as uniform
 from .qaoa import QAOA
+from .qaoa_sparse import QAOASparse
+from .qaoa_transverse_field import QAOATransverseField
 from .qwoa import QWOA
 
-__all__ = ["QWOA", "QAOA", "qwoa", "qaoa", "serial", "csv", "hdf5", "array", "rand"]
+__all__ = [
+    "QWOA",
+    "QAOA",
+    "QAOASparse",
+    "QAOATransverseField",
+    "qwoa",
+    "qaoa",
+    "qaoa_sparse",
+    "qaoa_transverse_field",
+    "serial",
+    "csv",
+    "hdf5",
+    "array",
+    "rand",
+]
 
-__getattr__ = deprecated_alias_getattr(__name__, globals(), {"qaoa": "QAOA", "qwoa": "QWOA"})
+__getattr__ = deprecated_alias_getattr(
+    __name__,
+    globals(),
+    {
+        "qaoa": "QAOA",
+        "qwoa": "QWOA",
+        "qaoa_sparse": "QAOASparse",
+        "qaoa_transverse_field": "QAOATransverseField",
+    },
+)

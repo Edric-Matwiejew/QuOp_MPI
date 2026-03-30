@@ -195,8 +195,14 @@ class Logging:
         ::
 
             config_name/
+                initial_state
                 final_state
                 observables
+
+        The saved ``initial_state`` and ``final_state`` datasets are the
+        algorithm-level ansatz states: ``initial_state`` comes from
+        :attr:`ansatz_initial_state`, and ``final_state`` comes from the current
+        context state after evolution. They are not backend work buffers.
 
         The minimization result is saved in the 'minimize_result' attribute of
         'config_name' as a formatted string.
@@ -212,12 +218,10 @@ class Logging:
 
             config_name = "my_simulation"
 
-            f = h5py.File(file_name + ".h5", "r") final_state =
-            np.array(f[config_name]['final_state']).view(np.complex128)
-            eigenvalues =
-            np.array(f[config_name]['eigenvalues']).view(np.complex128)
-            observables =
-            np.array(f[config_name]['observables']).view(np.float64)
+            f = h5py.File(file_name + ".h5", "r")
+            initial_state = np.array(f[config_name]["initial_state"]).view(np.complex128)
+            final_state = np.array(f[config_name]["final_state"]).view(np.complex128)
+            observables = np.array(f[config_name]["observables"]).view(np.float64)
 
             print(f["my_simulation"].attrs["minimize_result"])
 

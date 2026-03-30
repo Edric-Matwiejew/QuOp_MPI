@@ -333,8 +333,8 @@ contains
                                                        1_C_INTPTR_T, &
                                                        self%local_n0, &
                                                        FFTW_MPI_DEFAULT_BLOCK, &
-                                                       self%context%initial_state, &
-                                                       self%context%initial_state, &
+                                                       self%context%state, &
+                                                       self%context%state, &
                                                        ci_subcomm, &
                                                        FFTW_FORWARD, &
                                                        FFTW_MEASURE)
@@ -344,8 +344,8 @@ contains
                                                         1_C_INTPTR_T, &
                                                         self%local_n0, &
                                                         FFTW_MPI_DEFAULT_BLOCK, &
-                                                        self%context%initial_state, &
-                                                        self%context%initial_state, &
+                                                        self%context%state, &
+                                                        self%context%state, &
                                                         ci_subcomm, &
                                                         FFTW_BACKWARD, &
                                                         FFTW_MEASURE)
@@ -408,14 +408,14 @@ contains
 
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
             call get_index(int(i, int32), n_dim, self%Ns, self%strides, inds)
-            self%context%initial_state(i - ci_local_i_offset) = &
-                ((-1.0_real64)**real(sum(inds - 1), real64)) * self%context%initial_state(i - ci_local_i_offset)
+            self%context%state(i - ci_local_i_offset) = &
+                ((-1.0_real64)**real(sum(inds - 1), real64)) * self%context%state(i - ci_local_i_offset)
         end do
 
-        call fftw_mpi_execute_dft(self%plan_forward, self%context%initial_state, self%context%initial_state)
+        call fftw_mpi_execute_dft(self%plan_forward, self%context%state, self%context%state)
 
-        self%context%initial_state(1:ci_local_i) = &
-            self%phase_k * self%context%initial_state(1:ci_local_i)
+        self%context%state(1:ci_local_i) = &
+            self%phase_k * self%context%state(1:ci_local_i)
 
         self%mixer = cmplx(0.0_real64, 0.0_real64, real64)
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
@@ -426,19 +426,19 @@ contains
             end do
         end do
 
-        self%context%initial_state(1:ci_local_i) = &
-            exp(-cI * self%mixer) * self%context%initial_state(1:ci_local_i)
+        self%context%state(1:ci_local_i) = &
+            exp(-cI * self%mixer) * self%context%state(1:ci_local_i)
 
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
             call get_index(int(i, int32), n_dim, self%Ns, self%strides, inds)
-            self%context%initial_state(i - ci_local_i_offset) = &
-                ((-1.0_real64)**real(sum(inds - 1), real64)) * self%context%initial_state(i - ci_local_i_offset)
+            self%context%state(i - ci_local_i_offset) = &
+                ((-1.0_real64)**real(sum(inds - 1), real64)) * self%context%state(i - ci_local_i_offset)
         end do
 
-        call fftw_mpi_execute_dft(self%plan_backward, self%context%initial_state, self%context%initial_state)
+        call fftw_mpi_execute_dft(self%plan_backward, self%context%state, self%context%state)
 
-        self%context%initial_state(1:ci_local_i) = &
-            self%phase_q * self%context%initial_state(1:ci_local_i) / ci_system_size
+        self%context%state(1:ci_local_i) = &
+            self%phase_q * self%context%state(1:ci_local_i) / ci_system_size
 
         deallocate (t_temp, inds)
 
