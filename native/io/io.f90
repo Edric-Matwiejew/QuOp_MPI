@@ -98,7 +98,6 @@ contains
         integer(HID_T) :: group_id ! Group identifier.
 
         integer(HSIZE_T), dimension(1) :: ftn_dimensions
-        integer(HSIZE_T), dimension(1) :: h5_dimensions
 
         integer(HSIZE_T), dimension(1) :: local_count
         integer(HSIZE_T), dimension(1) :: data_offset
@@ -112,20 +111,22 @@ contains
         integer(HID_T) ::  imag_id
 
         logical :: group_exists
-        logical :: dataset_exists
         logical :: file_exists
         integer(int32) :: error
 
         ! MPI variables
         integer(int32) :: info
         integer(int32) :: ierr
+        integer(int32) :: comm_rank
 
         ftn_dimensions = N
-        h5_dimensions = N
         local_count = local_i
         data_offset = local_i_offset
 
         info = MPI_INFO_NULL
+
+        call MPI_Comm_rank(MPI_communicator, comm_rank, ierr)
+        call check_mpi(ierr, MPI_communicator, 'MPI_Comm_rank')
 
         call h5open_f(error)
         call check_hdf5(error, MPI_communicator, 'h5open_f')
@@ -137,7 +138,13 @@ contains
 
         if (access_type == "a") then
 
-            inquire (file=trim(file_name), exist=file_exists)
+            if (comm_rank == 0) then
+                inquire (file=trim(file_name), exist=file_exists)
+            else
+                file_exists = .false.
+            end if
+            call MPI_Bcast(file_exists, 1, MPI_LOGICAL, 0, MPI_communicator, ierr)
+            call check_mpi(ierr, MPI_communicator, 'MPI_Bcast(file_exists)')
             if (file_exists) then
 
                 call H5fopen_f(trim(file_name), H5F_ACC_RDWR_F, file_id, &
@@ -221,12 +228,12 @@ contains
         call h5tinsert_f(imag_id, "imag", type_offset, H5T_NATIVE_DOUBLE, error)
         call check_hdf5(error, MPI_communicator, 'h5tinsert_f(imag_field.imag)')
 
-        call h5dwrite_f(dset_id, real_id, real(complex_array), ftn_dimensions, error, &
+        call h5dwrite_f(dset_id, real_id, real(complex_array), local_count, error, &
                         file_space_id=file_data_id, mem_space_id=memspace_id, &
                         xfer_prp=plist_id)
         call check_hdf5(error, MPI_communicator, 'h5dwrite_f(complex.real)')
 
-        call h5dwrite_f(dset_id, imag_id, aimag(complex_array), ftn_dimensions, error, &
+        call h5dwrite_f(dset_id, imag_id, aimag(complex_array), local_count, error, &
                         file_space_id=file_data_id, mem_space_id=memspace_id, &
                         xfer_prp=plist_id)
         call check_hdf5(error, MPI_communicator, 'h5dwrite_f(complex.imag)')
@@ -306,27 +313,28 @@ contains
         integer(HID_T) :: group_id ! Group identifier in file.
 
         integer(HSIZE_T), dimension(1) :: ftn_dimensions
-        integer(HSIZE_T), dimension(1) :: h5_dimensions
 
         integer(HSIZE_T), dimension(1) :: local_count
         integer(HSIZE_T), dimension(1) :: data_offset
         integer(int32) :: dataset_rank = 1
 
         logical :: group_exists
-        logical :: dataset_exists
         logical :: file_exists
         integer(int32) :: error
 
         ! MPI variables
         integer(int32) :: info
         integer(int32) :: ierr
+        integer(int32) :: comm_rank
 
         ftn_dimensions = N
-        h5_dimensions = N
         local_count = local_i
         data_offset = local_i_offset
 
         info = MPI_INFO_NULL
+
+        call MPI_Comm_rank(MPI_communicator, comm_rank, ierr)
+        call check_mpi(ierr, MPI_communicator, 'MPI_Comm_rank')
 
         call h5open_f(error)
         call check_hdf5(error, MPI_communicator, 'h5open_f')
@@ -338,7 +346,13 @@ contains
 
         if (access_type == "a") then
 
-            inquire (file=trim(file_name), exist=file_exists)
+            if (comm_rank == 0) then
+                inquire (file=trim(file_name), exist=file_exists)
+            else
+                file_exists = .false.
+            end if
+            call MPI_Bcast(file_exists, 1, MPI_LOGICAL, 0, MPI_communicator, ierr)
+            call check_mpi(ierr, MPI_communicator, 'MPI_Bcast(file_exists)')
             if (file_exists) then
 
                 call H5fopen_f(trim(file_name), H5F_ACC_RDWR_F, file_id, &
@@ -398,7 +412,7 @@ contains
         call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
         call check_hdf5(error, MPI_communicator, 'h5pset_dxpl_mpio_f')
 
-        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, real_array, ftn_dimensions, error, &
+        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, real_array, local_count, error, &
                         file_space_id=file_data_id, mem_space_id=memspace_id, &
                         xfer_prp=plist_id)
         call check_hdf5(error, MPI_communicator, 'h5dwrite_f(real)')
