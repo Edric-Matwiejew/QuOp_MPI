@@ -68,7 +68,7 @@ contains
         integer(int32) :: i, available_ranks, max_size, ierr
         integer(C_INTPTR_T) :: alloc_local, local_n0, local_n0_offset
         integer(C_INTPTR_T) :: local_no, local_o_offset
-        integer(int32) :: n_active
+        integer(int32) :: n_active, local_active
         integer(int64) :: slab_size, local_i_64, local_i_offset_64
 
         call ensure_fftw_mpi_init()
@@ -94,11 +94,11 @@ contains
 
             ! Count ranks with work (mirroring circulant)
             if (local_n0 > 0) then
-                n_active = 1
+                local_active = 1
             else
-                n_active = 0
+                local_active = 0
             end if
-            call MPI_Allreduce(MPI_IN_PLACE, n_active, 1, MPI_INTEGER, &
+            call MPI_Allreduce(local_active, n_active, 1, MPI_INTEGER, &
                                MPI_SUM, ci%get_SUBCOMM(), ierr)
 
             call ci%set_n_processes(int(n_active, int64), error_code)

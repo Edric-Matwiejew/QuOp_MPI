@@ -84,7 +84,7 @@ contains
         integer(C_INTPTR_T) :: system_size, local_i, local_i_offset
         integer(C_INTPTR_T) :: alloc_local
         integer(int32) :: ierr, comm_size, comm_rank
-        integer(int32) :: n_active
+        integer(int32) :: n_active, local_active
 
         call ensure_fftw_mpi_init()
 
@@ -131,7 +131,7 @@ contains
         self%local_o = int(ci%get_local_i(), C_INTPTR_T)
         self%local_o_offset = int(ci%get_local_i_offset(), C_INTPTR_T)
 
-        ! Query FFTW for the distribution it will use
+        ! Query FFTW for the distribution it will use.
         alloc_local = fftw_mpi_local_size_1d(system_size, &
                                              ci%get_SUBCOMM(), &
                                              FFTW_FORWARD, &
@@ -146,11 +146,19 @@ contains
 
         ! Count how many ranks have local_i > 0
         if (local_i > 0) then
-            n_active = 1
+            local_active = 1
         else
-            n_active = 0
+            local_active = 0
         end if
-        call MPI_Allreduce(MPI_IN_PLACE, n_active, 1, MPI_INTEGER, MPI_SUM, ci%get_SUBCOMM(), ierr)
+        call MPI_Allreduce(local_active, n_active, 1, MPI_INTEGER, MPI_SUM, ci%get_SUBCOMM(), ierr)
+
+        if (n_active == 0) then
+            write (error_unit, '(A,I0,A)') &
+                "ERROR: fftw_mpi_local_size_1d reported zero active ranks for system_size=", &
+                int(system_size, int64), "."
+            error_code = 1
+            return
+        end if
 
         ! Update layout with FFTW distribution
         call ci%set_n_processes(int(n_active, int64), error_code)
@@ -176,7 +184,7 @@ contains
 
         integer(C_INTPTR_T) :: alloc_local, system_size
         integer(C_INTPTR_T) :: local_i, local_i_offset
-        integer(int32) :: ierr, local_error, synced_error
+        integer(int32) :: ierr, local_error, synced_error, n_active, local_active
         integer(int64) :: ci_local_i, ci_local_i_offset, ci_alloc_local
 
         error_code = 0
@@ -208,6 +216,16 @@ contains
                                              local_i_offset, &
                                              self%local_o, &
                                              self%local_o_offset)
+
+        if (local_i > 0) then
+            local_active = 1
+        else
+            local_active = 0
+        end if
+        call MPI_Allreduce(local_active, n_active, 1, MPI_INTEGER, MPI_SUM, &
+                           self%context%ci%get_SUBCOMM(), ierr)
+
+        alloc_local = max(alloc_local, int(self%context%ci%get_alloc_local(), C_INTPTR_T))
 
         ci_local_i = self%context%ci%get_local_i()
         ci_local_i_offset = self%context%ci%get_local_i_offset()
