@@ -39,6 +39,43 @@ def make_qualities_function(system_size):
 _cached_devcomm_size = None
 
 
+def _skip_if_wavefront_gpu_slots_heterogeneous(comm, n_workers):
+    """Skip multi-worker wavefront tests on heterogeneous per-node GPU slots.
+
+    The wavefront worker splitter requires the same number of device-rank
+    slots on every node when creating multiple worker subcommunicators.
+    """
+    if config.backend != "wavefront" or n_workers <= 1:
+        return
+
+    from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+    from quop_mpi._utils._comm_size import _unwrap_pointer_status
+
+    backend_flag = 1
+    topo_ptr = _unwrap_pointer_status(
+        _ciw.wrapper_discover_topology(comm.py2f(), backend_flag),
+        "discover_topology",
+    )
+    try:
+        n_gpus, ranks_per_gpu, _ = _ciw.wrapper_get_topology_info(topo_ptr)
+        device_slots = int(n_gpus) * max(int(ranks_per_gpu), 1)
+    finally:
+        _ciw.wrapper_destroy_topology(topo_ptr)
+
+    local_slots = np.array([device_slots], dtype=np.int32)
+    min_slots = np.zeros(1, dtype=np.int32)
+    max_slots = np.zeros(1, dtype=np.int32)
+    comm.Allreduce(local_slots, min_slots, op=MPI.MIN)
+    comm.Allreduce(local_slots, max_slots, op=MPI.MAX)
+
+    if min_slots[0] != max_slots[0]:
+        pytest.skip(
+            "Wavefront parallel-jacobian tests require uniform GPU device "
+            f"slots per node, but this job spans nodes with "
+            f"{min_slots[0]} to {max_slots[0]} slots."
+        )
+
+
 def _probe_devcomm_size():
     """Return the global DEVCOMM size on the wavefront backend.
 
@@ -102,6 +139,8 @@ def skip_wavefront_parallel_jacobian(n_workers=2):
     """
     if config.backend != "wavefront":
         return
+
+    _skip_if_wavefront_gpu_slots_heterogeneous(MPI.COMM_WORLD, n_workers)
 
     devcomm_size = _probe_devcomm_size()
     if devcomm_size < n_workers:

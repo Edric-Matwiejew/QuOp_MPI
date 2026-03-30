@@ -67,6 +67,43 @@ def _make_single_marked_oracle(marked_state):
 _cached_wavefront_devcomm_size = None
 
 
+def _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers):
+    """Skip multi-worker wavefront tests on heterogeneous per-node GPU slots.
+
+    The wavefront backend requires the same number of device-rank slots on
+    every node when splitting into multiple worker subcommunicators.
+    """
+    if config.backend != "wavefront" or n_workers <= 1:
+        return
+
+    from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+    from quop_mpi._utils._comm_size import _unwrap_pointer_status
+
+    backend_flag = 1
+    topo_ptr = _unwrap_pointer_status(
+        _ciw.wrapper_discover_topology(mpi_comm.py2f(), backend_flag),
+        "discover_topology",
+    )
+    try:
+        n_gpus, ranks_per_gpu, _ = _ciw.wrapper_get_topology_info(topo_ptr)
+        device_slots = int(n_gpus) * max(int(ranks_per_gpu), 1)
+    finally:
+        _ciw.wrapper_destroy_topology(topo_ptr)
+
+    local_slots = np.array([device_slots], dtype=np.int32)
+    min_slots = np.zeros(1, dtype=np.int32)
+    max_slots = np.zeros(1, dtype=np.int32)
+    mpi_comm.Allreduce(local_slots, min_slots, op=MPI.MIN)
+    mpi_comm.Allreduce(local_slots, max_slots, op=MPI.MAX)
+
+    if min_slots[0] != max_slots[0]:
+        pytest.skip(
+            "Wavefront parallel-jacobian benchmarks require uniform GPU "
+            f"device slots per node, but this job spans nodes with "
+            f"{min_slots[0]} to {max_slots[0]} slots."
+        )
+
+
 def _probe_wavefront_devcomm_size(mpi_comm):
     """Return the global DEVCOMM size for wavefront worker-layout checks."""
     global _cached_wavefront_devcomm_size
@@ -966,6 +1003,7 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
     all MPI ranks become GPU ranks, ensuring every subcomm has coverage.
     """
     n_workers = benchmark_parallel_jacobian_workers
+    _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers)
     rpg = _ranks_per_gpu_for_workers(mpi_comm, n_workers)
     if rpg is None:
         # MPI backend — no env var needed
@@ -1065,6 +1103,8 @@ class TestBenchmarkWithParallelJacobian:
         Worker count is topology-aware: at least 2, and at most 3.
         """
         from quop_mpi.algorithm.combinatorial import QAOA
+
+        mpi_comm.barrier()  # Sync before test
 
         with QAOA(simple_oracle.system_size, mpi_comm) as alg:
             alg.set_qualities(simple_oracle.qualities_function())
