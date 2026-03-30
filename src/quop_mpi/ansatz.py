@@ -1404,13 +1404,26 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.context.state = self.ansatz_initial_state.astype(np.complex128)
         params_split = np.split(x, self.ansatz_depth)
 
-        for params in params_split:
+        for layer_index, params in enumerate(params_split):
 
             for i, unitary in enumerate(self.unitaries):
+                self._trace_ansatz_event(
+                    "evolve.unitary.enter",
+                    evolve_call=evolve_call,
+                    layer=layer_index,
+                    unitary_index=i,
+                    unitary_type=getattr(unitary, "unitary_type", type(unitary).__name__),
+                )
 
                 param_slice = params[self.param_map[i] : self.param_map[i + 1]]
 
                 if unitary.operator_n_params > 0:
+                    self._trace_ansatz_event(
+                        "evolve.unitary.gen_operator.enter",
+                        evolve_call=evolve_call,
+                        layer=layer_index,
+                        unitary_index=i,
+                    )
 
                     evolution_parameter = param_slice[: -unitary.operator_n_params]
 
@@ -1418,13 +1431,34 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
                     unitary.gen_operator()
 
+                    self._trace_ansatz_event(
+                        "evolve.unitary.gen_operator.exit",
+                        evolve_call=evolve_call,
+                        layer=layer_index,
+                        unitary_index=i,
+                    )
+
                     if isinstance(self.observable_function, int) and i == self.observable_function:
                         self.local_observables = np.asarray(unitary.operator)
 
                 else:
                     evolution_parameter = param_slice
 
+                self._trace_ansatz_event(
+                    "evolve.unitary.propagate.enter",
+                    evolve_call=evolve_call,
+                    layer=layer_index,
+                    unitary_index=i,
+                    unitary_type=getattr(unitary, "unitary_type", type(unitary).__name__),
+                )
                 unitary.propagate(evolution_parameter)
+                self._trace_ansatz_event(
+                    "evolve.unitary.propagate.exit",
+                    evolve_call=evolve_call,
+                    layer=layer_index,
+                    unitary_index=i,
+                    unitary_type=getattr(unitary, "unitary_type", type(unitary).__name__),
+                )
 
         if self.subcomms.SUBCOMM.Get_rank() == 0:
             self.n_evolutions += 1
