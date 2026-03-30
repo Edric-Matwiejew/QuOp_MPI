@@ -1130,29 +1130,37 @@ class TestBenchmarkWithParallelJacobian:
         """
         from quop_mpi.algorithm.combinatorial import QAOA
 
+        _trace_rank0(mpi_comm, "benchmark+param_map test start before barrier")
         mpi_comm.barrier()  # Sync before test
+        _trace_rank0(mpi_comm, "benchmark+param_map test after barrier")
 
         with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            _trace_rank0(mpi_comm, "benchmark+param_map entered QAOA context")
             alg.set_qualities(simple_oracle.qualities_function())
+            _trace_rank0(mpi_comm, "benchmark+param_map set qualities")
 
             def parameter_map(ansatz_depth, total_params, free_vec):
                 gamma, t = free_vec
                 return np.tile([gamma, t], ansatz_depth)
 
             alg.set_parameter_map(2, parameter_map)
+            _trace_rank0(mpi_comm, "benchmark+param_map set parameter map")
             alg.set_parallel_jacobian(
                 n_workers=benchmark_parallel_jacobian_workers,
                 method="forward",
             )
+            _trace_rank0(mpi_comm, "benchmark+param_map set parallel jacobian")
 
             initial_params = np.array([np.pi, 0.5])
 
+            _trace_rank0(mpi_comm, "benchmark+param_map before benchmark call")
             alg.benchmark(
                 ansatz_depths=[1],
                 repeats=1,
                 initial_parameters=initial_params,
                 verbose=False,
             )
+            _trace_rank0(mpi_comm, "benchmark+param_map after benchmark call")
 
             if mpi_comm.Get_rank() == 0:
                 assert alg.result is not None
@@ -1177,18 +1185,23 @@ class TestBenchmarkWithParallelJacobian:
 
         oracle = simple_oracle
 
+        _trace_rank0(mpi_comm, "convergence test start")
         with QWOA(oracle.system_size, mpi_comm) as alg:
+            _trace_rank0(mpi_comm, "convergence test entered QWOA context")
             alg.set_qualities(oracle.qualities_function())
+            _trace_rank0(mpi_comm, "convergence test set qualities")
 
             def parameter_map(ansatz_depth, total_params, free_vec):
                 gamma, t = free_vec
                 return np.tile([gamma, t], ansatz_depth)
 
             alg.set_parameter_map(2, parameter_map)
+            _trace_rank0(mpi_comm, "convergence test set parameter map")
             alg.set_parallel_jacobian(
                 n_workers=benchmark_parallel_jacobian_workers,
                 method="forward",
             )
+            _trace_rank0(mpi_comm, "convergence test set parallel jacobian")
 
             # Start away from optimal to verify optimizer moves toward it
             # Optimal is approximately (gamma=pi, t=pi/N), start at (1.0, 0.1)
@@ -1197,12 +1210,14 @@ class TestBenchmarkWithParallelJacobian:
             # Uniform superposition expectation comes from the active oracle ratio.
             uniform_expectation = oracle.uniform_expectation()
 
+            _trace_rank0(mpi_comm, "convergence test before benchmark call")
             alg.benchmark(
                 ansatz_depths=[1],
                 repeats=1,
                 initial_parameters=initial_params,
                 verbose=False,
             )
+            _trace_rank0(mpi_comm, "convergence test after benchmark call")
 
             if mpi_comm.Get_rank() == 0:
                 assert alg.result is not None
