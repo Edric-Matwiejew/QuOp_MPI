@@ -593,16 +593,10 @@ contains
         if (self%SUBCOMM /= MPI_COMM_NULL) then
             call MPI_Comm_size(self%SUBCOMM, comm_size, ierr)
             if (n_processes < 0 .or. n_processes > int(comm_size, int64)) then
-                write (error_unit, '(A,I0,A,I0)') &
-                    "ERROR: n_processes=", n_processes, &
-                    " is out of range [0, SUBCOMM size]=", comm_size
                 error_code = 2
                 return
             end if
         else if (n_processes /= 0) then
-            write (error_unit, '(A,I0)') &
-                "ERROR: cannot assign non-zero n_processes without a valid SUBCOMM: ", &
-                n_processes
             error_code = 2
             return
         end if
@@ -999,9 +993,6 @@ contains
 
         call MPI_Comm_size(self%SUBCOMM, comm_size, ierr)
         if (new_size <= 0_int64 .or. new_size > int(comm_size, int64)) then
-            write (error_unit, '(A,I0,A,I0)') &
-                "ERROR: shrink size=", new_size, &
-                " is out of range [1, SUBCOMM size]=", comm_size
             local_error = 2
             call layout_sync_precondition_error(self%SUBCOMM, local_error, error_code)
             return
@@ -1564,9 +1555,6 @@ contains
         si%MPI_COMM = MPI_COMM ! store parent comm for negotiate()
 
         if (n_jacobian_workers <= 0 .or. n_jacobian_workers > nprocs) then
-            write (error_unit, '(A,I0,A,I0,A)') &
-                "ERROR: n_jacobian_workers=", n_jacobian_workers, &
-                " out of range [1,", nprocs, "]"
             status = 1
             si%SUBCOMM = MPI_COMM_NULL
             si%worker_id = -1
@@ -1939,8 +1927,6 @@ contains
             integer(int32) :: val_err
             call ci%validate(system_size, val_err)
             if (val_err /= 0) then
-                write (error_unit, '(A,I0)') &
-                    "ERROR: layout validation failed inside negotiate, error_code=", val_err
                 status = 100 + val_err
                 layout_ptr = c_loc(ci)
                 return
