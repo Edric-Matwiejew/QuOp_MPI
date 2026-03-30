@@ -1401,7 +1401,15 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             mapped_size=len(x),
         )
 
+        self._trace_ansatz_event(
+            "evolve.state_reset.enter",
+            evolve_call=evolve_call,
+        )
         self.context.state = self.ansatz_initial_state.astype(np.complex128)
+        self._trace_ansatz_event(
+            "evolve.state_reset.exit",
+            evolve_call=evolve_call,
+        )
         params_split = np.split(x, self.ansatz_depth)
 
         for layer_index, params in enumerate(params_split):
