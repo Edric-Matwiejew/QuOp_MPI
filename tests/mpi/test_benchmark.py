@@ -15,6 +15,7 @@ import math
 import os
 import sys
 import tempfile
+from functools import wraps
 
 import numpy as np
 import pytest
@@ -65,6 +66,62 @@ def _make_single_marked_oracle(marked_state):
 
 
 _cached_wavefront_devcomm_size = None
+
+
+def _benchmark_trace_enabled():
+    """Return True when benchmark phase tracing is enabled for this module."""
+    return os.environ.get("QUOP_TRACE_BENCHMARK_TESTS", "").strip() != ""
+
+
+def _trace_test_barrier(mpi_comm, request, phase):
+    """Emit a labeled world barrier marker for benchmark-order debugging."""
+    mpi_comm.Barrier()
+    if mpi_comm.Get_rank() == 0:
+        print(
+            f"[BENCH-TRACE] {phase} {request.node.nodeid}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+@pytest.fixture(autouse=True)
+def _trace_benchmark_lifecycle(request, monkeypatch, mpi_comm):
+    """Optionally trace benchmark/destroy phases within this module.
+
+    Enable with ``QUOP_TRACE_BENCHMARK_TESTS=1`` to add labeled world barriers
+    around every ``Ansatz.benchmark()`` and ``Ansatz.destroy()`` call made by
+    tests in this file. This helps identify the first test that leaves ranks
+    out of phase before the parallel-Jacobian benchmarks begin.
+    """
+    if not _benchmark_trace_enabled():
+        yield
+        return
+
+    from quop_mpi.ansatz import Ansatz
+
+    original_benchmark = Ansatz.benchmark
+    original_destroy = Ansatz.destroy
+
+    @wraps(original_benchmark)
+    def traced_benchmark(self, *args, **kwargs):
+        _trace_test_barrier(mpi_comm, request, "before benchmark")
+        try:
+            return original_benchmark(self, *args, **kwargs)
+        finally:
+            _trace_test_barrier(mpi_comm, request, "after benchmark")
+
+    @wraps(original_destroy)
+    def traced_destroy(self, *args, **kwargs):
+        _trace_test_barrier(mpi_comm, request, "before destroy")
+        try:
+            return original_destroy(self, *args, **kwargs)
+        finally:
+            _trace_test_barrier(mpi_comm, request, "after destroy")
+
+    monkeypatch.setattr(Ansatz, "benchmark", traced_benchmark)
+    monkeypatch.setattr(Ansatz, "destroy", traced_destroy)
+
+    yield
 
 
 def _probe_wavefront_devcomm_size(mpi_comm):
