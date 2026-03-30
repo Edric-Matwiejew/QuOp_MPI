@@ -40,7 +40,10 @@ def simple_oracle(mpi_sizing):
 def single_solution_oracle(mpi_sizing):
     """Scale the single-solution optimization oracle with MPI world size."""
     system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
-    return TestOracle(system_size=system_size, n_marked=1, seed=123)
+    # Keep M/N ≈ 1/64 so depth-2 Grover rotation remains effective as
+    # system_size scales up with MPI rank count.
+    n_marked = _marked_count_from_ratio(system_size, denominator=64, minimum=1)
+    return TestOracle(system_size=system_size, n_marked=n_marked, seed=123)
 
 
 @pytest.mark.mpi
