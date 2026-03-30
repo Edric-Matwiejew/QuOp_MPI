@@ -13,6 +13,7 @@ import math
 import os
 import sys
 import tempfile
+from ctypes import CDLL
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,30 @@ from mpi4py import MPI
 # Set OMP_NUM_THREADS=1 to prevent OpenMP thread contention with MPI
 # This must be set before any OpenMP-enabled libraries are loaded
 os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+try:
+    _LIBC = CDLL(None)
+except OSError:
+    _LIBC = None
+
+
+def _flush_process_output() -> None:
+    """Best-effort flush of Python and C stdio buffers for the current rank."""
+    try:
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+    try:
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+    if _LIBC is not None:
+        try:
+            _LIBC.fflush(None)
+        except Exception:
+            pass
 
 def _system_tmp_is_shared() -> bool:
     """Return True if the system temp directory is writable AND on a shared filesystem.
@@ -329,15 +354,18 @@ def _mpi_barrier_teardown(request):
 
     When FFTW excludes ranks from a SUBCOMM, some tests leave unmatched
     collectives in flight.  A world barrier at teardown guarantees all
-    ranks are synchronised before the next test begins.
+    ranks are synchronised before the next test begins. Flush each rank's
+    Python and C stdio buffers first so the barrier marker better reflects
+    the output that preceded it.
     """
     yield
     if MPI.Is_initialized() and not MPI.Is_finalized():
+        _flush_process_output()
         MPI.COMM_WORLD.Barrier()
         if MPI.COMM_WORLD.Get_rank() == 0:
-            import sys
-
             print(f"[BARRIER] after {request.node.nodeid}", file=sys.stderr, flush=True)
+        _flush_process_output()
+        MPI.COMM_WORLD.Barrier()
 
 
 @pytest.fixture(scope="session")
