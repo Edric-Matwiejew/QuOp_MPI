@@ -105,9 +105,6 @@ class Jacobian:
         # Communicator attribute (from Communicator mixin)
         self.n_jacobian_workers = n_workers
 
-        # Reconfigure the optimiser on the next setup/__pre cycle so the jacobian
-        # callback matches the latest method/step size. If the worker count changed,
-        # also force communicator re-splitting.
         self._dirty |= _Dirty.OPTIMISER
         if previous_workers != n_workers:
             self._dirty |= _Dirty.WORKER_SPLIT
