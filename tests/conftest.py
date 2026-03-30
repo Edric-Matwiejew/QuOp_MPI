@@ -32,6 +32,19 @@ except OSError:
     _LIBC = None
 
 
+def _mpi_trace_enabled() -> bool:
+    """Return True when extra MPI test progress tracing is enabled."""
+    return os.environ.get("QUOP_MPI_TEST_TRACE", "").lower() not in {"", "0", "false", "no"}
+
+
+def _trace_mpi_progress(message: str) -> None:
+    """Emit a rank-0 trace line for MPI test debugging."""
+    if not _mpi_trace_enabled():
+        return
+    if MPI.Is_initialized() and not MPI.Is_finalized() and MPI.COMM_WORLD.Get_rank() == 0:
+        print(f"[TRACE] {message}", file=sys.stderr, flush=True)
+
+
 def _flush_process_output() -> None:
     """Best-effort flush of Python and C stdio buffers for the current rank."""
     try:
@@ -360,12 +373,14 @@ def _mpi_barrier_teardown(request):
     """
     yield
     if MPI.Is_initialized() and not MPI.Is_finalized():
+        _trace_mpi_progress(f"teardown start {request.node.nodeid}")
         _flush_process_output()
         MPI.COMM_WORLD.Barrier()
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(f"[BARRIER] after {request.node.nodeid}", file=sys.stderr, flush=True)
         _flush_process_output()
         MPI.COMM_WORLD.Barrier()
+        _trace_mpi_progress(f"teardown end {request.node.nodeid}")
 
 
 @pytest.fixture(scope="session")

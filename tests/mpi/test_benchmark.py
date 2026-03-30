@@ -21,7 +21,13 @@ import pytest
 from mpi4py import MPI
 
 from quop_mpi import config
-from tests.conftest import TestOracle
+from tests.conftest import TestOracle, _mpi_trace_enabled
+
+
+def _trace_rank0(mpi_comm, message):
+    """Emit rank-0 fixture/test tracing when explicitly enabled."""
+    if _mpi_trace_enabled() and mpi_comm.Get_rank() == 0:
+        print(f"[TRACE] {message}", file=sys.stderr, flush=True)
 
 
 def _scaled_power_of_two_system_size(mpi_sizing, base):
@@ -76,6 +82,8 @@ def _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers):
     if config.backend != "wavefront" or n_workers <= 1:
         return
 
+    _trace_rank0(mpi_comm, f"gpu-slot check start n_workers={n_workers}")
+
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
     from quop_mpi._utils._comm_size import _unwrap_pointer_status
 
@@ -96,6 +104,11 @@ def _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers):
     mpi_comm.Allreduce(local_slots, min_slots, op=MPI.MIN)
     mpi_comm.Allreduce(local_slots, max_slots, op=MPI.MAX)
 
+    _trace_rank0(
+        mpi_comm,
+        f"gpu-slot check complete min_slots={min_slots[0]} max_slots={max_slots[0]}",
+    )
+
     if min_slots[0] != max_slots[0]:
         pytest.skip(
             "Wavefront parallel-jacobian benchmarks require uniform GPU "
@@ -108,6 +121,10 @@ def _probe_wavefront_devcomm_size(mpi_comm):
     """Return the global DEVCOMM size for wavefront worker-layout checks."""
     global _cached_wavefront_devcomm_size
     if _cached_wavefront_devcomm_size is not None:
+        _trace_rank0(
+            mpi_comm,
+            f"devcomm probe cached size={_cached_wavefront_devcomm_size}",
+        )
         return _cached_wavefront_devcomm_size
 
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
@@ -115,6 +132,8 @@ def _probe_wavefront_devcomm_size(mpi_comm):
 
     backend_flag = 1  # wavefront
     system_size = max(64, mpi_comm.Get_size())
+
+    _trace_rank0(mpi_comm, f"devcomm probe start system_size={system_size}")
 
     layout = QuopMpiLayout.create_workers(1, mpi_comm, backend_flag=backend_flag)
 
@@ -139,6 +158,7 @@ def _probe_wavefront_devcomm_size(mpi_comm):
     layout.destroy()
 
     _cached_wavefront_devcomm_size = global_size
+    _trace_rank0(mpi_comm, f"devcomm probe complete size={_cached_wavefront_devcomm_size}")
     return global_size
 
 
@@ -1003,8 +1023,11 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
     all MPI ranks become GPU ranks, ensuring every subcomm has coverage.
     """
     n_workers = benchmark_parallel_jacobian_workers
+    _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu start n_workers={n_workers}")
     _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers)
+    _trace_rank0(mpi_comm, "ensure_ranks_per_gpu after gpu-slot check")
     rpg = _ranks_per_gpu_for_workers(mpi_comm, n_workers)
+    _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu computed rpg={rpg}")
     if rpg is None:
         # MPI backend — no env var needed
         yield
@@ -1013,7 +1036,9 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
     old_val = os.environ.get("QUOP_RANKS_PER_GPU")
     os.environ["QUOP_RANKS_PER_GPU"] = str(rpg)
     try:
+        _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu set QUOP_RANKS_PER_GPU={rpg}")
         devcomm_size = _probe_wavefront_devcomm_size(mpi_comm)
+        _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu devcomm_size={devcomm_size}")
         if devcomm_size < n_workers:
             pytest.skip(
                 f"Parallel jacobian benchmark tests require at least {n_workers} "
@@ -1021,6 +1046,7 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
             )
         yield
     finally:
+        _trace_rank0(mpi_comm, "ensure_ranks_per_gpu cleanup")
         if old_val is None:
             os.environ.pop("QUOP_RANKS_PER_GPU", None)
         else:
