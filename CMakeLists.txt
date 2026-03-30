@@ -135,7 +135,9 @@ if(WAVEFRONT_BACKEND)
   endif()
 endif()
 
-set(CMAKE_VERBOSE_MAKEFILE OFF)
+if(NOT DEFINED CMAKE_VERBOSE_MAKEFILE)
+  set(CMAKE_VERBOSE_MAKEFILE OFF)
+endif()
 
 include(CMakePrintHelpers)
 
@@ -333,15 +335,19 @@ cmake_print_variables(BUILD_TESTING)
 message("")
 message("-------------------------------------------------")
 
-# Build LD_LIBRARY_PATH with only the relevant paths
+# Build LD_LIBRARY_PATH with only the relevant paths (wavefront builds only).
 # Note: Linux wheel builds repair SHAFFT into the final artifact via auditwheel,
 # so it does not need to appear here at runtime.
-set(_ld_paths "")
-if(ROCM_PATH)
-  list(APPEND _ld_paths "${ROCM_PATH}/lib")
+if(WAVEFRONT_BACKEND)
+  set(_ld_paths "")
+  if(ROCM_PATH)
+    list(APPEND _ld_paths "${ROCM_PATH}/lib")
+  endif()
+  if(HIP_PLATFORM STREQUAL nvidia AND CUDA_PATH)
+    list(APPEND _ld_paths "${CUDA_PATH}/lib64")
+  endif()
+  if(_ld_paths)
+    string(REPLACE ";" ":" LD_LIBRARY_PATH "${_ld_paths}")
+    message("\nSet LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:\$LD_LIBRARY_PATH\n")
+  endif()
 endif()
-if(HIP_PLATFORM STREQUAL nvidia AND CUDA_PATH)
-  list(APPEND _ld_paths "${CUDA_PATH}/lib64")
-endif()
-string(REPLACE ";" ":" LD_LIBRARY_PATH "${_ld_paths}")
-message("\nSet LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:\$LD_LIBRARY_PATH\n")
