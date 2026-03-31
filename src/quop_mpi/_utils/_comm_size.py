@@ -449,22 +449,22 @@ class QuopMpiLayout:
         if self._roots is not None:
             return self._roots
 
-        # Gather (worker_id, world_rank) for all ranks then extract roots
+        # Gather (worker_id, subcomm_rank, world_rank) for all ranks, then
+        # extract the world rank of each actual SUBCOMM leader (subcomm rank 0).
         world_rank = self._comm.Get_rank()
-        local_info = np.array([self._worker_id, world_rank], dtype=np.int32)
-        all_info = np.empty(self._comm.Get_size() * 2, dtype=np.int32)
+        subcomm_rank = self.subcomm.Get_rank() if self.in_subcomm() else -1
+        local_info = np.array([self._worker_id, subcomm_rank, world_rank], dtype=np.int32)
+        all_info = np.empty(self._comm.Get_size() * 3, dtype=np.int32)
         self._comm.Allgather(local_info, all_info)
 
-        # Reshape to (n_ranks, 2), each row is (worker_id, world_rank)
-        all_info = all_info.reshape(-1, 2)
+        # Reshape to (n_ranks, 3), each row is (worker_id, subcomm_rank, world_rank)
+        all_info = all_info.reshape(-1, 3)
 
-        # Find root (rank 0 in SUBCOMM) for each worker
-        # Root is the rank with lowest world_rank for each worker_id
+        # Find the actual SUBCOMM leader (rank 0 in SUBCOMM) for each worker.
         roots = [-1] * self._n_workers
-        for wid, wrank in all_info:
-            if wid >= 0:
-                if roots[wid] == -1 or wrank < roots[wid]:
-                    roots[wid] = wrank
+        for wid, srank, wrank in all_info:
+            if wid >= 0 and srank == 0:
+                roots[wid] = wrank
 
         self._roots = roots
         return roots

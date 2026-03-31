@@ -271,6 +271,42 @@ class TestSubcommunicatorCreation:
                     all_in_jaccomm
                 ), f"With {n_subcomms} subcomms, some ranks should be in JACCOMM"
 
+    def test_get_subcomm_roots_matches_actual_subcomm_leaders(
+        self, mpi_comm, jacobian_system_size
+    ):
+        """get_subcomm_roots should return the world ranks of SUBCOMM rank-0 leaders."""
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        size = mpi_comm.Get_size()
+
+        if size < 2:
+            pytest.skip("Need at least 2 MPI processes")
+
+        skip_wavefront_parallel_jacobian()
+
+        system_size = jacobian_system_size
+
+        alg = QWOA(system_size, mpi_comm)
+        alg.set_qualities(serial, {"args": [make_qualities_function(system_size)]})
+        alg.set_depth(1)
+        alg.set_parallel_jacobian(n_workers=2, method="forward")
+
+        alg.setup()
+
+        local_subcomm_rank = (
+            alg.subcomms.SUBCOMM.Get_rank() if alg.subcomms.in_subcomm() else -1
+        )
+        local_worker_id = alg.subcomms.get_subcomm_index()
+        local_world_rank = mpi_comm.Get_rank()
+
+        gathered = mpi_comm.allgather((local_worker_id, local_subcomm_rank, local_world_rank))
+        expected_roots = [-1] * alg.subcomms.get_n_subcomms()
+        for worker_id, subcomm_rank, world_rank in gathered:
+            if worker_id >= 0 and subcomm_rank == 0:
+                expected_roots[worker_id] = world_rank
+
+        assert alg.subcomms.get_subcomm_roots() == expected_roots
+
 
 # =============================================================================
 # Jacobian Method Tests
