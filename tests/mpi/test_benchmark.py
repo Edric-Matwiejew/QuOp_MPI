@@ -13,7 +13,6 @@ Run with: mpiexec -n 2 python -m pytest tests/mpi/test_benchmark.py -v --with-mp
 
 import math
 import os
-import sys
 import tempfile
 
 import numpy as np
@@ -21,13 +20,7 @@ import pytest
 from mpi4py import MPI
 
 from quop_mpi import config
-from tests.conftest import TestOracle, _mpi_trace_enabled
-
-
-def _trace_rank0(mpi_comm, message):
-    """Emit rank-0 fixture/test tracing when explicitly enabled."""
-    if _mpi_trace_enabled() and mpi_comm.Get_rank() == 0:
-        print(f"[TRACE] {message}", file=sys.stderr, flush=True)
+from tests.conftest import TestOracle
 
 
 def _scaled_power_of_two_system_size(mpi_sizing, base):
@@ -82,8 +75,6 @@ def _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers):
     if config.backend != "wavefront" or n_workers <= 1:
         return
 
-    _trace_rank0(mpi_comm, f"gpu-slot check start n_workers={n_workers}")
-
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
     from quop_mpi._utils._comm_size import _unwrap_pointer_status
 
@@ -104,11 +95,6 @@ def _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers):
     mpi_comm.Allreduce(local_slots, min_slots, op=MPI.MIN)
     mpi_comm.Allreduce(local_slots, max_slots, op=MPI.MAX)
 
-    _trace_rank0(
-        mpi_comm,
-        f"gpu-slot check complete min_slots={min_slots[0]} max_slots={max_slots[0]}",
-    )
-
     if min_slots[0] != max_slots[0]:
         pytest.skip(
             "Wavefront parallel-jacobian benchmarks require uniform GPU "
@@ -121,10 +107,6 @@ def _probe_wavefront_devcomm_size(mpi_comm):
     """Return the global DEVCOMM size for wavefront worker-layout checks."""
     global _cached_wavefront_devcomm_size
     if _cached_wavefront_devcomm_size is not None:
-        _trace_rank0(
-            mpi_comm,
-            f"devcomm probe cached size={_cached_wavefront_devcomm_size}",
-        )
         return _cached_wavefront_devcomm_size
 
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
@@ -132,8 +114,6 @@ def _probe_wavefront_devcomm_size(mpi_comm):
 
     backend_flag = 1  # wavefront
     system_size = max(64, mpi_comm.Get_size())
-
-    _trace_rank0(mpi_comm, f"devcomm probe start system_size={system_size}")
 
     layout = QuopMpiLayout.create_workers(1, mpi_comm, backend_flag=backend_flag)
 
@@ -158,7 +138,6 @@ def _probe_wavefront_devcomm_size(mpi_comm):
     layout.destroy()
 
     _cached_wavefront_devcomm_size = global_size
-    _trace_rank0(mpi_comm, f"devcomm probe complete size={_cached_wavefront_devcomm_size}")
     return global_size
 
 
@@ -1023,11 +1002,8 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
     all MPI ranks become GPU ranks, ensuring every subcomm has coverage.
     """
     n_workers = benchmark_parallel_jacobian_workers
-    _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu start n_workers={n_workers}")
     _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers)
-    _trace_rank0(mpi_comm, "ensure_ranks_per_gpu after gpu-slot check")
     rpg = _ranks_per_gpu_for_workers(mpi_comm, n_workers)
-    _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu computed rpg={rpg}")
     if rpg is None:
         # MPI backend — no env var needed
         yield
@@ -1036,9 +1012,7 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
     old_val = os.environ.get("QUOP_RANKS_PER_GPU")
     os.environ["QUOP_RANKS_PER_GPU"] = str(rpg)
     try:
-        _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu set QUOP_RANKS_PER_GPU={rpg}")
         devcomm_size = _probe_wavefront_devcomm_size(mpi_comm)
-        _trace_rank0(mpi_comm, f"ensure_ranks_per_gpu devcomm_size={devcomm_size}")
         if devcomm_size < n_workers:
             pytest.skip(
                 f"Parallel jacobian benchmark tests require at least {n_workers} "
@@ -1046,7 +1020,6 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
             )
         yield
     finally:
-        _trace_rank0(mpi_comm, "ensure_ranks_per_gpu cleanup")
         if old_val is None:
             os.environ.pop("QUOP_RANKS_PER_GPU", None)
         else:
@@ -1130,37 +1103,29 @@ class TestBenchmarkWithParallelJacobian:
         """
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        _trace_rank0(mpi_comm, "benchmark+param_map test start before barrier")
         mpi_comm.barrier()  # Sync before test
-        _trace_rank0(mpi_comm, "benchmark+param_map test after barrier")
 
         with QAOA(simple_oracle.system_size, mpi_comm) as alg:
-            _trace_rank0(mpi_comm, "benchmark+param_map entered QAOA context")
             alg.set_qualities(simple_oracle.qualities_function())
-            _trace_rank0(mpi_comm, "benchmark+param_map set qualities")
 
             def parameter_map(ansatz_depth, total_params, free_vec):
                 gamma, t = free_vec
                 return np.tile([gamma, t], ansatz_depth)
 
             alg.set_parameter_map(2, parameter_map)
-            _trace_rank0(mpi_comm, "benchmark+param_map set parameter map")
             alg.set_parallel_jacobian(
                 n_workers=benchmark_parallel_jacobian_workers,
                 method="forward",
             )
-            _trace_rank0(mpi_comm, "benchmark+param_map set parallel jacobian")
 
             initial_params = np.array([np.pi, 0.5])
 
-            _trace_rank0(mpi_comm, "benchmark+param_map before benchmark call")
             alg.benchmark(
                 ansatz_depths=[1],
                 repeats=1,
                 initial_parameters=initial_params,
                 verbose=False,
             )
-            _trace_rank0(mpi_comm, "benchmark+param_map after benchmark call")
 
             if mpi_comm.Get_rank() == 0:
                 assert alg.result is not None
@@ -1185,23 +1150,18 @@ class TestBenchmarkWithParallelJacobian:
 
         oracle = simple_oracle
 
-        _trace_rank0(mpi_comm, "convergence test start")
         with QWOA(oracle.system_size, mpi_comm) as alg:
-            _trace_rank0(mpi_comm, "convergence test entered QWOA context")
             alg.set_qualities(oracle.qualities_function())
-            _trace_rank0(mpi_comm, "convergence test set qualities")
 
             def parameter_map(ansatz_depth, total_params, free_vec):
                 gamma, t = free_vec
                 return np.tile([gamma, t], ansatz_depth)
 
             alg.set_parameter_map(2, parameter_map)
-            _trace_rank0(mpi_comm, "convergence test set parameter map")
             alg.set_parallel_jacobian(
                 n_workers=benchmark_parallel_jacobian_workers,
                 method="forward",
             )
-            _trace_rank0(mpi_comm, "convergence test set parallel jacobian")
 
             # Start away from optimal to verify optimizer moves toward it
             # Optimal is approximately (gamma=pi, t=pi/N), start at (1.0, 0.1)
@@ -1210,14 +1170,12 @@ class TestBenchmarkWithParallelJacobian:
             # Uniform superposition expectation comes from the active oracle ratio.
             uniform_expectation = oracle.uniform_expectation()
 
-            _trace_rank0(mpi_comm, "convergence test before benchmark call")
             alg.benchmark(
                 ansatz_depths=[1],
                 repeats=1,
                 initial_parameters=initial_params,
                 verbose=False,
             )
-            _trace_rank0(mpi_comm, "convergence test after benchmark call")
 
             if mpi_comm.Get_rank() == 0:
                 assert alg.result is not None
