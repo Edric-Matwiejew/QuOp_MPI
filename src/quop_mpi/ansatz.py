@@ -1446,34 +1446,56 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.in_subcomm():
 
+            self._parallel_jacobian_control_active = (
+                self.parallel_jacobian_enabled and self.subcomms.get_n_subcomms() > 1
+            )
             self.stop = False
             self.n_evolutions = 0
 
-            if self.subcomms.get_subcomm_index() == 0:
+            try:
+                if self.subcomms.get_subcomm_index() == 0:
 
-                self.objective_cnt = 0
+                    self.objective_cnt = 0
 
-                if self.subcomms.SUBCOMM.Get_rank() == 0:
-                    self.__execute_subcomm_group_zero()
+                    if self.subcomms.SUBCOMM.Get_rank() == 0:
+                        self.__execute_subcomm_group_zero()
+                    else:
+                        while not self.stop:
+                            self.__objective(None)
+
+                    self.__post()
+
+                    if self.log:
+                        self._log_update()
+
                 else:
-                    while not self.stop:
-                        self.__objective(None)
+                    if self._parallel_jacobian_control_active:
+                        while not self.stop:
+                            command = self._await_parallel_jacobian_command()
+                            if command is None:
+                                raise RuntimeError(
+                                    "Worker subcommunicator received no parallel jacobian command."
+                                )
+                            if command not in (
+                                self.PARALLEL_JAC_COMMAND_EVALUATE,
+                                self.PARALLEL_JAC_COMMAND_STOP,
+                            ):
+                                raise RuntimeError(
+                                    f"Unknown parallel jacobian command {command}."
+                                )
+                            self._mpi_jacobian(None)
+                    else:
+                        while not self.stop:
+                            self._mpi_jacobian(None)
 
-                self.__post()
+                    self.__post()
 
-                if self.log:
-                    self._log_update()
-
-            else:
-                while not self.stop:
-                    self._mpi_jacobian(None)
-
-                self.__post()
-
-            # Broadcast results to all active ranks via SUBCOMM
-            self.result = self.subcomms.SUBCOMM.bcast(self.result, root=0)
-            self.quop_result = self.subcomms.SUBCOMM.bcast(self.quop_result, root=0)
-            self.state_norm = self.subcomms.SUBCOMM.bcast(self.state_norm, root=0)
+                # Broadcast results to all active ranks via SUBCOMM
+                self.result = self.subcomms.SUBCOMM.bcast(self.result, root=0)
+                self.quop_result = self.subcomms.SUBCOMM.bcast(self.quop_result, root=0)
+                self.state_norm = self.subcomms.SUBCOMM.bcast(self.state_norm, root=0)
+            finally:
+                self._parallel_jacobian_control_active = False
         else:
             # Excluded ranks: nothing to do, mark as stopped
             self.stop = True
@@ -1489,15 +1511,25 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         self.time = time()
 
-        self.result = self.optimiser(
-            self.__objective, self.variational_parameters, **self.optimiser_args
-        )
+        try:
+            self.result = self.optimiser(
+                self.__objective, self.variational_parameters, **self.optimiser_args
+            )
+        except Exception:
+            self.stop = True
+            try:
+                self.__objective(None)
+                if self._parallel_jacobian_control_active:
+                    self._mpi_jacobian(None)
+            finally:
+                self.time = time() - self.time
+            raise
 
         self.stop = True
 
         self.__objective(None)
 
-        if self.subcomms.get_n_subcomms() > 1:
+        if self._parallel_jacobian_control_active:
             self._mpi_jacobian(None)
 
         self.time = time() - self.time
