@@ -58,7 +58,7 @@ class Jacobian:
         self.jac_ranks: list[int] | None = None
         self.h: float = np.sqrt(np.finfo(float).eps)
         self.neval_mpi_jac: int = 0
-        self.var: int = -999  # Placeholder value to detect if it's not being set correctly
+        self.var: int = -999
         self.var_map: list[list[int]] | None = None
         self.parallel_jacobian_enabled: bool = False
         self._parallel_jacobian_control_active: bool = False
@@ -243,70 +243,19 @@ class Jacobian:
             )
             self._signal_parallel_jacobian_command(command)
 
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} entering jaccomm_barrier_initial on line 196",
-            flush=True,
-        )
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} exiting jaccomm_barrier_initial on line 196",
-            flush=True,
-        )
-
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} entering jaccomm_bcast_stop on line 207",
-            flush=True,
-        )
         self.stop = self.subcomms.JACCOMM.bcast(self.stop, 0)
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} exiting jaccomm_bcast_stop on line 207",
-            flush=True,
-        )
 
         if self.stop:
-            self.subcomms.JACCOMM.barrier()
-            print(
-                f"Rank {rank} entering jaccomm_barrier_stop_exit on line 220",
-                flush=True,
-            )
-            self.subcomms.JACCOMM.barrier()
-            print(
-                f"Rank {rank} exiting jaccomm_barrier_stop_exit on line 220",
-                flush=True,
-            )
             return
 
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} entering jaccomm_bcast_variational_parameters on line 232",
-            flush=True,
-        )
         broadcast_parameters = self.subcomms.JACCOMM.bcast(self.variational_parameters, 0)
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} exiting jaccomm_bcast_variational_parameters on line 232",
-            flush=True,
-        )
         self.variational_parameters = (
             None
             if broadcast_parameters is None
             else np.asarray(broadcast_parameters, dtype=np.float64)
         )
 
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} entering jaccomm_bcast_x on line 249",
-            flush=True,
-        )
         x = np.asarray(self.subcomms.JACCOMM.bcast(x, 0), dtype=np.float64)
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} exiting jaccomm_bcast_x on line 249",
-            flush=True,
-        )
 
         if rank != 0:
             # When a parameter map is set, x contains the free parameters.
@@ -342,24 +291,7 @@ class Jacobian:
         else:
             jacobian = None
 
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} entering jaccomm_barrier_pre_reduce on line 295",
-            flush=True,
-        )
-        self.subcomms.JACCOMM.barrier()
-        print(
-            f"Rank {rank} exiting jaccomm_barrier_pre_reduce on line 295",
-            flush=True,
-        )
-
         if self.record_objective:
-            reduce_line = 308 if rank == 0 else 312
-            self.subcomms.JACCOMM.barrier()
-            print(
-                f"Rank {rank} entering jaccomm_reduce_n_evolutions on line {reduce_line}",
-                flush=True,
-            )
             if rank == 0:
                 self.n_evolutions = self.subcomms.JACCOMM.reduce(
                     self.n_evolutions, op=MPI.SUM, root=0
@@ -367,11 +299,6 @@ class Jacobian:
             else:
                 self.subcomms.JACCOMM.reduce(self.n_evolutions, op=MPI.SUM, root=0)
                 self.n_evolutions = 0
-            self.subcomms.JACCOMM.barrier()
-            print(
-                f"Rank {rank} exiting jaccomm_reduce_n_evolutions on line {reduce_line}",
-                flush=True,
-            )
 
         if rank == 0:
 
