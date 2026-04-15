@@ -563,3 +563,104 @@ class TestContextManagerCleanup:
                 raise RuntimeError("expected lifecycle failure")
 
         assert alg.MPI_COMM_WORLD is not None
+
+
+@pytest.mark.mpi
+class TestLifecycleWorkflows:
+    """Lifecycle sequences matching documented user workflows."""
+
+    def test_prepare_inspect_then_evolve(self, mpi_comm, simple_oracle):
+        """Verify the prepare -> inspect -> evolve workflow from documentation.
+
+        Users call prepare() (not just setup()) to fully initialize the
+        Ansatz, inspect state, then evolve_state() manually.
+        setup() only negotiates parallelisation; prepare() also runs the
+        __pre() step that generates initial state, observables, etc.
+        """
+        import numpy as np
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_depth(1)
+
+            alg.prepare()
+
+            # Inspect: initial state should be allocated on subcomm ranks
+            if alg.subcomms.in_subcomm():
+                assert alg.ansatz_initial_state is not None
+                assert len(alg.ansatz_initial_state) > 0
+
+            # Evolve and check expectation value
+            params = simple_oracle.optimal_params(depth=1)
+            alg.evolve_state(params)
+            exp_val = alg.get_expectation_value()
+
+            if alg.subcomms.in_subcomm():
+                assert isinstance(exp_val, (float, np.floating))
+                assert np.isfinite(exp_val)
+
+    def test_reexecute_after_config_change(self, mpi_comm, simple_oracle):
+        """Verify re-execution after changing configuration between runs.
+
+        Users should be able to execute(), change settings, and execute() again.
+        """
+        import numpy as np
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+
+        alg.execute()
+
+        if mpi_comm.Get_rank() == 0:
+            result1 = alg.result["fun"]
+        else:
+            result1 = None
+        result1 = mpi_comm.bcast(result1, root=0)
+
+        # Change depth and re-execute
+        alg.set_depth(2)
+        alg.execute()
+
+        if mpi_comm.Get_rank() == 0:
+            result2 = alg.result["fun"]
+        else:
+            result2 = None
+        result2 = mpi_comm.bcast(result2, root=0)
+
+        assert np.isfinite(result1)
+        assert np.isfinite(result2)
+
+        alg.destroy()
+
+    def test_evolve_state_independence_across_calls(self, mpi_comm, simple_oracle):
+        """Verify that successive evolve_state() calls with different params
+        produce independent results."""
+        import numpy as np
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_depth(1)
+            alg.setup()
+
+            params1 = simple_oracle.optimal_params(depth=1)
+            alg.evolve_state(params1)
+            exp1 = alg.get_expectation_value()
+
+            # Different params should give a different expectation value
+            params2 = params1 * 0.5
+            alg.evolve_state(params2)
+            exp2 = alg.get_expectation_value()
+
+            assert isinstance(exp1, float)
+            assert isinstance(exp2, float)
+            # With different params, expectation values should generally differ
+            # (only assert both are finite; exact inequality is not guaranteed)
+            assert np.isfinite(exp1)
+            assert np.isfinite(exp2)

@@ -232,17 +232,6 @@ class Jacobian:
 
         rank = self.subcomms.JACCOMM.Get_rank()
 
-        if (
-            self._parallel_jacobian_control_active
-            and rank == 0
-            and self.subcomms.get_subcomm_index() == 0
-            and self.subcomms.SUBCOMM.Get_rank() == 0
-        ):
-            command = (
-                self.PARALLEL_JAC_COMMAND_STOP if self.stop else self.PARALLEL_JAC_COMMAND_EVALUATE
-            )
-            self._signal_parallel_jacobian_command(command)
-
         self.stop = self.subcomms.JACCOMM.bcast(self.stop, 0)
 
         if self.stop:

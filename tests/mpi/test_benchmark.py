@@ -76,6 +76,7 @@ def _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers):
         return
 
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+
     from quop_mpi._utils._comm_size import _unwrap_pointer_status
 
     backend_flag = 1
@@ -110,6 +111,7 @@ def _probe_wavefront_devcomm_size(mpi_comm):
         return _cached_wavefront_devcomm_size
 
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+
     from quop_mpi._utils._comm_size import QuopMpiLayout
 
     backend_flag = 1  # wavefront
@@ -475,9 +477,8 @@ class TestBenchmarkSeed:
     def test_benchmark_uses_algorithm_seed(self, mpi_comm, simple_oracle):
         """Verify benchmark uses the algorithm's seed."""
         import quop_mpi._benchmark as benchmark_module
-
-        from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi._utils._tracker import JobTracker as BaseJobTracker
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         initial_seed = 12345
         init_seeds = []
@@ -867,9 +868,7 @@ class TestBenchmarkWithParameterMap:
                     for result in results[depth]:
                         assert "fun" in result
 
-    def test_benchmark_parameter_map_finds_optimal(
-        self, mpi_comm, benchmark_param_map_system_size
-    ):
+    def test_benchmark_parameter_map_finds_optimal(self, mpi_comm, benchmark_param_map_system_size):
         """Verify benchmark with parameter map can optimize toward the marked state.
 
         For Grover search, the optimal gamma is near pi (phase flip)
@@ -956,6 +955,7 @@ def _ranks_per_gpu_for_workers(mpi_comm, n_workers):
         return None
 
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+
     from quop_mpi._utils._comm_size import _unwrap_pointer_status
 
     backend_flag = 1
@@ -1210,9 +1210,7 @@ class TestBenchmarkWithSamplingAndParameterMap:
     a parameter map for Grover-like search optimization.
     """
 
-    def test_benchmark_sampling_with_parameter_map(
-        self, mpi_comm, benchmark_param_map_system_size
-    ):
+    def test_benchmark_sampling_with_parameter_map(self, mpi_comm, benchmark_param_map_system_size):
         """Verify benchmark works with both sampling and parameter map enabled."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -1327,6 +1325,50 @@ class TestBenchmarkWithSamplingAndParameterMap:
                 ansatz_depths=[1],
                 repeats=1,
                 initial_parameters=initial_params,
+                verbose=False,
+            )
+
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+
+
+@pytest.mark.mpi
+class TestBenchmarkCombinations:
+    """Benchmark with custom objective and custom initial state."""
+
+    def test_benchmark_with_custom_objective(self, mpi_comm, simple_oracle):
+        """Verify benchmark works with a user-supplied objective function."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        def custom_obj(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.sum(local_probabilities * local_observables)
+            return MPI_COMM.allreduce(local_exp, op=MPI.SUM)
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_objective(custom_obj)
+
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
+
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+
+    def test_benchmark_with_custom_initial_state(self, mpi_comm, simple_oracle):
+        """Verify benchmark works with a user-supplied initial state."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+        from quop_mpi.state import equal
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_initial_state(equal)
+
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
                 verbose=False,
             )
 

@@ -123,9 +123,7 @@ class TestOptimizationQuality:
             optimized_expectation = alg.result["fun"]
             uniform_expectation = simple_oracle.uniform_expectation()
 
-            assert (
-                optimized_expectation < uniform_expectation
-            ), (
+            assert optimized_expectation < uniform_expectation, (
                 f"Optimized ({optimized_expectation:.4f}) "
                 f"should beat uniform ({uniform_expectation:.4f})"
             )
@@ -227,9 +225,7 @@ class TestOptimizationConvergence:
             uniform = oracle.uniform_expectation()
 
             # Starting near optimum should achieve much better than uniform
-            assert (
-                final_expectation < uniform * 0.8
-            ), (
+            assert final_expectation < uniform * 0.8, (
                 f"Near-optimal start should beat uniform ({uniform:.4f}) "
                 f"significantly (got {final_expectation:.4f})"
             )
@@ -300,5 +296,47 @@ class TestOptimizationWithDifferentAlgorithms:
 
         if mpi_comm.Get_rank() == 0:
             assert alg.result["fun"] < simple_oracle.uniform_expectation()
+
+        alg.destroy()
+
+    def test_execute_with_nlopt(self, mpi_comm, simple_oracle):
+        """Verify execute() works with NLopt integration optimizer."""
+        nlopt = pytest.importorskip("nlopt")  # noqa: F841
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.set_optimiser("nlopt", {"method": "LN_NELDERMEAD"})
+
+        alg.execute()
+
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+            assert np.isfinite(alg.result["fun"])
+
+        alg.destroy()
+
+
+@pytest.mark.mpi
+class TestObjectiveTracking:
+    """Tests for record_objective and objective_history."""
+
+    def test_record_objective_history(self, mpi_comm, simple_oracle):
+        """Verify that enabling record_objective populates objective_history."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.record_objective = True
+
+        alg.execute()
+
+        if mpi_comm.Get_rank() == 0:
+            assert len(alg.objective_history) > 0, "objective_history should be populated"
+            for val in alg.objective_history:
+                assert np.isfinite(val), f"Non-finite value in objective_history: {val}"
 
         alg.destroy()

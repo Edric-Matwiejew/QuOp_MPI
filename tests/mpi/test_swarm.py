@@ -143,7 +143,7 @@ class TestSwarmExecution:
 
         s.set_qualities(qualities)
         s.set_depth(1)
-        s.set_optimiser("BFGS", {"maxiter": 5})
+        s.set_optimiser("scipy", {"method": "BFGS", "options": {"maxiter": 5}})
 
         # Execute with initial parameters
         initial_params = np.array([0.1, 0.1])
@@ -172,7 +172,7 @@ class TestSwarmExecution:
 
         s.set_qualities(qualities)
         s.set_depth(1)
-        s.set_optimiser("BFGS", {"maxiter": 3})
+        s.set_optimiser("scipy", {"method": "BFGS", "options": {"maxiter": 3}})
 
         # Execute
         initial_params = np.array([0.2, 0.2])
@@ -217,6 +217,72 @@ class TestSwarmExecution:
 
         s.destroy()
 
+    def test_swarm_with_param_map(self, mpi_comm, swarm_system_size):
+        """Verify swarm execute works with a parameter map."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+        from quop_mpi.meta import Swarm
+
+        system_size = swarm_system_size
+
+        def qualities(local_i, local_i_offset):
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
+
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+
+        s = Swarm(1, mpi_comm, QAOA, system_size)
+
+        s.set_qualities(qualities)
+        s.set_parameter_map(2, parameter_map)
+        s.set_optimiser("scipy", {"method": "BFGS", "options": {"maxiter": 3}})
+
+        initial_params = np.array([0.1, 0.1])
+        s.execute(initial_params)
+
+        result = s.get_optimal_result()
+
+        if mpi_comm.Get_rank() == 0:
+            assert result is not None
+            assert "fun" in result
+
+        s.destroy()
+
+    def test_swarm_with_custom_objective(self, mpi_comm, swarm_system_size):
+        """Verify swarm execute works with a custom objective function."""
+        from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+        from quop_mpi.meta import Swarm
+
+        system_size = swarm_system_size
+
+        def qualities(local_i, local_i_offset):
+            return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
+
+        def custom_obj(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.sum(local_probabilities * local_observables)
+            return MPI_COMM.allreduce(local_exp, op=MPI.SUM)
+
+        s = Swarm(1, mpi_comm, QAOA, system_size)
+
+        s.set_qualities(qualities)
+        s.set_objective(custom_obj)
+        s.set_depth(1)
+        s.set_optimiser("scipy", {"method": "BFGS", "options": {"maxiter": 3}})
+
+        initial_params = np.array([0.1, 0.1])
+        s.execute(initial_params)
+
+        result = s.get_optimal_result()
+
+        if mpi_comm.Get_rank() == 0:
+            assert result is not None
+            assert "fun" in result
+            assert np.isfinite(result["fun"])
+
+        s.destroy()
+
 
 # =============================================================================
 # Tests for Swarm with Multiple Subcommunicators
@@ -258,7 +324,9 @@ class TestSwarmMultipleSubcomms:
         gathered = mpi_comm.gather(local_result, root=0)
 
         if mpi_comm.Get_rank() == 0:
-            subcomm_results = {idx: value for item in gathered if item is not None for idx, value in [item]}
+            subcomm_results = {
+                idx: value for item in gathered if item is not None for idx, value in [item]
+            }
             assert len(subcomm_results) == 2
             reference = next(iter(subcomm_results.values()))
             for value in subcomm_results.values():
@@ -290,7 +358,7 @@ class TestExecuteSwarm:
 
         s.set_qualities(qualities)
         s.set_depth(1)
-        s.set_optimiser("BFGS", {"maxiter": 2})
+        s.set_optimiser("scipy", {"method": "BFGS", "options": {"maxiter": 2}})
 
         # Create multiple parameter sets
         param_lists = [
@@ -418,7 +486,7 @@ class TestSwarmUtilities:
 
         s.set_qualities(qualities)
         s.set_depth(1)
-        s.set_optimiser("BFGS", {"maxiter": 2})
+        s.set_optimiser("scipy", {"method": "BFGS", "options": {"maxiter": 2}})
 
         # Execute to get a result
         s.execute(np.array([0.1, 0.1]))
