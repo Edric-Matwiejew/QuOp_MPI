@@ -1,6 +1,6 @@
 module mpi_sparse
 
-    use iso_fortran_env, only: real32, real64, int32, int64
+    use iso_fortran_env, only: real32, real64, int32, int64, error_unit
     use iso_c_binding, only: c_f_pointer, c_ptr
     use mpi
     use mpi_backend, only: mpi_context
@@ -148,6 +148,12 @@ contains
             end do
         end if
 
+        ! The sparse backend requires column indices within each row to be
+        ! sorted in ascending order (binary search in spmv_cpu).
+        call check_csr_sorted(self%row_starts_0based, self%col_indexes_0based, &
+                              n_local, error_code)
+        if (error_code /= 0) return
+
         self%generator%rows = int(ci_system_size)
         self%generator%columns = int(ci_system_size)
         self%generator%row_starts => self%row_starts_0based
@@ -193,6 +199,37 @@ contains
         self%context%final_state => ptr_tmp
 
     end subroutine mpi_sparse_propagate
+
+    subroutine check_csr_sorted(row_starts, col_indexes, n_local, error_code)
+        !! Validate that column indices within each CSR row are sorted in
+        !! ascending order.  Sets error_code = 1 and writes a diagnostic
+        !! to error_unit if the precondition is violated.
+        !! row_starts and col_indexes are 0-based.
+        integer(int64), intent(in) :: row_starts(:)
+        integer(int64), intent(in) :: col_indexes(:)
+        integer(int32), intent(in) :: n_local
+        integer(int32), intent(out) :: error_code
+
+        integer(int32) :: row, j
+        integer(int64) :: lo, hi
+
+        error_code = 0
+
+        do row = 1, n_local
+            lo = row_starts(row) + 1
+            hi = row_starts(row + 1)
+            do j = int(lo) + 1, int(hi)
+                if (col_indexes(j) < col_indexes(j - 1)) then
+                    write (error_unit, '(A,I0,A)') &
+                        'mpi_sparse: CSR column indices in row ', row, &
+                        ' are not sorted in ascending order.'
+                    error_code = 1
+                    return
+                end if
+            end do
+        end do
+
+    end subroutine check_csr_sorted
 
     subroutine mpi_sparse_destroy(self)
 

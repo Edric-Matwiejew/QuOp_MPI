@@ -90,7 +90,7 @@ profile_post_modules_env() {
         export PATH="${ROCM_PATH}/bin${PATH:+:${PATH}}"
         export SHAFFT_PATH="${SHAFFT_PATH:-$(resolve_shafft_path || true)}"
 
-        local -a extra_ld_paths=("${ROCM_PATH}/lib")
+        typeset -a extra_ld_paths=("${ROCM_PATH}/lib")
         local extra_ld_path
         extra_ld_path="$(IFS=:; echo "${extra_ld_paths[*]}")"
         export LD_LIBRARY_PATH="${extra_ld_path}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"

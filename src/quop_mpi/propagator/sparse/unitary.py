@@ -11,6 +11,42 @@ from quop_mpi._lib.propagator import Propagator
 from quop_mpi.unitary import UnitaryBase
 
 
+def _sort_csr_columns(
+    row_starts_list: list[np.ndarray],
+    col_indexes_list: list[np.ndarray],
+    values_list: list[np.ndarray] | None,
+) -> None:
+    """Sort column indices within each CSR row in ascending order.
+
+    Operates in-place on the parallel CSR partition arrays. Co-permutes
+    the values arrays when present so that column-value pairs remain
+    consistent.
+
+    Parameters
+    ----------
+    row_starts_list : list[np.ndarray]
+        Per-operator list of 1-based row-pointer arrays.
+    col_indexes_list : list[np.ndarray]
+        Per-operator list of 1-based column-index arrays.
+    values_list : list[np.ndarray] or None
+        Per-operator list of value arrays, or ``None`` for unit-valued
+        matrices.
+    """
+    for k, (row_starts, col_indexes) in enumerate(
+        zip(row_starts_list, col_indexes_list, strict=True)
+    ):
+        values = None if values_list is None else values_list[k]
+        for r in range(len(row_starts) - 1):
+            lo = row_starts[r] - row_starts[0]
+            hi = row_starts[r + 1] - row_starts[0]
+            if hi - lo <= 1:
+                continue
+            order = np.argsort(col_indexes[lo:hi], kind="quicksort")
+            col_indexes[lo:hi] = col_indexes[lo:hi][order]
+            if values is not None:
+                values[lo:hi] = values[lo:hi][order]
+
+
 class Unitary(UnitaryBase):
     """Compute the action of a :term:`mixing unitary` with a sparse
     :term:`operator` or a sequence of mixing-unitaries with sparse
@@ -79,6 +115,10 @@ class Unitary(UnitaryBase):
             self.W_row_starts, self.W_col_indexes, self.W_values = self.operator
             # Detect unit-valued from None values
             self.is_unit_valued = self.W_values is None
+
+        # The sparse Fortran backend requires column indices within each row
+        # to be sorted in ascending order (binary search in spmv_cpu).
+        _sort_csr_columns(self.W_row_starts, self.W_col_indexes, self.W_values)
 
         for i, propagator in enumerate(self.propagators):
             if self.is_unit_valued:

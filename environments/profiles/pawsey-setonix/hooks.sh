@@ -27,7 +27,7 @@ profile_wrapper_opts() {
 
 profile_sanitize_path_flags() {
     local flags="$1"
-    local -a sanitized=()
+    typeset -a sanitized=()
     local token
     local path
 
@@ -56,11 +56,11 @@ profile_sanitize_path_flags() {
 
 profile_write_mpi_cfg() {
     local output="$1"
-    local -a include_dirs=()
-    local -a library_dirs=()
-    local -a libraries=()
-    local -a extra_compile_args=()
-    local -a extra_link_args=()
+    typeset -a include_dirs=()
+    typeset -a library_dirs=()
+    typeset -a libraries=()
+    typeset -a extra_compile_args=()
+    typeset -a extra_link_args=()
     local token
 
     for token in ${MPI_CFLAGS}; do
@@ -174,7 +174,7 @@ profile_post_modules_env() {
 
         export MPICH_GPU_SUPPORT_ENABLED=1
 
-        local -a extra_ld_paths=("${ROCM_PATH}/lib")
+        typeset -a extra_ld_paths=("${ROCM_PATH}/lib")
         local wrapper_ld_path
         wrapper_ld_path="$(profile_wrapper_opts "$MPI_CC_WRAPPER" cray_ld_library_path)"
 

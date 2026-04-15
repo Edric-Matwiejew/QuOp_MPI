@@ -87,7 +87,7 @@ build_docs() {
     local src_docs="$PROJECT_ROOT/docs"
     local dst_docs="$INSTALL_ROOT/docs"
     local docs_python="$DOCS_VENV_DIR/bin/python"
-    local -a docs_packages=()
+    typeset -a docs_packages=()
     local package
 
     if [[ ! -f "$src_docs/source/conf.py" ]]; then

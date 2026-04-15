@@ -59,7 +59,12 @@ profile_post_modules_env() {
 
     # Resolve full paths when the compiler lives under the Homebrew prefix.
     for var in CC CXX FC; do
-        local val="${!var}"
+        local val
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            val="${(P)var}"
+        else
+            val="${!var}"
+        fi
         if ! command -v "$val" >/dev/null 2>&1; then
             if [[ -x "$prefix/bin/$val" ]]; then
                 export "$var=$prefix/bin/$val"

@@ -139,7 +139,7 @@ cleanup_install_state() {
 
 ensure_python_build_requirements() {
     step "Ensuring Python build requirements"
-    local -a _pip_quiet=()
+    typeset -a _pip_quiet=()
     if [[ "${QUOP_VERBOSE:-false}" != "true" ]]; then _pip_quiet=(--quiet); fi
     python -m pip install "${_pip_quiet[@]}" --upgrade \
         pip \
@@ -158,7 +158,7 @@ ensure_python_build_requirements() {
 
 ensure_python_support_packages() {
     info "Ensuring Python support packages"
-    local -a _pip_quiet=()
+    typeset -a _pip_quiet=()
     if [[ "${QUOP_VERBOSE:-false}" != "true" ]]; then _pip_quiet=(--quiet); fi
     python -m pip install "${_pip_quiet[@]}" pytest-mpi scipy pandas networkx
 }

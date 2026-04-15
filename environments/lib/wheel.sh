@@ -70,7 +70,7 @@ PY
 }
 
 collect_auditwheel_excludes() {
-    local -a site_lib_prefixes=(
+    typeset -a site_lib_prefixes=(
         libmpi
         libmpich
         libamdhip
@@ -104,7 +104,7 @@ collect_auditwheel_excludes() {
 }
 
 auditwheel_library_path() {
-    local -a extra_paths=()
+    typeset -a extra_paths=()
     local joined=""
 
     if [[ -n "${SHAFFT_PATH:-}" ]]; then
@@ -179,9 +179,9 @@ PY
 repair_linux_wheel() {
     local wheel_path="$1"
     local repair_dir
-    local -a wheel_files=()
+    typeset -a wheel_files=()
     local wheel_file
-    local -a exclude_args=()
+    typeset -a exclude_args=()
     local exclude_lib
     local auditwheel_ld_path
 
@@ -250,7 +250,7 @@ repair_linux_wheel() {
 
 build_and_inspect_wheel() {
     local wheel_dir="$PROFILE_WORK_DIR/dist"
-    local -a wheel_files=()
+    typeset -a wheel_files=()
     local wheel_file
     local final_wheel
 

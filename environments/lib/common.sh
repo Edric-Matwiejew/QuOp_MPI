@@ -224,9 +224,10 @@ ensure_module_command() {
 
 load_module_list() {
     local array_name="$1"
-    local -a modules_ref=()
+    typeset -a modules_ref=()
 
-    if ! declare -p "$array_name" >/dev/null 2>&1; then
+    # Portable variable-existence check (works in both bash and zsh).
+    if ! eval '[ -n "${'"$array_name"'+set}" ]' 2>/dev/null; then
         return 0
     fi
 
@@ -247,9 +248,9 @@ load_module_list() {
 run_profile_environment_hooks() {
     # Load common modules from config by default.  If a profile defines
     # profile_load_modules it takes full control of common module loading.
-    if declare -f profile_load_modules >/dev/null 2>&1; then
+    if type profile_load_modules >/dev/null 2>&1; then
         profile_load_modules || return 1
-    elif declare -p CFG_PROFILE_MODULES_COMMON >/dev/null 2>&1 && \
+    elif [ -n "${CFG_PROFILE_MODULES_COMMON+set}" ] && \
          (( ${#CFG_PROFILE_MODULES_COMMON[@]} > 0 )); then
         load_module_list CFG_PROFILE_MODULES_COMMON || return 1
     fi
@@ -257,35 +258,35 @@ run_profile_environment_hooks() {
     # Load wavefront modules from config by default.  If a profile defines
     # profile_load_modules_gpu it takes full control of GPU module loading.
     if [[ "${BACKEND:-mpi}" == "wavefront" ]]; then
-        if declare -f profile_load_modules_gpu >/dev/null 2>&1; then
+        if type profile_load_modules_gpu >/dev/null 2>&1; then
             profile_load_modules_gpu || return 1
-        elif declare -p CFG_PROFILE_MODULES_WAVEFRONT >/dev/null 2>&1 && \
+        elif [ -n "${CFG_PROFILE_MODULES_WAVEFRONT+set}" ] && \
              (( ${#CFG_PROFILE_MODULES_WAVEFRONT[@]} > 0 )); then
             load_module_list CFG_PROFILE_MODULES_WAVEFRONT || return 1
         fi
     fi
 
-    if declare -f profile_post_modules_env >/dev/null 2>&1; then
+    if type profile_post_modules_env >/dev/null 2>&1; then
         profile_post_modules_env || return 1
     fi
 }
 
 prepare_profile_venv_args() {
     VENV_ARGS=()
-    if declare -f profile_configure_venv >/dev/null 2>&1; then
+    if type profile_configure_venv >/dev/null 2>&1; then
         profile_configure_venv || return 1
     fi
 }
 
 collect_profile_cmake_args() {
-    local -a extra_args=()
+    typeset -a extra_args=()
     local line
 
     CMAKE_ARGS_ARRAY=(-DBUILD_TESTING=ON)
     if [[ "${QUOP_VERBOSE:-false}" == "true" ]]; then
         CMAKE_ARGS_ARRAY+=(-DCMAKE_VERBOSE_MAKEFILE=ON)
     fi
-    if declare -f profile_cmake_args >/dev/null 2>&1; then
+    if type profile_cmake_args >/dev/null 2>&1; then
         while IFS= read -r line; do
             [[ "$line" =~ ^[[:space:]]*$ ]] && continue
             extra_args+=("$line")
@@ -373,7 +374,7 @@ resolve_python_interpreter() {
     local requested_version="${1:-}"
     local requested_major="${requested_version%%.*}"
     local override="${CONFIG_PYTHON:-}"
-    local -a candidates=()
+    typeset -a candidates=()
     local candidate
     local candidate_path
     local seen=""
