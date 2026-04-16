@@ -407,10 +407,10 @@ class TestTransverseFieldPropagator:
 
         alg.destroy()
 
-    def test_transverse_field_negotiates_power_of_two_subcomm(
+    def test_transverse_field_uses_full_active_subcomm(
         self, mpi_comm, propagator_small_system_size
     ):
-        """The aligned MVP should shrink to a power-of-two active communicator."""
+        """The transverse-field propagator should keep all active ranks up to system size."""
         system_size = propagator_small_system_size
 
         alg = self._create_ansatz(system_size, mpi_comm)
@@ -419,8 +419,7 @@ class TestTransverseFieldPropagator:
         if alg.subcomms.in_subcomm():
             subcomm_size = alg.subcomms.SUBCOMM.Get_size()
             assert subcomm_size > 0
-            assert subcomm_size & (subcomm_size - 1) == 0
-            assert subcomm_size <= min(mpi_comm.Get_size(), system_size)
+            assert subcomm_size == min(mpi_comm.Get_size(), system_size)
 
         alg.destroy()
 
@@ -467,6 +466,65 @@ class TestTransverseFieldPropagator:
             assert_probabilities_normalized(
                 transverse_field_probs,
                 context="Transverse-field propagation should preserve normalization",
+            )
+            np.testing.assert_allclose(
+                transverse_field_probs,
+                sparse_probs,
+                rtol=1e-8,
+                atol=1e-10,
+            )
+
+        assert mpi_comm.allreduce(did_compare, op=MPI.SUM) == 1
+
+        sparse_alg.destroy()
+        transverse_field_alg.destroy()
+
+    def test_transverse_field_matches_sparse_hypercube_probabilities_segmented_medium(
+        self, mpi_comm, propagator_medium_system_size
+    ):
+        """Medium non-power-of-two layouts should also match sparse hypercube evolution."""
+        from quop_mpi.propagator import sparse, transverse_field
+
+        if mpi_comm.Get_size() & (mpi_comm.Get_size() - 1) == 0:
+            pytest.skip("requires a non-power-of-two communicator size")
+
+        system_size = propagator_medium_system_size
+        rng = np.random.default_rng(271828)
+        initial_state = rng.standard_normal(system_size) + 1j * rng.standard_normal(system_size)
+        initial_state = np.asarray(initial_state, dtype=np.complex128)
+        initial_state /= np.linalg.norm(initial_state)
+
+        sparse_time = 0.19
+        theta = 2.0 * sparse_time
+
+        sparse_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            sparse.Unitary(sparse.operator.hypercube),
+            initial_state,
+        )
+        transverse_field_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            transverse_field.Unitary(),
+            initial_state,
+        )
+
+        sparse_alg.evolve_state(np.array([sparse_time], dtype=np.float64))
+        transverse_field_alg.evolve_state(np.array([theta], dtype=np.float64))
+
+        sparse_probs = sparse_alg.get_probabilities()
+        transverse_field_probs = transverse_field_alg.get_probabilities()
+        did_compare = int(sparse_probs is not None and transverse_field_probs is not None)
+
+        if sparse_probs is not None and transverse_field_probs is not None:
+            assert_probabilities_normalized(
+                sparse_probs,
+                context="Segmented sparse hypercube propagation should preserve normalization",
+            )
+            assert_probabilities_normalized(
+                transverse_field_probs,
+                context="Segmented transverse-field propagation should preserve normalization",
             )
             np.testing.assert_allclose(
                 transverse_field_probs,

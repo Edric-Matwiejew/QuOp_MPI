@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from .qaoa_sparse import QAOASparse
+from .qaoa_transverse_field import QAOATransverseField
 
 
-class QAOA(QAOASparse):
+class QAOA(QAOATransverseField):
     """Simulate the :ref:`QAOA <QAOA>`.
 
-    This remains the default sparse-hypercube implementation while the
-    transverse-field-backed variant is kept alongside it for benchmarking.
+    Uses the transverse-field mixer propagator, which applies per-qubit
+    :math:`R_X(\\theta)` rotations directly on the distributed statevector
+    without constructing a sparse operator.  The previous sparse-hypercube
+    implementation is available as :class:`QAOASparse`.
     """
 
     pass

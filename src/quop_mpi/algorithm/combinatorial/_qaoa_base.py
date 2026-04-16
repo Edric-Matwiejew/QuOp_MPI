@@ -23,6 +23,10 @@ class _QAOABase(Ansatz):
 
     def __init__(self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD) -> None:  # noqa: N803
         """Initialise a QAOA-like instance."""
+        if system_size < 1 or (system_size & (system_size - 1)) != 0:
+            raise ValueError(
+                f"QAOA requires system_size = 2**n for integer n, got {system_size}."
+            )
         super().__init__(system_size, MPI_communicator)
 
         self.operator_function = None

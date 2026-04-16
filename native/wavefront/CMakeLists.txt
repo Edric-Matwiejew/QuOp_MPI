@@ -77,3 +77,4 @@ endif()
 
 add_subdirectory(diagonal)
 add_subdirectory(sparse)
+add_subdirectory(transverse_field)

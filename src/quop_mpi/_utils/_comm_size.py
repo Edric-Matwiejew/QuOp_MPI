@@ -87,6 +87,15 @@ class QuopMpiLayout:
         """Create a layout handle populated with explicit partition fields."""
         obj = cls(MPI_COMM, system_size=system_size)
         try:
+            from quop_mpi import config
+
+            if config.backend == "wavefront":
+                status = int(_ciw.init_wavefront_layout(obj.handle))
+                if status != 0:
+                    raise RuntimeError(
+                        "Fortran init_wavefront_layout failed with status "
+                        f"{status}"
+                    )
             obj.set_partitioning(int(local_i), int(local_i_offset))
             if alloc_local is None:
                 alloc_local = local_i
@@ -164,9 +173,11 @@ class QuopMpiLayout:
         negotiate completes.
 
         On the wavefront backend, ``n_workers`` is clamped to the total
-        number of device-rank slots so that every subcomm is guaranteed
-        at least one GPU.  The effective (possibly clamped) worker count
-        is available via ``get_n_subcomms()``.
+        number of launched GPU-capable ranks so that every subcomm is
+        guaranteed at least one active GPU rank. ``QUOP_RANKS_PER_GPU``
+        increases sharing capacity only when those ranks are actually
+        launched. The effective (possibly clamped) worker count is
+        available via ``get_n_subcomms()``.
 
         Raises ``RuntimeError`` if a heterogeneous GPU topology is
         detected (different device-slot counts across nodes).
@@ -200,14 +211,15 @@ class QuopMpiLayout:
         )
 
         try:
-            # On wavefront, cap workers to total device-rank slots so every
-            # subcomm is guaranteed at least one GPU.
+            # On wavefront, cap workers to the number of launched GPU-capable
+            # ranks so every subcomm is guaranteed at least one active GPU rank.
             if backend_flag == 1 and n_workers > 1:
                 n_gpus, rpg, node_size = _ciw.wrapper_get_topology_info(topo_ptr)
                 n_gpus = int(n_gpus)
                 rpg = int(rpg)
                 node_size = int(node_size)
                 device_slots = n_gpus * max(rpg, 1)
+                active_device_ranks = min(node_size, device_slots)
 
                 # Reject heterogeneous GPU topology — the GPU-aware
                 # worker split assumes every node has the same number
@@ -226,11 +238,11 @@ class QuopMpiLayout:
                     )
 
                 # Each of the node_size co-located ranks contributes
-                # (device_slots / node_size) so the sum across all ranks
-                # equals the total device slots cluster-wide.
-                if device_slots > 0 and node_size > 0:
+                # (active_device_ranks / node_size) so the sum across all ranks
+                # equals the number of launched GPU-capable ranks cluster-wide.
+                if active_device_ranks > 0 and node_size > 0:
                     local_slots = np.array(
-                        [float(device_slots) / node_size], dtype=np.float64
+                        [float(active_device_ranks) / node_size], dtype=np.float64
                     )
                 else:
                     local_slots = np.zeros(1, dtype=np.float64)

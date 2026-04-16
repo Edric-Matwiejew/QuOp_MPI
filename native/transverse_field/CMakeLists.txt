@@ -1,0 +1,2 @@
+add_library(transverse_field_common OBJECT src/transverse_field_common.f90)
+target_link_libraries(transverse_field_common PUBLIC MPI::MPI_Fortran)

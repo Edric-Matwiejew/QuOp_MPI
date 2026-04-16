@@ -4,6 +4,7 @@ module mpi_transverse_field
     use mpi
     use mpi_backend, only: mpi_context
     use comm_info_module, only: quop_mpi_layout_t
+    use transverse_field_common
 
     implicit none
 
@@ -11,20 +12,21 @@ module mpi_transverse_field
 
     public :: transverse_field_propagator
 
-    integer(int64), parameter :: COMPLEX128_BYTES = 16_int64
-    integer(int64), parameter :: DEFAULT_CHUNK_BYTES = 67108864_int64
-
     type transverse_field_propagator
 
         type(mpi_context), pointer :: context => null()
         complex(real64), allocatable, dimension(:) :: recvbuf
+        integer(int64), allocatable, dimension(:) :: partition_table_0
 
         integer(int32) :: rank = 0
         integer(int32) :: comm_size = 0
         integer(int32) :: n_qubits = 0
         integer(int32) :: n_local_qubits = 0
+        integer(int32) :: layout_mode = TF_MODE_UNSET
         integer(int64) :: local_i = 0_int64
         integer(int64) :: chunk_elems = 0_int64
+        integer(int64) :: lb_global = 0_int64
+        integer(int64) :: ub_global = -1_int64
 
     contains
 
@@ -39,50 +41,146 @@ module mpi_transverse_field
 
 contains
 
-    pure logical function is_power_of_two_int64(value)
-        integer(int64), intent(in) :: value
-        integer(int64) :: tmp
+    subroutine mpi_transverse_field_apply_local_pair_segment( &
+        psi, lb_global, g0, g1, delta, coeff_diag, coeff_offdiag)
+        complex(real64), intent(inout) :: psi(:)
+        integer(int64), intent(in) :: lb_global, g0, g1, delta
+        complex(real64), intent(in) :: coeff_diag, coeff_offdiag
 
-        is_power_of_two_int64 = .false.
-        if (value <= 0_int64) return
+        integer(int64) :: g, local_u, local_v
+        complex(real64) :: u, v
 
-        tmp = value
-        do while (mod(tmp, 2_int64) == 0_int64 .and. tmp > 1_int64)
-            tmp = tmp / 2_int64
+        do g = g0, g1
+            local_u = g - lb_global + 1_int64
+            local_v = g + delta - lb_global + 1_int64
+
+            u = psi(local_u)
+            v = psi(local_v)
+
+            psi(local_u) = coeff_diag * u + coeff_offdiag * v
+            psi(local_v) = coeff_offdiag * u + coeff_diag * v
+        end do
+    end subroutine mpi_transverse_field_apply_local_pair_segment
+
+    subroutine mpi_transverse_field_exchange_remote_segment( &
+        self, psi, q, seg, coeff_diag, coeff_offdiag, error_code)
+        class(transverse_field_propagator), intent(inout) :: self
+        complex(real64), intent(inout) :: psi(:)
+        integer(int32), intent(in) :: q
+        type(tf_segment_t), intent(in) :: seg
+        complex(real64), intent(in) :: coeff_diag, coeff_offdiag
+        integer(int32), intent(out) :: error_code
+
+        integer(int64) :: chunk_g0, chunk_g1, m, local0, j
+        integer(int32) :: count, ierr
+        integer(int32) :: ci_subcomm
+        integer(int32) :: status(MPI_STATUS_SIZE)
+
+        error_code = 0
+        ci_subcomm = self%context%ci%get_SUBCOMM()
+
+        chunk_g0 = seg%g0
+        do while (chunk_g0 <= seg%g1)
+            chunk_g1 = min(seg%g1, chunk_g0 + self%chunk_elems - 1_int64)
+            m = chunk_g1 - chunk_g0 + 1_int64
+            count = int(m, int32)
+
+            local0 = chunk_g0 - self%lb_global + 1_int64
+
+            call MPI_Sendrecv(psi(local0:local0 + m - 1_int64), count, MPI_DOUBLE_COMPLEX, seg%owner, q, &
+                              self%recvbuf(1:count), count, MPI_DOUBLE_COMPLEX, seg%owner, q, &
+                              ci_subcomm, status, ierr)
+
+            if (ierr /= MPI_SUCCESS) then
+                error_code = 1
+                return
+            end if
+
+            do j = 1_int64, m
+                psi(local0 + j - 1_int64) = coeff_diag * psi(local0 + j - 1_int64) + &
+                                            coeff_offdiag * self%recvbuf(j)
+            end do
+
+            chunk_g0 = chunk_g1 + 1_int64
+        end do
+    end subroutine mpi_transverse_field_exchange_remote_segment
+
+    subroutine mpi_transverse_field_propagate_segmented(self, psi, coeff_diag, coeff_offdiag, error_code)
+        class(transverse_field_propagator), intent(inout) :: self
+        complex(real64), intent(inout) :: psi(:)
+        complex(real64), intent(in) :: coeff_diag, coeff_offdiag
+        integer(int32), intent(out) :: error_code
+
+        integer(int32) :: q, owner, n_remote, remote_idx, remote_cap
+        integer(int64) :: bit_mask, g, gp, g_end, delta
+        logical :: is_lower_half
+        type(tf_segment_t), allocatable :: remote_segs(:)
+
+        error_code = 0
+
+        if (.not. allocated(self%partition_table_0)) then
+            error_code = 1
+            return
+        end if
+
+        remote_cap = 0
+
+        do q = 0, self%n_qubits - 1
+            bit_mask = ishft(1_int64, q)
+
+            n_remote = 0
+            g = self%lb_global
+
+            do while (g <= self%ub_global)
+                gp = ieor(g, bit_mask)
+                owner = tf_find_owner_0(gp, self%partition_table_0)
+                is_lower_half = (iand(g, bit_mask) == 0_int64)
+                delta = tf_partner_delta(g, bit_mask)
+
+                if (owner == self%rank .and. .not. is_lower_half) then
+                    g_end = min(self%ub_global, tf_current_half_band_end(g, bit_mask))
+                    g = g_end + 1_int64
+                    cycle
+                end if
+
+                g_end = tf_max_segment_end( &
+                    g, bit_mask, delta, owner, self%ub_global, self%partition_table_0)
+
+                if (owner == self%rank) then
+                    call mpi_transverse_field_apply_local_pair_segment( &
+                        psi, self%lb_global, g, g_end, delta, coeff_diag, coeff_offdiag)
+                else
+                    n_remote = n_remote + 1
+                    if (n_remote > remote_cap) then
+                        call tf_grow_remote_arrays(remote_segs, remote_cap)
+                    end if
+                    remote_segs(n_remote)%g0 = g
+                    remote_segs(n_remote)%g1 = g_end
+                    remote_segs(n_remote)%delta = delta
+                    remote_segs(n_remote)%owner = owner
+                    remote_segs(n_remote)%exchange_key = min(g, gp)
+                end if
+
+                g = g_end + 1_int64
+            end do
+
+            if (n_remote > 1) then
+                call tf_sort_remote_segments(remote_segs, n_remote)
+            end if
+
+            do remote_idx = 1, n_remote
+                call mpi_transverse_field_exchange_remote_segment( &
+                    self, psi, q, remote_segs(remote_idx), &
+                    coeff_diag, coeff_offdiag, error_code)
+                if (error_code /= 0) then
+                    if (allocated(remote_segs)) deallocate (remote_segs)
+                    return
+                end if
+            end do
         end do
 
-        is_power_of_two_int64 = (tmp == 1_int64)
-    end function is_power_of_two_int64
-
-    pure integer(int64) function largest_power_of_two_leq(limit)
-        integer(int64), intent(in) :: limit
-
-        largest_power_of_two_leq = 1_int64
-        if (limit <= 1_int64) return
-
-        do while (largest_power_of_two_leq <= limit / 2_int64)
-            largest_power_of_two_leq = largest_power_of_two_leq * 2_int64
-        end do
-    end function largest_power_of_two_leq
-
-    subroutine exact_log2_int64(value, exponent, is_exact)
-        integer(int64), intent(in) :: value
-        integer(int32), intent(out) :: exponent
-        logical, intent(out) :: is_exact
-        integer(int64) :: tmp
-
-        exponent = 0
-        is_exact = .false.
-        if (value <= 0_int64) return
-
-        tmp = value
-        do while (mod(tmp, 2_int64) == 0_int64 .and. tmp > 1_int64)
-            tmp = tmp / 2_int64
-            exponent = exponent + 1_int32
-        end do
-
-        is_exact = (tmp == 1_int64)
-    end subroutine exact_log2_int64
+        if (allocated(remote_segs)) deallocate (remote_segs)
+    end subroutine mpi_transverse_field_propagate_segmented
 
     subroutine mpi_transverse_field_reset_state(self)
         class(transverse_field_propagator), intent(inout) :: self
@@ -90,14 +188,20 @@ contains
         if (allocated(self%recvbuf)) then
             deallocate (self%recvbuf)
         end if
+        if (allocated(self%partition_table_0)) then
+            deallocate (self%partition_table_0)
+        end if
 
         self%context => null()
         self%rank = 0
         self%comm_size = 0
         self%n_qubits = 0
         self%n_local_qubits = 0
+        self%layout_mode = TF_MODE_UNSET
         self%local_i = 0_int64
         self%chunk_elems = 0_int64
+        self%lb_global = 0_int64
+        self%ub_global = -1_int64
     end subroutine mpi_transverse_field_reset_state
 
     subroutine mpi_transverse_field_max_comm_size(self, ci, error_code)
@@ -112,7 +216,7 @@ contains
         system_size = ci%get_system_size()
         available_ranks = ci%get_n_processes()
 
-        if (.not. is_power_of_two_int64(system_size)) then
+        if (.not. tf_is_power_of_two(system_size)) then
             write (error_unit, '(A,I0)') &
                 "ERROR: transverse_field requires power-of-two system_size, got ", system_size
             error_code = 1
@@ -126,7 +230,7 @@ contains
             return
         end if
 
-        target_ranks = largest_power_of_two_leq(min(system_size, available_ranks))
+        target_ranks = min(system_size, available_ranks)
 
         call ci%set_n_processes(target_ranks, error_code)
     end subroutine mpi_transverse_field_max_comm_size
@@ -190,6 +294,7 @@ contains
 
         integer(int32) :: ierr, local_error, synced_error
         integer(int64) :: system_size, local_i, local_i_offset, alloc_local
+        integer(int64), pointer :: pt(:)
         logical :: exact_power
 
         error_code = 0
@@ -203,7 +308,7 @@ contains
             local_i_offset = self%context%ci%get_local_i_offset()
             alloc_local = self%context%ci%get_alloc_local()
 
-            call exact_log2_int64(system_size, self%n_qubits, exact_power)
+            call tf_exact_log2(system_size, self%n_qubits, exact_power)
             if (.not. exact_power) then
                 write (error_unit, '(A,I0)') &
                     "ERROR: transverse_field requires power-of-two system_size, got ", system_size
@@ -211,32 +316,18 @@ contains
             end if
 
             if (local_error == 0) then
-                call exact_log2_int64(local_i, self%n_local_qubits, exact_power)
-                if (.not. exact_power) then
-                    write (error_unit, '(A,I0)') &
-                        "ERROR: transverse_field requires power-of-two local_i, got ", local_i
+                self%local_i = local_i
+
+                pt => self%context%ci%get_partition_table()
+                if (.not. associated(pt)) then
+                    write (error_unit, '(A)') &
+                        'ERROR: transverse_field requires an allocated partition_table.'
                     local_error = 1
+                else
+                    call tf_copy_partition_table_0(pt, self%comm_size, self%rank, &
+                                                  self%partition_table_0, self%lb_global, &
+                                                  self%ub_global, local_error)
                 end if
-            end if
-
-            if (local_error == 0 .and. .not. is_power_of_two_int64(int(self%comm_size, int64))) then
-                write (error_unit, '(A,I0)') &
-                    "ERROR: transverse_field requires power-of-two communicator size, got ", self%comm_size
-                local_error = 1
-            end if
-
-            if (local_error == 0 .and. local_i * int(self%comm_size, int64) /= system_size) then
-                write (error_unit, '(A,I0,A,I0,A,I0)') &
-                    "ERROR: transverse_field requires equal block distribution: local_i=", local_i, &
-                    ", comm_size=", self%comm_size, ", system_size=", system_size
-                local_error = 1
-            end if
-
-            if (local_error == 0 .and. local_i_offset /= int(self%rank, int64) * local_i) then
-                write (error_unit, '(A,I0,A,I0,A,I0)') &
-                    "ERROR: transverse_field requires aligned local offsets: rank=", self%rank, &
-                    ", local_i_offset=", local_i_offset, ", local_i=", local_i
-                local_error = 1
             end if
 
             if (local_error == 0 .and. alloc_local < local_i) then
@@ -247,7 +338,9 @@ contains
             end if
 
             if (local_error == 0) then
-                self%local_i = local_i
+                call tf_classify_layout(system_size, local_i, local_i_offset, &
+                                       self%comm_size, self%rank, self%layout_mode, &
+                                       self%n_local_qubits, local_error)
             end if
         end if
 
@@ -266,11 +359,8 @@ contains
         integer(int32), intent(out) :: error_code
 
         complex(real64), dimension(:), pointer :: psi
-        complex(real64) :: u, v, coeff_diag, coeff_offdiag
-        integer(int64) :: stride, base, j, off, m, local_i
-        integer(int32) :: q, peer_mask, peer, count, ierr
-        integer(int32) :: ci_subcomm
-        integer(int32) :: status(MPI_STATUS_SIZE)
+        complex(real64) :: coeff_diag, coeff_offdiag
+        integer(int64) :: local_i
 
         error_code = 0
 
@@ -303,6 +393,32 @@ contains
 
         coeff_diag = cmplx(cos(theta(1) / 2.0_real64), 0.0_real64, real64)
         coeff_offdiag = cmplx(0.0_real64, -sin(theta(1) / 2.0_real64), real64)
+
+        select case (self%layout_mode)
+        case (TF_MODE_ALIGNED)
+            call mpi_transverse_field_propagate_aligned(self, psi, local_i, coeff_diag, coeff_offdiag, error_code)
+        case (TF_MODE_SEGMENTED)
+            call mpi_transverse_field_propagate_segmented(self, psi, coeff_diag, coeff_offdiag, error_code)
+        case default
+            write (error_unit, '(A,I0)') &
+                'ERROR: transverse_field layout mode is not yet implemented: ', self%layout_mode
+            error_code = 1
+        end select
+    end subroutine mpi_transverse_field_propagate
+
+    subroutine mpi_transverse_field_propagate_aligned(self, psi, local_i, coeff_diag, coeff_offdiag, error_code)
+        class(transverse_field_propagator), intent(inout) :: self
+        complex(real64), intent(inout), dimension(:) :: psi
+        integer(int64), intent(in) :: local_i
+        complex(real64), intent(in) :: coeff_diag, coeff_offdiag
+        integer(int32), intent(out) :: error_code
+
+        complex(real64) :: u, v
+        integer(int64) :: stride, base, j, off, m
+        integer(int32) :: q, peer_mask, peer, count, ierr
+        integer(int32) :: ci_subcomm
+        integer(int32) :: status(MPI_STATUS_SIZE)
+
         ci_subcomm = self%context%ci%get_SUBCOMM()
 
         do q = 0, self%n_qubits - 1
@@ -339,7 +455,7 @@ contains
                 end do
             end if
         end do
-    end subroutine mpi_transverse_field_propagate
+    end subroutine mpi_transverse_field_propagate_aligned
 
     subroutine mpi_transverse_field_destroy(self)
         class(transverse_field_propagator), intent(inout) :: self

@@ -37,7 +37,7 @@ class Unitary(UnitaryBase):
             self.propagator_module = backend.transverse_field_propagator
         except AttributeError as exc:
             raise NotImplementedError(
-                "The transverse_field propagator is currently only implemented for the MPI backend."
+                "The transverse_field propagator is not implemented for this backend."
             ) from exc
 
         self.propagators = [

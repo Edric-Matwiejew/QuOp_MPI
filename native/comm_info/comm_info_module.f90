@@ -36,6 +36,7 @@ module comm_info_module
     public :: discover_topology, destroy_topology, get_topology_info, get_layout_topology_info, split_workers, negotiate
     public :: create_jaccomm, create_rootcomm
     public :: create_split_from_subcomm
+    public :: init_explicit_wavefront_layout
     public :: dump_comm_info
 #ifdef WAVEFRONT_BACKEND
     public :: sync_layout_from_device_partition
@@ -1315,6 +1316,64 @@ contains
         topo_ptr = c_null_ptr
     end subroutine destroy_topology
 
+    subroutine init_explicit_wavefront_layout(ci_ptr, error_code)
+        !! Populate NODECOMM and topology on an explicit layout so the
+        !! wavefront backend can initialise native contexts without going
+        !! through the full negotiate path.
+        type(c_ptr), intent(in) :: ci_ptr
+        integer(int32), intent(out) :: error_code
+
+        type(quop_mpi_layout_t), pointer :: ci
+        type(gpu_topology_t), pointer :: topo
+        type(c_ptr) :: topo_ptr
+
+        error_code = 0
+        topo_ptr = c_null_ptr
+
+        if (.not. c_associated(ci_ptr)) then
+            error_code = 1
+            return
+        end if
+
+        call c_f_pointer(ci_ptr, ci)
+        if (.not. associated(ci)) then
+            error_code = 1
+            return
+        end if
+
+        if (ci%locked) then
+            error_code = 1
+            return
+        end if
+
+        if (ci%SUBCOMM == MPI_COMM_NULL) then
+            error_code = 2
+            return
+        end if
+
+        ci%backend_flag = 1
+
+        if (ci%NODECOMM == MPI_COMM_NULL) then
+            call create_layout_nodecomm(ci%SUBCOMM, ci%NODECOMM)
+        end if
+
+        call discover_topology(topo_ptr, ci%SUBCOMM, 1_int32, error_code)
+        if (error_code /= 0) return
+
+        call c_f_pointer(topo_ptr, topo)
+        ci%topology = topo
+        call destroy_topology(topo_ptr)
+
+        ci%DEVCOMM = MPI_COMM_NULL
+        ci%DEVCOMM_NODE = MPI_COMM_NULL
+        ci%device_n_processes = 0_int64
+        ci%device_local_i = 0_int64
+        ci%device_local_i_offset = 0_int64
+        ci%device_alloc_local = 0_int64
+
+        call refresh_layout_topology(ci)
+    end subroutine init_explicit_wavefront_layout
+
     subroutine get_topology_info(topo_ptr, n_physical_gpus, ranks_per_gpu, node_size)
         !! Return key topology fields for Python-side configuration.
         !! NOT collective -- purely local read.
@@ -1397,6 +1456,7 @@ contains
         topo%my_gpu_index = 0
         topo%assigned_device_id = 0
         topo%rank_within_gpu = 0
+        topo%gpu_slot_ordinal = -1
         topo%cpu_numa_node = -1
         topo%rank_within_cpu_numa = 0
         topo%is_gpu_rank = .false.
@@ -1541,9 +1601,13 @@ contains
         integer(int32) :: nodes_per_worker, node_remainder
         integer(int32) :: ranks_per_worker, rank_remainder
         integer(int32) :: subcomm_rank
-        integer(int32) :: wpn_base, wpn_extra
         integer(int32) :: my_node_nw, my_node_w0
-        integer(int32) :: total_node_slots, slot
+        integer(int32) :: my_node_active_gpu_ranks
+        integer(int32) :: my_gpu_ordinal, remaining_workers, progress
+        integer(int32) :: i, other_node_id, other_is_leader, other_active_gpu_ranks
+        integer(int32) :: local_error, global_error
+        integer(int32) :: gather_info(3)
+        integer(int32), allocatable :: all_worker_info(:), node_active_gpu_ranks(:), workers_per_node(:)
 
         status = 0
         allocate (si)
@@ -1591,42 +1655,99 @@ contains
             else
 #ifdef WAVEFRONT_BACKEND
                 ! -- GPU-aware intra-node split ----------------------
-                ! Distribute workers across nodes (even, with remainder),
-                ! then assign GPU ranks to workers based on their device
-                ! slot index.  Non-GPU ranks round-robin among their
-                ! node's workers so every worker has at least one GPU.
+                ! Distribute workers across nodes according to the number
+                ! of launched GPU-capable ranks on each node, then assign
+                ! those active GPU ranks evenly to workers.
+                !
+                ! QUOP_RANKS_PER_GPU limits how many launched ranks may
+                ! share a GPU, but it must not create empty workers from
+                ! theoretical slot capacity that has not actually been
+                ! launched into this MPI job.
                 !
                 ! Heterogeneous GPU topology (nodes with different GPU
                 ! counts) is rejected by Python create_workers().
-                wpn_base = n_jacobian_workers / n_nodes
-                wpn_extra = mod(n_jacobian_workers, n_nodes)
+                allocate (all_worker_info(3 * nprocs))
+                allocate (node_active_gpu_ranks(n_nodes))
+                allocate (workers_per_node(n_nodes))
+                node_active_gpu_ranks = 0
+                workers_per_node = 0
 
-                if (my_node_id < wpn_extra) then
-                    my_node_nw = wpn_base + 1
-                    my_node_w0 = my_node_id * (wpn_base + 1)
+                gather_info(1) = my_node_id
+                gather_info(2) = merge(1_int32, 0_int32, topo%node_rank == 0)
+                gather_info(3) = topo%devcomm_node_size
+                call MPI_Allgather(gather_info, 3, MPI_INTEGER, all_worker_info, 3, MPI_INTEGER, MPI_COMM, ierr)
+
+                do i = 0, nprocs - 1
+                    other_node_id = all_worker_info(3 * i + 1)
+                    other_is_leader = all_worker_info(3 * i + 2)
+                    other_active_gpu_ranks = all_worker_info(3 * i + 3)
+                    if (other_node_id >= 0 .and. other_node_id < n_nodes) then
+                        if (other_is_leader /= 0) then
+                            node_active_gpu_ranks(other_node_id + 1) = other_active_gpu_ranks
+                        end if
+                    end if
+                end do
+
+                ! Give each populated node one worker, then hand out the
+                ! remaining workers round-robin up to the number of active
+                ! GPU ranks on that node.
+                remaining_workers = n_jacobian_workers
+                do i = 1, n_nodes
+                    if (node_active_gpu_ranks(i) > 0 .and. remaining_workers > 0) then
+                        workers_per_node(i) = 1
+                        remaining_workers = remaining_workers - 1
+                    end if
+                end do
+
+                do while (remaining_workers > 0)
+                    progress = 0
+                    do i = 1, n_nodes
+                        if (workers_per_node(i) < node_active_gpu_ranks(i)) then
+                            workers_per_node(i) = workers_per_node(i) + 1
+                            remaining_workers = remaining_workers - 1
+                            progress = 1
+                            if (remaining_workers == 0) exit
+                        end if
+                    end do
+                    if (progress == 0) exit
+                end do
+
+                my_node_active_gpu_ranks = topo%devcomm_node_size
+                my_node_nw = workers_per_node(my_node_id + 1)
+
+                if (remaining_workers > 0 .or. (my_node_nw > 0 .and. my_node_active_gpu_ranks <= 0) .or. &
+                    (topo%is_gpu_rank .and. (topo%gpu_slot_ordinal < 0 .or. &
+                     topo%gpu_slot_ordinal >= my_node_active_gpu_ranks))) then
+                    local_error = 1
                 else
-                    my_node_nw = wpn_base
-                    my_node_w0 = wpn_extra * (wpn_base + 1) + &
-                                 (my_node_id - wpn_extra) * wpn_base
+                    local_error = 0
+                end if
+                call MPI_Allreduce(local_error, global_error, 1, MPI_INTEGER, MPI_MAX, MPI_COMM, ierr)
+                if (global_error /= 0) then
+                    deallocate (all_worker_info, node_active_gpu_ranks, workers_per_node)
+                    status = 1
+                    si%SUBCOMM = MPI_COMM_NULL
+                    si%worker_id = -1
+                    split_ptr = c_loc(si)
+                    worker_id = si%worker_id
+                    return
                 end if
 
-                total_node_slots = topo%n_physical_gpus * max(topo%ranks_per_gpu, 1)
+                my_node_w0 = 0
+                do i = 1, my_node_id
+                    my_node_w0 = my_node_w0 + workers_per_node(i)
+                end do
 
-                ! Defence-in-depth: clamp in case n_workers exceeds
-                ! the node's device slots (Python rejects heterogeneous
-                ! topology, so this should not trigger in practice).
-                if (total_node_slots > 0 .and. my_node_nw > total_node_slots) then
-                    my_node_nw = total_node_slots
-                end if
-
-                if (topo%is_gpu_rank .and. total_node_slots > 0) then
-                    slot = topo%my_gpu_index * max(topo%ranks_per_gpu, 1) &
-                           + topo%rank_within_gpu
-                    color = my_node_w0 + slot * my_node_nw / total_node_slots
+                if (topo%is_gpu_rank) then
+                    ! gpu_topology owns the dense per-node GPU slot order.
+                    my_gpu_ordinal = topo%gpu_slot_ordinal
+                    color = my_node_w0 + my_gpu_ordinal * my_node_nw / my_node_active_gpu_ranks
                 else
                     ! Non-GPU rank: round-robin among this node's workers.
                     color = my_node_w0 + mod(topo%node_rank, my_node_nw)
                 end if
+
+                deallocate (all_worker_info, node_active_gpu_ranks, workers_per_node)
 #else
                 ! -- Rank-based fallback (MPI backend) ---------------
                 ! More workers than nodes: must split intra-node.

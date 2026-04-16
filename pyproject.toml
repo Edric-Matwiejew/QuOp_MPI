@@ -60,6 +60,7 @@ build.targets = [
     "wavefront_composite_propagator_f2py",
     "wavefront_momentum_propagator_f2py",
     "wavefront_sparse_propagator_f2py",
+    "wavefront_transverse_field_propagator_f2py",
 ]
 wheel.packages = ["src/quop_mpi"]
 

@@ -39,6 +39,7 @@ module gpu_topology
         integer(int32) :: my_gpu_index = 0
         integer(int32) :: assigned_device_id = 0
         integer(int32) :: rank_within_gpu = 0
+        integer(int32) :: gpu_slot_ordinal = -1
         type(visible_gpu_info_t), allocatable :: visible_gpus(:)
         integer(int32) :: cpu_numa_node = -1
         integer(int32) :: rank_within_cpu_numa = 0
