@@ -453,3 +453,131 @@ class TestParameterMapWithEvolveState:
             )
 
         alg.destroy()
+
+    def test_evolve_state_param_map_get_expectation_value(self, mpi_comm, simple_oracle):
+        """Verify get_expectation_value() works after evolve_state() with a parameter map."""
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_depth(1)
+
+        free_params = np.array([np.pi, oracle.optimal_walk_time])
+        alg.evolve_state(free_params)
+
+        result = alg.get_expectation_value()
+
+        if alg.subcomms.get_subcomm_index() == 0:
+            assert result is not None, "get_expectation_value() should return a value"
+            assert isinstance(result, (float, np.floating))
+            assert np.isfinite(result)
+            # With optimal Grover params, expectation should be below uniform
+            assert result < oracle.uniform_expectation()
+
+        alg.destroy()
+
+
+@pytest.mark.mpi
+class TestParameterMapWithEvaluate:
+    """Tests for parameter map with evaluate()."""
+
+    def test_param_map_with_evaluate(self, mpi_comm, simple_oracle):
+        """Verify evaluate() works with a parameter map."""
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_depth(1)
+        alg.prepare()
+
+        free_params = np.array([np.pi, oracle.optimal_walk_time])
+        result = alg.evaluate(free_params)
+
+        if alg.subcomms.in_subcomm():
+            assert result is not None
+            assert isinstance(result, (float, np.floating))
+            assert np.isfinite(result)
+
+        alg.destroy()
+
+
+@pytest.mark.mpi
+class TestParameterMapWithInitialState:
+    """Tests for parameter map combined with custom initial state."""
+
+    def test_param_map_with_custom_initial_state(self, mpi_comm, simple_oracle):
+        """Verify execute() works with both parameter map and custom initial state."""
+        from quop_mpi.algorithm.combinatorial import QWOA
+        from quop_mpi.state import equal
+
+        oracle = simple_oracle
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+        alg.set_initial_state(equal)
+
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_depth(1)
+
+        initial_params = np.array([np.pi, oracle.optimal_walk_time])
+        alg.execute(initial_params)
+
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+            assert len(alg.result["x"]) == 2
+            assert np.isfinite(alg.result["fun"])
+
+        alg.destroy()
+
+
+@pytest.mark.mpi
+class TestParameterMapGenInitialParams:
+    """Tests for gen_initial_params() with a parameter map active."""
+
+    def test_gen_initial_params_with_param_map(self, mpi_comm, simple_oracle):
+        """Verify gen_initial_params() returns n_free_params when a parameter map is set."""
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_depth(1)
+
+        alg.prepare()
+
+        params = alg.gen_initial_params()
+
+        if alg.subcomms.in_subcomm():
+            assert params is not None
+            assert (
+                len(params) == 2
+            ), f"gen_initial_params() should return n_free_params={2}, got {len(params)}"
+
+        alg.destroy()

@@ -350,3 +350,37 @@ class TestSetLogWithMultipleExecutions:
                 assert len(rows) >= n_runs, f"Expected at least {n_runs} rows, got {len(rows)}"
 
             alg.destroy()
+
+
+@pytest.mark.mpi
+class TestSetLogWithManualEvolution:
+    """Test logging interaction with evolve_state() instead of execute()."""
+
+    def test_log_with_manual_evolution(self, mpi_comm, simple_oracle):
+        """Verify that set_log + evolve_state does not crash.
+
+        When a user configures logging but calls evolve_state() instead of
+        execute(), the system should not error.  Logging entries are only
+        written by execute(), so the log file may remain empty or absent.
+        """
+        import numpy as np
+
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = os.path.join(tmpdir, "test_log.csv")
+
+            with QWOA(oracle.system_size, mpi_comm) as alg:
+                alg.set_qualities(oracle.qualities_function())
+                alg.set_log(log_path, "manual_evolve", action="w")
+                alg.set_depth(1)
+
+                params = oracle.optimal_params(depth=1)
+                alg.evolve_state(params)
+                exp_val = alg.get_expectation_value()
+
+                if alg.subcomms.in_subcomm():
+                    assert isinstance(exp_val, (float, np.floating))
+                    assert np.isfinite(exp_val)

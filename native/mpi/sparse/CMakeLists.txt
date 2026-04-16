@@ -39,15 +39,10 @@ quop_preprocess_fortran_source(
 add_library(chebyshev OBJECT "${_mpi_chebyshev_src}")
 target_link_libraries(chebyshev PUBLIC MPI::MPI_Fortran)
 add_dependencies(chebyshev sparse)
-target_include_directories(chebyshev PUBLIC ${CMAKE_Fortran_MODULE_DIRECTORY}/Sparse)
 
 add_library(mpi_sparse OBJECT mpi_sparse.f90)
 target_link_libraries(mpi_sparse PUBLIC MPI::MPI_Fortran)
 add_dependencies(mpi_sparse expm chebyshev one_norms sparse comm_info_mod)
-target_include_directories(
-  mpi_sparse PUBLIC ${CMAKE_Fortran_MODULE_DIRECTORY}/Sparse ${CMAKE_Fortran_MODULE_DIRECTORY}/One_Norms
-                    ${CMAKE_Fortran_MODULE_DIRECTORY}/Chebyshev
-)
 
 set(_depends
     mpi_sparse

@@ -59,7 +59,12 @@ profile_post_modules_env() {
 
     # Resolve full paths when the compiler lives under the Homebrew prefix.
     for var in CC CXX FC; do
-        local val="${!var}"
+        local val
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            val="${(P)var}"
+        else
+            val="${!var}"
+        fi
         if ! command -v "$val" >/dev/null 2>&1; then
             if [[ -x "$prefix/bin/$val" ]]; then
                 export "$var=$prefix/bin/$val"
@@ -126,7 +131,6 @@ profile_install_h5py() {
 profile_cmake_args() {
     cat <<ARGS
 -DCMAKE_C_COMPILER=${CC}
--DCMAKE_CXX_COMPILER=${CXX}
 -DCMAKE_Fortran_COMPILER=${FC}
 -DHDF5_ROOT=${HDF5_DIR}
 -DHDF5_NO_FIND_PACKAGE_CONFIG_FILE=TRUE
@@ -135,6 +139,5 @@ profile_cmake_args() {
 -DWAVEFRONT_BACKEND=OFF
 -DWITH_SHAFFT=OFF
 -DGPU_AWARE_MPI=OFF
--DCMAKE_BUILD_TYPE=Release
 ARGS
 }

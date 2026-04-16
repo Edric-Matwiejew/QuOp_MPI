@@ -71,16 +71,18 @@ class TestInterfaceWarnings:
         def serial_like(partition_table, MPI_COMM, function, *args, **kwargs):  # noqa: N803
             return function(*args, **kwargs)
 
+        interface = Interface(
+            [_BoundAttrs()],
+            serial_like,
+            "observable",
+            _FakeComm(),
+        )
+
         with pytest.warns(
             UserWarning,
             match="Interface 'observable': parameter 'function' not found",
         ):
-            Interface(
-                [_BoundAttrs()],
-                serial_like,
-                "observable",
-                _FakeComm(),
-            )
+            interface.update_parameters()
 
     def test_raises_when_explicit_positional_precedes_bindable_parameters(self):
         def invalid_observable(scale_factor, local_i, local_i_offset):

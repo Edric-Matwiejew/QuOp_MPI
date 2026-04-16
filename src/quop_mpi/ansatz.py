@@ -154,7 +154,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         MPI Intracomm, by default MPI.COMM_WORLD
     """
 
-    def __init__(self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD) -> None:  # noqa: N803
+    def __init__(
+        self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD  # noqa: N803
+    ) -> None:
         """Initialise an Ansatz instance.
 
         Parameters
@@ -760,7 +762,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             seeds the generation of random parameters
         """
         self.seed = seed
-    
+
     @scope("subcomm", returns="all")
     def get_state_norm(self) -> float:
         """Compute the norm of the wavefunction, should be 1 for a properly normalised state.
@@ -768,7 +770,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         Returns
         -------
         float
-            objective function value, or None on excluded ranks
+            state norm, or None on excluded ranks
         """
 
         if self.subcomms.get_subcomm_index() == 0:
@@ -778,16 +780,20 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         return self.subcomms.SUBCOMM.bcast(state_norm, root=0)
 
-
     @scope("subcomm", returns="all")
     def get_expectation_value(self) -> float:
-        """Compute the :term:`objective function` at the current
-        value of ``variational_parameters``.
+        """Compute the expectation value of the observables at the current
+        :term:`final state`.
+
+        This always computes the default expectation value
+        (probability-weighted sum of observables). It does **not** use any
+        custom objective set via :meth:`set_objective`; for that, use
+        :meth:`objective` or :meth:`execute`.
 
         Returns
         -------
         float
-            objective function value, or None on excluded ranks
+            expectation value, or None on excluded ranks
         """
 
         if self.subcomms.get_subcomm_index() == 0:
@@ -838,6 +844,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def objective(self, variational_parameters: list[float] | np.ndarray[float]) -> float:
         """Compute the :term:`objective function` at :term:`variational parameters`
         :literal:`variational_parameters`.
+
+        Requires a previous call to :meth:`~quop_mpi.ansatz.prepare`,
+        :meth:`~quop_mpi.ansatz.evolve_state` or
+        :meth:`~quop_mpi.ansatz.execute`.
 
         Parameters
         ----------
@@ -1084,15 +1094,23 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         function Jacobian.
         """
 
-        if self.optimiser is None:
-            # Inline the essential attribute assignments from
-            # set_optimiser() to avoid calling a world-scoped method
-            # from this subcomm-scoped context.
+        if self.optimiser_args is None:
+            self.optimiser_args = {"method": "BFGS", "options": {"gtol": 1e-3}}
+
+        if self.optimiser_log is None:
+            self.optimiser_log = ["fun", "nfev", "success"]
+
+        if (
+            self.optimiser is None
+            and self.subcomms.get_subcomm_index() == 0
+            and self.subcomms.SUBCOMM.Get_rank() == 0
+        ):
+            # Only the leader rank actually calls the optimiser. Worker
+            # subcommunicators participate only in objective/jacobian collectives,
+            # so avoid importing scipy.optimize there.
             from scipy.optimize import minimize as sp_minimize
 
             self.optimiser = sp_minimize
-            self.optimiser_args = {"method": "BFGS", "options": {"gtol": 1e-3}}
-            self.optimiser_log = ["fun", "nfev", "success"]
 
         # Configure parallel jacobian if requested (from Jacobian mixin)
         self._configure_parallel_jacobian()
@@ -1235,7 +1253,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         >>> alg.set_qualities(my_observables)
         >>> alg.prepare()  # Fully initialize
         >>> alg.print_all_bindable_attributes()  # Now shows actual values
-        >>> print(f"Observables range: {alg.local_observables.min():.2f} to {alg.local_observables.max():.2f}")
+        >>> print(
+        ...     f"Observables range: {alg.local_observables.min():.2f}"
+        ...     f" to {alg.local_observables.max():.2f}"
+        ... )
 
         Related methods: ``setup()`` for low-level setup and ``execute()`` to
         run optimization.
@@ -1358,18 +1379,15 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             x = np.array(x, dtype=np.float64)
 
         x = self.__to_full(x)  # apply parameter mapping if present
-
         self.context.state = self.ansatz_initial_state.astype(np.complex128)
         params_split = np.split(x, self.ansatz_depth)
 
         for params in params_split:
 
             for i, unitary in enumerate(self.unitaries):
-
                 param_slice = params[self.param_map[i] : self.param_map[i + 1]]
 
                 if unitary.operator_n_params > 0:
-
                     evolution_parameter = param_slice[: -unitary.operator_n_params]
 
                     unitary.variational_parameters = param_slice[unitary.unitary_n_params : :]
@@ -1391,13 +1409,22 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     @scope("subcomm", returns="all")
     def evaluate(self, variational_parameters: list[float] | np.ndarray[float]) -> float:
-        """Lazily computes the :term:`objective function` value.
+        """Lazily computes the expectation value.
 
         The :class:`~quop_mpi.ansatz` instance stores the last :term:`variational
-        parameters` passed to :literal:`evaluate` and the corresponding objective
-        function value. If the input variational parameters match,
+        parameters` passed to :literal:`evaluate` and the corresponding
+        expectation value. If the input variational parameters match,
         re-computation of the :term:`final state` is skipped and the previously
-        computed objective function value is returned.
+        computed value is returned.
+
+        This always computes the default expectation value
+        (probability-weighted sum of observables). It does **not** use any
+        custom objective set via :meth:`set_objective`; for that, use
+        :meth:`objective` or :meth:`execute`.
+
+        Requires a previous call to :meth:`~quop_mpi.ansatz.prepare`,
+        :meth:`~quop_mpi.ansatz.evolve_state` or
+        :meth:`~quop_mpi.ansatz.execute`.
 
         Parameters
         ----------
@@ -1408,7 +1435,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         Returns
         -------
         float
-            objective function value, or None on excluded ranks
+            expectation value, or None on excluded ranks
         """
 
         if not np.array_equal(self.last_evaluated, variational_parameters):
@@ -1449,9 +1476,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
             # Broadcast parameters over SUBCOMM only (excluded ranks skip)
             if self.subcomms.in_subcomm():
-                broadcast_parameters = self.subcomms.SUBCOMM.bcast(
-                    variational_parameters, root=0
-                )
+                broadcast_parameters = self.subcomms.SUBCOMM.bcast(variational_parameters, root=0)
                 self.variational_parameters = (
                     None
                     if broadcast_parameters is None
@@ -1465,34 +1490,44 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.in_subcomm():
 
+            self._parallel_jacobian_control_active = (
+                self.parallel_jacobian_enabled and self.subcomms.get_n_subcomms() > 1
+            )
             self.stop = False
             self.n_evolutions = 0
 
-            if self.subcomms.get_subcomm_index() == 0:
+            try:
+                if self.subcomms.get_subcomm_index() == 0:
 
-                self.objective_cnt = 0
+                    self.objective_cnt = 0
 
-                if self.subcomms.SUBCOMM.Get_rank() == 0:
-                    self.__execute_subcomm_group_zero()
+                    if self.subcomms.SUBCOMM.Get_rank() == 0:
+                        self.__execute_subcomm_group_zero()
+                    else:
+                        while not self.stop:
+                            self.__objective(None)
+
+                    self.__post()
+
+                    if self.log:
+                        self._log_update()
+
                 else:
                     while not self.stop:
-                        self.__objective(None)
+                        # JACCOMM already includes the optimiser root together with
+                        # all ranks of the worker subcommunicators, so worker ranks
+                        # can block directly on the jacobian broadcast without a
+                        # separate ROOTCOMM command relay.
+                        self._mpi_jacobian(None)
 
-                self.__post()
+                    self.__post()
 
-                if self.log:
-                    self._log_update()
-
-            else:
-                while not self.stop:
-                    self._mpi_jacobian(None)
-
-                self.__post()
-
-            # Broadcast results to all active ranks via SUBCOMM
-            self.result = self.subcomms.SUBCOMM.bcast(self.result, root=0)
-            self.quop_result = self.subcomms.SUBCOMM.bcast(self.quop_result, root=0)
-            self.state_norm = self.subcomms.SUBCOMM.bcast(self.state_norm, root=0)
+                # Broadcast results to all active ranks via SUBCOMM
+                self.result = self.subcomms.SUBCOMM.bcast(self.result, root=0)
+                self.quop_result = self.subcomms.SUBCOMM.bcast(self.quop_result, root=0)
+                self.state_norm = self.subcomms.SUBCOMM.bcast(self.state_norm, root=0)
+            finally:
+                self._parallel_jacobian_control_active = False
         else:
             # Excluded ranks: nothing to do, mark as stopped
             self.stop = True
@@ -1508,15 +1543,25 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         self.time = time()
 
-        self.result = self.optimiser(
-            self.__objective, self.variational_parameters, **self.optimiser_args
-        )
+        try:
+            self.result = self.optimiser(
+                self.__objective, self.variational_parameters, **self.optimiser_args
+            )
+        except Exception:
+            self.stop = True
+            try:
+                self.__objective(None)
+                if self._parallel_jacobian_control_active:
+                    self._mpi_jacobian(None)
+            finally:
+                self.time = time() - self.time
+            raise
 
         self.stop = True
 
         self.__objective(None)
 
-        if self.subcomms.get_n_subcomms() > 1:
+        if self._parallel_jacobian_control_active:
             self._mpi_jacobian(None)
 
         self.time = time() - self.time
@@ -1747,9 +1792,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if not self.stop:
 
-            broadcast_parameters = self.subcomms.SUBCOMM.bcast(
-                variational_parameters, root=0
-            )
+            broadcast_parameters = self.subcomms.SUBCOMM.bcast(variational_parameters, root=0)
             self.variational_parameters = np.asarray(broadcast_parameters, dtype=np.float64)
 
             self.__evolve_state(self.variational_parameters)

@@ -81,6 +81,7 @@ INSTALL_PREFIX=""
 CLEAN_MODE="none"
 WITH_DOCS="false"
 PACKAGE="false"
+QUOP_VERBOSE="false"
 
 # ---- Usage ------------------------------------------------------------------
 usage() {
@@ -105,6 +106,7 @@ Options:
                           install prefix (implies --with-docs)
   --clean                 Remove <prefix>/.cache before installing
   --veryclean             Remove <prefix>/.cache and <prefix>/.deps before installing
+  -v, --verbose           Show full build output (pip, cmake, f2py)
   -h, --help              Show this help message
 
 Examples:
@@ -137,7 +139,9 @@ cleanup_install_state() {
 
 ensure_python_build_requirements() {
     step "Ensuring Python build requirements"
-    python -m pip install --upgrade \
+    typeset -a _pip_quiet=()
+    if [[ "${QUOP_VERBOSE:-false}" != "true" ]]; then _pip_quiet=(--quiet); fi
+    python -m pip install "${_pip_quiet[@]}" --upgrade \
         pip \
         setuptools \
         wheel \
@@ -148,13 +152,15 @@ ensure_python_build_requirements() {
         "numpy>=2.0"
 
     if [[ "$(uname -s)" == "Linux" ]]; then
-        python -m pip install --upgrade auditwheel patchelf
+        python -m pip install "${_pip_quiet[@]}" --upgrade auditwheel patchelf
     fi
 }
 
 ensure_python_support_packages() {
     info "Ensuring Python support packages"
-    python -m pip install pytest-mpi scipy pandas networkx
+    typeset -a _pip_quiet=()
+    if [[ "${QUOP_VERBOSE:-false}" != "true" ]]; then _pip_quiet=(--quiet); fi
+    python -m pip install "${_pip_quiet[@]}" pytest-mpi scipy pandas networkx
 }
 
 validate_installed_package() {
@@ -178,6 +184,7 @@ while [[ $# -gt 0 ]]; do
         --package)    PACKAGE="true"; WITH_DOCS="true"; shift ;;
         --clean)      CLEAN_MODE="clean"; shift ;;
         --veryclean)  CLEAN_MODE="veryclean"; shift ;;
+        -v|--verbose) QUOP_VERBOSE="true"; shift ;;
         -h|--help)    usage 0               ;;
         *) echo "Error: unknown option '$1'"; usage 1 ;;
     esac
@@ -319,6 +326,8 @@ export QUOP_FETCHCONTENT_BASE_DIR="$FETCHCONTENT_BASE_DIR"
 export SKBUILD_BUILD_DIR
 export QUOP_SKBUILD_BUILD_DIR="$SKBUILD_BUILD_DIR"
 export QUOP_SKBUILD_BUILD_BASE="$SKBUILD_BUILD_DIR"
+export QUOP_VERBOSE
+if [[ "${QUOP_VERBOSE}" == "true" ]]; then export VERBOSE=1; fi
 
 # ---- Load modules -----------------------------------------------------------
 step "Loading modules"
@@ -432,7 +441,3 @@ info "Environment variables available after activation:"
 info "  QUOP_EXAMPLES_DIR    -- examples directory"
 info "  QUOP_BENCHMARKS_DIR  -- benchmarks directory"
 info "  QUOP_DOCS_DIR        -- documentation directory"
-info ""
-info "Standard-install note: if PYTHONPATH includes $PROJECT_ROOT/src, Python"
-info "will import the source checkout before site-packages. Unset that path"
-info "when checking the installed package."

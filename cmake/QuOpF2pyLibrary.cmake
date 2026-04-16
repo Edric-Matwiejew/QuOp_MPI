@@ -12,7 +12,26 @@ Provides
 
 include_guard(GLOBAL)
 
+# Generate a tiny helper script (once) that runs a command with output suppressed.
+# On failure it re-runs visibly so errors are still reported.
+set(_f2py_quiet_runner "${CMAKE_BINARY_DIR}/_f2py_quiet.cmake")
+file(WRITE "${_f2py_quiet_runner}" [=[
+execute_process(COMMAND ${F2PY_CMD} WORKING_DIRECTORY "${WORKDIR}" OUTPUT_QUIET ERROR_QUIET RESULT_VARIABLE _rc)
+if(NOT _rc EQUAL 0)
+  execute_process(COMMAND ${F2PY_CMD} WORKING_DIRECTORY "${WORKDIR}")
+  message(FATAL_ERROR "f2py failed (${_rc})")
+endif()
+]=])
+
 function(add_f2py_library)
+
+  # Suppress f2py chatter unless verbose build is requested.
+  set(_f2py_quiet_flag "--quiet")
+  set(_f2py_run_quiet TRUE)
+  if(CMAKE_VERBOSE_MAKEFILE)
+    set(_f2py_quiet_flag "")
+    set(_f2py_run_quiet FALSE)
+  endif()
   set(options "")
   set(oneValueArgs MODULE_NAME SRC INSTALL_SUBDIR)
   set(multiValueArgs DEPENDS DEFINITIONS INCLUDE_DIRS LIBRARIES)
@@ -41,24 +60,58 @@ function(add_f2py_library)
     ${F2PY_LIBRARY_INCLUDE_DIRS}
   )
 
-  add_custom_command(
-    OUTPUT "${module_pyf}"
-    COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py -h "${module_pyf}" -m "${F2PY_LIBRARY_MODULE_NAME}"
-            "${PREPROCESSED_SRC}" --overwrite-signature
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    DEPENDS "${PREPROCESSED_SRC}"
-    COMMENT "Generating .pyf file using numpy.f2py with preprocessed source"
-    VERBATIM
+  # -- Generate .pyf signature file --
+  set(_pyf_cmd
+    "${Python3_EXECUTABLE}" -m numpy.f2py ${_f2py_quiet_flag}
+    -h "${module_pyf}" -m "${F2PY_LIBRARY_MODULE_NAME}"
+    "${PREPROCESSED_SRC}" --overwrite-signature
   )
+  if(_f2py_run_quiet)
+    add_custom_command(
+      OUTPUT "${module_pyf}"
+      COMMAND "${CMAKE_COMMAND}" "-DF2PY_CMD=${_pyf_cmd}" "-DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}"
+              -P "${_f2py_quiet_runner}"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      DEPENDS "${PREPROCESSED_SRC}"
+      COMMENT "Generating .pyf file for ${F2PY_LIBRARY_MODULE_NAME}"
+      VERBATIM
+    )
+  else()
+    add_custom_command(
+      OUTPUT "${module_pyf}"
+      COMMAND ${_pyf_cmd}
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      DEPENDS "${PREPROCESSED_SRC}"
+      COMMENT "Generating .pyf file for ${F2PY_LIBRARY_MODULE_NAME}"
+      VERBATIM
+    )
+  endif()
 
-  add_custom_command(
-    OUTPUT "${module_f2py_wrapper}" "${module_f2py_c}"
-    COMMAND "${Python3_EXECUTABLE}" -m numpy.f2py --f2cmap "${f2py_cmap}" "${module_pyf}"
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    DEPENDS "${module_pyf}"
-    COMMENT "Generating Fortran f2py wrapper and C module"
-    VERBATIM
+  # -- Generate Fortran wrapper + C module from .pyf --
+  set(_wrapper_cmd
+    "${Python3_EXECUTABLE}" -m numpy.f2py ${_f2py_quiet_flag}
+    --f2cmap "${f2py_cmap}" "${module_pyf}"
   )
+  if(_f2py_run_quiet)
+    add_custom_command(
+      OUTPUT "${module_f2py_wrapper}" "${module_f2py_c}"
+      COMMAND "${CMAKE_COMMAND}" "-DF2PY_CMD=${_wrapper_cmd}" "-DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}"
+              -P "${_f2py_quiet_runner}"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      DEPENDS "${module_pyf}"
+      COMMENT "Generating f2py wrapper and C module for ${F2PY_LIBRARY_MODULE_NAME}"
+      VERBATIM
+    )
+  else()
+    add_custom_command(
+      OUTPUT "${module_f2py_wrapper}" "${module_f2py_c}"
+      COMMAND ${_wrapper_cmd}
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      DEPENDS "${module_pyf}"
+      COMMENT "Generating f2py wrapper and C module for ${F2PY_LIBRARY_MODULE_NAME}"
+      VERBATIM
+    )
+  endif()
 
   set(generate_f2py_target_name "generate_f2py_files_${F2PY_LIBRARY_MODULE_NAME}")
   add_custom_target(
@@ -151,6 +204,9 @@ function(add_f2py_library)
     "${f2py_target_name}" PUBLIC ${Python3_INCLUDE_DIRS} "${F2PY_INCLUDE_DIR}" ${Python3_NumPy_INCLUDE_DIRS}
                                  ${F2PY_LIBRARY_INCLUDE_DIRS} "${CMAKE_Fortran_MODULE_DIRECTORY}"
   )
+
+  # Suppress -Wformat in f2py-generated C code (uses %ld for long long).
+  target_compile_options("${f2py_target_name}" PRIVATE $<$<COMPILE_LANGUAGE:C>:-Wno-format>)
 
   target_link_libraries(
     "${f2py_target_name}" PRIVATE "${F2PY_LIBRARY_MODULE_NAME}module" "${F2PY_LIBRARY_MODULE_NAME}wrapper"

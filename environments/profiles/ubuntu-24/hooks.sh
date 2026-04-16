@@ -90,7 +90,7 @@ profile_post_modules_env() {
         export PATH="${ROCM_PATH}/bin${PATH:+:${PATH}}"
         export SHAFFT_PATH="${SHAFFT_PATH:-$(resolve_shafft_path || true)}"
 
-        local -a extra_ld_paths=("${ROCM_PATH}/lib")
+        typeset -a extra_ld_paths=("${ROCM_PATH}/lib")
         local extra_ld_path
         extra_ld_path="$(IFS=:; echo "${extra_ld_paths[*]}")"
         export LD_LIBRARY_PATH="${extra_ld_path}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
@@ -187,13 +187,11 @@ ${fftw_libdir_arg}
 -DOFFLOAD_ARCH=${OFFLOAD_ARCH}
 -DROCM_PATH=${ROCM_PATH}
 -DGPU_AWARE_MPI=OFF
--DCMAKE_BUILD_TYPE=${WAVEFRONT_BUILD_TYPE}
 ARGS
     else
         cmake_prefix_path="$(join_by_delimiter ';' "${HDF5_DIR}" "${FFTW_ROOT}")"
         cat <<ARGS
 -DCMAKE_C_COMPILER=${CC}
--DCMAKE_CXX_COMPILER=${CXX}
 -DCMAKE_Fortran_COMPILER=${FC}
 -DHDF5_ROOT=${HDF5_DIR}
 -DHDF5_NO_FIND_PACKAGE_CONFIG_FILE=TRUE
@@ -204,7 +202,6 @@ ${fftw_libdir_arg}
 -DWAVEFRONT_BACKEND=OFF
 -DWITH_SHAFFT=OFF
 -DGPU_AWARE_MPI=OFF
--DCMAKE_BUILD_TYPE=${MPI_BUILD_TYPE}
 ARGS
     fi
 }

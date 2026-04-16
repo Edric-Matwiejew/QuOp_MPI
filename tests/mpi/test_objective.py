@@ -190,7 +190,9 @@ class TestSetObjectiveWithFunctionDict:
         alg.set_qualities(oracle.qualities_function())
 
         # Objective that uses extra argument and does proper MPI reduction
-        def objective_with_offset(local_probabilities, local_observables, MPI_COMM, offset):  # noqa: N803
+        def objective_with_offset(
+            local_probabilities, local_observables, MPI_COMM, offset
+        ):  # noqa: N803
             local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + offset
@@ -220,7 +222,9 @@ class TestSetObjectiveWithFunctionDict:
         alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
 
-        def objective_with_weight(local_probabilities, local_observables, MPI_COMM, weight=1.0):  # noqa: N803
+        def objective_with_weight(
+            local_probabilities, local_observables, MPI_COMM, weight=1.0
+        ):  # noqa: N803
             local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return weight * global_exp
@@ -318,3 +322,129 @@ class TestSetObjectiveWithOptimization:
 
         alg_min.destroy()
         alg_max.destroy()
+
+
+@pytest.mark.mpi
+class TestSetObjectiveStandalone:
+    """Tests for standalone objective() calls and custom objective after evolve_state."""
+
+    def test_objective_standalone_call(self, mpi_comm, simple_oracle):
+        """Verify the public objective() method returns a valid value."""
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+        alg.set_depth(1)
+
+        alg.prepare()
+
+        params = oracle.optimal_params(depth=1)
+        value = alg.objective(params)
+
+        # objective() only returns a value on the root rank of subcomm 0
+        if alg.subcomms.get_subcomm_index() == 0:
+            if alg.subcomms.SUBCOMM.Get_rank() == 0:
+                assert value is not None
+                assert isinstance(value, (float, np.floating))
+                assert np.isfinite(value)
+            else:
+                assert value is None
+
+        alg.destroy()
+
+    def test_custom_objective_evolve_then_objective(self, mpi_comm, simple_oracle):
+        """Verify objective() uses the custom objective function.
+
+        get_expectation_value() always computes the default dot-product
+        regardless of set_objective(). Only objective() and execute() route
+        through the custom objective.
+        """
+        from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        offset = 10.0
+
+        def offset_objective(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
+            global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
+            return global_exp + offset
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+        alg.set_objective(offset_objective)
+        alg.set_depth(1)
+        alg.prepare()
+
+        params = oracle.optimal_params(depth=1)
+
+        # objective() should use the custom objective
+        obj_result = alg.objective(params)
+
+        # get_expectation_value() should use the default dot-product
+        default_result = alg.get_expectation_value()
+
+        if alg.subcomms.get_subcomm_index() == 0:
+            if alg.subcomms.SUBCOMM.Get_rank() == 0:
+                assert obj_result is not None
+                assert np.isfinite(obj_result)
+                # Custom objective adds the offset
+                assert (
+                    obj_result >= offset
+                ), f"objective() should include offset {offset}, got {obj_result}"
+
+            # get_expectation_value returns to all subcomm ranks
+            assert default_result is not None
+            assert np.isfinite(default_result)
+            # Default expectation value should be less than offset (it's a
+            # probability-weighted sum of Grover qualities in [0, 1])
+            assert (
+                default_result < offset
+            ), f"get_expectation_value() should ignore custom objective, got {default_result}"
+
+        alg.destroy()
+
+
+@pytest.mark.mpi
+class TestSetObjectiveWithParameterMap:
+    """Tests for combining set_objective with set_parameter_map."""
+
+    def test_param_map_with_custom_objective_execute(self, mpi_comm, simple_oracle):
+        """Verify execute() works with both parameter map and custom objective."""
+        from mpi4py import MPI
+
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        penalty = 0.5
+
+        def penalized_objective(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.dot(local_probabilities, local_observables)
+            global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
+            return global_exp + penalty
+
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+        alg.set_objective(penalized_objective)
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_depth(1)
+
+        initial_params = np.array([np.pi, oracle.optimal_walk_time])
+        alg.execute(initial_params)
+
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+            assert len(alg.result["x"]) == 2
+            # Result fun should include the penalty
+            assert alg.result["fun"] >= penalty
+
+        alg.destroy()

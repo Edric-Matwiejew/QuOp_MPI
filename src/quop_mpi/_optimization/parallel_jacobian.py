@@ -31,6 +31,9 @@ class Jacobian:
     to provide subcommunicator management (n_jacobian_workers, subcomms attributes).
     """
 
+    PARALLEL_JAC_COMMAND_EVALUATE = 1
+    PARALLEL_JAC_COMMAND_STOP = 2
+
     # Type hints for attributes provided by Ansatz and Communicator mixin
     if TYPE_CHECKING:
         MPI_COMM_WORLD: MPI.Intracomm
@@ -55,8 +58,10 @@ class Jacobian:
         self.jac_ranks: list[int] | None = None
         self.h: float = np.sqrt(np.finfo(float).eps)
         self.neval_mpi_jac: int = 0
-        self.var: int = -999  # Placeholder value to detect if it's not being set correctly
+        self.var: int = -999
         self.var_map: list[list[int]] | None = None
+        self.parallel_jacobian_enabled: bool = False
+        self._parallel_jacobian_control_active: bool = False
 
     @scope("world")
     def set_parallel_jacobian(
@@ -94,12 +99,20 @@ class Jacobian:
         if n_workers < 1:
             raise ValueError(f"n_workers must be >= 1, got {n_workers}")
 
+        from ..ansatz import _Dirty
+
+        previous_workers = self.n_jacobian_workers
+
         # Jacobian-specific attributes
         self.jacobian_input = [method]
         self.h = h if h is not None else np.sqrt(np.finfo(float).eps)
 
         # Communicator attribute (from Communicator mixin)
         self.n_jacobian_workers = n_workers
+
+        self._dirty |= _Dirty.OPTIMISER
+        if previous_workers != n_workers:
+            self._dirty |= _Dirty.WORKER_SPLIT
 
     @scope("world")
     def _update_var_map(self) -> None:
@@ -142,6 +155,7 @@ class Jacobian:
             if self.optimiser_args is None:
                 raise RuntimeError("optimiser_args must be configured before enabling jacobian.")
             self.optimiser_args["jac"] = self._mpi_jacobian
+            self.parallel_jacobian_enabled = True
             return True
         elif self.jacobian_input is not None:
             # User requested parallel jacobian but only 1 subcomm was created
@@ -154,8 +168,46 @@ class Jacobian:
                 RuntimeWarning,
                 stacklevel=2,
             )
+            self.parallel_jacobian_enabled = False
             return False
+        self.parallel_jacobian_enabled = False
         return False
+
+    @scope("subcomm")
+    def _signal_parallel_jacobian_command(self, command: int) -> None:
+        """Signal worker subcommunicators to enter the parallel jacobian path.
+
+        Commands are sent over ROOTCOMM from the optimizer subcomm leader and
+        relayed to each worker SUBCOMM leader.
+        """
+        if not self._parallel_jacobian_control_active:
+            return
+        if self.subcomms.get_n_subcomms() <= 1:
+            return
+        if self.subcomms.ROOTCOMM is None:
+            raise RuntimeError("ROOTCOMM is required for coordinated parallel jacobian execution.")
+        if self.subcomms.get_subcomm_index() != 0 or self.subcomms.SUBCOMM.Get_rank() != 0:
+            return
+
+        self.subcomms.ROOTCOMM.bcast(int(command), root=0)
+
+    @scope("subcomm")
+    def _await_parallel_jacobian_command(self) -> int | None:
+        """Wait for the optimizer leader to request jacobian work or shutdown."""
+        if not self._parallel_jacobian_control_active:
+            return None
+        if self.subcomms.get_subcomm_index() == 0:
+            return None
+        if self.subcomms.ROOTCOMM is None:
+            raise RuntimeError("ROOTCOMM is required for coordinated parallel jacobian execution.")
+
+        if self.subcomms.SUBCOMM.Get_rank() == 0:
+            command = self.subcomms.ROOTCOMM.bcast(None, root=0)
+        else:
+            command = None
+
+        command = self.subcomms.SUBCOMM.bcast(command, root=0)
+        return None if command is None else int(command)
 
     @scope("jaccomm")
     def _mpi_jacobian(self, x: np.ndarray[float] | None) -> np.ndarray[np.float64] | None:
@@ -178,11 +230,11 @@ class Jacobian:
         if self.subcomms.JACCOMM is None:
             return None
 
-        self.subcomms.JACCOMM.barrier()
+        rank = self.subcomms.JACCOMM.Get_rank()
+
         self.stop = self.subcomms.JACCOMM.bcast(self.stop, 0)
 
         if self.stop:
-            self.subcomms.JACCOMM.barrier()
             return
 
         broadcast_parameters = self.subcomms.JACCOMM.bcast(self.variational_parameters, 0)
@@ -194,7 +246,7 @@ class Jacobian:
 
         x = np.asarray(self.subcomms.JACCOMM.bcast(x, 0), dtype=np.float64)
 
-        if self.subcomms.JACCOMM.Get_rank() != 0:
+        if rank != 0:
             # When a parameter map is set, x contains the free parameters.
             # We keep variational_parameters as the free params so that
             # the jacobian functions perturb the correct indices.
@@ -202,14 +254,14 @@ class Jacobian:
             self.variational_parameters = x
 
         partials = []
-        if self.subcomms.JACCOMM.Get_rank() != 0:
+        if rank != 0:
             for var in self.var_map[self.subcomms.get_subcomm_index()]:
                 self.var = var
                 self.jacobian.update_parameters()
                 # Pass the parameter index - jacobian.call computes partial derivative
                 partials.append(self.jacobian.call())
 
-        if self.subcomms.JACCOMM.Get_rank() == 0:
+        if rank == 0:
             jacobian = np.zeros(self.n_free_params, dtype=np.float64)
             roots = self.subcomms.get_subcomm_roots()
             for root, mapping in zip(roots, self.var_map, strict=True):
@@ -228,10 +280,8 @@ class Jacobian:
         else:
             jacobian = None
 
-        self.subcomms.JACCOMM.barrier()
-
         if self.record_objective:
-            if self.subcomms.JACCOMM.Get_rank() == 0:
+            if rank == 0:
                 self.n_evolutions = self.subcomms.JACCOMM.reduce(
                     self.n_evolutions, op=MPI.SUM, root=0
                 )
@@ -239,7 +289,7 @@ class Jacobian:
                 self.subcomms.JACCOMM.reduce(self.n_evolutions, op=MPI.SUM, root=0)
                 self.n_evolutions = 0
 
-        if self.subcomms.JACCOMM.Get_rank() == 0:
+        if rank == 0:
 
             self.neval_mpi_jac += 1
             return jacobian

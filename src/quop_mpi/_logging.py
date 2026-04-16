@@ -247,37 +247,48 @@ class Logging:
 
         from quop_mpi._lib import parallel_io
 
+        file_name = ensure_path_and_extension(file_name, "h5")
+
         if self.subcomms.SUBCOMM.Get_rank() == 0:
 
             import h5py
 
             self.config_name = config_name
 
-            file_name = ensure_path_and_extension(file_name, "h5")
-            h5_file = h5py.File(file_name, action)
+            with h5py.File(file_name, action) as h5_file:
+                # If the config_name already exists in the target file, add an underscore.
+                duplicate = True
+                while duplicate:
+                    if self.config_name in h5_file:
+                        self.config_name += "_"
+                    else:
+                        duplicate = False
 
-            # If the config_name already exists in the target file, add an underscore.
-            duplicate = True
-            while duplicate:
-                if self.config_name in h5_file:
-                    self.config_name += "_"
-                else:
-                    duplicate = False
+                config = h5_file.create_group(self.config_name)
 
-            config = h5_file.create_group(self.config_name)
+                if self.result is not None:
+                    config.attrs["minimize_result"] = str(self.result)
 
-            if self.result is not None:
-                config.attrs["minimize_result"] = str(self.result)
+                h5_file.create_dataset(
+                    f"{self.config_name}/initial_phases",
+                    data=self.variational_parameters,
+                    dtype=np.float64,
+                )
+                h5_file.flush()
 
-            h5_file.create_dataset(
-                f"{self.config_name}/initial_phases",
-                data=self.variational_parameters,
-                dtype=np.float64,
-            )
-            h5_file.close()
+                # Make the serial metadata update durable before the subcomm
+                # reopens the file via parallel HDF5.
+                try:
+                    file_handle = h5_file.id.get_vfd_handle()
+                except (AttributeError, OSError, ValueError):
+                    file_handle = None
+
+                if isinstance(file_handle, int):
+                    os.fsync(file_handle)
         else:
             self.config_name = None
 
+        self.subcomms.SUBCOMM.barrier()
         file_name = self.subcomms.SUBCOMM.bcast(file_name, root=0)
         self.config_name = self.subcomms.SUBCOMM.bcast(self.config_name, root=0)
 

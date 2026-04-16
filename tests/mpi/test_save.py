@@ -613,11 +613,14 @@ class TestParallelIODataIntegrity:
         system_size = save_partition_system_size
 
         # Use rank-identifiable values
+        # Encode as rank * system_size + global_index so modular decode works
+        # for any system_size (the old hardcoded 1000 broke when system_size > 1000).
+        stride = system_size
+
         def qualities(local_i, local_i_offset):
             rank = mpi_comm.Get_rank()
-            # Mark with rank * 1000 + position for easy identification
             return np.array(
-                [rank * 1000 + local_i_offset + i for i in range(local_i)],
+                [rank * stride + local_i_offset + i for i in range(local_i)],
                 dtype=np.float64,
             )
 
@@ -639,11 +642,10 @@ class TestParallelIODataIntegrity:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
                 saved_obs = np.array(f[config_name]["observables"]).view(np.float64)
 
-                # Verify the structure matches expected rank contributions
-                # Each element should encode: rank * 1000 + global_index
+                # Each element encodes: rank * system_size + global_index
                 for i in range(system_size):
                     val = saved_obs[i]
-                    encoded_index = int(val) % 1000
+                    encoded_index = int(val) % stride
 
                     assert (
                         encoded_index == i
@@ -651,9 +653,7 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_complex_data_real_imag_preserved(
-        self, mpi_comm, temp_h5_file, save_small_system_size
-    ):
+    def test_complex_data_real_imag_preserved(self, mpi_comm, temp_h5_file, save_small_system_size):
         """Verify complex state data preserves both real and imaginary parts."""
         import h5py
 
@@ -793,9 +793,7 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_initial_state_parallel_save(
-        self, mpi_comm, temp_h5_file, save_medium_system_size
-    ):
+    def test_initial_state_parallel_save(self, mpi_comm, temp_h5_file, save_medium_system_size):
         """Verify initial_state is correctly saved in parallel."""
         import h5py
 
@@ -830,9 +828,7 @@ class TestParallelIODataIntegrity:
 
         alg.destroy()
 
-    def test_multiple_configs_independent(
-        self, mpi_comm, temp_h5_file, save_small_system_size
-    ):
+    def test_multiple_configs_independent(self, mpi_comm, temp_h5_file, save_small_system_size):
         """Verify multiple saved configs don't interfere with each other."""
         import h5py
 
@@ -881,5 +877,37 @@ class TestParallelIODataIntegrity:
                 ]:
                     probs = np.abs(state) ** 2
                     assert np.isclose(np.sum(probs), 1.0, rtol=1e-10), f"{name} not normalized"
+
+        alg.destroy()
+
+
+@pytest.mark.mpi
+class TestSaveAfterEvolveState:
+    """Verify save() works when called after evolve_state() without execute()."""
+
+    def test_save_after_evolve_state(self, mpi_comm, simple_oracle, temp_h5_file):
+        """Users should be able to evolve_state() and then save() directly."""
+        import h5py
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+
+        params = simple_oracle.optimal_params(depth=1)
+        alg.evolve_state(params)
+        alg.save(temp_h5_file, "evolve_only")
+
+        mpi_comm.barrier()
+
+        if mpi_comm.Get_rank() == 0:
+            assert os.path.exists(temp_h5_file + ".h5")
+            with h5py.File(temp_h5_file + ".h5", "r") as f:
+                assert "evolve_only" in f
+                assert "final_state" in f["evolve_only"]
+                state = np.array(f["evolve_only"]["final_state"]).view(np.complex128)
+                probs = np.abs(state) ** 2
+                assert np.isclose(np.sum(probs), 1.0, rtol=1e-10)
 
         alg.destroy()

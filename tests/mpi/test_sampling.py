@@ -593,3 +593,56 @@ class TestSamplingEdgeCases:
             assert alg.result is not None
 
         alg.destroy()
+
+
+@pytest.mark.mpi
+class TestSamplingCombinations:
+    """Tests for sampling combined with manual evolution and parameter map."""
+
+    def test_sampling_after_evolve_state(self, mpi_comm, simple_oracle):
+        """Verify evolve_state + get_expectation_value works with sampling enabled."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_sampling(sample_block_size=50)
+        alg.set_depth(1)
+
+        params = simple_oracle.optimal_params(depth=1)
+        alg.evolve_state(params)
+
+        result = alg.get_expectation_value()
+
+        if alg.subcomms.get_subcomm_index() == 0:
+            assert result is not None
+            assert isinstance(result, (float, np.floating))
+            assert np.isfinite(result)
+
+        alg.destroy()
+
+    def test_sampling_with_param_map_execute(self, mpi_comm, simple_oracle):
+        """Verify execute() works with both sampling and parameter map."""
+        from quop_mpi.algorithm.combinatorial import QWOA
+
+        oracle = simple_oracle
+
+        alg = QWOA(oracle.system_size, mpi_comm)
+        alg.set_qualities(oracle.qualities_function())
+        alg.set_sampling(sample_block_size=50)
+
+        def parameter_map(ansatz_depth, total_params, free_vec):
+            gamma, t = free_vec
+            return np.tile([gamma, t], ansatz_depth)
+
+        alg.set_parameter_map(2, parameter_map)
+        alg.set_depth(1)
+
+        initial_params = np.array([np.pi, oracle.optimal_walk_time])
+        alg.execute(initial_params)
+
+        if mpi_comm.Get_rank() == 0:
+            assert alg.result is not None
+            assert len(alg.result["x"]) == 2
+            assert np.isfinite(alg.result["fun"])
+
+        alg.destroy()

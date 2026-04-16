@@ -1,4 +1,5 @@
 from . import algorithm, config, observable, param, propagator, state, toolkit
+from ._profile import profiler as _profiler  # noqa: F401  # side-effect: enables tracing
 from ._utils._deprecation import deprecated_alias_getattr
 from .ansatz import Ansatz
 from .unitary import UnitaryBase

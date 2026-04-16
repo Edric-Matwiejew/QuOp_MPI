@@ -332,9 +332,7 @@ class TestEvolveStateCorrectness:
             theoretical = oracle.theoretical_success_probability(depth)
 
             # Should match theoretical Grover probability
-            assert (
-                abs(marked_prob - theoretical) < 0.02
-            ), (
+            assert abs(marked_prob - theoretical) < 0.02, (
                 f"Optimal params should match theory: "
                 f"got {marked_prob:.4f}, expected {theoretical:.4f}"
             )
@@ -423,3 +421,37 @@ class TestEvolveStateCorrectness:
                 assert (
                     abs(concentrations[i] - theoretical) < 0.02
                 ), f"Depth {depth}: got {concentrations[i]:.4f}, expected {theoretical:.4f}"
+
+
+@pytest.mark.mpi
+class TestPostExecuteInspection:
+    """Verify state inspection after execute() completes."""
+
+    def test_post_execute_state_inspection(self, mpi_comm, simple_oracle):
+        """After execute(), the final state, probabilities, and expectation
+        value should all be accessible and consistent."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_depth(1)
+
+            alg.execute()
+
+            # Final state should be populated
+            assert alg.final_state is not None
+            assert len(alg.final_state) > 0
+
+            # Probabilities should be valid
+            local_probs = np.abs(alg.final_state) ** 2
+            assert np.all(local_probs >= 0)
+
+            # Expectation value should be finite
+            exp_val = alg.get_expectation_value()
+            assert isinstance(exp_val, float)
+            assert np.isfinite(exp_val)
+
+            # Result should be available on rank 0
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+                assert np.isfinite(alg.result["fun"])

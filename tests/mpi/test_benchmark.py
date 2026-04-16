@@ -13,7 +13,6 @@ Run with: mpiexec -n 2 python -m pytest tests/mpi/test_benchmark.py -v --with-mp
 
 import math
 import os
-import sys
 import tempfile
 
 import numpy as np
@@ -67,6 +66,44 @@ def _make_single_marked_oracle(marked_state):
 _cached_wavefront_devcomm_size = None
 
 
+def _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers):
+    """Skip multi-worker wavefront tests on heterogeneous per-node GPU slots.
+
+    The wavefront backend requires the same number of device-rank slots on
+    every node when splitting into multiple worker subcommunicators.
+    """
+    if config.backend != "wavefront" or n_workers <= 1:
+        return
+
+    from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+
+    from quop_mpi._utils._comm_size import _unwrap_pointer_status
+
+    backend_flag = 1
+    topo_ptr = _unwrap_pointer_status(
+        _ciw.wrapper_discover_topology(mpi_comm.py2f(), backend_flag),
+        "discover_topology",
+    )
+    try:
+        n_gpus, ranks_per_gpu, _ = _ciw.wrapper_get_topology_info(topo_ptr)
+        device_slots = int(n_gpus) * max(int(ranks_per_gpu), 1)
+    finally:
+        _ciw.wrapper_destroy_topology(topo_ptr)
+
+    local_slots = np.array([device_slots], dtype=np.int32)
+    min_slots = np.zeros(1, dtype=np.int32)
+    max_slots = np.zeros(1, dtype=np.int32)
+    mpi_comm.Allreduce(local_slots, min_slots, op=MPI.MIN)
+    mpi_comm.Allreduce(local_slots, max_slots, op=MPI.MAX)
+
+    if min_slots[0] != max_slots[0]:
+        pytest.skip(
+            "Wavefront parallel-jacobian benchmarks require uniform GPU "
+            f"device slots per node, but this job spans nodes with "
+            f"{min_slots[0]} to {max_slots[0]} slots."
+        )
+
+
 def _probe_wavefront_devcomm_size(mpi_comm):
     """Return the global DEVCOMM size for wavefront worker-layout checks."""
     global _cached_wavefront_devcomm_size
@@ -74,6 +111,7 @@ def _probe_wavefront_devcomm_size(mpi_comm):
         return _cached_wavefront_devcomm_size
 
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+
     from quop_mpi._utils._comm_size import QuopMpiLayout
 
     backend_flag = 1  # wavefront
@@ -113,68 +151,60 @@ class TestBenchmarkBasic:
         """Verify benchmark runs to completion without error."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        # Run benchmark with minimal settings
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
-
-        alg.destroy()
+            # Run benchmark with minimal settings
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
     def test_benchmark_with_multiple_depths(self, mpi_comm, simple_oracle):
         """Verify benchmark runs across multiple depths."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=1,
-            verbose=False,
-        )
-
-        alg.destroy()
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=1,
+                verbose=False,
+            )
 
     def test_benchmark_with_multiple_repeats(self, mpi_comm, simple_oracle):
         """Verify benchmark runs multiple repeats at each depth."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=3,
-            verbose=False,
-        )
-
-        alg.destroy()
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=3,
+                verbose=False,
+            )
 
     def test_benchmark_sets_benchmarking_flag_during_run(self, mpi_comm, simple_oracle):
         """Verify benchmarking flag is set during benchmark."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        # Before benchmark
-        assert not alg.benchmarking
+            # Before benchmark
+            assert not alg.benchmarking
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        # After benchmark completes, flag should be reset
-        assert not alg.benchmarking
-
-        alg.destroy()
+            # After benchmark completes, flag should be reset
+            assert not alg.benchmarking
 
 
 @pytest.mark.mpi
@@ -185,64 +215,58 @@ class TestBenchmarkResults:
         """Verify benchmark produces a result."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        # Result should be set
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            # Result should be set
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
     def test_benchmark_tracker_has_results(self, mpi_comm, simple_oracle):
         """Verify tracker accumulates results."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=2,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=2,
+                verbose=False,
+            )
 
-        # Tracker should have results for each depth
-        results = alg.tracker.get_results()
+            # Tracker should have results for each depth
+            results = alg.tracker.get_results()
 
-        if mpi_comm.Get_rank() == 0:
-            assert len(results[1]) == 2  # 2 repeats at depth 1
-            assert len(results[2]) == 2  # 2 repeats at depth 2
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert len(results[1]) == 2  # 2 repeats at depth 1
+                assert len(results[2]) == 2  # 2 repeats at depth 2
 
     def test_benchmark_results_contain_fun(self, mpi_comm, simple_oracle):
         """Verify results contain objective function values."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=2,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=2,
+                verbose=False,
+            )
 
-        results = alg.tracker.get_results()
+            results = alg.tracker.get_results()
 
-        if mpi_comm.Get_rank() == 0:
-            for result in results[1]:
-                assert "fun" in result
-                assert np.isfinite(result["fun"])
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                for result in results[1]:
+                    assert "fun" in result
+                    assert np.isfinite(result["fun"])
 
 
 @pytest.mark.mpi
@@ -253,39 +277,35 @@ class TestBenchmarkParamPersist:
         """Verify benchmark works with param_persist=False."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=1,
-            param_persist=False,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=1,
+                param_persist=False,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
     def test_benchmark_param_persist_true(self, mpi_comm, simple_oracle):
         """Verify benchmark works with param_persist=True."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=2,
-            param_persist=True,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=2,
+                param_persist=True,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
 
 @pytest.mark.mpi
@@ -296,40 +316,36 @@ class TestBenchmarkWithQWOA:
         """Verify benchmark works with QWOA."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        alg = QWOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QWOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
     def test_qwoa_benchmark_multiple_depths(self, mpi_comm, simple_oracle):
         """Verify QWOA benchmark works with multiple depths."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        alg = QWOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QWOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=1,
+                verbose=False,
+            )
 
-        results = alg.tracker.get_results()
+            results = alg.tracker.get_results()
 
-        if mpi_comm.Get_rank() == 0:
-            assert len(results[1]) == 1
-            assert len(results[2]) == 1
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert len(results[1]) == 1
+                assert len(results[2]) == 1
 
 
 @pytest.mark.mpi
@@ -342,32 +358,30 @@ class TestBenchmarkSaveResults:
 
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filename = os.path.join(tmpdir, "benchmark_test")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                filename = os.path.join(tmpdir, "benchmark_test")
 
-            alg.benchmark(
-                ansatz_depths=[1],
-                repeats=1,
-                verbose=False,
-                filename=filename,
-                label="test",
-            )
+                alg.benchmark(
+                    ansatz_depths=[1],
+                    repeats=1,
+                    verbose=False,
+                    filename=filename,
+                    label="test",
+                )
 
-            mpi_comm.barrier()
+                mpi_comm.barrier()
 
-            # Check file was created
-            h5_file = filename + ".h5"
-            if mpi_comm.Get_rank() == 0:
-                assert os.path.exists(h5_file)
+                # Check file was created
+                h5_file = filename + ".h5"
+                if mpi_comm.Get_rank() == 0:
+                    assert os.path.exists(h5_file)
 
-                # Verify file contents
-                with h5py.File(h5_file, "r") as f:
-                    assert "test_1_1" in f
-
-        alg.destroy()
+                    # Verify file contents
+                    with h5py.File(h5_file, "r") as f:
+                        assert "test_1_1" in f
 
     def test_benchmark_saves_multiple_runs(self, mpi_comm, simple_oracle):
         """Verify benchmark saves all runs to HDF5 file."""
@@ -375,32 +389,30 @@ class TestBenchmarkSaveResults:
 
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            filename = os.path.join(tmpdir, "benchmark_test")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                filename = os.path.join(tmpdir, "benchmark_test")
 
-            alg.benchmark(
-                ansatz_depths=[1, 2],
-                repeats=2,
-                verbose=False,
-                filename=filename,
-                label="multi",
-            )
+                alg.benchmark(
+                    ansatz_depths=[1, 2],
+                    repeats=2,
+                    verbose=False,
+                    filename=filename,
+                    label="multi",
+                )
 
-            mpi_comm.barrier()
+                mpi_comm.barrier()
 
-            h5_file = filename + ".h5"
-            if mpi_comm.Get_rank() == 0:
-                with h5py.File(h5_file, "r") as f:
-                    # Should have entries for all depth/repeat combos
-                    assert "multi_1_1" in f
-                    assert "multi_1_2" in f
-                    assert "multi_2_1" in f
-                    assert "multi_2_2" in f
-
-        alg.destroy()
+                h5_file = filename + ".h5"
+                if mpi_comm.Get_rank() == 0:
+                    with h5py.File(h5_file, "r") as f:
+                        # Should have entries for all depth/repeat combos
+                        assert "multi_1_1" in f
+                        assert "multi_1_2" in f
+                        assert "multi_2_1" in f
+                        assert "multi_2_2" in f
 
 
 @pytest.mark.mpi
@@ -411,22 +423,20 @@ class TestBenchmarkDepthRestoration:
         """Verify original ansatz depth is restored after benchmark."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_depth(3)  # Set initial depth
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_depth(3)  # Set initial depth
 
-        original_depth = alg.ansatz_depth
+            original_depth = alg.ansatz_depth
 
-        alg.benchmark(
-            ansatz_depths=[1, 2, 4],  # Different depths
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2, 4],  # Different depths
+                repeats=1,
+                verbose=False,
+            )
 
-        # Depth should be restored
-        assert alg.ansatz_depth == original_depth
-
-        alg.destroy()
+            # Depth should be restored
+            assert alg.ansatz_depth == original_depth
 
 
 @pytest.mark.mpi
@@ -440,26 +450,24 @@ class TestBenchmarkVerbose:
 
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        # Capture stdout to suppress output
-        old_stdout = sys.stdout
-        sys.stdout = io.StringIO()
+            # Capture stdout to suppress output
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
 
-        try:
-            alg.benchmark(
-                ansatz_depths=[1],
-                repeats=1,
-                verbose=True,
-            )
-        finally:
-            sys.stdout = old_stdout
+            try:
+                alg.benchmark(
+                    ansatz_depths=[1],
+                    repeats=1,
+                    verbose=True,
+                )
+            finally:
+                sys.stdout = old_stdout
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
 
 @pytest.mark.mpi
@@ -469,15 +477,10 @@ class TestBenchmarkSeed:
     def test_benchmark_uses_algorithm_seed(self, mpi_comm, simple_oracle):
         """Verify benchmark uses the algorithm's seed."""
         import quop_mpi._benchmark as benchmark_module
-
-        from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi._utils._tracker import JobTracker as BaseJobTracker
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         initial_seed = 12345
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.setup()
-        alg.set_seed(initial_seed)
         init_seeds = []
         requested_seeds = []
 
@@ -494,20 +497,23 @@ class TestBenchmarkSeed:
         original_tracker = benchmark_module.JobTracker
         benchmark_module.JobTracker = RecordingJobTracker
         try:
-            alg.benchmark(
-                ansatz_depths=[1, 2],
-                repeats=2,
-                verbose=False,
-            )
+            with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+                alg.set_qualities(simple_oracle.qualities_function())
+                alg.setup()
+                alg.set_seed(initial_seed)
+
+                alg.benchmark(
+                    ansatz_depths=[1, 2],
+                    repeats=2,
+                    verbose=False,
+                )
+
+                expected_calls = list(range(initial_seed, initial_seed + 4))
+                assert init_seeds == [initial_seed]
+                assert requested_seeds == expected_calls
+                assert alg.tracker.seed == initial_seed + len(expected_calls)
         finally:
             benchmark_module.JobTracker = original_tracker
-
-        expected_calls = list(range(initial_seed, initial_seed + 4))
-        assert init_seeds == [initial_seed]
-        assert requested_seeds == expected_calls
-        assert alg.tracker.seed == initial_seed + len(expected_calls)
-
-        alg.destroy()
 
     def test_benchmark_reproducible_with_seed(self, mpi_comm, simple_oracle):
         """Verify benchmark is reproducible with same seed."""
@@ -516,40 +522,36 @@ class TestBenchmarkSeed:
         seed = 42
 
         # First run
-        alg1 = QAOA(simple_oracle.system_size, mpi_comm)
-        alg1.set_qualities(simple_oracle.qualities_function())
-        alg1.set_seed(seed)
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg1:
+            alg1.set_qualities(simple_oracle.qualities_function())
+            alg1.set_seed(seed)
 
-        alg1.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            alg1.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        result1 = None
-        if mpi_comm.Get_rank() == 0:
-            result1 = alg1.result["fun"]
-        result1 = mpi_comm.bcast(result1, root=0)
-
-        alg1.destroy()
+            result1 = None
+            if mpi_comm.Get_rank() == 0:
+                result1 = alg1.result["fun"]
+            result1 = mpi_comm.bcast(result1, root=0)
 
         # Second run with same seed
-        alg2 = QAOA(simple_oracle.system_size, mpi_comm)
-        alg2.set_qualities(simple_oracle.qualities_function())
-        alg2.set_seed(seed)
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg2:
+            alg2.set_qualities(simple_oracle.qualities_function())
+            alg2.set_seed(seed)
 
-        alg2.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            alg2.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        result2 = None
-        if mpi_comm.Get_rank() == 0:
-            result2 = alg2.result["fun"]
-        result2 = mpi_comm.bcast(result2, root=0)
-
-        alg2.destroy()
+            result2 = None
+            if mpi_comm.Get_rank() == 0:
+                result2 = alg2.result["fun"]
+            result2 = mpi_comm.bcast(result2, root=0)
 
         # Results should be identical
         assert np.isclose(result1, result2)
@@ -563,59 +565,53 @@ class TestBenchmarkEdgeCases:
         """Test minimal benchmark: 1 depth, 1 repeat."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
     def test_benchmark_deep_circuit(self, mpi_comm, simple_oracle):
         """Test benchmark with deeper circuit."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1, 2, 3],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2, 3],
+                repeats=1,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-            # Last result should have more parameters
-            assert len(alg.result["x"]) == 6  # 2 params per layer * 3 layers
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+                # Last result should have more parameters
+                assert len(alg.result["x"]) == 6  # 2 params per layer * 3 layers
 
     def test_benchmark_non_sequential_depths(self, mpi_comm, simple_oracle):
         """Test benchmark with non-sequential depths."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        # Note: benchmark uses max of ansatz_depths, not the actual list
-        # This tests that the internal handling works
-        alg.benchmark(
-            ansatz_depths=[2],  # Start at depth 2
-            repeats=1,
-            verbose=False,
-        )
+            # Note: benchmark uses max of ansatz_depths, not the actual list
+            # This tests that the internal handling works
+            alg.benchmark(
+                ansatz_depths=[2],  # Start at depth 2
+                repeats=1,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
 
 @pytest.mark.mpi
@@ -626,24 +622,22 @@ class TestBenchmarkTimeLimit:
         """Verify benchmark with large time limit completes normally."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            suspend_path = os.path.join(tmpdir, "suspend")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                suspend_path = os.path.join(tmpdir, "suspend")
 
-            alg.benchmark(
-                ansatz_depths=[1],
-                repeats=1,
-                verbose=False,
-                time_limit=3600,  # 1 hour - should not trigger suspend
-                suspend_path=suspend_path,
-            )
+                alg.benchmark(
+                    ansatz_depths=[1],
+                    repeats=1,
+                    verbose=False,
+                    time_limit=3600,  # 1 hour - should not trigger suspend
+                    suspend_path=suspend_path,
+                )
 
-            if mpi_comm.Get_rank() == 0:
-                assert alg.result is not None
-
-        alg.destroy()
+                if mpi_comm.Get_rank() == 0:
+                    assert alg.result is not None
 
 
 @pytest.mark.mpi
@@ -654,56 +648,52 @@ class TestBenchmarkMPIConsistency:
         """Verify the final benchmark result is consistent across active ranks."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=2,
-            verbose=False,
-        )
-
-        local_result = None
-        if alg.subcomms.in_subcomm():
-            assert alg.result is not None
-            local_result = (
-                float(alg.result["fun"]),
-                np.asarray(alg.result["x"], dtype=np.float64),
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=2,
+                verbose=False,
             )
 
-        gathered = mpi_comm.gather(local_result, root=0)
+            local_result = None
+            if alg.subcomms.in_subcomm():
+                assert alg.result is not None
+                local_result = (
+                    float(alg.result["fun"]),
+                    np.asarray(alg.result["x"], dtype=np.float64),
+                )
 
-        if mpi_comm.Get_rank() == 0:
-            active_results = [result for result in gathered if result is not None]
-            assert active_results
-            reference_fun, reference_x = active_results[0]
-            for fun, x in active_results[1:]:
-                assert np.isclose(fun, reference_fun)
-                np.testing.assert_allclose(x, reference_x)
+            gathered = mpi_comm.gather(local_result, root=0)
 
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                active_results = [result for result in gathered if result is not None]
+                assert active_results
+                reference_fun, reference_x = active_results[0]
+                for fun, x in active_results[1:]:
+                    assert np.isclose(fun, reference_fun)
+                    np.testing.assert_allclose(x, reference_x)
 
     def test_benchmark_tracker_complete_all_ranks(self, mpi_comm, simple_oracle):
         """Verify tracker reports complete on all ranks."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=2,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=2,
+                verbose=False,
+            )
 
-        # All ranks should agree tracker is complete
-        local_complete = alg.tracker.complete
-        all_complete = mpi_comm.gather(local_complete, root=0)
+            # All ranks should agree tracker is complete
+            local_complete = alg.tracker.complete
+            all_complete = mpi_comm.gather(local_complete, root=0)
 
-        if mpi_comm.Get_rank() == 0:
-            assert all(c for c in all_complete)
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert all(c for c in all_complete)
 
 
 @pytest.mark.mpi
@@ -714,73 +704,67 @@ class TestBenchmarkWithSampling:
         """Verify benchmark works with sampling enabled."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_sampling(
-            max_sample_iterations=3,
-            sample_block_size=5,
-        )
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_sampling(
+                max_sample_iterations=3,
+                sample_block_size=5,
+            )
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=2,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=2,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
     def test_benchmark_sampling_tracks_shots(self, mpi_comm, simple_oracle):
         """Verify sampling during benchmark tracks total shots."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_sampling(
-            max_sample_iterations=2,
-            sample_block_size=10,
-        )
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_sampling(
+                max_sample_iterations=2,
+                sample_block_size=10,
+            )
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        # total_shots should have been incremented during sampling
-        if mpi_comm.Get_rank() == 0:
-            # After benchmark, sampling was used
-            assert alg.result is not None
-
-        alg.destroy()
+            # total_shots should have been incremented during sampling
+            if mpi_comm.Get_rank() == 0:
+                # After benchmark, sampling was used
+                assert alg.result is not None
 
     def test_benchmark_sampling_with_multiple_depths(self, mpi_comm, simple_oracle):
         """Verify benchmark with sampling works across multiple depths."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_sampling(
-            max_sample_iterations=2,
-            sample_block_size=5,
-        )
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_sampling(
+                max_sample_iterations=2,
+                sample_block_size=5,
+            )
 
-        alg.benchmark(
-            ansatz_depths=[1, 2, 3],
-            repeats=1,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2, 3],
+                repeats=1,
+                verbose=False,
+            )
 
-        # Should have results for all depths
-        results = alg.tracker.get_results()
-        if mpi_comm.Get_rank() == 0:
-            assert len(results[1]) == 1
-            assert len(results[2]) == 1
-            assert len(results[3]) == 1
-
-        alg.destroy()
+            # Should have results for all depths
+            results = alg.tracker.get_results()
+            if mpi_comm.Get_rank() == 0:
+                assert len(results[1]) == 1
+                assert len(results[2]) == 1
+                assert len(results[3]) == 1
 
 
 @pytest.mark.mpi
@@ -817,29 +801,27 @@ class TestBenchmarkWithParameterMap:
                 full_params[layer * total_params + 1] = t  # Walk time
             return full_params
 
-        alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(_make_single_marked_oracle(marked_state))
+        with QWOA(system_size, mpi_comm) as alg:
+            alg.set_qualities(_make_single_marked_oracle(marked_state))
 
-        # Set up parameter map - n_free_params=2 for [gamma, t]
-        alg.set_parameter_map(2, parameter_map)
+            # Set up parameter map - n_free_params=2 for [gamma, t]
+            alg.set_parameter_map(2, parameter_map)
 
-        # Initial guess: gamma near pi, t around 0.5
-        initial_params = np.array([np.pi, 0.5])
+            # Initial guess: gamma near pi, t around 0.5
+            initial_params = np.array([np.pi, 0.5])
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            initial_parameters=initial_params,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                initial_parameters=initial_params,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-            assert "x" in alg.result
-            # The free vector should have 2 parameters
-            assert len(alg.result["x"]) == 2
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+                assert "x" in alg.result
+                # The free vector should have 2 parameters
+                assert len(alg.result["x"]) == 2
 
     def test_benchmark_parameter_map_multiple_depths(
         self, mpi_comm, benchmark_param_map_system_size
@@ -860,37 +842,33 @@ class TestBenchmarkWithParameterMap:
                 full_params[layer * total_params + 1] = t
             return full_params
 
-        alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(_make_single_marked_oracle(marked_state))
+        with QWOA(system_size, mpi_comm) as alg:
+            alg.set_qualities(_make_single_marked_oracle(marked_state))
 
-        # ansatz_depth is automatically bound from Ansatz.ansatz_depth
-        alg.set_parameter_map(2, parameter_map)
+            # ansatz_depth is automatically bound from Ansatz.ansatz_depth
+            alg.set_parameter_map(2, parameter_map)
 
-        initial_params = np.array([np.pi, 0.5])
+            initial_params = np.array([np.pi, 0.5])
 
-        # Test multiple depths - ansatz_depth is auto-updated during benchmark
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=2,
-            initial_parameters=initial_params,
-            param_persist=True,
-            verbose=False,
-        )
+            # Test multiple depths - ansatz_depth is auto-updated during benchmark
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=2,
+                initial_parameters=initial_params,
+                param_persist=True,
+                verbose=False,
+            )
 
-        results = alg.tracker.get_results()
-        if mpi_comm.Get_rank() == 0:
-            # Check both depths have 2 repeats each
-            assert len(results[1]) == 2  # 2 repeats at depth 1
-            assert len(results[2]) == 2  # 2 repeats at depth 2
-            for depth in [1, 2]:
-                for result in results[depth]:
-                    assert "fun" in result
+            results = alg.tracker.get_results()
+            if mpi_comm.Get_rank() == 0:
+                # Check both depths have 2 repeats each
+                assert len(results[1]) == 2  # 2 repeats at depth 1
+                assert len(results[2]) == 2  # 2 repeats at depth 2
+                for depth in [1, 2]:
+                    for result in results[depth]:
+                        assert "fun" in result
 
-        alg.destroy()
-
-    def test_benchmark_parameter_map_finds_optimal(
-        self, mpi_comm, benchmark_param_map_system_size
-    ):
+    def test_benchmark_parameter_map_finds_optimal(self, mpi_comm, benchmark_param_map_system_size):
         """Verify benchmark with parameter map can optimize toward the marked state.
 
         For Grover search, the optimal gamma is near pi (phase flip)
@@ -909,29 +887,27 @@ class TestBenchmarkWithParameterMap:
                 full_params[layer * total_params + 1] = t
             return full_params
 
-        alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(_make_single_marked_oracle(marked_state))
+        with QWOA(system_size, mpi_comm) as alg:
+            alg.set_qualities(_make_single_marked_oracle(marked_state))
 
-        alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(2, parameter_map)
 
-        # Start near optimal: gamma close to pi, t reasonably sized
-        initial_params = np.array([np.pi * 0.9, 0.4])
+            # Start near optimal: gamma close to pi, t reasonably sized
+            initial_params = np.array([np.pi * 0.9, 0.4])
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            initial_parameters=initial_params,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                initial_parameters=initial_params,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-            optimized_gamma = alg.result["x"][0]
-            assert 0 < optimized_gamma < 2 * np.pi
-            uniform_expectation = (system_size - 1) / system_size
-            assert alg.result["fun"] < uniform_expectation
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+                optimized_gamma = alg.result["x"][0]
+                assert 0 < optimized_gamma < 2 * np.pi
+                uniform_expectation = (system_size - 1) / system_size
+                assert alg.result["fun"] < uniform_expectation
 
     def test_benchmark_param_map_auto_generates_initial_params(
         self, mpi_comm, benchmark_param_map_system_size
@@ -948,23 +924,21 @@ class TestBenchmarkWithParameterMap:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(grover_oracle)
-        # Specify n_free_params=2, so benchmark can auto-generate
-        alg.set_parameter_map(2, parameter_map)
+        with QWOA(system_size, mpi_comm) as alg:
+            alg.set_qualities(grover_oracle)
+            # Specify n_free_params=2, so benchmark can auto-generate
+            alg.set_parameter_map(2, parameter_map)
 
-        # Should work without initial_parameters
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            verbose=False,
-        )
+            # Should work without initial_parameters
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-            assert len(alg.result["x"]) == 2
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+                assert len(alg.result["x"]) == 2
 
 
 def _ranks_per_gpu_for_workers(mpi_comm, n_workers):
@@ -981,6 +955,7 @@ def _ranks_per_gpu_for_workers(mpi_comm, n_workers):
         return None
 
     from quop_mpi._lib.comm_info_wrapper import comm_info_wrapper as _ciw
+
     from quop_mpi._utils._comm_size import _unwrap_pointer_status
 
     backend_flag = 1
@@ -1027,6 +1002,7 @@ def ensure_ranks_per_gpu_for_workers(mpi_comm, benchmark_parallel_jacobian_worke
     all MPI ranks become GPU ranks, ensuring every subcomm has coverage.
     """
     n_workers = benchmark_parallel_jacobian_workers
+    _skip_if_wavefront_gpu_slots_heterogeneous(mpi_comm, n_workers)
     rpg = _ranks_per_gpu_for_workers(mpi_comm, n_workers)
     if rpg is None:
         # MPI backend — no env var needed
@@ -1066,54 +1042,50 @@ class TestBenchmarkWithParallelJacobian:
         """Verify parallel jacobian and parameter map can be configured together."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        # Set up parallel jacobian first
-        alg.set_parallel_jacobian(
-            n_workers=3,
-            method="forward",
-        )
+            # Set up parallel jacobian first
+            alg.set_parallel_jacobian(
+                n_workers=3,
+                method="forward",
+            )
 
-        # Now set parameter map - should work now
-        def parameter_map(ansatz_depth, total_params, free_vec):
-            gamma, t = free_vec
-            return np.tile([gamma, t], ansatz_depth)
+            # Now set parameter map - should work now
+            def parameter_map(ansatz_depth, total_params, free_vec):
+                gamma, t = free_vec
+                return np.tile([gamma, t], ansatz_depth)
 
-        # This should not raise
-        alg.set_parameter_map(2, parameter_map)
+            # This should not raise
+            alg.set_parameter_map(2, parameter_map)
 
-        # Verify both are configured
-        assert alg._has_param_map
-        assert alg.jacobian_input is not None
-
-        alg.destroy()
+            # Verify both are configured
+            assert alg._has_param_map
+            assert alg.jacobian_input is not None
 
     def test_param_map_then_parallel_jacobian(self, mpi_comm, simple_oracle):
         """Verify parameter map and parallel jacobian can be set in either order."""
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        # Set up parameter map first
-        def parameter_map(ansatz_depth, total_params, free_vec):
-            gamma, t = free_vec
-            return np.tile([gamma, t], ansatz_depth)
+            # Set up parameter map first
+            def parameter_map(ansatz_depth, total_params, free_vec):
+                gamma, t = free_vec
+                return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(2, parameter_map)
 
-        # Now set parallel jacobian - should work now
-        alg.set_parallel_jacobian(
-            n_workers=3,
-            method="forward",
-        )
+            # Now set parallel jacobian - should work now
+            alg.set_parallel_jacobian(
+                n_workers=3,
+                method="forward",
+            )
 
-        # Verify both are configured
-        assert alg._has_param_map
-        assert alg.jacobian_input is not None
-
-        alg.destroy()
+            # Verify both are configured
+            assert alg._has_param_map
+            assert alg.jacobian_input is not None
 
         mpi_comm.barrier()  # Sync before test
 
@@ -1131,32 +1103,32 @@ class TestBenchmarkWithParallelJacobian:
         """
         from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = QAOA(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
+        mpi_comm.barrier()  # Sync before test
 
-        def parameter_map(ansatz_depth, total_params, free_vec):
-            gamma, t = free_vec
-            return np.tile([gamma, t], ansatz_depth)
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
 
-        alg.set_parameter_map(2, parameter_map)
-        alg.set_parallel_jacobian(
-            n_workers=benchmark_parallel_jacobian_workers,
-            method="forward",
-        )
+            def parameter_map(ansatz_depth, total_params, free_vec):
+                gamma, t = free_vec
+                return np.tile([gamma, t], ansatz_depth)
 
-        initial_params = np.array([np.pi, 0.5])
+            alg.set_parameter_map(2, parameter_map)
+            alg.set_parallel_jacobian(
+                n_workers=benchmark_parallel_jacobian_workers,
+                method="forward",
+            )
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            initial_parameters=initial_params,
-            verbose=False,
-        )
+            initial_params = np.array([np.pi, 0.5])
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                initial_parameters=initial_params,
+                verbose=False,
+            )
 
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
     def test_parallel_jacobian_with_param_map_convergence(
         self,
@@ -1178,58 +1150,56 @@ class TestBenchmarkWithParallelJacobian:
 
         oracle = simple_oracle
 
-        alg = QWOA(oracle.system_size, mpi_comm)
-        alg.set_qualities(oracle.qualities_function())
+        with QWOA(oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(oracle.qualities_function())
 
-        def parameter_map(ansatz_depth, total_params, free_vec):
-            gamma, t = free_vec
-            return np.tile([gamma, t], ansatz_depth)
+            def parameter_map(ansatz_depth, total_params, free_vec):
+                gamma, t = free_vec
+                return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
-        alg.set_parallel_jacobian(
-            n_workers=benchmark_parallel_jacobian_workers,
-            method="forward",
-        )
-
-        # Start away from optimal to verify optimizer moves toward it
-        # Optimal is approximately (gamma=pi, t=pi/N), start at (1.0, 0.1)
-        initial_params = np.array([1.0, 0.1])
-
-        # Uniform superposition expectation comes from the active oracle ratio.
-        uniform_expectation = oracle.uniform_expectation()
-
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            initial_parameters=initial_params,
-            verbose=False,
-        )
-
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-            final_objective = alg.result["fun"]
-
-            # Key algorithmic test: final objective should be LESS than uniform
-            # This proves the optimizer is actually finding better parameters
-            assert final_objective < uniform_expectation, (
-                f"Optimizer should reduce expectation value below uniform. "
-                f"Got {final_objective:.4f}, uniform = {uniform_expectation:.4f}"
+            alg.set_parameter_map(2, parameter_map)
+            alg.set_parallel_jacobian(
+                n_workers=benchmark_parallel_jacobian_workers,
+                method="forward",
             )
 
-            # The objective should have decreased from initial evaluation
-            # (can't easily get initial objective, but we know uniform is the baseline)
+            # Start away from optimal to verify optimizer moves toward it
+            # Optimal is approximately (gamma=pi, t=pi/N), start at (1.0, 0.1)
+            initial_params = np.array([1.0, 0.1])
 
-            # Compare against the active oracle's one-step Grover prediction.
-            theoretical_success = oracle.theoretical_success_probability(1)
-            theoretical_expectation = 1 - theoretical_success
+            # Uniform superposition expectation comes from the active oracle ratio.
+            uniform_expectation = oracle.uniform_expectation()
 
-            # Allow significant tolerance since we only run 1 repeat
-            assert final_objective < 0.6, (
-                f"Expected significant probability on marked state. "
-                f"Got objective {final_objective:.4f}, theoretical ~= {theoretical_expectation:.4f}"
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                initial_parameters=initial_params,
+                verbose=False,
             )
 
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+                final_objective = alg.result["fun"]
+
+                # Key algorithmic test: final objective should be LESS than uniform
+                # This proves the optimizer is actually finding better parameters
+                assert final_objective < uniform_expectation, (
+                    f"Optimizer should reduce expectation value below uniform. "
+                    f"Got {final_objective:.4f}, uniform = {uniform_expectation:.4f}"
+                )
+
+                # The objective should have decreased from initial evaluation
+                # (can't easily get initial objective, but we know uniform is the baseline)
+
+                # Compare against the active oracle's one-step Grover prediction.
+                theoretical_success = oracle.theoretical_success_probability(1)
+                theoretical_expectation = 1 - theoretical_success
+
+                # Allow significant tolerance since we only run 1 repeat
+                assert final_objective < 0.6, (
+                    f"Expected significant probability on marked state. "
+                    f"Got objective {final_objective:.4f}, theoretical ~= {theoretical_expectation:.4f}"
+                )
 
 
 @pytest.mark.mpi
@@ -1240,9 +1210,7 @@ class TestBenchmarkWithSamplingAndParameterMap:
     a parameter map for Grover-like search optimization.
     """
 
-    def test_benchmark_sampling_with_parameter_map(
-        self, mpi_comm, benchmark_param_map_system_size
-    ):
+    def test_benchmark_sampling_with_parameter_map(self, mpi_comm, benchmark_param_map_system_size):
         """Verify benchmark works with both sampling and parameter map enabled."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -1258,30 +1226,28 @@ class TestBenchmarkWithSamplingAndParameterMap:
                 full_params[layer * total_params + 1] = t
             return full_params
 
-        alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(_make_single_marked_oracle(marked_state))
+        with QWOA(system_size, mpi_comm) as alg:
+            alg.set_qualities(_make_single_marked_oracle(marked_state))
 
-        # Enable sampling with 100 shots per block
-        alg.set_sampling(sample_block_size=100)
+            # Enable sampling with 100 shots per block
+            alg.set_sampling(sample_block_size=100)
 
-        # Set parameter map
-        alg.set_parameter_map(2, parameter_map)
+            # Set parameter map
+            alg.set_parameter_map(2, parameter_map)
 
-        initial_params = np.array([np.pi, 0.5])
+            initial_params = np.array([np.pi, 0.5])
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            initial_parameters=initial_params,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                initial_parameters=initial_params,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
-            assert "x" in alg.result
-            assert len(alg.result["x"]) == 2
-
-        alg.destroy()
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+                assert "x" in alg.result
+                assert len(alg.result["x"]) == 2
 
     def test_benchmark_sampling_param_map_multiple_depths(
         self, mpi_comm, benchmark_param_map_system_size
@@ -1303,24 +1269,22 @@ class TestBenchmarkWithSamplingAndParameterMap:
                 full_params[layer * total_params + 1] = t
             return full_params
 
-        alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(qualities)
-        alg.set_sampling(sample_block_size=50)
-        alg.set_parameter_map(2, parameter_map)
+        with QWOA(system_size, mpi_comm) as alg:
+            alg.set_qualities(qualities)
+            alg.set_sampling(sample_block_size=50)
+            alg.set_parameter_map(2, parameter_map)
 
-        alg.benchmark(
-            ansatz_depths=[1, 2],
-            repeats=2,
-            param_persist=True,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1, 2],
+                repeats=2,
+                param_persist=True,
+                verbose=False,
+            )
 
-        results = alg.tracker.get_results()
-        if mpi_comm.Get_rank() == 0:
-            assert len(results[1]) == 2
-            assert len(results[2]) == 2
-
-        alg.destroy()
+            results = alg.tracker.get_results()
+            if mpi_comm.Get_rank() == 0:
+                assert len(results[1]) == 2
+                assert len(results[2]) == 2
 
     def test_benchmark_sampling_param_map_custom_sampling_fn(
         self, mpi_comm, benchmark_param_map_system_size
@@ -1346,25 +1310,67 @@ class TestBenchmarkWithSamplingAndParameterMap:
             accept = len(samples) >= 2
             return mean_val, accept
 
-        alg = QWOA(system_size, mpi_comm)
-        alg.set_qualities(qualities)
-        alg.set_sampling(
-            sample_block_size=20,
-            function=custom_sampling,
-            max_sample_iterations=5,
-        )
-        alg.set_parameter_map(2, parameter_map)
+        with QWOA(system_size, mpi_comm) as alg:
+            alg.set_qualities(qualities)
+            alg.set_sampling(
+                sample_block_size=20,
+                function=custom_sampling,
+                max_sample_iterations=5,
+            )
+            alg.set_parameter_map(2, parameter_map)
 
-        initial_params = np.array([1.0, 0.5])
+            initial_params = np.array([1.0, 0.5])
 
-        alg.benchmark(
-            ansatz_depths=[1],
-            repeats=1,
-            initial_parameters=initial_params,
-            verbose=False,
-        )
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                initial_parameters=initial_params,
+                verbose=False,
+            )
 
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
 
-        alg.destroy()
+
+@pytest.mark.mpi
+class TestBenchmarkCombinations:
+    """Benchmark with custom objective and custom initial state."""
+
+    def test_benchmark_with_custom_objective(self, mpi_comm, simple_oracle):
+        """Verify benchmark works with a user-supplied objective function."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        def custom_obj(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+            local_exp = np.sum(local_probabilities * local_observables)
+            return MPI_COMM.allreduce(local_exp, op=MPI.SUM)
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_objective(custom_obj)
+
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
+
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
+
+    def test_benchmark_with_custom_initial_state(self, mpi_comm, simple_oracle):
+        """Verify benchmark works with a user-supplied initial state."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+        from quop_mpi.state import equal
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_initial_state(equal)
+
+            alg.benchmark(
+                ansatz_depths=[1],
+                repeats=1,
+                verbose=False,
+            )
+
+            if mpi_comm.Get_rank() == 0:
+                assert alg.result is not None
