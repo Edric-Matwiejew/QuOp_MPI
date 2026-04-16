@@ -115,7 +115,7 @@ if(WAVEFRONT_BACKEND)
   )
 
   target_link_libraries(
-    comm_info_wrapper_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
+    comm_info_wrapper_f2py PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,${QUOP_HIPFORT_TARGET}> ${NUMA_LIBRARY} hip::device
                                    ${ROCM_PATH}/lib/libamdhip64.so
   )
   if(TARGET CrayGTL::CrayGTL)

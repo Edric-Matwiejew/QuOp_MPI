@@ -97,7 +97,7 @@ add_dependencies(wavefront_circulant_propagatorwrapper circulant_propagator_wrap
 add_dependencies(wavefront_circulant_propagatormodule circulant_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_circulant_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
+  wavefront_circulant_propagator_f2py PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,${QUOP_HIPFORT_TARGET}> ${NUMA_LIBRARY} hip::device
                                               ${ROCM_PATH}/lib/libamdhip64.so
 )
 if(TARGET CrayGTL::CrayGTL)
