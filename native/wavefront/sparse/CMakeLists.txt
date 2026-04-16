@@ -147,7 +147,7 @@ add_dependencies(wavefront_sparse_propagatorwrapper sparse_propagator_wrapper_mo
 add_dependencies(wavefront_sparse_propagatormodule sparse_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_sparse_propagator_f2py PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,${QUOP_HIPFORT_TARGET}> ${NUMA_LIBRARY} hip::device
+  wavefront_sparse_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
                                            ${ROCM_PATH}/lib/libamdhip64.so
 )
 if(TARGET CrayGTL::CrayGTL)

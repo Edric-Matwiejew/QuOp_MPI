@@ -124,7 +124,7 @@ add_dependencies(wavefront_composite_propagatorwrapper composite_propagator_wrap
 add_dependencies(wavefront_composite_propagatormodule composite_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_composite_propagator_f2py PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,${QUOP_HIPFORT_TARGET}> ${NUMA_LIBRARY} hip::device
+  wavefront_composite_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
                                               ${ROCM_PATH}/lib/libamdhip64.so
 )
 if(TARGET CrayGTL::CrayGTL)
@@ -199,7 +199,7 @@ add_dependencies(wavefront_momentum_propagatorwrapper momentum_propagator_wrappe
 add_dependencies(wavefront_momentum_propagatormodule momentum_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_momentum_propagator_f2py PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,${QUOP_HIPFORT_TARGET}> ${NUMA_LIBRARY} hip::device
+  wavefront_momentum_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
                                              ${ROCM_PATH}/lib/libamdhip64.so
 )
 if(TARGET CrayGTL::CrayGTL)
