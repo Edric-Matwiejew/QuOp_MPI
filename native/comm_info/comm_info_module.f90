@@ -1457,8 +1457,8 @@ contains
         topo%binding_mode = 'none'
         topo%visible_device_count = 0
         topo%n_physical_gpus = 0
-        topo%my_gpu_index = 0
-        topo%assigned_device_id = 0
+        topo%my_gpu_index = -1
+        topo%assigned_device_id = -1
         topo%rank_within_gpu = 0
         topo%gpu_slot_ordinal = -1
         topo%cpu_numa_node = -1
