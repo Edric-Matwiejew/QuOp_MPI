@@ -21,7 +21,7 @@ import sys
 import numpy as np
 
 
-def run_qaoa(system_size):
+def run_qaoa(system_size, n_workers=1):
     """QAOA with diagonal phase + transverse_field mixer."""
     from quop_mpi.algorithm.combinatorial import QAOA, serial
 
@@ -31,10 +31,12 @@ def run_qaoa(system_size):
     alg = QAOA(system_size)
     alg.set_qualities(serial, {"args": [zero_qualities]})
     alg.set_depth(1)
+    if n_workers > 1:
+        alg.set_parallel_jacobian(n_workers)
     alg.execute()
 
 
-def run_qwoa(system_size):
+def run_qwoa(system_size, n_workers=1):
     """QWOA with diagonal phase + circulant mixer."""
     from quop_mpi.algorithm.combinatorial import QWOA, serial
 
@@ -44,10 +46,12 @@ def run_qwoa(system_size):
     alg = QWOA(system_size)
     alg.set_qualities(serial, {"args": [zero_qualities]})
     alg.set_depth(1)
+    if n_workers > 1:
+        alg.set_parallel_jacobian(n_workers)
     alg.execute()
 
 
-def run_qmoa(Ns):
+def run_qmoa(Ns, n_workers=1):
     """QMOA with diagonal phase + composite mixer."""
     from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
@@ -61,14 +65,16 @@ def run_qmoa(Ns):
     alg = QMOA(Ns)
     alg.set_qualities(cartesian, {"args": [deltas, mins, zero_function]})
     alg.set_depth(1)
+    if n_workers > 1:
+        alg.set_parallel_jacobian(n_workers)
     alg.execute()
 
 
 USAGE = """\
 Usage:
-  {prog} qaoa <system_size>
-  {prog} qwoa <system_size>
-  {prog} qmoa <N1> <N2> [N3 ...]
+  {prog} qaoa <system_size> [--workers N]
+  {prog} qwoa <system_size> [--workers N]
+  {prog} qmoa <N1> <N2> [N3 ...] [--workers N]
 """
 
 
@@ -77,15 +83,23 @@ def main():
         print(USAGE.format(prog=sys.argv[0]), file=sys.stderr)
         sys.exit(1)
 
-    algorithm = sys.argv[1].lower()
+    # Extract --workers before parsing positional args
+    args = list(sys.argv[1:])
+    n_workers = 1
+    if "--workers" in args:
+        idx = args.index("--workers")
+        n_workers = int(args[idx + 1])
+        del args[idx : idx + 2]
+
+    algorithm = args[0].lower()
 
     if algorithm == "qaoa":
-        run_qaoa(int(sys.argv[2]))
+        run_qaoa(int(args[1]), n_workers)
     elif algorithm == "qwoa":
-        run_qwoa(int(sys.argv[2]))
+        run_qwoa(int(args[1]), n_workers)
     elif algorithm == "qmoa":
-        Ns = [int(x) for x in sys.argv[2:]]
-        run_qmoa(Ns)
+        Ns = [int(x) for x in args[1:]]
+        run_qmoa(Ns, n_workers)
     else:
         print(f"Unknown algorithm: {algorithm}", file=sys.stderr)
         print(USAGE.format(prog=sys.argv[0]), file=sys.stderr)

@@ -189,6 +189,16 @@ TIER1_TESTS=(
     "T13 1  4 1 auto work  64"
 )
 
+# Multi-worker diagonal tests (Tier 1 consistency-only, no exact CSV comparison)
+TIER1_WORKER_TESTS=(
+    "W01 1  8 1 sequential gpu 128 2"
+    "W02 1  8 1 sequential gpu 128 4"
+    "W03 1 16 2 sequential gpu 256 2"
+    "W04 1 16 2 sequential gpu 256 4"
+    "W05 1  4 1 auto       work  64 2"
+    "W06 1  8 1 auto       work 128 4"
+)
+
 run_tier1() {
     log_info "═══ Tier 1: Diagonal oracle tests ═══"
 
@@ -238,6 +248,50 @@ run_tier1() {
 }
 
 # ══════════════════════════════════════════════════════════════════════
+#  TIER 1b — Multi-worker diagonal (consistency checks only)
+# ══════════════════════════════════════════════════════════════════════
+
+run_tier1_workers() {
+    log_info "═══ Tier 1b: Multi-worker diagonal tests ═══"
+
+    for entry in "${TIER1_WORKER_TESTS[@]}"; do
+        # shellcheck disable=SC2086
+        set -- $entry
+        local test_id="$1" nodes="$2" rpn="$3" rpg="$4"
+        local binding="$5" partition="$6" sys_size="$7" workers="$8"
+
+        log_info "[$test_id] nodes=$nodes rpn=$rpn rpg=$rpg partition=$partition sys_size=$sys_size workers=$workers"
+
+        local rc=0
+        run_test "$test_id" "$nodes" "$rpn" "$rpg" "$binding" "$partition" \
+                python "$DIAG_RUNNER" "$sys_size" --workers "$workers" || rc=$?
+        if [[ $rc -eq 99 ]]; then continue; fi
+        if [[ $rc -ne 0 ]]; then
+            log_fail "$test_id — execution failed (exit $rc)"
+            continue
+        fi
+
+        local dump
+        dump="$(find_dump "$RESULTS_DIR/$test_id" "$PHASE")"
+        if [[ -z "$dump" ]]; then
+            log_fail "$test_id — no dump file for phase '$PHASE'"
+            continue
+        fi
+
+        # Run consistency checks (no exact CSV comparison)
+        local chk_out
+        chk_out="$(python "$VERIFY" check "$dump" --rpg "$rpg" 2>&1)" || true
+        if echo "$chk_out" | grep -qi "issue\|error\|fail"; then
+            log_fail "$test_id"
+            echo "$chk_out" | head -20 | sed 's/^/    /'
+        else
+            log_pass "$test_id"
+        fi
+    done
+    echo ""
+}
+
+# ══════════════════════════════════════════════════════════════════════
 #  TIER 2 — Algorithm-class integration (consistency checks)
 # ══════════════════════════════════════════════════════════════════════
 
@@ -250,6 +304,15 @@ TIER2_TESTS=(
     "A04 1  4 1 auto       work qaoa 64"
     "A08 1  4 1 auto       work qwoa 64"
     "A12 1  4 1 auto       work qmoa 3 3"
+    # Multi-worker GPU tests
+    "A13 1  8 1 sequential gpu qwoa 128 --workers 2"
+    "A14 1  8 1 sequential gpu qaoa 128 --workers 4"
+    "A15 1 16 2 sequential gpu qwoa 256 --workers 2"
+    "A16 1 16 2 sequential gpu qaoa 256 --workers 4"
+    # Multi-worker CPU tests
+    "A17 1  4 1 auto       work qaoa 64 --workers 2"
+    "A18 1  8 1 auto       work qwoa 128 --workers 4"
+    "A19 1  4 1 auto       work qmoa 3 3 --workers 2"
 )
 
 run_tier2() {
@@ -309,6 +372,7 @@ main() {
 
     if [[ "$TIER" == "both" || "$TIER" == "1" ]]; then
         run_tier1
+        run_tier1_workers
     fi
 
     if [[ "$TIER" == "both" || "$TIER" == "2" ]]; then

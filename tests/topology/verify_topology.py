@@ -237,9 +237,18 @@ def check_topology_consistency(
         issues.append("No rank data found in dump")
         return issues
 
+    # Detect worker count and group ranks by worker_id.
+    n_workers = actual_ranks[0].get("n_workers", 1)
+    worker_groups: Dict[int, List[Dict]] = {}
+    for r in actual_ranks:
+        wid = r.get("worker_id", 0)
+        worker_groups.setdefault(wid, []).append(r)
+
     gpu_ranks = [r for r in actual_ranks if r["is_gpu_rank"] == 1]
     non_gpu_ranks = [r for r in actual_ranks if r["is_gpu_rank"] == 0]
     nodes = sorted(set(r["node_id"] for r in actual_ranks))
+
+    # ── Global checks (GPU topology assigned before worker split) ────
 
     # 1. GPU / DEVCOMM membership consistency.
     for r in gpu_ranks:
@@ -252,40 +261,6 @@ def check_topology_consistency(
             issues.append(
                 f"Rank {r['mpi_rank']}: is_gpu_rank=0 but gpu_devcomm_flag=1"
             )
-
-    # 2. DEVCOMM size consistent across GPU ranks.
-    if gpu_ranks:
-        dc_sizes = set(r["dc_s"] for r in gpu_ranks)
-        if len(dc_sizes) > 1:
-            issues.append(f"Inconsistent DEVCOMM sizes: {dc_sizes}")
-        elif list(dc_sizes)[0] != len(gpu_ranks):
-            issues.append(
-                f"DEVCOMM size {list(dc_sizes)[0]} != GPU rank count {len(gpu_ranks)}"
-            )
-
-    # 3. DEVCOMM ranks dense [0, n_gpu-1].
-    if gpu_ranks:
-        dc_ranks = sorted(r["dc_r"] for r in gpu_ranks)
-        expected_dc = list(range(len(gpu_ranks)))
-        if dc_ranks != expected_dc:
-            issues.append(f"DEVCOMM ranks not contiguous 0..{len(gpu_ranks)-1}")
-
-    # 4. Per-node DEVCOMM_NODE consistency.
-    for nid in nodes:
-        node_gpu = [r for r in gpu_ranks if r["node_id"] == nid]
-        if not node_gpu:
-            continue
-        dn_sizes = set(r["dn_s"] for r in node_gpu)
-        if len(dn_sizes) > 1:
-            issues.append(f"Node {nid}: inconsistent DEVCOMM_NODE sizes: {dn_sizes}")
-        elif list(dn_sizes)[0] != len(node_gpu):
-            issues.append(
-                f"Node {nid}: DEVCOMM_NODE size {list(dn_sizes)[0]} "
-                f"!= GPU rank count {len(node_gpu)}"
-            )
-        dn_ranks = sorted(r["dn_r"] for r in node_gpu)
-        if dn_ranks != list(range(len(node_gpu))):
-            issues.append(f"Node {nid}: DEVCOMM_NODE ranks not contiguous")
 
     # 5. Non-GPU ranks excluded from device communicators.
     for r in non_gpu_ranks:
@@ -332,32 +307,6 @@ def check_topology_consistency(
                     f"Node {nid}, GPU {g}: {count} ranks > rpg={rpg}"
                 )
 
-    # 9. NODECOMM sizes consistent per node.
-    for nid in nodes:
-        node_ranks = [r for r in actual_ranks if r["node_id"] == nid]
-        nc_sizes = set(r["nc_s"] for r in node_ranks)
-        if len(nc_sizes) > 1:
-            issues.append(f"Node {nid}: inconsistent NODECOMM sizes: {nc_sizes}")
-        elif list(nc_sizes)[0] != len(node_ranks):
-            issues.append(
-                f"Node {nid}: NODECOMM size {list(nc_sizes)[0]} "
-                f"!= rank count {len(node_ranks)}"
-            )
-
-    # 10. SUBCOMM size consistent.
-    sc_sizes = set(r["sc_s"] for r in actual_ranks)
-    if len(sc_sizes) > 1:
-        issues.append(f"Inconsistent SUBCOMM sizes: {sc_sizes}")
-    elif list(sc_sizes)[0] != len(actual_ranks):
-        issues.append(
-            f"SUBCOMM size {list(sc_sizes)[0]} != total rank count {len(actual_ranks)}"
-        )
-
-    # 11. SUBCOMM ranks dense [0, n-1].
-    sc_ranks = sorted(r["sc_r"] for r in actual_ranks)
-    if sc_ranks != list(range(len(actual_ranks))):
-        issues.append("SUBCOMM ranks not contiguous")
-
     # 12. Non-GPU gpu_slot_ordinal should be -1.
     for r in non_gpu_ranks:
         if r["gpu_slot_ordinal"] != -1:
@@ -372,15 +321,6 @@ def check_topology_consistency(
             issues.append(
                 f"Rank {r['mpi_rank']}: cpu_numa_node={r['cpu_numa_node']} "
                 f"but rank_within_cpu_numa={r['rank_within_cpu_numa']}"
-            )
-
-    # 14. DEVCOMM ranks ordered by SUBCOMM rank.
-    if gpu_ranks:
-        gpu_by_dc = sorted(gpu_ranks, key=lambda r: r["dc_r"])
-        sc_order = [r["sc_r"] for r in gpu_by_dc]
-        if sc_order != sorted(sc_order):
-            issues.append(
-                "DEVCOMM rank order does not match SUBCOMM rank order"
             )
 
     # 15. n_workers consistent across all ranks.
@@ -398,15 +338,95 @@ def check_topology_consistency(
                     f"worker_id={wid} outside [0, {nwk - 1}]"
                 )
 
-    # 17. Ranks with same worker_id should have identical SUBCOMM sizes.
-    wid_groups: Dict[int, List[Dict]] = {}
-    for r in actual_ranks:
-        wid_groups.setdefault(r["worker_id"], []).append(r)
-    for wid, group in sorted(wid_groups.items()):
+    # ── Per-worker checks (SUBCOMM/NODECOMM/DEVCOMM are per-worker) ──
+
+    for wid, group in sorted(worker_groups.items()):
+        pfx = f"Worker {wid}: " if n_workers > 1 else ""
+        w_gpu = [r for r in group if r["is_gpu_rank"] == 1]
+        w_nodes = sorted(set(r["node_id"] for r in group))
+
+        # 2. DEVCOMM size consistent across GPU ranks in this worker.
+        if w_gpu:
+            dc_sizes = set(r["dc_s"] for r in w_gpu)
+            if len(dc_sizes) > 1:
+                issues.append(f"{pfx}Inconsistent DEVCOMM sizes: {dc_sizes}")
+            elif list(dc_sizes)[0] != len(w_gpu):
+                issues.append(
+                    f"{pfx}DEVCOMM size {list(dc_sizes)[0]} "
+                    f"!= GPU rank count {len(w_gpu)}"
+                )
+
+        # 3. DEVCOMM ranks dense [0, n_gpu-1].
+        if w_gpu:
+            dc_ranks = sorted(r["dc_r"] for r in w_gpu)
+            if dc_ranks != list(range(len(w_gpu))):
+                issues.append(
+                    f"{pfx}DEVCOMM ranks not contiguous 0..{len(w_gpu)-1}"
+                )
+
+        # 4. Per-node DEVCOMM_NODE consistency.
+        for nid in w_nodes:
+            node_gpu = [r for r in w_gpu if r["node_id"] == nid]
+            if not node_gpu:
+                continue
+            dn_sizes = set(r["dn_s"] for r in node_gpu)
+            if len(dn_sizes) > 1:
+                issues.append(
+                    f"{pfx}Node {nid}: inconsistent DEVCOMM_NODE sizes: {dn_sizes}"
+                )
+            elif list(dn_sizes)[0] != len(node_gpu):
+                issues.append(
+                    f"{pfx}Node {nid}: DEVCOMM_NODE size {list(dn_sizes)[0]} "
+                    f"!= GPU rank count {len(node_gpu)}"
+                )
+            dn_ranks = sorted(r["dn_r"] for r in node_gpu)
+            if dn_ranks != list(range(len(node_gpu))):
+                issues.append(f"{pfx}Node {nid}: DEVCOMM_NODE ranks not contiguous")
+
+        # 9. NODECOMM sizes consistent per node within this worker.
+        for nid in w_nodes:
+            node_ranks = [r for r in group if r["node_id"] == nid]
+            nc_sizes = set(r["nc_s"] for r in node_ranks)
+            if len(nc_sizes) > 1:
+                issues.append(
+                    f"{pfx}Node {nid}: inconsistent NODECOMM sizes: {nc_sizes}"
+                )
+            elif list(nc_sizes)[0] != len(node_ranks):
+                issues.append(
+                    f"{pfx}Node {nid}: NODECOMM size {list(nc_sizes)[0]} "
+                    f"!= rank count {len(node_ranks)}"
+                )
+
+        # 10. SUBCOMM size = number of ranks in this worker.
+        sc_sizes = set(r["sc_s"] for r in group)
+        if len(sc_sizes) > 1:
+            issues.append(f"{pfx}Inconsistent SUBCOMM sizes: {sc_sizes}")
+        elif list(sc_sizes)[0] != len(group):
+            issues.append(
+                f"{pfx}SUBCOMM size {list(sc_sizes)[0]} "
+                f"!= worker rank count {len(group)}"
+            )
+
+        # 11. SUBCOMM ranks dense [0, n-1].
+        sc_ranks = sorted(r["sc_r"] for r in group)
+        if sc_ranks != list(range(len(group))):
+            issues.append(f"{pfx}SUBCOMM ranks not contiguous")
+
+        # 14. DEVCOMM ranks ordered by SUBCOMM rank.
+        if w_gpu:
+            gpu_by_dc = sorted(w_gpu, key=lambda r: r["dc_r"])
+            sc_order = [r["sc_r"] for r in gpu_by_dc]
+            if sc_order != sorted(sc_order):
+                issues.append(
+                    f"{pfx}DEVCOMM rank order does not match SUBCOMM rank order"
+                )
+
+        # 17. SUBCOMM sizes consistent within worker (already implied by 10,
+        #     but kept for explicit per-worker validation).
         sc_sizes_w = set(r["sc_s"] for r in group)
         if len(sc_sizes_w) > 1:
             issues.append(
-                f"Worker {wid}: inconsistent SUBCOMM sizes: {sc_sizes_w}"
+                f"{pfx}inconsistent SUBCOMM sizes: {sc_sizes_w}"
             )
 
     return issues

@@ -39,10 +39,14 @@ def zero_observable(system_size):
 
 def main():
     if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <system_size>", file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} <system_size> [--workers N]", file=sys.stderr)
         sys.exit(1)
 
     system_size = int(sys.argv[1])
+    n_workers = 1
+    if "--workers" in sys.argv:
+        idx = sys.argv.index("--workers")
+        n_workers = int(sys.argv[idx + 1])
 
     UQ = DiagonalUnitary(
         diag_serial,
@@ -53,6 +57,9 @@ def main():
     alg.set_unitaries([UQ])
     alg.set_observables(obs_serial, {"args": [zero_observable, system_size]})
     alg.set_depth(1)
+
+    if n_workers > 1:
+        alg.set_parallel_jacobian(n_workers)
 
     alg.execute()
 

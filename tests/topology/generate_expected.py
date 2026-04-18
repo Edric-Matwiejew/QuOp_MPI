@@ -45,6 +45,7 @@ class TestConfig:
     ranks_per_gpu: int
     system_size: int        # state-vector dimension (2^n_qubits)
     description: str
+    n_workers: int = 1      # parallel jacobian workers
 
 
 #    ID   Part  Nodes  RPN  Mode          RPG  SysSize  Description
@@ -99,6 +100,126 @@ FIELD_NAMES = [
     "device_local_i", "device_local_i_offset", "device_alloc_local",
     "n_processes",
 ]
+
+# ─── Oracle: worker split assignment ────────────────────────────────────────
+
+
+def gpu_aware_worker_split(
+    n_workers: int,
+    n_nodes: int,
+    ranks_per_node: int,
+    is_gpu_ranks: List[bool],
+    gpu_slot_ordinals: List[int],
+    node_ids: List[int],
+) -> List[int]:
+    """Replicate the GPU-aware intra-node split from split_workers.
+
+    Parameters
+    ----------
+    n_workers : int
+        Number of worker subcommunicators.
+    n_nodes : int
+        Number of compute nodes.
+    ranks_per_node : int
+        Ranks per node.
+    is_gpu_ranks : list[bool]
+        Per-MPI-rank GPU flag.
+    gpu_slot_ordinals : list[int]
+        Per-MPI-rank gpu_slot_ordinal.
+    node_ids : list[int]
+        Per-MPI-rank node id.
+
+    Returns
+    -------
+    list[int]
+        worker_id for each MPI rank.
+    """
+    total_ranks = len(is_gpu_ranks)
+
+    if n_workers <= n_nodes:
+        # Node-aligned split
+        nodes_per_worker = n_nodes // n_workers
+        node_remainder = n_nodes % n_workers
+        worker_ids = []
+        for mpi_rank in range(total_ranks):
+            nid = node_ids[mpi_rank]
+            if nid < node_remainder * (nodes_per_worker + 1):
+                color = nid // (nodes_per_worker + 1)
+            else:
+                color = node_remainder + (
+                    nid - node_remainder * (nodes_per_worker + 1)
+                ) // nodes_per_worker
+            worker_ids.append(color)
+        return worker_ids
+
+    # GPU-aware intra-node split (n_workers > n_nodes)
+    # Count active GPU ranks per node (devcomm_node_size)
+    node_active_gpu = [0] * n_nodes
+    for mpi_rank in range(total_ranks):
+        if is_gpu_ranks[mpi_rank]:
+            node_active_gpu[node_ids[mpi_rank]] += 1
+
+    # Distribute workers across nodes
+    workers_per_node = [0] * n_nodes
+    remaining = n_workers
+    for nid in range(n_nodes):
+        if node_active_gpu[nid] > 0 and remaining > 0:
+            workers_per_node[nid] = 1
+            remaining -= 1
+
+    while remaining > 0:
+        progress = False
+        for nid in range(n_nodes):
+            if workers_per_node[nid] < node_active_gpu[nid]:
+                workers_per_node[nid] += 1
+                remaining -= 1
+                progress = True
+                if remaining == 0:
+                    break
+        if not progress:
+            break
+
+    # Assign each rank to a worker
+    worker_ids = []
+    # Track node_rank for non-GPU round-robin
+    node_rank_counters = [0] * n_nodes
+    for mpi_rank in range(total_ranks):
+        nid = node_ids[mpi_rank]
+        nr = node_rank_counters[nid]
+        node_rank_counters[nid] += 1
+
+        w0 = sum(workers_per_node[:nid])
+        nw = workers_per_node[nid]
+        active = node_active_gpu[nid]
+
+        if is_gpu_ranks[mpi_rank]:
+            ordinal = gpu_slot_ordinals[mpi_rank]
+            color = w0 + ordinal * nw // active
+        else:
+            color = w0 + (nr % nw)
+        worker_ids.append(color)
+
+    return worker_ids
+
+
+def mpi_backend_worker_split(
+    n_workers: int, total_ranks: int
+) -> List[int]:
+    """Replicate rank-based round-robin split for MPI backend."""
+    if n_workers <= 1:
+        return [0] * total_ranks
+
+    rpw = total_ranks // n_workers
+    remainder = total_ranks % n_workers
+    worker_ids = []
+    for rank in range(total_ranks):
+        if rank < remainder * (rpw + 1):
+            color = rank // (rpw + 1)
+        else:
+            color = remainder + (rank - remainder * (rpw + 1)) // rpw
+        worker_ids.append(color)
+    return worker_ids
+
 
 # ─── Oracle: sequential GPU assignment ──────────────────────────────────────
 
