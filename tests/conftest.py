@@ -11,8 +11,11 @@ Use --backend to select the backend:
 
 import math
 import os
+import signal
 import sys
 import tempfile
+import time
+import traceback
 from ctypes import CDLL
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -32,6 +35,11 @@ except OSError:
     _LIBC = None
 
 
+# Default timeout (seconds) for per-test MPI deadlock detection.
+# Override with ``--mpi-timeout`` on the pytest command line.
+_MPI_TEST_TIMEOUT: int = 120
+
+
 def _flush_process_output() -> None:
     """Best-effort flush of Python and C stdio buffers for the current rank."""
     try:
@@ -49,6 +57,37 @@ def _flush_process_output() -> None:
             _LIBC.fflush(None)
         except Exception:
             pass
+
+
+def _timed_barrier(comm, timeout_seconds: int = 30, label: str = "") -> None:
+    """Non-blocking barrier with timeout to prevent deadlocks.
+
+    Polls ``Ibarrier`` in a loop.  If *timeout_seconds* elapses before
+    all ranks arrive, the current rank dumps its Python thread stacks to
+    stderr and calls ``MPI.COMM_WORLD.Abort(1)`` so the entire job
+    terminates instead of hanging forever.
+    """
+    req = comm.Ibarrier()
+    deadline = time.monotonic() + timeout_seconds
+    while not req.Test()[0]:
+        if time.monotonic() > deadline:
+            rank = comm.Get_rank()
+            _flush_process_output()
+            lines = [
+                f"\n{'='*60}",
+                f"BARRIER TIMEOUT on rank {rank} after {timeout_seconds}s",
+            ]
+            if label:
+                lines.append(f"  context: {label}")
+            lines.append("Stack traces of all threads:")
+            for thread_id, frame in sys._current_frames().items():
+                lines.append(f"\n--- Thread {thread_id} ---")
+                lines.extend(traceback.format_stack(frame))
+            lines.append(f"{'='*60}\n")
+            print("\n".join(lines), file=sys.stderr, flush=True)
+            _flush_process_output()
+            MPI.COMM_WORLD.Abort(1)
+        time.sleep(0.1)
 
 def _system_tmp_is_shared() -> bool:
     """Return True if the system temp directory is writable AND on a shared filesystem.
@@ -111,13 +150,24 @@ def _configure_temp_fallback_if_needed(config):
 
 
 def pytest_addoption(parser):
-    """Add --backend option to pytest."""
+    """Add --backend and --mpi-timeout options to pytest."""
     parser.addoption(
         "--backend",
         action="store",
         default=None,
         choices=["mpi", "wavefront"],
         help="Set the QuOp backend: mpi or wavefront",
+    )
+    parser.addoption(
+        "--mpi-timeout",
+        action="store",
+        type=int,
+        default=_MPI_TEST_TIMEOUT,
+        help=(
+            "Per-test timeout in seconds for MPI deadlock detection. "
+            "When a test exceeds this limit the rank dumps its stack "
+            "traces and calls MPI_Abort. Default: %(default)s"
+        ),
     )
 
 
@@ -357,15 +407,62 @@ def _mpi_barrier_teardown(request):
     ranks are synchronised before the next test begins. Flush each rank's
     Python and C stdio buffers first so the barrier marker better reflects
     the output that preceded it.
+
+    Uses a non-blocking barrier with timeout so that if a test fails on
+    one rank (leaving other ranks stuck in a collective), the job aborts
+    with full stack traces instead of hanging forever.
     """
+    timeout = request.config.getoption("--mpi-timeout", default=_MPI_TEST_TIMEOUT)
     yield
     if MPI.Is_initialized() and not MPI.Is_finalized():
         _flush_process_output()
-        MPI.COMM_WORLD.Barrier()
+        _timed_barrier(MPI.COMM_WORLD, timeout, label=f"teardown of {request.node.nodeid}")
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(f"[BARRIER] after {request.node.nodeid}", file=sys.stderr, flush=True)
         _flush_process_output()
-        MPI.COMM_WORLD.Barrier()
+        _timed_barrier(MPI.COMM_WORLD, timeout, label=f"teardown-flush of {request.node.nodeid}")
+
+
+def _mpi_test_timeout_handler(signum, frame):
+    """Signal handler that fires when a test exceeds --mpi-timeout."""
+    rank = MPI.COMM_WORLD.Get_rank() if MPI.Is_initialized() else "?"
+    _flush_process_output()
+    lines = [
+        f"\n{'='*60}",
+        f"MPI TEST TIMEOUT on rank {rank} (SIGALRM)",
+        "Stack traces of all threads:",
+    ]
+    for thread_id, frame in sys._current_frames().items():
+        lines.append(f"\n--- Thread {thread_id} ---")
+        lines.extend(traceback.format_stack(frame))
+    lines.append(f"{'='*60}\n")
+    print("\n".join(lines), file=sys.stderr, flush=True)
+    _flush_process_output()
+    if MPI.Is_initialized() and not MPI.Is_finalized():
+        MPI.COMM_WORLD.Abort(1)
+    sys.exit(1)
+
+
+@pytest.fixture(autouse=True)
+def _mpi_test_timeout(request):
+    """Per-test alarm that fires if a test body deadlocks.
+
+    Sets SIGALRM before the test and cancels it afterwards.  On timeout
+    the handler prints stack traces for every thread on this rank, then
+    calls ``MPI_Abort`` so the entire job terminates with useful output.
+    Only active on Unix (SIGALRM is not available on Windows).
+    """
+    if not hasattr(signal, "SIGALRM"):
+        yield
+        return
+    timeout = request.config.getoption("--mpi-timeout", default=_MPI_TEST_TIMEOUT)
+    old_handler = signal.signal(signal.SIGALRM, _mpi_test_timeout_handler)
+    signal.alarm(timeout)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 @pytest.fixture(scope="session")
