@@ -121,6 +121,10 @@ run_test() {
     local env_vars="QUOP_DUMP_COMM_INFO=$test_dir"
     if [[ "$partition" == "gpu" ]]; then
         env_vars="$env_vars QUOP_GPU_BINDING_MODE=$binding QUOP_RANKS_PER_GPU=$rpg"
+    else
+        # Force MPI backend for CPU-only tests so GPU detection is skipped
+        # even when running on a GPU-capable node.
+        env_vars="$env_vars QUOP_BACKEND=mpi"
     fi
 
     local launch
