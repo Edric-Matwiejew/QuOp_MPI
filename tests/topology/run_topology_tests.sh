@@ -87,6 +87,13 @@ log_fail() { echo -e "  ${RED}FAIL${RESET} $1"; ((fail_count++)) || true; }
 log_skip() { echo -e "  ${YELLOW}SKIP${RESET} $1"; ((skip_count++)) || true; }
 log_info() { echo -e "${BOLD}$1${RESET}"; }
 
+# ── Detect available nodes ───────────────────────────────────────────
+if [[ "$LAUNCHER" == "srun" ]]; then
+    AVAILABLE_NODES="${SLURM_JOB_NUM_NODES:-1}"
+else
+    AVAILABLE_NODES=1
+fi
+
 # ── Helper: build launcher command ───────────────────────────────────
 # Usage: build_launch_cmd <n_nodes> <n_tasks> <tasks_per_node>
 build_launch_cmd() {
@@ -123,6 +130,12 @@ run_test() {
     if $DRY_RUN; then
         echo "  [dry-run] $full_cmd"
         log_skip "$test_id (dry-run)"
+        return 99
+    fi
+
+    if [[ "$nodes" -gt "$AVAILABLE_NODES" ]]; then
+        echo "  Requires $nodes nodes but only $AVAILABLE_NODES available"
+        log_skip "$test_id (need $nodes nodes)"
         return 99
     fi
 

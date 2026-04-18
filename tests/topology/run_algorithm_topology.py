@@ -56,7 +56,7 @@ def run_qmoa(Ns):
     deltas, mins = setup_cartesian(Ns, bounds)
 
     def zero_function(x):
-        return np.zeros(x.shape[1], dtype=np.float64)
+        return np.zeros(x.shape[0], dtype=np.float64)
 
     alg = QMOA(Ns)
     alg.set_qualities(cartesian, {"args": [deltas, mins, zero_function]})
