@@ -123,6 +123,10 @@ module comm_info_module
         ! -- Whether any of the propagators requires a device work buffer (wavefront only, false for MPI) --
         logical :: requires_device_work_buffer = .false.
 
+        ! -- Worker split identity (from split_workers) ---------------
+        integer(int32) :: worker_id = 0
+        integer(int32) :: n_workers = 1
+
     contains
 
         ! Lifecycle
@@ -1864,6 +1868,8 @@ contains
         ci%MPI_COMM = si%MPI_COMM
         ci%backend_flag = backend_flag
         ci%system_size = system_size
+        ci%worker_id = si%worker_id
+        ci%n_workers = si%n_workers
 
         ! Copy topology invariants (needed even for excluded ranks)
         ci%topology = topo
@@ -2475,8 +2481,8 @@ contains
         character(len=*), intent(in)         :: phase
 
         ! -- Per-rank record for MPI_Gather --
-        ! Packed into 10 x int64 + 24 x int32, plus binding mode and hostname strings.
-        integer, parameter :: N_I64 = 10, N_I32 = 24, BIND_MODE_MAXLEN = 16
+        ! Packed into 10 x int64 + 26 x int32, plus binding mode and hostname strings.
+        integer, parameter :: N_I64 = 10, N_I32 = 26, BIND_MODE_MAXLEN = 16
         integer(int64) :: send_i64(N_I64)
         integer(int32) :: send_i32(N_I32)
         integer(int64), allocatable :: recv_i64(:, :)
@@ -2591,6 +2597,8 @@ contains
         else
             send_i32(24) = 0
         end if
+        send_i32(25) = self%worker_id
+        send_i32(26) = self%n_workers
 
         send_binding_mode = self%topology%binding_mode
         ! Processor/host name (stored as invariant in topology)
@@ -2722,6 +2730,9 @@ contains
                 end if
                 write (funit, '(A,I0)') 'ranks_per_gpu   = ', recv_i32(22, ref_idx)
             end if
+            if (ref_idx > 0) then
+                write (funit, '(A,I0)') 'n_workers       = ', recv_i32(26, ref_idx)
+            end if
             write (funit, '(A)') ''
 
             ! -- Per-rank table -------------------------------------
@@ -2730,14 +2741,14 @@ contains
             write (funit, '(A)') &
                 '  Rank          li      li_off       alloc        d_li       d_alc       d_off'// &
                 '    SC_r  SC_s  NC_r  NC_s  DC_r  DC_s  DN_r  DN_s   GPU  phys  gpu?  cpuNm'// &
-                '   rCpuN   rGpu   slot  igpu   rpg   node  mode        hostname'
-            write (funit, '(A)') repeat('-', 310)
+                '   rCpuN   rGpu   slot  igpu   rpg   node   wid  nwk  mode        hostname'
+            write (funit, '(A)') repeat('-', 325)
 
             ! Data rows
             do i = 1, mpi_size
                 write (funit, '(I6,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,'// &
                        'I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,'// &
-                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,I5,2X,I5,2X,I6,2X,A10,2X,A)') &
+                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,I5,2X,I5,2X,I6,2X,I5,2X,I5,2X,A10,2X,A)') &
                     i - 1, &
                     recv_i64(1, i), recv_i64(2, i), recv_i64(3, i), & ! li, li_off, alloc
                     recv_i64(4, i), recv_i64(6, i), recv_i64(5, i), & ! d_li, d_alc, d_off
@@ -2748,7 +2759,8 @@ contains
                     recv_i32(11, i), recv_i32(16, i), recv_i32(12, i), & ! GPU, phys, gpu?
                     recv_i32(17, i), recv_i32(18, i), recv_i32(19, i), & ! cpu_numa, rank_within_cpu_numa, rank_within_gpu
                     recv_i32(23, i), recv_i32(24, i), recv_i32(22, i), & ! gpu_slot_ordinal, is_gpu_rank, ranks_per_gpu
-                    recv_i32(14, i), adjustl(recv_binding_mode(i)), & ! node_id, binding mode
+                    recv_i32(14, i), recv_i32(25, i), recv_i32(26, i), & ! node_id, worker_id, n_workers
+                    adjustl(recv_binding_mode(i)), & ! binding mode
                     trim(recv_proc_name(i)) ! hostname
             end do
             write (funit, '(A)') ''
@@ -2847,6 +2859,8 @@ contains
             write (funit, '(A)') '  igpu          : is_gpu_rank (1 if assigned a topology-defined GPU rank)'
             write (funit, '(A)') '  rpg           : ranks_per_gpu (QUOP_RANKS_PER_GPU setting)'
             write (funit, '(A)') '  node          : active node_id (0-based within current SUBCOMM; -1 if excluded)'
+            write (funit, '(A)') '  wid           : worker_id (0-based worker/Jacobian group index)'
+            write (funit, '(A)') '  nwk           : n_workers (total worker groups from split_workers)'
             write (funit, '(A)') '  mode          : GPU binding mode used by topology assignment'
             write (funit, '(A)') '  hostname      : MPI processor name (often the hostname)'
             write (funit, '(A)') '  Note: *_r=-1 and *_s=0 indicates MPI_COMM_NULL.'
