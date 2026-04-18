@@ -82,9 +82,9 @@ pass_count=0
 fail_count=0
 skip_count=0
 
-log_pass() { echo -e "  ${GREEN}PASS${RESET} $1"; ((pass_count++)); }
-log_fail() { echo -e "  ${RED}FAIL${RESET} $1"; ((fail_count++)); }
-log_skip() { echo -e "  ${YELLOW}SKIP${RESET} $1"; ((skip_count++)); }
+log_pass() { echo -e "  ${GREEN}PASS${RESET} $1"; ((pass_count++)) || true; }
+log_fail() { echo -e "  ${RED}FAIL${RESET} $1"; ((fail_count++)) || true; }
+log_skip() { echo -e "  ${YELLOW}SKIP${RESET} $1"; ((skip_count++)) || true; }
 log_info() { echo -e "${BOLD}$1${RESET}"; }
 
 # ── Helper: build launcher command ───────────────────────────────────
