@@ -2475,8 +2475,8 @@ contains
         character(len=*), intent(in)         :: phase
 
         ! -- Per-rank record for MPI_Gather --
-        ! Packed into 10 x int64 + 19 x int32, plus binding mode and hostname strings.
-        integer, parameter :: N_I64 = 10, N_I32 = 19, BIND_MODE_MAXLEN = 16
+        ! Packed into 10 x int64 + 24 x int32, plus binding mode and hostname strings.
+        integer, parameter :: N_I64 = 10, N_I32 = 24, BIND_MODE_MAXLEN = 16
         integer(int64) :: send_i64(N_I64)
         integer(int32) :: send_i32(N_I32)
         integer(int64), allocatable :: recv_i64(:, :)
@@ -2486,6 +2486,17 @@ contains
         character(len=BIND_MODE_MAXLEN), allocatable :: recv_binding_mode(:)
         character(len=PROC_NAME_MAXLEN) :: send_proc_name
         character(len=PROC_NAME_MAXLEN), allocatable :: recv_proc_name(:)
+
+        ! -- Per-rank visible_gpus record for MPI_Gather --
+        ! Each visible GPU is packed as 3 x int32 (device_id, physical_gpu_index,
+        ! numa_node) plus a 16-character PCI bus ID string.
+        integer, parameter :: MAX_VIS_GPUS = 16, VIS_I32_PER_GPU = 3
+        integer, parameter :: PCI_BUS_ID_LEN = 16
+        integer, parameter :: VIS_I32_TOTAL = MAX_VIS_GPUS * VIS_I32_PER_GPU
+        integer(int32) :: send_vis_i32(VIS_I32_TOTAL)
+        integer(int32), allocatable :: recv_vis_i32(:, :)
+        character(len=PCI_BUS_ID_LEN) :: send_vis_pci(MAX_VIS_GPUS)
+        character(len=PCI_BUS_ID_LEN), allocatable :: recv_vis_pci(:, :)
 
         character(len=512) :: env_val, output_dir, filename
         integer(int32) :: env_len, env_stat
@@ -2499,6 +2510,7 @@ contains
         logical :: dir_exists
         logical :: dump_enabled, env_is_logical
         logical :: header_locked
+        integer(int32) :: d, n_vis, base
 
         ! -- 1. Check environment variable --------------------------
         call GET_ENVIRONMENT_VARIABLE("QUOP_DUMP_COMM_INFO", &
@@ -2566,10 +2578,37 @@ contains
         send_i32(17) = self%topology%cpu_numa_node
         send_i32(18) = self%topology%rank_within_cpu_numa
         send_i32(19) = self%topology%rank_within_gpu
+        send_i32(20) = self%backend_flag
+        if (self%requires_device_work_buffer) then
+            send_i32(21) = 1
+        else
+            send_i32(21) = 0
+        end if
+        send_i32(22) = self%topology%ranks_per_gpu
+        send_i32(23) = self%topology%gpu_slot_ordinal
+        if (self%topology%is_gpu_rank) then
+            send_i32(24) = 1
+        else
+            send_i32(24) = 0
+        end if
 
         send_binding_mode = self%topology%binding_mode
         ! Processor/host name (stored as invariant in topology)
         send_proc_name = self%topology%hostname
+
+        ! -- 3b. Pack per-rank visible_gpus data --------------------
+        send_vis_i32 = 0
+        send_vis_pci = ''
+        n_vis = min(self%topology%visible_device_count, MAX_VIS_GPUS)
+        if (allocated(self%topology%visible_gpus)) then
+            do d = 1, min(size(self%topology%visible_gpus), n_vis)
+                base = (d - 1) * VIS_I32_PER_GPU
+                send_vis_i32(base + 1) = self%topology%visible_gpus(d)%device_id
+                send_vis_i32(base + 2) = self%topology%visible_gpus(d)%physical_gpu_index
+                send_vis_i32(base + 3) = self%topology%visible_gpus(d)%numa_node
+                send_vis_pci(d) = self%topology%visible_gpus(d)%pci_bus_id
+            end do
+        end if
 
         ! -- 4. Gather on rank 0 -----------------------------------
         if (mpi_rank == 0) then
@@ -2577,11 +2616,15 @@ contains
             allocate (recv_i32(N_I32, mpi_size))
             allocate (recv_binding_mode(mpi_size))
             allocate (recv_proc_name(mpi_size))
+            allocate (recv_vis_i32(VIS_I32_TOTAL, mpi_size))
+            allocate (recv_vis_pci(MAX_VIS_GPUS, mpi_size))
         else
             allocate (recv_i64(1, 1)) ! dummy
             allocate (recv_i32(1, 1))
             allocate (recv_binding_mode(1))
             allocate (recv_proc_name(1))
+            allocate (recv_vis_i32(1, 1))
+            allocate (recv_vis_pci(1, 1))
         end if
 
         call MPI_Gather(send_i64, N_I64, MPI_INTEGER8, &
@@ -2592,6 +2635,10 @@ contains
                         recv_binding_mode, BIND_MODE_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
         call MPI_Gather(send_proc_name, PROC_NAME_MAXLEN, MPI_CHARACTER, &
                         recv_proc_name, PROC_NAME_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
+        call MPI_Gather(send_vis_i32, VIS_I32_TOTAL, MPI_INTEGER4, &
+                        recv_vis_i32, VIS_I32_TOTAL, MPI_INTEGER4, 0, self%MPI_COMM, ierr)
+        call MPI_Gather(send_vis_pci, MAX_VIS_GPUS * PCI_BUS_ID_LEN, MPI_CHARACTER, &
+                        recv_vis_pci, MAX_VIS_GPUS * PCI_BUS_ID_LEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
 
         ! -- 5. Rank 0 writes the file -----------------------------
         if (mpi_rank == 0) then
@@ -2645,6 +2692,7 @@ contains
                 write (error_unit, '(A,A)') "WARNING: dump_comm_info: could not open ", &
                     trim(filepath)
                 deallocate (recv_i64, recv_i32, recv_binding_mode, recv_proc_name)
+                deallocate (recv_vis_i32, recv_vis_pci)
                 return
             end if
 
@@ -2665,6 +2713,15 @@ contains
             else
                 write (funit, '(A)') 'locked          = False'
             end if
+            if (ref_idx > 0) then
+                write (funit, '(A,I0)') 'backend_flag    = ', recv_i32(20, ref_idx)
+                if (recv_i32(21, ref_idx) /= 0) then
+                    write (funit, '(A)') 'requires_device_work_buffer = True'
+                else
+                    write (funit, '(A)') 'requires_device_work_buffer = False'
+                end if
+                write (funit, '(A,I0)') 'ranks_per_gpu   = ', recv_i32(22, ref_idx)
+            end if
             write (funit, '(A)') ''
 
             ! -- Per-rank table -------------------------------------
@@ -2673,14 +2730,14 @@ contains
             write (funit, '(A)') &
                 '  Rank          li      li_off       alloc        d_li       d_alc       d_off'// &
                 '    SC_r  SC_s  NC_r  NC_s  DC_r  DC_s  DN_r  DN_s   GPU  phys  gpu?  cpuNm'// &
-                '   rCpuN   rGpu   node  mode        hostname'
-            write (funit, '(A)') repeat('-', 290)
+                '   rCpuN   rGpu   slot  igpu   rpg   node  mode        hostname'
+            write (funit, '(A)') repeat('-', 310)
 
             ! Data rows
             do i = 1, mpi_size
                 write (funit, '(I6,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,'// &
                        'I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,'// &
-                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,A10,2X,A)') &
+                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,I5,2X,I5,2X,I6,2X,A10,2X,A)') &
                     i - 1, &
                     recv_i64(1, i), recv_i64(2, i), recv_i64(3, i), & ! li, li_off, alloc
                     recv_i64(4, i), recv_i64(6, i), recv_i64(5, i), & ! d_li, d_alc, d_off
@@ -2690,6 +2747,7 @@ contains
                     recv_i32(7, i), recv_i32(8, i), & ! DN_r, DN_s
                     recv_i32(11, i), recv_i32(16, i), recv_i32(12, i), & ! GPU, phys, gpu?
                     recv_i32(17, i), recv_i32(18, i), recv_i32(19, i), & ! cpu_numa, rank_within_cpu_numa, rank_within_gpu
+                    recv_i32(23, i), recv_i32(24, i), recv_i32(22, i), & ! gpu_slot_ordinal, is_gpu_rank, ranks_per_gpu
                     recv_i32(14, i), adjustl(recv_binding_mode(i)), & ! node_id, binding mode
                     trim(recv_proc_name(i)) ! hostname
             end do
@@ -2729,6 +2787,42 @@ contains
                 end block
             end if
 
+            ! -- Per-rank GPU visibility ----------------------------
+            block
+                integer(int32) :: r_vis, vd, vb
+                integer(int32) :: v_dev_id, v_phys_idx, v_numa
+                logical :: any_visible
+
+                any_visible = .false.
+                do r_vis = 1, mpi_size
+                    if (recv_i32(10, r_vis) > 0) then
+                        any_visible = .true.
+                        exit
+                    end if
+                end do
+
+                if (any_visible) then
+                    write (funit, '(A)') &
+                        'Per-rank GPU visibility (visible_gpus):'
+                    write (funit, '(A)') &
+                        '  Rank  dev_id  phys_idx  numa  pci_bus_id'
+                    write (funit, '(A)') repeat('-', 60)
+                    do r_vis = 1, mpi_size
+                        n_vis = min(recv_i32(10, r_vis), MAX_VIS_GPUS)
+                        do vd = 1, n_vis
+                            vb = (vd - 1) * VIS_I32_PER_GPU
+                            v_dev_id = recv_vis_i32(vb + 1, r_vis)
+                            v_phys_idx = recv_vis_i32(vb + 2, r_vis)
+                            v_numa = recv_vis_i32(vb + 3, r_vis)
+                            write (funit, '(I6,2X,I6,2X,I8,2X,I4,2X,A)') &
+                                r_vis - 1, v_dev_id, v_phys_idx, v_numa, &
+                                trim(recv_vis_pci(vd, r_vis))
+                        end do
+                    end do
+                    write (funit, '(A)') ''
+                end if
+            end block
+
             ! -- Footer / column legend -----------------------------
             write (funit, '(A)') repeat('=', 70)
             write (funit, '(A)') 'Column legend:'
@@ -2749,6 +2843,9 @@ contains
             write (funit, '(A)') '  cpuNm         : cpu_numa_node (best NUMA match for this rank''s CPU affinity)'
             write (funit, '(A)') '  rCpuN         : rank_within_cpu_numa (lower NODECOMM ranks on same CPU NUMA node)'
             write (funit, '(A)') '  rGpu          : rank_within_gpu (lower NODECOMM ranks sharing this GPU)'
+            write (funit, '(A)') '  slot          : gpu_slot_ordinal (dense ordinal of active GPU ranks on node)'
+            write (funit, '(A)') '  igpu          : is_gpu_rank (1 if assigned a topology-defined GPU rank)'
+            write (funit, '(A)') '  rpg           : ranks_per_gpu (QUOP_RANKS_PER_GPU setting)'
             write (funit, '(A)') '  node          : active node_id (0-based within current SUBCOMM; -1 if excluded)'
             write (funit, '(A)') '  mode          : GPU binding mode used by topology assignment'
             write (funit, '(A)') '  hostname      : MPI processor name (often the hostname)'
@@ -2826,6 +2923,7 @@ contains
         end if
 
         deallocate (recv_i64, recv_i32, recv_binding_mode, recv_proc_name)
+        deallocate (recv_vis_i32, recv_vis_pci)
 
     contains
 
