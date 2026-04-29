@@ -69,7 +69,7 @@ def _timed_barrier(comm, timeout_seconds: int = 30, label: str = "") -> None:
     """
     req = comm.Ibarrier()
     deadline = time.monotonic() + timeout_seconds
-    while not req.Test()[0]:
+    while not req.Test():
         if time.monotonic() > deadline:
             rank = comm.Get_rank()
             _flush_process_output()
