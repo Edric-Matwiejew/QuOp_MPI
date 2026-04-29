@@ -22,7 +22,8 @@ from typing import Dict, List, Optional
 # ─── Dump file parser ───────────────────────────────────────────────────────
 
 # Per-rank table columns in dump output order (after whitespace split).
-# Indices 0-24 are numeric, 25 is binding mode string, 26+ is hostname.
+# Indices 0-26 are numeric, 27 is binding mode string, 28 is binding strategy,
+# 29+ is hostname.
 DUMP_COL_MAP = {
     0: "mpi_rank",
     1: "li",
@@ -107,14 +108,15 @@ def parse_dump_file(filepath: str) -> Dict:
             if stripped == "" or stripped.startswith("Partition") or stripped.startswith("Per-"):
                 break
             parts = stripped.split()
-            if len(parts) < 28:
+            if len(parts) < 29:
                 continue
             try:
                 row: Dict = {}
                 for idx, name in DUMP_COL_MAP.items():
                     row[name] = int(parts[idx])
                 row["binding_mode"] = parts[27].strip()
-                row["hostname"] = " ".join(parts[28:]) if len(parts) > 28 else ""
+                row["binding_strategy"] = parts[28].strip()
+                row["hostname"] = " ".join(parts[29:]) if len(parts) > 29 else ""
                 result["ranks"].append(row)
             except (ValueError, IndexError):
                 continue
@@ -489,7 +491,7 @@ def check_topology_consistency(
 def dump_to_csv(ranks: List[Dict], out=sys.stdout) -> None:
     if not ranks:
         return
-    fields = list(DUMP_COL_MAP.values()) + ["binding_mode", "hostname"]
+    fields = list(DUMP_COL_MAP.values()) + ["binding_mode", "binding_strategy", "hostname"]
     writer = csv.DictWriter(out, fieldnames=fields)
     writer.writeheader()
     for r in ranks:

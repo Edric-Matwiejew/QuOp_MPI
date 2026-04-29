@@ -197,6 +197,9 @@ TIER1_WORKER_TESTS=(
     "W04 1 16 2 sequential gpu 256 4"
     "W05 1  4 1 auto       work  64 2"
     "W06 1  8 1 auto       work 128 4"
+    # Auto-mode GPU runs (exercise NUMA-aware path with sequential fallback)
+    "W07 1  8 1 auto       gpu  128 1"
+    "W08 2 16 2 auto       gpu  512 1"
 )
 
 run_tier1() {

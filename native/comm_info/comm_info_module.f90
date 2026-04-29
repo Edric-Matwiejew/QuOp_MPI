@@ -1455,6 +1455,7 @@ contains
         ! Ensure deterministic defaults even when backend_flag == 0
         topo%ranks_per_gpu = 0
         topo%binding_mode = 'none'
+        topo%binding_strategy = 'none'
         topo%visible_device_count = 0
         topo%n_physical_gpus = 0
         topo%my_gpu_index = -1
@@ -2494,6 +2495,8 @@ contains
         integer, parameter :: PROC_NAME_MAXLEN = MPI_MAX_PROCESSOR_NAME
         character(len=BIND_MODE_MAXLEN) :: send_binding_mode
         character(len=BIND_MODE_MAXLEN), allocatable :: recv_binding_mode(:)
+        character(len=BIND_MODE_MAXLEN) :: send_binding_strategy
+        character(len=BIND_MODE_MAXLEN), allocatable :: recv_binding_strategy(:)
         character(len=PROC_NAME_MAXLEN) :: send_proc_name
         character(len=PROC_NAME_MAXLEN), allocatable :: recv_proc_name(:)
 
@@ -2605,6 +2608,7 @@ contains
         send_i32(26) = self%n_workers
 
         send_binding_mode = self%topology%binding_mode
+        send_binding_strategy = self%topology%binding_strategy
         ! Processor/host name (stored as invariant in topology)
         send_proc_name = self%topology%hostname
 
@@ -2627,6 +2631,7 @@ contains
             allocate (recv_i64(N_I64, mpi_size))
             allocate (recv_i32(N_I32, mpi_size))
             allocate (recv_binding_mode(mpi_size))
+            allocate (recv_binding_strategy(mpi_size))
             allocate (recv_proc_name(mpi_size))
             allocate (recv_vis_i32(VIS_I32_TOTAL, mpi_size))
             allocate (recv_vis_pci(MAX_VIS_GPUS, mpi_size))
@@ -2634,6 +2639,7 @@ contains
             allocate (recv_i64(1, 1)) ! dummy
             allocate (recv_i32(1, 1))
             allocate (recv_binding_mode(1))
+            allocate (recv_binding_strategy(1))
             allocate (recv_proc_name(1))
             allocate (recv_vis_i32(1, 1))
             allocate (recv_vis_pci(1, 1))
@@ -2645,6 +2651,8 @@ contains
                         recv_i32, N_I32, MPI_INTEGER4, 0, self%MPI_COMM, ierr)
         call MPI_Gather(send_binding_mode, BIND_MODE_MAXLEN, MPI_CHARACTER, &
                         recv_binding_mode, BIND_MODE_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
+        call MPI_Gather(send_binding_strategy, BIND_MODE_MAXLEN, MPI_CHARACTER, &
+                        recv_binding_strategy, BIND_MODE_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
         call MPI_Gather(send_proc_name, PROC_NAME_MAXLEN, MPI_CHARACTER, &
                         recv_proc_name, PROC_NAME_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
         call MPI_Gather(send_vis_i32, VIS_I32_TOTAL, MPI_INTEGER4, &
@@ -2703,7 +2711,7 @@ contains
             if (ierr /= 0) then
                 write (error_unit, '(A,A)') "WARNING: dump_comm_info: could not open ", &
                     trim(filepath)
-                deallocate (recv_i64, recv_i32, recv_binding_mode, recv_proc_name)
+                deallocate (recv_i64, recv_i32, recv_binding_mode, recv_binding_strategy, recv_proc_name)
                 deallocate (recv_vis_i32, recv_vis_pci)
                 return
             end if
@@ -2745,14 +2753,14 @@ contains
             write (funit, '(A)') &
                 '  Rank          li      li_off       alloc        d_li       d_alc       d_off'// &
                 '    SC_r  SC_s  NC_r  NC_s  DC_r  DC_s  DN_r  DN_s   GPU  phys  gpu?  cpuNm'// &
-                '   rCpuN   rGpu   slot  igpu   rpg   node   wid  nwk  mode        hostname'
-            write (funit, '(A)') repeat('-', 325)
+                '   rCpuN   rGpu   slot  igpu   rpg   node   wid  nwk  mode        strategy    hostname'
+            write (funit, '(A)') repeat('-', 340)
 
             ! Data rows
             do i = 1, mpi_size
                 write (funit, '(I6,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,'// &
                        'I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,'// &
-                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,I5,2X,I5,2X,I6,2X,I5,2X,I5,2X,A10,2X,A)') &
+                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,I5,2X,I5,2X,I6,2X,I5,2X,I5,2X,A10,2X,A10,2X,A)') &
                     i - 1, &
                     recv_i64(1, i), recv_i64(2, i), recv_i64(3, i), & ! li, li_off, alloc
                     recv_i64(4, i), recv_i64(6, i), recv_i64(5, i), & ! d_li, d_alc, d_off
@@ -2765,6 +2773,7 @@ contains
                     recv_i32(23, i), recv_i32(24, i), recv_i32(22, i), & ! gpu_slot_ordinal, is_gpu_rank, ranks_per_gpu
                     recv_i32(14, i), recv_i32(25, i), recv_i32(26, i), & ! node_id, worker_id, n_workers
                     adjustl(recv_binding_mode(i)), & ! binding mode
+                    adjustl(recv_binding_strategy(i)), & ! actual strategy fired
                     trim(recv_proc_name(i)) ! hostname
             end do
             write (funit, '(A)') ''
@@ -2940,7 +2949,7 @@ contains
             close (funit)
         end if
 
-        deallocate (recv_i64, recv_i32, recv_binding_mode, recv_proc_name)
+        deallocate (recv_i64, recv_i32, recv_binding_mode, recv_binding_strategy, recv_proc_name)
         deallocate (recv_vis_i32, recv_vis_pci)
 
     contains
