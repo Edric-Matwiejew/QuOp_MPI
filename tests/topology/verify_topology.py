@@ -217,11 +217,45 @@ def compare_expected_vs_actual(
 # ─── Consistency checks (binding-mode agnostic) ────────────────────────────
 
 
+# Sentinel values expected on ranks sidelined by negotiate (node_id == -1).
+# This occurs when the propagator's max_comm_size logic shrinks the active
+# SUBCOMM below the available rank count (e.g. FFTW-MPI's 1D slab decomposition
+# of N=2048 across 128 ranks gives work to only 32 of them; or composite n-D
+# constrains comm size to divide leading_dim).
+_SIDELINED_SENTINELS = {
+    "sc_r": -1, "sc_s": 0,
+    "nc_r": -1, "nc_s": 0,
+    "dc_r": -1, "dc_s": 0,
+    "dn_r": -1, "dn_s": 0,
+    "is_gpu_rank": 0,
+    "gpu_devcomm_flag": 0,
+    "gpu_slot_ordinal": -1,
+}
+
+
+def summarize_sidelined(actual_ranks: List[Dict]) -> Optional[str]:
+    """Return a one-line summary of negotiate-sidelined ranks, or None."""
+    sidelined = [r for r in actual_ranks if r["node_id"] == -1]
+    if not sidelined:
+        return None
+    total = len(actual_ranks)
+    active = total - len(sidelined)
+    return (
+        f"{len(sidelined)} of {total} ranks sidelined by negotiate "
+        f"(active SUBCOMM size = {active}); see propagator max_comm_size logic."
+    )
+
+
 def check_topology_consistency(
     actual_ranks: List[Dict],
     rpg: int = 1,
 ) -> List[str]:
     """Verify topology invariants on any dump, regardless of binding mode.
+
+    Ranks with ``node_id == -1`` are treated as sidelined by negotiate (the
+    propagator's max_comm_size routine shrank the active SUBCOMM below the
+    available rank count). They are validated against a sentinel pattern
+    and excluded from per-worker SUBCOMM/NODECOMM/DEVCOMM grouping checks.
 
     Parameters
     ----------
@@ -237,16 +271,33 @@ def check_topology_consistency(
         issues.append("No rank data found in dump")
         return issues
 
-    # Detect worker count and group ranks by worker_id.
-    n_workers = actual_ranks[0].get("n_workers", 1)
+    # Partition active vs. negotiate-sidelined ranks. Sidelined ranks get
+    # excluded from grouping checks but are validated for sentinel values.
+    active_ranks = [r for r in actual_ranks if r["node_id"] != -1]
+    sidelined_ranks = [r for r in actual_ranks if r["node_id"] == -1]
+
+    for r in sidelined_ranks:
+        for field, expected in _SIDELINED_SENTINELS.items():
+            if r.get(field) != expected:
+                issues.append(
+                    f"Rank {r['mpi_rank']}: sidelined (node_id=-1) but "
+                    f"{field}={r.get(field)} (expected {expected})"
+                )
+
+    if not active_ranks:
+        # Nothing left to check; everything was sidelined (degenerate case).
+        return issues
+
+    # Detect worker count and group active ranks by worker_id.
+    n_workers = active_ranks[0].get("n_workers", 1)
     worker_groups: Dict[int, List[Dict]] = {}
-    for r in actual_ranks:
+    for r in active_ranks:
         wid = r.get("worker_id", 0)
         worker_groups.setdefault(wid, []).append(r)
 
-    gpu_ranks = [r for r in actual_ranks if r["is_gpu_rank"] == 1]
-    non_gpu_ranks = [r for r in actual_ranks if r["is_gpu_rank"] == 0]
-    nodes = sorted(set(r["node_id"] for r in actual_ranks))
+    gpu_ranks = [r for r in active_ranks if r["is_gpu_rank"] == 1]
+    non_gpu_ranks = [r for r in active_ranks if r["is_gpu_rank"] == 0]
+    nodes = sorted(set(r["node_id"] for r in active_ranks))
 
     # ── Global checks (GPU topology assigned before worker split) ────
 
@@ -316,22 +367,22 @@ def check_topology_consistency(
             )
 
     # 13. rank_within_cpu_numa >= 0 when cpu_numa_node >= 0.
-    for r in actual_ranks:
+    for r in active_ranks:
         if r["cpu_numa_node"] >= 0 and r["rank_within_cpu_numa"] < 0:
             issues.append(
                 f"Rank {r['mpi_rank']}: cpu_numa_node={r['cpu_numa_node']} "
                 f"but rank_within_cpu_numa={r['rank_within_cpu_numa']}"
             )
 
-    # 15. n_workers consistent across all ranks.
-    nwk_values = set(r["n_workers"] for r in actual_ranks)
+    # 15. n_workers consistent across all active ranks.
+    nwk_values = set(r["n_workers"] for r in active_ranks)
     if len(nwk_values) > 1:
         issues.append(f"Inconsistent n_workers across ranks: {nwk_values}")
 
     # 16. worker_id in [0, n_workers-1].
     if nwk_values:
         nwk = list(nwk_values)[0]
-        wids = set(r["worker_id"] for r in actual_ranks)
+        wids = set(r["worker_id"] for r in active_ranks)
         for wid in wids:
             if not (0 <= wid < nwk):
                 issues.append(
@@ -504,6 +555,10 @@ def cmd_compare(args: List[str]) -> int:
     else:
         print("=== All consistency checks passed ===")
 
+    sidelined_msg = summarize_sidelined(dump["ranks"])
+    if sidelined_msg:
+        print(f"\nNote: {sidelined_msg}")
+
     return 0 if ok else 1
 
 
@@ -532,10 +587,16 @@ def cmd_check(args: List[str]) -> int:
         print("=== Consistency issues ===")
         for iss in issues:
             print(f"  WARN  {iss}")
-        return 1
+        rc = 1
     else:
         print("=== All consistency checks passed ===")
-        return 0
+        rc = 0
+
+    sidelined_msg = summarize_sidelined(dump["ranks"])
+    if sidelined_msg:
+        print(f"\nNote: {sidelined_msg}")
+
+    return rc
 
 
 def cmd_parse(args: List[str]) -> int:
