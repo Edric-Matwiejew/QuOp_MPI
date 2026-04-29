@@ -1656,8 +1656,7 @@ contains
                             (my_node_id - node_remainder * (nodes_per_worker + 1)) &
                             / nodes_per_worker
                 end if
-            else
-#ifdef WAVEFRONT_BACKEND
+            else if (backend_flag == 1) then
                 ! -- GPU-aware intra-node split ----------------------
                 ! Distribute workers across nodes according to the number
                 ! of launched GPU-capable ranks on each node, then assign
@@ -1670,6 +1669,11 @@ contains
                 !
                 ! Heterogeneous GPU topology (nodes with different GPU
                 ! counts) is rejected by Python create_workers().
+                !
+                ! Selected at runtime via backend_flag so a wavefront-built
+                ! binary can still execute MPI-backend workloads (the rank-
+                ! based fallback below) on hosts where no GPUs are bound
+                ! into the active topology.
                 allocate (all_worker_info(3 * nprocs))
                 allocate (node_active_gpu_ranks(n_nodes))
                 allocate (workers_per_node(n_nodes))
@@ -1752,8 +1756,9 @@ contains
                 end if
 
                 deallocate (all_worker_info, node_active_gpu_ranks, workers_per_node)
-#else
-                ! -- Rank-based fallback (MPI backend) ---------------
+            else
+                ! -- Rank-based fallback (MPI backend or wavefront-built
+                !    binary running with backend_flag == 0) ----------
                 ! More workers than nodes: must split intra-node.
                 ranks_per_worker = nprocs / n_jacobian_workers
                 rank_remainder = mod(nprocs, n_jacobian_workers)
@@ -1765,7 +1770,6 @@ contains
                             (rank - rank_remainder * (ranks_per_worker + 1)) &
                             / ranks_per_worker
                 end if
-#endif
             end if
 
             si%worker_id = color
