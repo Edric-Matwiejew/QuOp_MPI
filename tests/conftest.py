@@ -17,7 +17,6 @@ import tempfile
 import time
 import traceback
 from ctypes import CDLL
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -768,100 +767,6 @@ def gather_state_probabilities(alg, comm):
 # =============================================================================
 # Algorithm Factory Functions
 # =============================================================================
-
-
-@contextmanager
-def patch_qaoa_mixer(complete_graph_operator_func):
-    """
-    Context manager to temporarily replace QAOA's hypercube mixer with a complete graph.
-
-    This allows testing the actual qaoa class with Grover-like behavior by
-    monkey-patching the sparse.operator.hypercube function during setup.
-
-    Parameters
-    ----------
-    complete_graph_operator_func : callable
-        A function with the same signature as sparse.operator.hypercube
-        that returns a complete graph CSR partition.
-
-    Usage
-    -----
-    >>> complete_op = make_complete_graph_operator(system_size)
-    >>> alg = QAOA(system_size, comm)
-    >>> alg.set_qualities(oracle.qualities_function())
-    >>> alg.set_depth(1)
-    >>> with patch_qaoa_mixer(complete_op):
-    ...     alg.setup()
-    >>> # alg now uses complete graph mixer
-    """
-    from quop_mpi.propagator.sparse import operator as sparse_operator
-
-    # Save original
-    original_hypercube = sparse_operator.hypercube
-
-    # Patch
-    sparse_operator.hypercube = complete_graph_operator_func
-
-    try:
-        yield
-    finally:
-        # Restore
-        sparse_operator.hypercube = original_hypercube
-
-
-def make_complete_graph_operator(system_size: int):
-    """
-    Create a complete graph operator function compatible with sparse.operator.hypercube.
-
-    The returned function has the same signature as hypercube() and can be
-    used to replace it via patch_qaoa_mixer.
-
-    Parameters
-    ----------
-    system_size : int
-        Number of basis states
-
-    Returns
-    -------
-    callable
-        Function compatible with sparse.operator.hypercube signature
-    """
-    from scipy.sparse import csr_matrix
-
-    # Pre-build the complete graph adjacency matrix
-    rows = []
-    cols = []
-    for i in range(system_size):
-        for j in range(system_size):
-            if i != j:
-                rows.append(i)
-                cols.append(j)
-
-    data = np.ones(len(rows), dtype=np.float64)
-    complete_graph = csr_matrix((data, (rows, cols)), shape=(system_size, system_size))
-
-    def complete_graph_operator(partition_table, MPI_COMM, *args, **kwargs):  # noqa: N803
-        """
-        Complete graph operator with same signature as sparse.operator.hypercube.
-
-        Returns CSR partition for a complete graph (all-to-all connectivity).
-        """
-        from quop_mpi._utils._mpi import __scatter_sparse
-
-        rank = MPI_COMM.Get_rank()
-
-        if rank == 0:
-            row_starts = [(complete_graph.tocsr()).indptr + 1]
-            col_indexes = [(complete_graph.tocsr()).indices + 1]
-            values = [(complete_graph.tocsr()).data]
-        else:
-            row_starts = None
-            col_indexes = None
-            values = None
-
-        return __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
-
-    return complete_graph_operator
 
 
 def create_qaoa_complete_graph(system_size: int, comm, oracle: TestOracle = None):

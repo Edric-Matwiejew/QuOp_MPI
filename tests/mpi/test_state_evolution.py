@@ -5,8 +5,10 @@ These tests verify that the Ansatz.evolve_state() method correctly
 evolves the quantum state according to the variational parameters.
 
 Uses test oracles with analytically known outcomes to verify correctness.
-For Grover-like tests, QAOA is patched to use a complete graph mixer
-to enable direct comparison with QWOA using the same parameters.
+For Grover-like tests we use ``create_qaoa_complete_graph`` to build a base
+Ansatz with a diagonal phase separator and a sparse complete-graph mixer,
+which is the QWOA-equivalent composition required for direct comparison
+with QWOA at the same parameters.
 
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_state_evolution.py -v --with-mpi
 """
@@ -16,9 +18,8 @@ import pytest
 
 from tests.conftest import (
     TestOracle,
+    create_qaoa_complete_graph,
     gather_state_probabilities,
-    make_complete_graph_operator,
-    patch_qaoa_mixer,
 )
 
 
@@ -189,17 +190,11 @@ class TestEvolveStateCorrectness:
         the default hypercube), it becomes equivalent to QWOA and should
         achieve the theoretical Grover success probability.
         """
-        from quop_mpi.algorithm.combinatorial import QAOA
-
         oracle = simple_oracle
-        complete_op = make_complete_graph_operator(oracle.system_size)
 
-        alg = QAOA(oracle.system_size, mpi_comm)
-        alg.set_qualities(oracle.qualities_function())
+        alg = create_qaoa_complete_graph(oracle.system_size, mpi_comm, oracle)
         alg.set_depth(1)
-
-        with patch_qaoa_mixer(complete_op):
-            alg.setup()
+        alg.setup()
 
         params = oracle.optimal_params(depth=1)
         alg.evolve_state(params)
@@ -260,18 +255,15 @@ class TestEvolveStateCorrectness:
         implementations, so we compare marked probability rather than
         element-wise equality.
         """
-        from quop_mpi.algorithm.combinatorial import QAOA, QWOA
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
-        complete_op = make_complete_graph_operator(oracle.system_size)
         params = oracle.optimal_params(depth=1)
 
-        # Run QAOA with complete graph
-        alg_qaoa = QAOA(oracle.system_size, mpi_comm)
-        alg_qaoa.set_qualities(oracle.qualities_function())
+        # Run QAOA with complete graph (built via create_qaoa_complete_graph)
+        alg_qaoa = create_qaoa_complete_graph(oracle.system_size, mpi_comm, oracle)
         alg_qaoa.set_depth(1)
-        with patch_qaoa_mixer(complete_op):
-            alg_qaoa.setup()
+        alg_qaoa.setup()
         alg_qaoa.evolve_state(params)
         probs_qaoa = gather_state_probabilities(alg_qaoa, mpi_comm)
 
@@ -309,18 +301,12 @@ class TestEvolveStateCorrectness:
         With analytically derived optimal parameters, the probability should
         concentrate on the marked (solution) states.
         """
-        from quop_mpi.algorithm.combinatorial import QAOA
-
         oracle = single_solution_oracle
-        complete_op = make_complete_graph_operator(oracle.system_size)
         depth = oracle.optimal_iterations
 
-        alg = QAOA(oracle.system_size, mpi_comm)
-        alg.set_qualities(oracle.qualities_function())
+        alg = create_qaoa_complete_graph(oracle.system_size, mpi_comm, oracle)
         alg.set_depth(depth)
-
-        with patch_qaoa_mixer(complete_op):
-            alg.setup()
+        alg.setup()
 
         params = oracle.optimal_params(depth)
         alg.evolve_state(params)
@@ -346,18 +332,12 @@ class TestEvolveStateCorrectness:
         When there are multiple marked states, probability should be
         roughly equal among them (by symmetry of Grover's algorithm).
         """
-        from quop_mpi.algorithm.combinatorial import QAOA
-
         oracle = simple_oracle  # Has 4 marked states
-        complete_op = make_complete_graph_operator(oracle.system_size)
         depth = oracle.optimal_iterations
 
-        alg = QAOA(oracle.system_size, mpi_comm)
-        alg.set_qualities(oracle.qualities_function())
+        alg = create_qaoa_complete_graph(oracle.system_size, mpi_comm, oracle)
         alg.set_depth(depth)
-
-        with patch_qaoa_mixer(complete_op):
-            alg.setup()
+        alg.setup()
 
         params = oracle.optimal_params(depth)
         alg.evolve_state(params)
@@ -384,24 +364,18 @@ class TestEvolveStateCorrectness:
         For problems with unique solutions, more layers generally allow
         better optimization (up to the optimal depth).
         """
-        from quop_mpi.algorithm.combinatorial import QAOA
-
         oracle = TestOracle(
             system_size=_scaled_power_of_two_system_size(mpi_sizing, base=64),
             n_marked=1,
             seed=456,
         )
-        complete_op = make_complete_graph_operator(oracle.system_size)
 
         concentrations = []
 
         for depth in [1, 2, 3]:
-            alg = QAOA(oracle.system_size, mpi_comm)
-            alg.set_qualities(oracle.qualities_function())
+            alg = create_qaoa_complete_graph(oracle.system_size, mpi_comm, oracle)
             alg.set_depth(depth)
-
-            with patch_qaoa_mixer(complete_op):
-                alg.setup()
+            alg.setup()
 
             params = oracle.optimal_params(depth)
             alg.evolve_state(params)
