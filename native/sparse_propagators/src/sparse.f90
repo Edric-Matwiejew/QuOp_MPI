@@ -92,6 +92,10 @@ module sparse
         complex(real64), dimension(:), pointer :: recv_buf => null()
         ! Local values for SpMV (slice of global values)
         complex(real64), dimension(:), pointer :: values_local => null()
+        ! True when *_local pointers own freshly allocated storage (legacy
+        ! globally-indexed path); false when they alias the borrowed
+        ! row_starts/col_indexes/values buffers (locally-indexed path).
+        logical :: owns_local_arrays = .false.
         ! Flag to indicate if graph comm is set up
         logical :: graph_comm_ready = .false.
         ! Flag to indicate if values are explicit (false = all ones)
@@ -1289,33 +1293,40 @@ contains
         ub_elem = int(ubound(A%col_indexes, 1), int64)
         local_nnz = ub_elem - lb_elem + 1
 
-        ! Create local copies - data is already 0-based, just copy directly
-        ! row_starts_local: 1-based array with 0-based offset values
-        allocate (A%row_starts_local(n_local + 1))
+        ! Bind *_local to the CSR storage. The data is already 0-based, so
+        ! when row_starts/col_indexes/values are locally indexed (lbound == 1)
+        ! we alias the borrowed buffers directly to avoid duplicating the CSR
+        ! in memory. The globally-indexed path (used only by the legacy
+        ! csr_dagger/expm pipeline) still allocates owned copies.
         if (lbound(A%row_starts, 1) == 1) then
-            ! Locally indexed: row_starts(1:n_local+1)
-            do i = 1, int(n_local) + 1
-                A%row_starts_local(i) = A%row_starts(i)
-            end do
+            A%owns_local_arrays = .false.
+            A%row_starts_local => A%row_starts
+            A%col_indexes_local => A%col_indexes
+            if (A%has_values .and. associated(A%values)) then
+                A%values_local => A%values
+            end if
         else
+            A%owns_local_arrays = .true.
+            ! row_starts_local: 1-based array with 0-based offset values
+            allocate (A%row_starts_local(n_local + 1))
             ! Globally indexed: row_starts(lb:ub+1) in original 1-based terms
             do i = 1, int(n_local) + 1
                 A%row_starts_local(i) = A%row_starts(partition_table(rank + 1) + i - 2)
             end do
-        end if
 
-        ! col_indexes_local: 1-based array with 0-based column values (already 0-based)
-        allocate (A%col_indexes_local(local_nnz))
-        do i = 1, int(local_nnz)
-            A%col_indexes_local(i) = A%col_indexes(lb_elem + i - 1)
-        end do
-
-        ! Create local values copy (only if has_values is true)
-        if (A%has_values .and. associated(A%values)) then
-            allocate (A%values_local(local_nnz))
+            ! col_indexes_local: 1-based array with 0-based column values (already 0-based)
+            allocate (A%col_indexes_local(local_nnz))
             do i = 1, int(local_nnz)
-                A%values_local(i) = A%values(lb_elem + i - 1)
+                A%col_indexes_local(i) = A%col_indexes(lb_elem + i - 1)
             end do
+
+            ! Create local values copy (only if has_values is true)
+            if (A%has_values .and. associated(A%values)) then
+                allocate (A%values_local(local_nnz))
+                do i = 1, int(local_nnz)
+                    A%values_local(i) = A%values(lb_elem + i - 1)
+                end do
+            end if
         end if
 
         ! Call setup_graph_comm (uses 1-based arrays with 0-based column values)
@@ -1331,6 +1342,12 @@ contains
         ! hash_keys stores 0-based columns, hash_vals stores 1-based positions
         call build_hash_table(A%recv_indices_sorted, A%total_recv, &
                               A%hash_keys, A%hash_vals, A%hash_size)
+
+        ! recv_indices_sorted is only needed to populate the hash table; the
+        ! SpMV path looks up remote columns via A%hash_keys/A%hash_vals, so
+        ! release the sorted index array now to avoid carrying total_recv
+        ! int64 entries for the propagator's lifetime.
+        if (allocated(A%recv_indices_sorted)) deallocate (A%recv_indices_sorted)
 
         ! Allocate persistent communication buffers on host (1-based)
         ! Always needed: CPU path uses them directly, GPU path uses them for
@@ -1467,9 +1484,16 @@ contains
         if (associated(A%hash_vals)) deallocate (A%hash_vals)
         if (associated(A%send_buf)) deallocate (A%send_buf)
         if (associated(A%recv_buf)) deallocate (A%recv_buf)
-        if (associated(A%row_starts_local)) deallocate (A%row_starts_local)
-        if (associated(A%col_indexes_local)) deallocate (A%col_indexes_local)
-        if (associated(A%values_local)) deallocate (A%values_local)
+        if (A%owns_local_arrays) then
+            if (associated(A%row_starts_local)) deallocate (A%row_starts_local)
+            if (associated(A%col_indexes_local)) deallocate (A%col_indexes_local)
+            if (associated(A%values_local)) deallocate (A%values_local)
+        else
+            nullify (A%row_starts_local)
+            nullify (A%col_indexes_local)
+            nullify (A%values_local)
+        end if
+        A%owns_local_arrays = .false.
 
         A%graph_comm_ready = .false.
 

@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 
@@ -22,6 +24,109 @@ def array_list_to_pointers(arrays):
     return owned_arrays, ptrs, array_sizes
 
 
+def _is_compliant_sparse_csr(row_starts, col_indexes, values):
+    """Cheap structural check for canonical sparse CSR buffers.
+
+    Compliant inputs are 1-D, C-contiguous, ``int64``/``complex128``, and
+    expressed in 0-based form with ``row_starts[0] == 0``. Sortedness of
+    columns within each row is *not* checked here -- the native backend
+    validates that precondition via ``check_csr_sorted``.
+    """
+    if row_starts.dtype != np.int64 or col_indexes.dtype != np.int64:
+        return False
+    if not row_starts.flags.c_contiguous or not col_indexes.flags.c_contiguous:
+        return False
+    if row_starts.ndim != 1 or col_indexes.ndim != 1:
+        return False
+    if row_starts.size == 0 or int(row_starts[0]) != 0:
+        return False
+    if values is not None:
+        if values.dtype != np.complex128 or not values.flags.c_contiguous:
+            return False
+        if values.ndim != 1 or values.size != col_indexes.size:
+            return False
+    return True
+
+
+def _normalize_sparse_csr_operator_args(operator_args):
+    """Return canonical 0-based, sorted CSR buffers and a compliance flag.
+
+    When the inputs are already compliant the original arrays are returned
+    unchanged (zero-copy fast path) and the native backend will validate
+    sortedness. Legacy 1-based or unsorted inputs are converted in-place to
+    fresh canonical arrays and ``compliant`` is reported as ``False`` so the
+    caller can emit a deprecation warning.
+    """
+    if len(operator_args) not in (2, 3):
+        raise ValueError(
+            "Sparse CSR operator arguments must contain row_starts, "
+            "col_indexes, and optional values"
+        )
+
+    raw_row_starts = np.asarray(operator_args[0])
+    raw_col_indexes = np.asarray(operator_args[1])
+    raw_values = None if len(operator_args) == 2 else np.asarray(operator_args[2])
+
+    if _is_compliant_sparse_csr(raw_row_starts, raw_col_indexes, raw_values):
+        # Zero-copy fast path. Sortedness is validated in the native backend.
+        return list(operator_args), True
+
+    # Legacy / non-compliant inputs: build canonical copies. In-tree generators
+    # emit 1-based CSR with a per-rank global nnz offset on row_starts; we
+    # detect that via row_starts[0] != 0.
+    legacy_one_based = raw_row_starts.size > 0 and int(raw_row_starts[0]) != 0
+
+    row_starts = np.ascontiguousarray(raw_row_starts, dtype=np.int64)
+    col_indexes = np.ascontiguousarray(raw_col_indexes, dtype=np.int64)
+    values = None if raw_values is None else np.ascontiguousarray(
+        raw_values, dtype=np.complex128
+    )
+
+    # Ensure copies (ascontiguousarray returns the input when types/layout
+    # already match) so we never mutate caller buffers.
+    if row_starts is raw_row_starts:
+        row_starts = row_starts.copy()
+    if col_indexes is raw_col_indexes:
+        col_indexes = col_indexes.copy()
+    if values is not None and values is raw_values:
+        values = values.copy()
+
+    if row_starts.size > 0 and int(row_starts[0]) != 0:
+        row_starts -= row_starts[0]
+    if legacy_one_based:
+        col_indexes -= 1
+
+    monotone = bool(np.all(np.diff(row_starts) >= 0)) if row_starts.size > 0 else True
+    lengths_match = (
+        int(row_starts[-1]) == col_indexes.size
+        if row_starts.size > 0
+        else col_indexes.size == 0
+    )
+    if not (monotone and lengths_match):
+        raise ValueError(
+            "Sparse CSR row_starts must be monotone and terminate at the "
+            "local nnz count"
+        )
+
+    # Sort columns within each row to satisfy the kernel precondition.
+    for row in range(row_starts.size - 1):
+        lo = int(row_starts[row])
+        hi = int(row_starts[row + 1])
+        if hi - lo <= 1:
+            continue
+        order = np.argsort(col_indexes[lo:hi], kind="stable")
+        col_indexes[lo:hi] = col_indexes[lo:hi][order]
+        if values is not None:
+            values[lo:hi] = values[lo:hi][order]
+
+    normalized = (
+        [row_starts, col_indexes]
+        if values is None
+        else [row_starts, col_indexes, values]
+    )
+    return normalized, False
+
+
 class Propagator:
 
     def __init__(self, propagator):
@@ -29,6 +134,9 @@ class Propagator:
         self.initialised = False
         self.ptr = 0
         self._negotiate_callback = None
+        # Strong references to Python buffers borrowed by the native backend
+        # via raw pointers (e.g. sparse CSR partitions). Cleared on destroy().
+        self._native_pinned_buffers = None
         self.ptr, error_code = self.propagator.setup()
         self._raise_propagator_status(
             "initialize propagator",
@@ -53,6 +161,7 @@ class Propagator:
     def destroy(self):
         if self.initialised and self.ptr not in (None, 0):
             self.propagator.destroy(self.ptr)
+        self._native_pinned_buffers = None
         self.ptr = 0
         self.initialised = False
         self._negotiate_callback = None
@@ -130,9 +239,29 @@ class Propagator:
             },
         )
 
-    def gen_operator(self, operator_args):
+    def gen_operator(self, operator_args, *, prepare_sparse_csr=False):
+        """Generate the native operator from ``operator_args``.
+
+        When ``prepare_sparse_csr`` is true the inputs are normalized to the
+        canonical 0-based, sorted CSR contract and the resulting buffers are
+        retained on this instance for the lifetime of the native propagator
+        (the Fortran backend borrows them as raw pointers).
+        """
         self._require_initialised("generate propagator operator")
-        _owned_arrays, ptrs, array_sizes = array_list_to_pointers(operator_args)
+        prepared_args = operator_args
+        if prepare_sparse_csr:
+            prepared_args, inputs_were_compliant = _normalize_sparse_csr_operator_args(
+                operator_args
+            )
+            if not inputs_were_compliant:
+                warnings.warn(
+                    "Legacy sparse CSR inputs are deprecated; return 0-based, "
+                    "contiguous, sorted int64/complex128 arrays instead.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+
+        owned_arrays, ptrs, array_sizes = array_list_to_pointers(prepared_args)
         error_code = self.propagator.gen_operator(self.ptr, ptrs, array_sizes)
         self._raise_propagator_status(
             "generate propagator operator",
@@ -148,6 +277,12 @@ class Propagator:
                 ),
             },
         )
+        if prepare_sparse_csr:
+            # The native backend holds raw pointers into these buffers until
+            # destroy(); keep strong Python references alive here.
+            if self._native_pinned_buffers is None:
+                self._native_pinned_buffers = []
+            self._native_pinned_buffers.append(owned_arrays)
 
     def propagate(self, ts):
         self._require_initialised("propagate")

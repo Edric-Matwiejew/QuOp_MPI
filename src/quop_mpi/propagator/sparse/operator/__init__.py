@@ -18,13 +18,15 @@ sequence of :term:`mixing unitaries <mixing unitary>` with independent
         upper index of the system state and observables partition,
         :class:`quop_mpi.unitary` attribute
 
-    W_col_index : ndarray[int[]]
-        a 1-D integer array containing non-zero column indexes for rows :literal:`lb`
-        to :literal:`ub` , grouped by ascending row index
+    W_col_index : ndarray[int64]
+        a 1-D, C-contiguous integer array containing non-zero column indexes
+        for rows :literal:`lb` to :literal:`ub`, grouped by ascending row
+        index. Column indexes are 0-based and must be sorted in ascending
+        order within each row.
 
-    W_values : ndarray[float] or None
-        a 1-D real array containing non-zero values for rows :literal:`lb`  to :literal:`ub` ,
-        grouped by ascending row index in the same order as :literal:`W_col_index`.
+    W_values : ndarray[complex128] or None
+        a 1-D, C-contiguous complex array containing non-zero values for rows
+        :literal:`lb` to :literal:`ub`, in the same order as :literal:`W_col_index`.
 
         For **unit-valued matrices** (where all non-zero entries are 1.0), this
         may be :literal:`None`. When :literal:`W_values` is :literal:`None`, the propagator
@@ -32,14 +34,24 @@ sequence of :term:`mixing unitaries <mixing unitary>` with independent
         usage and improving performance. This is automatically detected for
         adjacency matrices such as those used by the hypercube mixer.
 
-    W_row_start : ndarray[int]
-        a 1-D integer array of length :literal:`ub - lb + 1` , a cumulative sum of the
-        number of non-zero elements in each row such that
-        :literal:`W_row_start[row_index + 1] - W_row_start[row_index]`  is equal to the
-        number of non-zero elements in the row with index :literal:`row_index`  and
-        :literal:`W_rows_start[row] - local_i_offset`  gives the local starting index
-        for the non-zero column indexes and values in :literal:`W_col_index`  and
-        :literal:`W_values`  for the row with index :literal:`row_index`
+    W_row_start : ndarray[int64]
+        a 1-D, C-contiguous integer array of length :literal:`ub - lb + 2`
+        giving 0-based cumulative offsets into :literal:`W_col_index` and
+        :literal:`W_values` for each local row. The contract is:
+
+        - :literal:`W_row_start[0] == 0`,
+        - :literal:`W_row_start[k + 1] - W_row_start[k]` equals the number
+          of non-zeros in the :literal:`k`-th local row, and
+        - :literal:`W_row_start[-1]` equals the total local nnz.
+
+**Legacy compatibility**
+
+Older sparse operator functions may return 1-based CSR (with
+:literal:`W_row_start[0]` carrying a global nnz offset and column indexes
+offset by 1) or columns that are not sorted within each row. The sparse
+propagator detects these inputs, converts them to the canonical form above,
+and emits a :class:`DeprecationWarning`. Future releases will require the
+canonical contract.
 
 These are returned by the Operator Function as
 :literal:`list[list[W_row_start], list[W_col_indexes], list[W_values]]`.

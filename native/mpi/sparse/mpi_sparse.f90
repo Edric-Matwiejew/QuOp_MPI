@@ -25,6 +25,9 @@ module mpi_sparse
         integer(int64), dimension(:), pointer :: row_starts_0based => null()
         integer(int64), dimension(:), pointer :: col_indexes_0based => null()
         complex(real64), dimension(:), pointer :: values_copy => null()
+        ! These pointers borrow Python-owned buffers; lifetime is managed by
+        ! the Python wrapper, which retains strong references for the lifetime
+        ! of this propagator instance. Do not deallocate.
 
     contains
 
@@ -101,15 +104,14 @@ contains
 
         type(c_ptr) :: array_ptr
 
-        ! Python-facing CSR inputs arrive with 1-based indexing.
+        ! Python-facing CSR inputs arrive already normalized to 0-based CSR.
         integer(int64), dimension(:), pointer :: local_row_starts
         integer(int64), dimension(:), pointer :: local_col_indexes
         complex(real64), dimension(:), pointer :: local_values
 
-        integer(int32) :: i, n_local, nnz_local
+        integer(int32) :: n_local
         integer(int64) :: lb, ub
         integer(int32) :: n_arrays
-        integer(int64) :: row_start_offset
 
         integer(int32) :: ierr, rank, flock
         integer(int32) :: ci_subcomm
@@ -149,26 +151,16 @@ contains
         ub = self%partition_table(rank + 2) - 1
         n_local = int(ub - lb + 1)
 
-        ! Convert to 0-based CSR expected by sparse kernels.
-        nnz_local = int(local_row_starts(n_local + 1) - local_row_starts(1))
-        row_start_offset = local_row_starts(1)
-
-        allocate (self%row_starts_0based(n_local + 1))
-        allocate (self%col_indexes_0based(nnz_local))
-
-        do i = 1, n_local + 1
-            self%row_starts_0based(i) = local_row_starts(i) - row_start_offset
-        end do
-
-        do i = 1, nnz_local
-            self%col_indexes_0based(i) = local_col_indexes(i) - 1
-        end do
+        ! Borrow the already normalized Python CSR buffers for the lifetime of
+        ! this propagator instance. Python retains strong references to the
+        ! exact arrays passed here.
+        self%row_starts_0based => local_row_starts
+        self%col_indexes_0based => local_col_indexes
 
         if (self%generator%has_values) then
-            allocate (self%values_copy(nnz_local))
-            do i = 1, nnz_local
-                self%values_copy(i) = local_values(i)
-            end do
+            self%values_copy => local_values
+        else
+            nullify (self%values_copy)
         end if
 
         ! The sparse backend requires column indices within each row to be
@@ -265,19 +257,14 @@ contains
 
         call cleanup_graph_communications(self%generator)
 
-        if (associated(self%row_starts_0based)) then
-            deallocate (self%row_starts_0based)
-        end if
-        if (associated(self%col_indexes_0based)) then
-            deallocate (self%col_indexes_0based)
-        end if
-        if (associated(self%values_copy)) then
-            deallocate (self%values_copy)
-        end if
-
+        ! row_starts_0based, col_indexes_0based and values_copy point at
+        ! Python-owned buffers; clear the references without deallocating.
         self%generator%row_starts => null()
         self%generator%col_indexes => null()
         self%generator%values => null()
+        self%row_starts_0based => null()
+        self%col_indexes_0based => null()
+        self%values_copy => null()
 
     end subroutine mpi_sparse_destroy
 
