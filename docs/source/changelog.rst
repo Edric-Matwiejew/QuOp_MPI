@@ -4,6 +4,34 @@
 Changelog
 =========
 
+Version 1.6.1 (Unreleased)
+=====================
+
+Added
+-----
+
+- Specialized transverse-field propagators and QAOA helpers for hypercube mixers, with native MPI and wavefront implementations
+- Expanded topology verification tooling and richer ``QUOP_DUMP_COMM_INFO`` diagnostics for backend, binding, and GPU visibility checks
+- Line-trace profiling support for MPI execution debugging
+- Benchmark coverage for comparing sparse and transverse-field QAOA propagation paths
+
+Changed
+-------
+
+- Parallel Jacobian worker coordination now keys communicator leadership and splits from worker identity instead of assuming world rank 0
+- Sparse CSR inputs are now normalized to sorted column order in Python and validated again at the native boundary
+- Environment install/build scripts are quieter by default and more portable across Bash and Z shell environments
+- MPI test coverage expanded across topology negotiation, communicator lifecycle, logging, sampling, and propagator behavior
+
+Fixed
+-----
+
+- Wavefront parallel HDF5 saves now use correct collective file creation and dataspace handling, avoiding resource leaks and inconsistent writes
+- Communicator synchronization and excluded-rank handling no longer desynchronize ``execute()``/``evolve_state()`` paths; collective Python exceptions now propagate consistently
+- NUMA detection and worker splitting fixes improve mixed CPU/GPU wavefront setups, including ranks without an assigned GPU
+- Single-rank and backend-specific MPI paths corrected for FFTW planning and ``MPI_IN_PLACE`` handling
+- Chebyshev sparse propagation now releases all temporary work buffers during teardown
+
 Version 1.6.0 (Unreleased)
 ==========================
 
