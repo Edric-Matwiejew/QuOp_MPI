@@ -2312,7 +2312,7 @@ contains
 
         type(split_info_t), pointer :: si
         type(quop_mpi_layout_t), pointer :: ci
-        integer(int32) :: mpi_rank, subcomm_rank, color, ierr
+        integer(int32) :: mpi_rank, subcomm_rank, color, ierr, jac_key
 
         call c_f_pointer(split_ptr, si)
         call MPI_Comm_rank(MPI_COMM, mpi_rank, ierr)
@@ -2340,8 +2340,6 @@ contains
             call MPI_Comm_split(MPI_COMM, color, mpi_rank, si%JACCOMM, ierr)
             return
         end if
-
-        integer(int32) :: jac_key
 
         if (si%worker_id > 0) then
             ! Worker subcomm: ALL ranks participate in Jacobian evaluation.
