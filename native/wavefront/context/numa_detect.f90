@@ -93,16 +93,20 @@ contains
             return
         end if
 
+        ! numa_sched_getaffinity() returns the size in bytes of the cpumask
+        ! on success (a positive value) and -1 on failure -- it does NOT
+        ! return 0 on success.  Treat any negative return as an error.
         ierr = c_numa_sched_getaffinity(0_c_int, task_mask)
-        if (ierr /= 0_c_int) then
+        if (ierr < 0_c_int) then
             call free_masks(task_mask, node_mask)
             call set_optional_outputs()
             return
         end if
 
         do node = 0_c_int, n_nodes - 1_c_int
+            ! numa_node_to_cpus() returns 0 on success, -1 on error.
             ierr = c_numa_node_to_cpus(node, node_mask)
-            if (ierr /= 0_c_int) cycle
+            if (ierr < 0_c_int) cycle
 
             current_overlap = 0
             do cpu = 0_c_int, n_cpus - 1_c_int

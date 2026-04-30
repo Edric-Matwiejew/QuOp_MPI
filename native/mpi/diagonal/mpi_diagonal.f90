@@ -85,8 +85,8 @@ contains
         error_code = 0
         ci_local_i = self%context%ci%get_local_i()
 
-        self%context%initial_state(:ci_local_i) = exp(cmplx(0.0_real64, -gamma(1), real64) * &
-                                                      self%diagonal_operator) * self%context%initial_state(:ci_local_i)
+        self%context%state(:ci_local_i) = exp(cmplx(0.0_real64, -gamma(1), real64) * &
+                                              self%diagonal_operator) * self%context%state(:ci_local_i)
 
     end subroutine mpi_diagonal_propagate
 

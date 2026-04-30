@@ -191,9 +191,10 @@ class TestContextFromLayout:
             assert ctx.host_alloc_local == padded_alloc_local
             assert ctx.host_alloc_local > ctx.host_local_i
 
-            # State write/read requires device communicator hierarchy
-            # (NODECOMM, DEVCOMM_NODE) on wavefront, which from_partition
-            # does not create.  Verify the buffer round-trip on MPI only.
+            # State write/read requires the wavefront device communicator
+            # hierarchy (DEVCOMM, DEVCOMM_NODE). Explicit from_partition
+            # layouts do not build that hierarchy, so verify the buffer
+            # round-trip on MPI only.
             if config.backend == "mpi":
                 test_state = (
                     np.arange(padded_alloc_local, dtype=np.float64) + 1.0 + 0.5j

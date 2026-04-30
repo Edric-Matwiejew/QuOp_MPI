@@ -282,7 +282,11 @@ if(EXISTS "${_hipfort_cached_config}")
   message(STATUS "Found cached hipfort in ${_hipfort_install_dir}")
 
   set(hipfort_DIR "${_hipfort_install_dir}/lib/cmake/hipfort")
-  find_package(hipfort CONFIG QUIET COMPONENTS hip)
+  find_package(
+    hipfort CONFIG QUIET COMPONENTS hip
+    PATHS "${_hipfort_install_dir}" "${hipfort_DIR}"
+    NO_DEFAULT_PATH
+  )
 
   if(hipfort_FOUND)
     set(_hipfort_skip_system TRUE)
@@ -350,11 +354,17 @@ if(NOT _hipfort_skip_system)
     set(_hf_path "$ENV{HIPFORT_PATH}")
   endif()
   if(_hf_path)
-    list(PREPEND CMAKE_PREFIX_PATH "${_hf_path}" "${_hf_path}/lib/cmake")
+    find_package(
+      hipfort CONFIG QUIET COMPONENTS hip
+      PATHS "${_hf_path}" "${_hf_path}/lib/cmake" "${_hf_path}/lib/cmake/hipfort"
+      NO_DEFAULT_PATH
+    )
   endif()
 
   # Request 'hip' component - required for hipfort::hip target
-  find_package(hipfort CONFIG QUIET COMPONENTS hip)
+  if(NOT hipfort_FOUND)
+    find_package(hipfort CONFIG QUIET COMPONENTS hip)
+  endif()
 
   if(hipfort_FOUND)
     message(VERBOSE "HipfortDependency: Found system hipfort at ${hipfort_DIR}")
@@ -525,28 +535,33 @@ externalproject_add(
 # step, not configure step)
 set(_hipfort_include_dir "${_hipfort_install_dir}/include/hipfort/${_hipfort_platform}")
 set(_hipfort_include_dir_base "${_hipfort_install_dir}/include")
+set(_hipfort_imported_location "${_hipfort_install_dir}/lib/libhipfort-${_hipfort_platform}.a")
 file(MAKE_DIRECTORY "${_hipfort_include_dir}")
 
 # Create or update the platform-specific target (e.g., hipfort::hipfort-amdgcn) If the target already exists (from an
 # incompatible system hipfort), update it to point to our freshly-built version instead
-if(TARGET hipfort::hipfort-${_hipfort_platform})
+set(_hipfort_platform_target hipfort::hipfort-${_hipfort_platform})
+
+if(TARGET ${_hipfort_platform_target})
   message(STATUS "Updating hipfort::hipfort-${_hipfort_platform} target")
-  # Update the existing target to point to our build
-  set_target_properties(
-    hipfort::hipfort-${_hipfort_platform}
-    PROPERTIES IMPORTED_LOCATION "${_hipfort_install_dir}/lib/libhipfort-${_hipfort_platform}.a"
-               INTERFACE_INCLUDE_DIRECTORIES "${_hipfort_include_dir};${_hipfort_include_dir_base}"
-  )
-  add_dependencies(hipfort::hipfort-${_hipfort_platform} hipfort_external)
 else()
-  add_library(hipfort::hipfort-${_hipfort_platform} STATIC IMPORTED GLOBAL)
-  add_dependencies(hipfort::hipfort-${_hipfort_platform} hipfort_external)
-  set_target_properties(
-    hipfort::hipfort-${_hipfort_platform}
-    PROPERTIES IMPORTED_LOCATION "${_hipfort_install_dir}/lib/libhipfort-${_hipfort_platform}.a"
-               INTERFACE_INCLUDE_DIRECTORIES "${_hipfort_include_dir};${_hipfort_include_dir_base}"
-  )
+  add_library(${_hipfort_platform_target} STATIC IMPORTED GLOBAL)
 endif()
+
+add_dependencies(${_hipfort_platform_target} hipfort_external)
+set_target_properties(
+  ${_hipfort_platform_target}
+  PROPERTIES IMPORTED_LOCATION "${_hipfort_imported_location}"
+             INTERFACE_INCLUDE_DIRECTORIES "${_hipfort_include_dir};${_hipfort_include_dir_base}"
+)
+
+foreach(_cfg IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+  set_target_properties(
+    ${_hipfort_platform_target}
+    PROPERTIES IMPORTED_LOCATION_${_cfg} "${_hipfort_imported_location}"
+               IMPORTED_LINK_INTERFACE_LANGUAGES_${_cfg} "Fortran"
+  )
+endforeach()
 
 # Create hipfort::hipfort as an alias-like target that links to the platform target This provides a convenient
 # platform-agnostic target name

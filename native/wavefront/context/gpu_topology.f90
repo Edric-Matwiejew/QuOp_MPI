@@ -24,6 +24,7 @@ module gpu_topology
         ! Configuration (read once from environment)
         integer(int32) :: ranks_per_gpu !< From QUOP_RANKS_PER_GPU (default: 1)
         character(len=16) :: binding_mode !< 'auto', 'explicit', 'numa', or 'sequential'
+        character(len=16) :: binding_strategy = 'none' !< actual strategy fired: 'explicit'/'numa'/'sequential'/'none'
 
         ! Detected topology (computed once)
         integer(int32) :: visible_device_count !< hipGetDeviceCount result for this rank
@@ -31,6 +32,7 @@ module gpu_topology
         integer(int32) :: my_gpu_index !< Which physical GPU I'm bound to (0-based)
         integer(int32) :: assigned_device_id !< Device ID to pass to hipSetDevice
         integer(int32) :: rank_within_gpu !< My rank among those sharing my GPU (0-based)
+        integer(int32) :: gpu_slot_ordinal = -1 !< Dense ordinal of active GPU ranks on this node, ordered by physical GPU then NODECOMM rank
         type(visible_gpu_info_t), allocatable :: visible_gpus(:) !< Per-visible-device metadata
         integer(int32) :: cpu_numa_node = -1 !< NUMA node for this rank's CPU affinity, or -1
         integer(int32) :: rank_within_cpu_numa = 0 !< Ranks with lower node_rank on the same CPU NUMA node
@@ -305,6 +307,31 @@ contains
             end do
         end if
 
+        topology%gpu_slot_ordinal = -1
+        if (topology%is_gpu_rank) then
+            block
+                integer(int32), allocatable :: active_gpu_counts(:)
+
+                allocate (active_gpu_counts(topology%n_physical_gpus))
+                active_gpu_counts = 0
+
+                do i = 1, topology%node_size
+                    if (.not. assigned_is_gpu_rank(i)) cycle
+                    g = assigned_physical_indices(i)
+                    if (g >= 0) then
+                        active_gpu_counts(g + 1) = active_gpu_counts(g + 1) + 1
+                    end if
+                end do
+
+                topology%gpu_slot_ordinal = topology%rank_within_gpu
+                do i = 1, topology%my_gpu_index
+                    topology%gpu_slot_ordinal = topology%gpu_slot_ordinal + active_gpu_counts(i)
+                end do
+
+                deallocate (active_gpu_counts)
+            end block
+        end if
+
         ! ===================================================================
         ! Step 6: Count GPU ranks on node (single reduction)
         ! ===================================================================
@@ -321,15 +348,17 @@ contains
         ! ===================================================================
         if (debug_communicators) then
             call MPI_Comm_rank(MPI_COMM_WORLD, global_rank, ierr)
-            write (error_unit, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,L1,A,L1,A,A)') &
+            write (error_unit, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,L1,A,L1,A,A,A,A)') &
                 "DEBUG [Rank ", global_rank, &
                 "]: visible_devices=", topology%visible_device_count, &
                 ", n_physical_gpus=", topology%n_physical_gpus, &
                 ", my_gpu_index=", topology%my_gpu_index, &
+                ", gpu_slot_ordinal=", topology%gpu_slot_ordinal, &
                 ", cpu_numa=", topology%cpu_numa_node, &
                 ", assigned_device=", topology%assigned_device_id, &
                 ", is_gpu_rank=", topology%is_gpu_rank, &
-                ", mode=", trim(topology%binding_mode)
+                ", mode=", trim(topology%binding_mode), &
+                ", strategy=", trim(topology%binding_strategy)
         end if
 
         if ((topology%binding_mode == 'auto' .or. topology%binding_mode == 'numa') .and. &
@@ -397,26 +426,34 @@ contains
 
         select case (trim(topology%binding_mode))
         case ('explicit')
+            topology%binding_strategy = 'explicit'
             call apply_explicit_assignment()
 
         case ('sequential')
+            topology%binding_strategy = 'sequential'
             call apply_sequential_assignment()
 
         case ('numa')
             if (external_binding_detected) then
+                topology%binding_strategy = 'explicit'
                 call apply_explicit_assignment()
             else if (numa_info_available(rank_numa_nodes, gpu_numa_by_physical)) then
+                topology%binding_strategy = 'numa'
                 call apply_numa_assignment()
             else
+                topology%binding_strategy = 'sequential'
                 call apply_sequential_assignment()
             end if
 
         case default ! 'auto'
             if (external_binding_detected) then
+                topology%binding_strategy = 'explicit'
                 call apply_explicit_assignment()
             else if (numa_info_available(rank_numa_nodes, gpu_numa_by_physical)) then
+                topology%binding_strategy = 'numa'
                 call apply_numa_assignment()
             else
+                topology%binding_strategy = 'sequential'
                 call apply_sequential_assignment()
             end if
         end select

@@ -10,6 +10,7 @@ module comm_info_wrapper
     use iso_c_binding, only: c_loc, c_f_pointer, c_ptr, c_null_ptr, c_associated
     use MPI, only: MPI_SUCCESS, MPI_Comm_dup, MPI_Comm_size, MPI_Comm_free
     use comm_info_module, only: quop_mpi_layout_t, split_info_t, &
+                                init_explicit_wavefront_layout_impl => init_explicit_wavefront_layout, &
                                 discover_topology_impl => discover_topology, &
                                 destroy_topology_impl => destroy_topology, &
                                 get_topology_info_impl => get_topology_info, &
@@ -97,6 +98,15 @@ contains
         call ci%destroy()
         deallocate (ci)
     end subroutine destroy
+
+    subroutine init_wavefront_layout(ci_ptr, error_code)
+        !! Forward to the layout-layer explicit wavefront initialiser.
+        !f2py integer(int64), intent(in) :: ci_ptr
+        !f2py integer(int32), intent(out) :: error_code
+        type(c_ptr), intent(in) :: ci_ptr
+        integer(int32), intent(out) :: error_code
+        call init_explicit_wavefront_layout_impl(ci_ptr, error_code)
+    end subroutine init_wavefront_layout
 
     ! -- Lock / unlock -----------------------------------------------
 

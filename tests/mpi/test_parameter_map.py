@@ -337,15 +337,13 @@ class TestParameterMapValidation:
 
         initial_params = np.array([np.pi, 0.4])
 
-        # Setup must be called first so we can check in_subcomm().
-        # The ValueError fires inside subcomm-scoped __to_full();
-        # excluded ranks skip it entirely.
-        alg.setup()
-
-        if alg.subcomms.in_subcomm():
-            with pytest.raises(ValueError):
-                alg.execute(initial_params)
-        else:
+        # ``execute`` is decorated with ``collective_raise=True``, so an
+        # asymmetric ValueError raised inside ``__to_full`` on the
+        # optimiser-leader rank is broadcast over MPI_COMM_WORLD: every
+        # rank (subcomm members and excluded ranks alike) raises the
+        # same exception class.  A plain ``pytest.raises`` therefore
+        # holds collectively without any rank-conditional branching.
+        with pytest.raises(ValueError):
             alg.execute(initial_params)
 
         alg.destroy()
@@ -404,9 +402,10 @@ class TestParameterMapWithEvolveState:
         free_params = np.array([np.pi, oracle.optimal_walk_time])
         alg.evolve_state(free_params)
 
-        # Should be able to get probabilities
+        # Probabilities are gathered to rank 0 of mpi_comm.
         probs = alg.get_probabilities()
-        if probs is not None:
+        if mpi_comm.Get_rank() == 0:
+            assert probs is not None
             assert len(probs) == oracle.system_size
             assert abs(np.sum(probs) - 1.0) < 1e-10
 
@@ -432,17 +431,11 @@ class TestParameterMapWithEvolveState:
         free_params = np.array([np.pi, oracle.optimal_walk_time])
         alg.evolve_state(free_params)
 
-        # Gather probabilities to rank 0
-        local_probs = alg.get_probabilities()
-        if mpi_comm.Get_rank() == 0 and local_probs is not None:
-            full_probs = local_probs
-        else:
-            full_probs = None
-
-        # Use get_final_state to gather properly
+        # Final state is gathered to rank 0 of mpi_comm.
         state = alg.get_final_state()
 
-        if mpi_comm.Get_rank() == 0 and state is not None:
+        if mpi_comm.Get_rank() == 0:
+            assert state is not None
             full_probs = np.abs(state) ** 2
             marked_prob = oracle.compute_marked_probability(full_probs)
             theoretical = oracle.theoretical_success_probability(1)

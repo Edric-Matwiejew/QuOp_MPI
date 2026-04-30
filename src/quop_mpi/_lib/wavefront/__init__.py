@@ -9,6 +9,7 @@ _MODULE_ALIASES = {
     "circulant_propagator": "wavefront_circulant_propagator",
     "composite_propagator": "wavefront_composite_propagator",
     "momentum_propagator": "wavefront_momentum_propagator",
+    "transverse_field_propagator": "wavefront_transverse_field_propagator",
 }
 
 __all__ = list(_MODULE_ALIASES)

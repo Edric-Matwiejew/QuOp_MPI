@@ -22,6 +22,7 @@ BACKEND_EXTENSION_STEMS = {
         "quop_mpi/_lib/mpi/mpi_circulant_propagator",
         "quop_mpi/_lib/mpi/mpi_composite_propagator",
         "quop_mpi/_lib/mpi/mpi_momentum_propagator",
+        "quop_mpi/_lib/mpi/mpi_transverse_field_propagator",
     ),
     "wavefront": (
         "quop_mpi/_lib/wavefront/wavefront_context",
@@ -30,6 +31,7 @@ BACKEND_EXTENSION_STEMS = {
         "quop_mpi/_lib/wavefront/wavefront_circulant_propagator",
         "quop_mpi/_lib/wavefront/wavefront_composite_propagator",
         "quop_mpi/_lib/wavefront/wavefront_momentum_propagator",
+        "quop_mpi/_lib/wavefront/wavefront_transverse_field_propagator",
     ),
 }
 

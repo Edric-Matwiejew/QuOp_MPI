@@ -32,13 +32,15 @@ module gpu_topology
         ! Configuration (read from environment in wavefront; defaults here)
         integer(int32) :: ranks_per_gpu = 0
         character(len=16) :: binding_mode = 'none'
+        character(len=16) :: binding_strategy = 'none'
 
         ! Detected topology (all zero/false for MPI backend)
         integer(int32) :: visible_device_count = 0
         integer(int32) :: n_physical_gpus = 0
-        integer(int32) :: my_gpu_index = 0
-        integer(int32) :: assigned_device_id = 0
+        integer(int32) :: my_gpu_index = -1
+        integer(int32) :: assigned_device_id = -1
         integer(int32) :: rank_within_gpu = 0
+        integer(int32) :: gpu_slot_ordinal = -1
         type(visible_gpu_info_t), allocatable :: visible_gpus(:)
         integer(int32) :: cpu_numa_node = -1
         integer(int32) :: rank_within_cpu_numa = 0

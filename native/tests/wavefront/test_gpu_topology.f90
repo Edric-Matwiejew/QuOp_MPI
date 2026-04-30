@@ -34,7 +34,9 @@ program test_gpu_topology
     integer(int32) :: expected_ranks_per_gpu
     integer(int32) :: actual_device_count
     integer(int32) :: gpu_rank_count, total_gpu_ranks
-    integer(int32) :: i
+    integer(int32) :: i, j, matches, slot
+    integer(int32) :: local_is_gpu
+    integer(int32), allocatable :: gathered_gpu_idx(:), gathered_is_gpu(:), gathered_slot_ord(:)
 
     ! Initialize MPI
     call MPI_Init(ierr)
@@ -188,6 +190,9 @@ program test_gpu_topology
     if (topology%rank_within_gpu < 0) then
         test_passed = 0
         write (error_msg, '(A,I4)') "rank_within_gpu negative: ", topology%rank_within_gpu
+    else if (topology%is_gpu_rank .and. topology%gpu_slot_ordinal < 0) then
+        test_passed = 0
+        write (error_msg, '(A,I4)') "gpu_slot_ordinal negative: ", topology%gpu_slot_ordinal
     end if
 
     if (test_passed == 1) then
@@ -239,6 +244,76 @@ program test_gpu_topology
         write (error_msg, '(A,I4,A,I4)') "devcomm_node_size mismatch: ", topology%devcomm_node_size, &
             " vs counted: ", total_gpu_ranks
     end if
+
+    local_is_gpu = merge(1_int32, 0_int32, topology%is_gpu_rank)
+    allocate (gathered_gpu_idx(nodecomm_size))
+    allocate (gathered_is_gpu(nodecomm_size))
+    allocate (gathered_slot_ord(nodecomm_size))
+
+    call MPI_Allgather(topology%my_gpu_index, 1, MPI_INTEGER, &
+                       gathered_gpu_idx, 1, MPI_INTEGER, NODECOMM, ierr)
+    call MPI_Allgather(local_is_gpu, 1, MPI_INTEGER, &
+                       gathered_is_gpu, 1, MPI_INTEGER, NODECOMM, ierr)
+    call MPI_Allgather(topology%gpu_slot_ordinal, 1, MPI_INTEGER, &
+                       gathered_slot_ord, 1, MPI_INTEGER, NODECOMM, ierr)
+
+    if (test_passed == 1 .and. topology%is_gpu_rank) then
+        if (topology%gpu_slot_ordinal >= total_gpu_ranks) then
+            test_passed = 0
+            write (error_msg, '(A,I4,A,I4)') "gpu_slot_ordinal out of range: ", &
+                topology%gpu_slot_ordinal, " total_gpu_ranks: ", total_gpu_ranks
+        end if
+    end if
+
+    if (test_passed == 1 .and. .not. topology%is_gpu_rank) then
+        if (topology%gpu_slot_ordinal /= -1) then
+            test_passed = 0
+            write (error_msg, '(A,I4)') "non-GPU rank has gpu_slot_ordinal ", topology%gpu_slot_ordinal
+        end if
+    end if
+
+    if (test_passed == 1) then
+        do slot = 0, total_gpu_ranks - 1
+            matches = 0
+            do i = 1, nodecomm_size
+                if (gathered_is_gpu(i) /= 0 .and. gathered_slot_ord(i) == slot) then
+                    matches = matches + 1
+                end if
+            end do
+            if (matches /= 1) then
+                test_passed = 0
+                write (error_msg, '(A,I4,A,I4)') "gpu_slot_ordinal multiplicity mismatch for slot ", &
+                    slot, ": matches=", matches
+                exit
+            end if
+        end do
+    end if
+
+    if (test_passed == 1) then
+        do i = 1, nodecomm_size
+            if (gathered_is_gpu(i) == 0) cycle
+            do j = i + 1, nodecomm_size
+                if (gathered_is_gpu(j) == 0) cycle
+
+                if (gathered_gpu_idx(i) < gathered_gpu_idx(j)) then
+                    if (gathered_slot_ord(i) >= gathered_slot_ord(j)) then
+                        test_passed = 0
+                        error_msg = "gpu_slot_ordinal ordering disagrees with physical GPU ordering"
+                        exit
+                    end if
+                else if (gathered_gpu_idx(i) == gathered_gpu_idx(j)) then
+                    if (gathered_slot_ord(i) >= gathered_slot_ord(j)) then
+                        test_passed = 0
+                        error_msg = "gpu_slot_ordinal ordering disagrees with NODECOMM rank ordering"
+                        exit
+                    end if
+                end if
+            end do
+            if (test_passed == 0) exit
+        end do
+    end if
+
+    deallocate (gathered_gpu_idx, gathered_is_gpu, gathered_slot_ord)
 
     ! GPU ranks should have valid assigned_device_id
     if (topology%is_gpu_rank) then
@@ -309,11 +384,12 @@ program test_gpu_topology
     do i = 0, comm_size - 1
         call MPI_Barrier(COMM, ierr)
         if (comm_rank == i) then
-            write (*, '(A,I3,A,I2,A,I2,A,I2,A,I2,A,I2,A,L1)') &
+            write (*, '(A,I3,A,I2,A,I2,A,I2,A,I2,A,I2,A,I3,A,L1)') &
                 "  Rank ", comm_rank, &
                 ": node_rank=", topology%node_rank, &
                 ", gpu_idx=", topology%my_gpu_index, &
                 ", rank_in_gpu=", topology%rank_within_gpu, &
+                ", slot=", topology%gpu_slot_ordinal, &
                 ", dev_id=", topology%assigned_device_id, &
                 ", visible=", topology%visible_device_count, &
                 ", is_gpu=", topology%is_gpu_rank

@@ -60,12 +60,35 @@ contains
         class(sparse_propagator), intent(inout) :: self
         type(mpi_context), target, intent(inout) :: context
         integer(int32), intent(out) :: error_code
+        integer :: alloc_status
+        integer(int32) :: ierr, local_error, synced_error
+        integer(int32) :: ci_subcomm
+        integer(int64) :: ci_alloc_local
 
         error_code = 0
 
         self%context => context
 
-        allocate (self%context%final_state(self%context%ci%get_alloc_local()))
+        ci_subcomm = self%context%ci%get_SUBCOMM()
+        ci_alloc_local = self%context%ci%get_alloc_local()
+
+        local_error = 0
+
+        if (.not. associated(self%context%work)) then
+            allocate (self%context%work(ci_alloc_local), stat=alloc_status)
+            if (alloc_status /= 0) then
+                local_error = 1
+            else
+                self%context%work = cmplx(0.0_real64, 0.0_real64, real64)
+            end if
+        else if (size(self%context%work) < ci_alloc_local) then
+            local_error = 1
+        end if
+
+        synced_error = local_error
+        call MPI_Allreduce(local_error, synced_error, 1, MPI_INTEGER4, MPI_MAX, &
+                           ci_subcomm, ierr)
+        error_code = synced_error
 
     end subroutine mpi_sparse_plan
 
@@ -187,16 +210,16 @@ contains
         t = ts(1)
 
         call chebyshev_multiply(self%generator, &
-                                self%context%initial_state, &
+                                self%context%state, &
                                 t, &
                                 self%partition_table, &
-                                self%context%final_state, &
+                                self%context%work, &
                                 self%context%ci%get_SUBCOMM(), &
                                 self%spectral_radius)
 
-        ptr_tmp => self%context%initial_state
-        self%context%initial_state => self%context%final_state
-        self%context%final_state => ptr_tmp
+        ptr_tmp => self%context%state
+        self%context%state => self%context%work
+        self%context%work => ptr_tmp
 
     end subroutine mpi_sparse_propagate
 

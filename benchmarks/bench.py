@@ -3,13 +3,15 @@
 QuOp_MPI Scaling Benchmark
 ===========================
 
-Measures prepare() and evolve_state() wall-clock time for qaoa, qwoa, or qmoa.
+Measures prepare() and evolve_state() wall-clock time for qaoa_sparse,
+qaoa_transverse_field, qwoa, or qmoa.
 
 Usage:
     python bench.py <algorithm> <size_arg> [--verify]
 
 Examples:
-    python bench.py qaoa 1048576
+    python bench.py qaoa_sparse 1048576
+    python bench.py qaoa_transverse_field 1048576
     python bench.py qwoa 1048576 --verify
     python bench.py qmoa "3 3 3 3 3"
 """
@@ -45,13 +47,13 @@ def parse_args():
     )
     parser.add_argument(
         "algorithm",
-        choices=["qaoa", "qwoa", "qmoa"],
+        choices=["qaoa_sparse", "qaoa_transverse_field", "qwoa", "qmoa"],
         help="Algorithm to benchmark.",
     )
     parser.add_argument(
         "size_arg",
         help=(
-            "For qaoa/qwoa: a single system_size."
+            "For qaoa_sparse/qaoa_transverse_field/qwoa: a single system_size."
             " For qmoa: a quoted space-separated"
             " Ns exponent list."
         ),
@@ -133,18 +135,32 @@ def problem_tag(algorithm, system_size, size_spec_value):
 
 def make_algorithm(name, size_args):
     """Instantiate the algorithm and return (alg, system_size)."""
-    if name == "qaoa":
-        from quop_mpi.algorithm.combinatorial import QAOA
+    if name == "qaoa_sparse":
+        from quop_mpi.algorithm.combinatorial import QAOASparse
 
         if len(size_args) != 1:
             msg = (
-                f"qaoa expects exactly 1 size_arg"
+                f"qaoa_sparse expects exactly 1 size_arg"
                 f" (system_size), got"
                 f" {len(size_args)}: {size_args}"
             )
             raise ValueError(msg)
         system_size = size_args[0]
-        alg = QAOA(system_size)
+        alg = QAOASparse(system_size)
+        return alg, system_size
+
+    if name == "qaoa_transverse_field":
+        from quop_mpi.algorithm.combinatorial import QAOATransverseField
+
+        if len(size_args) != 1:
+            msg = (
+                f"qaoa_transverse_field expects exactly 1 size_arg"
+                f" (system_size), got"
+                f" {len(size_args)}: {size_args}"
+            )
+            raise ValueError(msg)
+        system_size = size_args[0]
+        alg = QAOATransverseField(system_size)
         return alg, system_size
 
     if name == "qwoa":

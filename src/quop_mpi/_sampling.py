@@ -141,14 +141,16 @@ class Sampling:
         self.global_minimum_found = False
         self.shots_to_global_minimum = "not found"
 
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
+        if self.subcomms is not None and self.subcomms.is_optimiser_leader():
             print("Executing with simulated sampling.")
 
     @scope("world")
     def _post_sampling(self) -> None:
         """Post simulation steps for simulated sampling."""
 
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
+        # quop_result is owned by the optimiser leader (subcomm 0, SUBCOMM
+        # rank 0); only it should write the sampling fields.
+        if self.subcomms is not None and self.subcomms.is_optimiser_leader():
 
             self.quop_result["sampling total shots"] = self.total_shots
             self.quop_result["sampling minimum measured"] = self.minimum_sampled

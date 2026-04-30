@@ -264,19 +264,29 @@ class Jacobian:
         if rank == 0:
             jacobian = np.zeros(self.n_free_params, dtype=np.float64)
             roots = self.subcomms.get_subcomm_roots()
-            for root, mapping in zip(roots, self.var_map, strict=True):
-                if root > 0:
-                    for var in mapping:
-                        self.MPI_COMM_WORLD.Recv(
-                            [jacobian[var : var + 1], MPI.DOUBLE], source=root, tag=var
-                        )
+            # roots[0] is the optimizer leader (this rank); skip it when
+            # collecting partials.  Use the worker index, not the world rank
+            # value, since a worker leader can legitimately be at world rank 0.
+            for worker_id, (root, mapping) in enumerate(
+                zip(roots, self.var_map, strict=True)
+            ):
+                if worker_id == 0:
+                    continue
+                for var in mapping:
+                    self.MPI_COMM_WORLD.Recv(
+                        [jacobian[var : var + 1], MPI.DOUBLE], source=root, tag=var
+                    )
 
         elif self.subcomms.SUBCOMM.Get_rank() == 0:
             jacobian = None
+            # The optimiser leader is at this world rank, not necessarily 0.
+            optimizer_world_rank = self.subcomms.optimiser_leader_world_rank()
             for part, mapping in zip(
                 partials, self.var_map[self.subcomms.get_subcomm_index()], strict=True
             ):
-                self.MPI_COMM_WORLD.Send([np.array([part]), MPI.DOUBLE], dest=0, tag=mapping)
+                self.MPI_COMM_WORLD.Send(
+                    [np.array([part]), MPI.DOUBLE], dest=optimizer_world_rank, tag=mapping
+                )
         else:
             jacobian = None
 

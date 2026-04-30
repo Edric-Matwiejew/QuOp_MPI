@@ -36,6 +36,7 @@ module comm_info_module
     public :: discover_topology, destroy_topology, get_topology_info, get_layout_topology_info, split_workers, negotiate
     public :: create_jaccomm, create_rootcomm
     public :: create_split_from_subcomm
+    public :: init_explicit_wavefront_layout
     public :: dump_comm_info
 #ifdef WAVEFRONT_BACKEND
     public :: sync_layout_from_device_partition
@@ -121,6 +122,10 @@ module comm_info_module
 
         ! -- Whether any of the propagators requires a device work buffer (wavefront only, false for MPI) --
         logical :: requires_device_work_buffer = .false.
+
+        ! -- Worker split identity (from split_workers) ---------------
+        integer(int32) :: worker_id = 0
+        integer(int32) :: n_workers = 1
 
     contains
 
@@ -1315,6 +1320,64 @@ contains
         topo_ptr = c_null_ptr
     end subroutine destroy_topology
 
+    subroutine init_explicit_wavefront_layout(ci_ptr, error_code)
+        !! Populate NODECOMM and topology on an explicit layout so the
+        !! wavefront backend can initialise native contexts without going
+        !! through the full negotiate path.
+        type(c_ptr), intent(in) :: ci_ptr
+        integer(int32), intent(out) :: error_code
+
+        type(quop_mpi_layout_t), pointer :: ci
+        type(gpu_topology_t), pointer :: topo
+        type(c_ptr) :: topo_ptr
+
+        error_code = 0
+        topo_ptr = c_null_ptr
+
+        if (.not. c_associated(ci_ptr)) then
+            error_code = 1
+            return
+        end if
+
+        call c_f_pointer(ci_ptr, ci)
+        if (.not. associated(ci)) then
+            error_code = 1
+            return
+        end if
+
+        if (ci%locked) then
+            error_code = 1
+            return
+        end if
+
+        if (ci%SUBCOMM == MPI_COMM_NULL) then
+            error_code = 2
+            return
+        end if
+
+        ci%backend_flag = 1
+
+        if (ci%NODECOMM == MPI_COMM_NULL) then
+            call create_layout_nodecomm(ci%SUBCOMM, ci%NODECOMM)
+        end if
+
+        call discover_topology(topo_ptr, ci%SUBCOMM, 1_int32, error_code)
+        if (error_code /= 0) return
+
+        call c_f_pointer(topo_ptr, topo)
+        ci%topology = topo
+        call destroy_topology(topo_ptr)
+
+        ci%DEVCOMM = MPI_COMM_NULL
+        ci%DEVCOMM_NODE = MPI_COMM_NULL
+        ci%device_n_processes = 0_int64
+        ci%device_local_i = 0_int64
+        ci%device_local_i_offset = 0_int64
+        ci%device_alloc_local = 0_int64
+
+        call refresh_layout_topology(ci)
+    end subroutine init_explicit_wavefront_layout
+
     subroutine get_topology_info(topo_ptr, n_physical_gpus, ranks_per_gpu, node_size)
         !! Return key topology fields for Python-side configuration.
         !! NOT collective -- purely local read.
@@ -1392,11 +1455,13 @@ contains
         ! Ensure deterministic defaults even when backend_flag == 0
         topo%ranks_per_gpu = 0
         topo%binding_mode = 'none'
+        topo%binding_strategy = 'none'
         topo%visible_device_count = 0
         topo%n_physical_gpus = 0
-        topo%my_gpu_index = 0
-        topo%assigned_device_id = 0
+        topo%my_gpu_index = -1
+        topo%assigned_device_id = -1
         topo%rank_within_gpu = 0
+        topo%gpu_slot_ordinal = -1
         topo%cpu_numa_node = -1
         topo%rank_within_cpu_numa = 0
         topo%is_gpu_rank = .false.
@@ -1541,9 +1606,13 @@ contains
         integer(int32) :: nodes_per_worker, node_remainder
         integer(int32) :: ranks_per_worker, rank_remainder
         integer(int32) :: subcomm_rank
-        integer(int32) :: wpn_base, wpn_extra
         integer(int32) :: my_node_nw, my_node_w0
-        integer(int32) :: total_node_slots, slot
+        integer(int32) :: my_node_active_gpu_ranks
+        integer(int32) :: my_gpu_ordinal, remaining_workers, progress
+        integer(int32) :: i, other_node_id, other_is_leader, other_active_gpu_ranks
+        integer(int32) :: local_error, global_error
+        integer(int32) :: gather_info(3)
+        integer(int32), allocatable :: all_worker_info(:), node_active_gpu_ranks(:), workers_per_node(:)
 
         status = 0
         allocate (si)
@@ -1588,47 +1657,109 @@ contains
                             (my_node_id - node_remainder * (nodes_per_worker + 1)) &
                             / nodes_per_worker
                 end if
-            else
-#ifdef WAVEFRONT_BACKEND
+            else if (backend_flag == 1) then
                 ! -- GPU-aware intra-node split ----------------------
-                ! Distribute workers across nodes (even, with remainder),
-                ! then assign GPU ranks to workers based on their device
-                ! slot index.  Non-GPU ranks round-robin among their
-                ! node's workers so every worker has at least one GPU.
+                ! Distribute workers across nodes according to the number
+                ! of launched GPU-capable ranks on each node, then assign
+                ! those active GPU ranks evenly to workers.
+                !
+                ! QUOP_RANKS_PER_GPU limits how many launched ranks may
+                ! share a GPU, but it must not create empty workers from
+                ! theoretical slot capacity that has not actually been
+                ! launched into this MPI job.
                 !
                 ! Heterogeneous GPU topology (nodes with different GPU
                 ! counts) is rejected by Python create_workers().
-                wpn_base = n_jacobian_workers / n_nodes
-                wpn_extra = mod(n_jacobian_workers, n_nodes)
+                !
+                ! Selected at runtime via backend_flag so a wavefront-built
+                ! binary can still execute MPI-backend workloads (the rank-
+                ! based fallback below) on hosts where no GPUs are bound
+                ! into the active topology.
+                allocate (all_worker_info(3 * nprocs))
+                allocate (node_active_gpu_ranks(n_nodes))
+                allocate (workers_per_node(n_nodes))
+                node_active_gpu_ranks = 0
+                workers_per_node = 0
 
-                if (my_node_id < wpn_extra) then
-                    my_node_nw = wpn_base + 1
-                    my_node_w0 = my_node_id * (wpn_base + 1)
+                gather_info(1) = my_node_id
+                gather_info(2) = merge(1_int32, 0_int32, topo%node_rank == 0)
+                gather_info(3) = topo%devcomm_node_size
+                call MPI_Allgather(gather_info, 3, MPI_INTEGER, all_worker_info, 3, MPI_INTEGER, MPI_COMM, ierr)
+
+                do i = 0, nprocs - 1
+                    other_node_id = all_worker_info(3 * i + 1)
+                    other_is_leader = all_worker_info(3 * i + 2)
+                    other_active_gpu_ranks = all_worker_info(3 * i + 3)
+                    if (other_node_id >= 0 .and. other_node_id < n_nodes) then
+                        if (other_is_leader /= 0) then
+                            node_active_gpu_ranks(other_node_id + 1) = other_active_gpu_ranks
+                        end if
+                    end if
+                end do
+
+                ! Give each populated node one worker, then hand out the
+                ! remaining workers round-robin up to the number of active
+                ! GPU ranks on that node.
+                remaining_workers = n_jacobian_workers
+                do i = 1, n_nodes
+                    if (node_active_gpu_ranks(i) > 0 .and. remaining_workers > 0) then
+                        workers_per_node(i) = 1
+                        remaining_workers = remaining_workers - 1
+                    end if
+                end do
+
+                do while (remaining_workers > 0)
+                    progress = 0
+                    do i = 1, n_nodes
+                        if (workers_per_node(i) < node_active_gpu_ranks(i)) then
+                            workers_per_node(i) = workers_per_node(i) + 1
+                            remaining_workers = remaining_workers - 1
+                            progress = 1
+                            if (remaining_workers == 0) exit
+                        end if
+                    end do
+                    if (progress == 0) exit
+                end do
+
+                my_node_active_gpu_ranks = topo%devcomm_node_size
+                my_node_nw = workers_per_node(my_node_id + 1)
+
+                if (remaining_workers > 0 .or. (my_node_nw > 0 .and. my_node_active_gpu_ranks <= 0) .or. &
+                    (topo%is_gpu_rank .and. (topo%gpu_slot_ordinal < 0 .or. &
+                     topo%gpu_slot_ordinal >= my_node_active_gpu_ranks))) then
+                    local_error = 1
                 else
-                    my_node_nw = wpn_base
-                    my_node_w0 = wpn_extra * (wpn_base + 1) + &
-                                 (my_node_id - wpn_extra) * wpn_base
+                    local_error = 0
+                end if
+                call MPI_Allreduce(local_error, global_error, 1, MPI_INTEGER, MPI_MAX, MPI_COMM, ierr)
+                if (global_error /= 0) then
+                    deallocate (all_worker_info, node_active_gpu_ranks, workers_per_node)
+                    status = 1
+                    si%SUBCOMM = MPI_COMM_NULL
+                    si%worker_id = -1
+                    split_ptr = c_loc(si)
+                    worker_id = si%worker_id
+                    return
                 end if
 
-                total_node_slots = topo%n_physical_gpus * max(topo%ranks_per_gpu, 1)
+                my_node_w0 = 0
+                do i = 1, my_node_id
+                    my_node_w0 = my_node_w0 + workers_per_node(i)
+                end do
 
-                ! Defence-in-depth: clamp in case n_workers exceeds
-                ! the node's device slots (Python rejects heterogeneous
-                ! topology, so this should not trigger in practice).
-                if (total_node_slots > 0 .and. my_node_nw > total_node_slots) then
-                    my_node_nw = total_node_slots
-                end if
-
-                if (topo%is_gpu_rank .and. total_node_slots > 0) then
-                    slot = topo%my_gpu_index * max(topo%ranks_per_gpu, 1) &
-                           + topo%rank_within_gpu
-                    color = my_node_w0 + slot * my_node_nw / total_node_slots
+                if (topo%is_gpu_rank) then
+                    ! gpu_topology owns the dense per-node GPU slot order.
+                    my_gpu_ordinal = topo%gpu_slot_ordinal
+                    color = my_node_w0 + my_gpu_ordinal * my_node_nw / my_node_active_gpu_ranks
                 else
                     ! Non-GPU rank: round-robin among this node's workers.
                     color = my_node_w0 + mod(topo%node_rank, my_node_nw)
                 end if
-#else
-                ! -- Rank-based fallback (MPI backend) ---------------
+
+                deallocate (all_worker_info, node_active_gpu_ranks, workers_per_node)
+            else
+                ! -- Rank-based fallback (MPI backend or wavefront-built
+                !    binary running with backend_flag == 0) ----------
                 ! More workers than nodes: must split intra-node.
                 ranks_per_worker = nprocs / n_jacobian_workers
                 rank_remainder = mod(nprocs, n_jacobian_workers)
@@ -1640,7 +1771,6 @@ contains
                             (rank - rank_remainder * (ranks_per_worker + 1)) &
                             / ranks_per_worker
                 end if
-#endif
             end if
 
             si%worker_id = color
@@ -1743,6 +1873,8 @@ contains
         ci%MPI_COMM = si%MPI_COMM
         ci%backend_flag = backend_flag
         ci%system_size = system_size
+        ci%worker_id = si%worker_id
+        ci%n_workers = si%n_workers
 
         ! Copy topology invariants (needed even for excluded ranks)
         ci%topology = topo
@@ -2180,7 +2312,7 @@ contains
 
         type(split_info_t), pointer :: si
         type(quop_mpi_layout_t), pointer :: ci
-        integer(int32) :: mpi_rank, subcomm_rank, color, ierr
+        integer(int32) :: mpi_rank, subcomm_rank, color, ierr, jac_key
 
         call c_f_pointer(split_ptr, si)
         call MPI_Comm_rank(MPI_COMM, mpi_rank, ierr)
@@ -2210,22 +2342,30 @@ contains
         end if
 
         if (si%worker_id > 0) then
-            ! Worker subcomm: ALL ranks participate in Jacobian evaluation
+            ! Worker subcomm: ALL ranks participate in Jacobian evaluation.
+            ! Use world rank + 1 as key so the optimizer leader (key = -1)
+            ! always sorts to JACCOMM rank 0.
             color = 0
+            jac_key = mpi_rank + 1
         else if (si%worker_id == 0) then
-            ! Optimizer subcomm: only rank 0 (the optimizer) joins JACCOMM
+            ! Optimizer subcomm: only rank 0 (the optimizer) joins JACCOMM.
+            ! Give it key = -1 so it is always assigned JACCOMM rank 0,
+            ! regardless of its world rank.
             call MPI_Comm_rank(ci%SUBCOMM, subcomm_rank, ierr)
             if (subcomm_rank == 0) then
                 color = 0
+                jac_key = -1
             else
                 color = MPI_UNDEFINED
+                jac_key = mpi_rank
             end if
         else
             ! Inactive rank (excluded during negotiate)
             color = MPI_UNDEFINED
+            jac_key = mpi_rank
         end if
 
-        call MPI_Comm_split(MPI_COMM, color, mpi_rank, si%JACCOMM, ierr)
+        call MPI_Comm_split(MPI_COMM, color, jac_key, si%JACCOMM, ierr)
     end subroutine create_jaccomm
 
     subroutine create_rootcomm(MPI_COMM, split_ptr, layout_ptr)
@@ -2243,6 +2383,7 @@ contains
         type(split_info_t), pointer :: si
         type(quop_mpi_layout_t), pointer :: ci
         integer(int32) :: mpi_rank, subcomm_rank, color, ierr
+        integer(int32) :: root_key
 
         call c_f_pointer(split_ptr, si)
         call MPI_Comm_rank(MPI_COMM, mpi_rank, ierr)
@@ -2271,20 +2412,31 @@ contains
             return
         end if
 
-        ! Determine if this rank is the leader of its SUBCOMM
+        ! Determine if this rank is the leader of its SUBCOMM.
+        ! Use a key that forces the optimizer leader (worker_id == 0,
+        ! subcomm_rank == 0) to ROOTCOMM rank 0 regardless of its world
+        ! rank, matching the convention in _signal_parallel_jacobian_command
+        ! and create_jaccomm.
         if (ci%SUBCOMM /= MPI_COMM_NULL) then
             call MPI_Comm_rank(ci%SUBCOMM, subcomm_rank, ierr)
             if (subcomm_rank == 0) then
                 color = 0
+                if (si%worker_id == 0) then
+                    root_key = -1
+                else
+                    root_key = mpi_rank + 1
+                end if
             else
                 color = MPI_UNDEFINED
+                root_key = mpi_rank
             end if
         else
             ! Inactive rank (excluded during negotiate)
             color = MPI_UNDEFINED
+            root_key = mpi_rank
         end if
 
-        call MPI_Comm_split(MPI_COMM, color, mpi_rank, si%ROOTCOMM, ierr)
+        call MPI_Comm_split(MPI_COMM, color, root_key, si%ROOTCOMM, ierr)
     end subroutine create_rootcomm
 
     subroutine create_split_from_subcomm(si_out, MPI_COMM, SUBCOMM, &
@@ -2354,8 +2506,8 @@ contains
         character(len=*), intent(in)         :: phase
 
         ! -- Per-rank record for MPI_Gather --
-        ! Packed into 10 x int64 + 19 x int32, plus binding mode and hostname strings.
-        integer, parameter :: N_I64 = 10, N_I32 = 19, BIND_MODE_MAXLEN = 16
+        ! Packed into 10 x int64 + 26 x int32, plus binding mode and hostname strings.
+        integer, parameter :: N_I64 = 10, N_I32 = 26, BIND_MODE_MAXLEN = 16
         integer(int64) :: send_i64(N_I64)
         integer(int32) :: send_i32(N_I32)
         integer(int64), allocatable :: recv_i64(:, :)
@@ -2363,8 +2515,21 @@ contains
         integer, parameter :: PROC_NAME_MAXLEN = MPI_MAX_PROCESSOR_NAME
         character(len=BIND_MODE_MAXLEN) :: send_binding_mode
         character(len=BIND_MODE_MAXLEN), allocatable :: recv_binding_mode(:)
+        character(len=BIND_MODE_MAXLEN) :: send_binding_strategy
+        character(len=BIND_MODE_MAXLEN), allocatable :: recv_binding_strategy(:)
         character(len=PROC_NAME_MAXLEN) :: send_proc_name
         character(len=PROC_NAME_MAXLEN), allocatable :: recv_proc_name(:)
+
+        ! -- Per-rank visible_gpus record for MPI_Gather --
+        ! Each visible GPU is packed as 3 x int32 (device_id, physical_gpu_index,
+        ! numa_node) plus a 16-character PCI bus ID string.
+        integer, parameter :: MAX_VIS_GPUS = 16, VIS_I32_PER_GPU = 3
+        integer, parameter :: PCI_BUS_ID_LEN = 16
+        integer, parameter :: VIS_I32_TOTAL = MAX_VIS_GPUS * VIS_I32_PER_GPU
+        integer(int32) :: send_vis_i32(VIS_I32_TOTAL)
+        integer(int32), allocatable :: recv_vis_i32(:, :)
+        character(len=PCI_BUS_ID_LEN) :: send_vis_pci(MAX_VIS_GPUS)
+        character(len=PCI_BUS_ID_LEN), allocatable :: recv_vis_pci(:, :)
 
         character(len=512) :: env_val, output_dir, filename
         integer(int32) :: env_len, env_stat
@@ -2378,6 +2543,7 @@ contains
         logical :: dir_exists
         logical :: dump_enabled, env_is_logical
         logical :: header_locked
+        integer(int32) :: d, n_vis, base
 
         ! -- 1. Check environment variable --------------------------
         call GET_ENVIRONMENT_VARIABLE("QUOP_DUMP_COMM_INFO", &
@@ -2445,22 +2611,58 @@ contains
         send_i32(17) = self%topology%cpu_numa_node
         send_i32(18) = self%topology%rank_within_cpu_numa
         send_i32(19) = self%topology%rank_within_gpu
+        send_i32(20) = self%backend_flag
+        if (self%requires_device_work_buffer) then
+            send_i32(21) = 1
+        else
+            send_i32(21) = 0
+        end if
+        send_i32(22) = self%topology%ranks_per_gpu
+        send_i32(23) = self%topology%gpu_slot_ordinal
+        if (self%topology%is_gpu_rank) then
+            send_i32(24) = 1
+        else
+            send_i32(24) = 0
+        end if
+        send_i32(25) = self%worker_id
+        send_i32(26) = self%n_workers
 
         send_binding_mode = self%topology%binding_mode
+        send_binding_strategy = self%topology%binding_strategy
         ! Processor/host name (stored as invariant in topology)
         send_proc_name = self%topology%hostname
+
+        ! -- 3b. Pack per-rank visible_gpus data --------------------
+        send_vis_i32 = 0
+        send_vis_pci = ''
+        n_vis = min(self%topology%visible_device_count, MAX_VIS_GPUS)
+        if (allocated(self%topology%visible_gpus)) then
+            do d = 1, min(size(self%topology%visible_gpus), n_vis)
+                base = (d - 1) * VIS_I32_PER_GPU
+                send_vis_i32(base + 1) = self%topology%visible_gpus(d)%device_id
+                send_vis_i32(base + 2) = self%topology%visible_gpus(d)%physical_gpu_index
+                send_vis_i32(base + 3) = self%topology%visible_gpus(d)%numa_node
+                send_vis_pci(d) = self%topology%visible_gpus(d)%pci_bus_id
+            end do
+        end if
 
         ! -- 4. Gather on rank 0 -----------------------------------
         if (mpi_rank == 0) then
             allocate (recv_i64(N_I64, mpi_size))
             allocate (recv_i32(N_I32, mpi_size))
             allocate (recv_binding_mode(mpi_size))
+            allocate (recv_binding_strategy(mpi_size))
             allocate (recv_proc_name(mpi_size))
+            allocate (recv_vis_i32(VIS_I32_TOTAL, mpi_size))
+            allocate (recv_vis_pci(MAX_VIS_GPUS, mpi_size))
         else
             allocate (recv_i64(1, 1)) ! dummy
             allocate (recv_i32(1, 1))
             allocate (recv_binding_mode(1))
+            allocate (recv_binding_strategy(1))
             allocate (recv_proc_name(1))
+            allocate (recv_vis_i32(1, 1))
+            allocate (recv_vis_pci(1, 1))
         end if
 
         call MPI_Gather(send_i64, N_I64, MPI_INTEGER8, &
@@ -2469,8 +2671,14 @@ contains
                         recv_i32, N_I32, MPI_INTEGER4, 0, self%MPI_COMM, ierr)
         call MPI_Gather(send_binding_mode, BIND_MODE_MAXLEN, MPI_CHARACTER, &
                         recv_binding_mode, BIND_MODE_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
+        call MPI_Gather(send_binding_strategy, BIND_MODE_MAXLEN, MPI_CHARACTER, &
+                        recv_binding_strategy, BIND_MODE_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
         call MPI_Gather(send_proc_name, PROC_NAME_MAXLEN, MPI_CHARACTER, &
                         recv_proc_name, PROC_NAME_MAXLEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
+        call MPI_Gather(send_vis_i32, VIS_I32_TOTAL, MPI_INTEGER4, &
+                        recv_vis_i32, VIS_I32_TOTAL, MPI_INTEGER4, 0, self%MPI_COMM, ierr)
+        call MPI_Gather(send_vis_pci, MAX_VIS_GPUS * PCI_BUS_ID_LEN, MPI_CHARACTER, &
+                        recv_vis_pci, MAX_VIS_GPUS * PCI_BUS_ID_LEN, MPI_CHARACTER, 0, self%MPI_COMM, ierr)
 
         ! -- 5. Rank 0 writes the file -----------------------------
         if (mpi_rank == 0) then
@@ -2523,7 +2731,8 @@ contains
             if (ierr /= 0) then
                 write (error_unit, '(A,A)') "WARNING: dump_comm_info: could not open ", &
                     trim(filepath)
-                deallocate (recv_i64, recv_i32, recv_binding_mode, recv_proc_name)
+                deallocate (recv_i64, recv_i32, recv_binding_mode, recv_binding_strategy, recv_proc_name)
+                deallocate (recv_vis_i32, recv_vis_pci)
                 return
             end if
 
@@ -2544,6 +2753,18 @@ contains
             else
                 write (funit, '(A)') 'locked          = False'
             end if
+            if (ref_idx > 0) then
+                write (funit, '(A,I0)') 'backend_flag    = ', recv_i32(20, ref_idx)
+                if (recv_i32(21, ref_idx) /= 0) then
+                    write (funit, '(A)') 'requires_device_work_buffer = True'
+                else
+                    write (funit, '(A)') 'requires_device_work_buffer = False'
+                end if
+                write (funit, '(A,I0)') 'ranks_per_gpu   = ', recv_i32(22, ref_idx)
+            end if
+            if (ref_idx > 0) then
+                write (funit, '(A,I0)') 'n_workers       = ', recv_i32(26, ref_idx)
+            end if
             write (funit, '(A)') ''
 
             ! -- Per-rank table -------------------------------------
@@ -2552,14 +2773,14 @@ contains
             write (funit, '(A)') &
                 '  Rank          li      li_off       alloc        d_li       d_alc       d_off'// &
                 '    SC_r  SC_s  NC_r  NC_s  DC_r  DC_s  DN_r  DN_s   GPU  phys  gpu?  cpuNm'// &
-                '   rCpuN   rGpu   node  mode        hostname'
-            write (funit, '(A)') repeat('-', 290)
+                '   rCpuN   rGpu   slot  igpu   rpg   node   wid  nwk  mode        strategy    hostname'
+            write (funit, '(A)') repeat('-', 340)
 
             ! Data rows
             do i = 1, mpi_size
                 write (funit, '(I6,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,I11,2X,'// &
                        'I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,I5,2X,'// &
-                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,A10,2X,A)') &
+                       'I5,2X,I5,2X,I5,2X,I6,2X,I7,2X,I6,2X,I6,2X,I5,2X,I5,2X,I6,2X,I5,2X,I5,2X,A10,2X,A10,2X,A)') &
                     i - 1, &
                     recv_i64(1, i), recv_i64(2, i), recv_i64(3, i), & ! li, li_off, alloc
                     recv_i64(4, i), recv_i64(6, i), recv_i64(5, i), & ! d_li, d_alc, d_off
@@ -2569,7 +2790,10 @@ contains
                     recv_i32(7, i), recv_i32(8, i), & ! DN_r, DN_s
                     recv_i32(11, i), recv_i32(16, i), recv_i32(12, i), & ! GPU, phys, gpu?
                     recv_i32(17, i), recv_i32(18, i), recv_i32(19, i), & ! cpu_numa, rank_within_cpu_numa, rank_within_gpu
-                    recv_i32(14, i), adjustl(recv_binding_mode(i)), & ! node_id, binding mode
+                    recv_i32(23, i), recv_i32(24, i), recv_i32(22, i), & ! gpu_slot_ordinal, is_gpu_rank, ranks_per_gpu
+                    recv_i32(14, i), recv_i32(25, i), recv_i32(26, i), & ! node_id, worker_id, n_workers
+                    adjustl(recv_binding_mode(i)), & ! binding mode
+                    adjustl(recv_binding_strategy(i)), & ! actual strategy fired
                     trim(recv_proc_name(i)) ! hostname
             end do
             write (funit, '(A)') ''
@@ -2608,6 +2832,42 @@ contains
                 end block
             end if
 
+            ! -- Per-rank GPU visibility ----------------------------
+            block
+                integer(int32) :: r_vis, vd, vb
+                integer(int32) :: v_dev_id, v_phys_idx, v_numa
+                logical :: any_visible
+
+                any_visible = .false.
+                do r_vis = 1, mpi_size
+                    if (recv_i32(10, r_vis) > 0) then
+                        any_visible = .true.
+                        exit
+                    end if
+                end do
+
+                if (any_visible) then
+                    write (funit, '(A)') &
+                        'Per-rank GPU visibility (visible_gpus):'
+                    write (funit, '(A)') &
+                        '  Rank  dev_id  phys_idx  numa  pci_bus_id'
+                    write (funit, '(A)') repeat('-', 60)
+                    do r_vis = 1, mpi_size
+                        n_vis = min(recv_i32(10, r_vis), MAX_VIS_GPUS)
+                        do vd = 1, n_vis
+                            vb = (vd - 1) * VIS_I32_PER_GPU
+                            v_dev_id = recv_vis_i32(vb + 1, r_vis)
+                            v_phys_idx = recv_vis_i32(vb + 2, r_vis)
+                            v_numa = recv_vis_i32(vb + 3, r_vis)
+                            write (funit, '(I6,2X,I6,2X,I8,2X,I4,2X,A)') &
+                                r_vis - 1, v_dev_id, v_phys_idx, v_numa, &
+                                trim(recv_vis_pci(vd, r_vis))
+                        end do
+                    end do
+                    write (funit, '(A)') ''
+                end if
+            end block
+
             ! -- Footer / column legend -----------------------------
             write (funit, '(A)') repeat('=', 70)
             write (funit, '(A)') 'Column legend:'
@@ -2628,7 +2888,12 @@ contains
             write (funit, '(A)') '  cpuNm         : cpu_numa_node (best NUMA match for this rank''s CPU affinity)'
             write (funit, '(A)') '  rCpuN         : rank_within_cpu_numa (lower NODECOMM ranks on same CPU NUMA node)'
             write (funit, '(A)') '  rGpu          : rank_within_gpu (lower NODECOMM ranks sharing this GPU)'
+            write (funit, '(A)') '  slot          : gpu_slot_ordinal (dense ordinal of active GPU ranks on node)'
+            write (funit, '(A)') '  igpu          : is_gpu_rank (1 if assigned a topology-defined GPU rank)'
+            write (funit, '(A)') '  rpg           : ranks_per_gpu (QUOP_RANKS_PER_GPU setting)'
             write (funit, '(A)') '  node          : active node_id (0-based within current SUBCOMM; -1 if excluded)'
+            write (funit, '(A)') '  wid           : worker_id (0-based worker/Jacobian group index)'
+            write (funit, '(A)') '  nwk           : n_workers (total worker groups from split_workers)'
             write (funit, '(A)') '  mode          : GPU binding mode used by topology assignment'
             write (funit, '(A)') '  hostname      : MPI processor name (often the hostname)'
             write (funit, '(A)') '  Note: *_r=-1 and *_s=0 indicates MPI_COMM_NULL.'
@@ -2704,7 +2969,8 @@ contains
             close (funit)
         end if
 
-        deallocate (recv_i64, recv_i32, recv_binding_mode, recv_proc_name)
+        deallocate (recv_i64, recv_i32, recv_binding_mode, recv_binding_strategy, recv_proc_name)
+        deallocate (recv_vis_i32, recv_vis_pci)
 
     contains
 

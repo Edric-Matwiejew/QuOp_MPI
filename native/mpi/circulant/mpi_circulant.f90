@@ -257,15 +257,15 @@ contains
         if (synced_error /= 0) return
 
         self%fftw_plan_forward = fftw_mpi_plan_dft_1d(system_size, &
-                                                      self%context%initial_state, &
-                                                      self%context%initial_state, &
+                                                      self%context%state, &
+                                                      self%context%state, &
                                                       self%context%ci%get_SUBCOMM(), &
                                                       FFTW_FORWARD, &
                                                       FFTW_MEASURE)
 
         self%fftw_plan_backward = fftw_mpi_plan_dft_1d(system_size, &
-                                                       self%context%initial_state, &
-                                                       self%context%initial_state, &
+                                                       self%context%state, &
+                                                       self%context%state, &
                                                        self%context%ci%get_SUBCOMM(), &
                                                        FFTW_BACKWARD, &
                                                        FFTW_MEASURE)
@@ -354,21 +354,21 @@ contains
         if (ci_system_size <= 1) then
             ci_local_i = int(self%context%ci%get_local_i(), C_INTPTR_T)
             if (ci_local_i > 0) then
-                self%context%initial_state(1:ci_local_i) = exp(cmplx(0.0_real64, -ts(1) * self%eigenvalues(1), kind=real64)) * &
-                                                           self%context%initial_state(1:ci_local_i)
+                self%context%state(1:ci_local_i) = exp(cmplx(0.0_real64, -ts(1) * self%eigenvalues(1), kind=real64)) * &
+                                                   self%context%state(1:ci_local_i)
             end if
             return
         end if
 
-        call fftw_mpi_execute_dft(self%fftw_plan_forward, self%context%initial_state, self%context%initial_state)
+        call fftw_mpi_execute_dft(self%fftw_plan_forward, self%context%state, self%context%state)
 
-        self%context%initial_state(1:self%local_o) = exp(cmplx(0.0_real64, -ts(1) * self%eigenvalues, kind=real64)) * &
-                                                     self%context%initial_state(1:self%local_o)
+        self%context%state(1:self%local_o) = exp(cmplx(0.0_real64, -ts(1) * self%eigenvalues, kind=real64)) * &
+                                             self%context%state(1:self%local_o)
 
-        self%context%initial_state(1:self%local_o) = self%context%initial_state(1:self%local_o) &
-                                                     / real(self%context%ci%get_system_size(), real64)
+        self%context%state(1:self%local_o) = self%context%state(1:self%local_o) &
+                                             / real(self%context%ci%get_system_size(), real64)
 
-        call fftw_mpi_execute_dft(self%fftw_plan_backward, self%context%initial_state, self%context%initial_state)
+        call fftw_mpi_execute_dft(self%fftw_plan_backward, self%context%state, self%context%state)
 
     end subroutine mpi_circulant_propagate
 

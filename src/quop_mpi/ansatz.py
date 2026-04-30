@@ -117,10 +117,12 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     ansatz_initial_state : ndarray[complex128]
         1-D complex array of :literal:`local_i` values, the
         :term:`initial system state <initial state>`
-    final_state : ndarray[complex128]
+    ansatz_final_state : ndarray[complex128]
         1-D array of :literal:`local_i` elements, the :term:`system state` after
         computation of the state evolution under the action of an
         :term:`ansatz unitary`.
+    final_state : ndarray[complex128]
+        Backward-compatible alias for :attr:`ansatz_final_state`.
     last_evaluated : ndarray[float]
         1-D real array, the last :term:`variational parameters` passed to
         :meth:`~quop_mpi.ansatz.evolve_state`
@@ -274,6 +276,19 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def layout(self) -> QuopMpiLayout | None:
         """The Fortran-backed ``QuopMpiLayout``, or ``None`` before setup."""
         return self._layout
+
+    @property
+    def ansatz_final_state(self) -> np.ndarray | None:
+        """Preferred name for the current/final ansatz state vector.
+
+        This aliases :attr:`final_state`, which is kept for backward
+        compatibility with earlier releases and existing user code.
+        """
+        return self.final_state
+
+    @ansatz_final_state.setter
+    def ansatz_final_state(self, value: np.ndarray | None) -> None:
+        self.final_state = value
 
     # -- Dirty-flag proxy properties --------------------------------
     # These expose individual _Dirty bits as boolean attributes so that
@@ -696,8 +711,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         "partition_table": "Array describing global partitioning scheme",
         # Observables and state
         "local_observables": "Local partition of observable values (after setup)",
-        "ansatz_initial_state": "Local partition of initial state vector",
-        "final_state": "Local partition of current/final state vector",
+        "ansatz_initial_state": "Local partition of the ansatz initial state vector",
+        "ansatz_final_state": "Local partition of the current/final ansatz state vector",
+        "final_state": "Legacy alias for ansatz_final_state",
         # Variational parameters
         "variational_parameters": "Current variational parameter values",
         "ansatz_depth": "Number of ansatz iterations (layers)",
@@ -1325,7 +1341,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self._objective_function_raw is not None:
             self._dirty |= _Dirty.OBJECTIVE
 
-    @scope("world")
+    @scope("world", collective_raise=True)
     def evolve_state(self, variational_parameters: list[float] | np.ndarray[float]) -> None:
         """Compute the :term:`system state` under the action of the
         :term:`ansatz unitary`.
@@ -1388,7 +1404,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.SUBCOMM.Get_rank() == 0:
             self.n_evolutions += 1
-        self.final_state = self.context.state
+        self.ansatz_final_state = self.context.state
         self.last_evaluated = copy(x)
 
     @scope("subcomm", returns="all")
@@ -1428,7 +1444,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         return self.subcomms.SUBCOMM.bcast(expectation_value, root=0)
 
-    @scope("world")
+    @scope("world", collective_raise=True)
     def execute(
         self,
         variational_parameters: list[float] | np.ndarray[float] | None = None,
@@ -1554,7 +1570,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def print_result(self) -> None:
         """Print a summary of the results of the last :term:`QVA` simulation."""
 
-        if self.MPI_COMM_WORLD.Get_rank() != 0:
+        # quop_result is only populated on the optimiser leader
+        # (subcomm 0, SUBCOMM rank 0) and broadcast within subcomm 0.
+        if self.subcomms is None or not self.subcomms.is_optimiser_leader():
             return
 
         print("\nQuOp_MPI Simulation Summary", flush=True)
@@ -1577,7 +1595,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def print_optimiser_result(self) -> None:
         """Print the result returned from the :term:`optimiser` for the last
         :term:`QVA` simulation."""
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
+        if self.subcomms is not None and self.subcomms.is_optimiser_leader():
             print("\nOptimisation Result", flush=True)
             print("===================\n", flush=True)
             print(self.result, flush=True)

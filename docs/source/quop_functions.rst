@@ -135,10 +135,13 @@ Sampling, and Objective Functions:
      - Local partition of observable values (available after setup)
    * - ``ansatz_initial_state``
      - ndarray[complex128]
-     - Local partition of the initial state vector
+     - Local partition of the ansatz initial state vector
+   * - ``ansatz_final_state``
+     - ndarray[complex128]
+     - Local partition of the current/final ansatz state vector
    * - ``final_state``
      - ndarray[complex128]
-     - Local partition of current/final state vector
+     - Legacy alias for ``ansatz_final_state``
    * - ``variational_parameters``
      - ndarray[float64]
      - Current variational parameter values
@@ -248,16 +251,22 @@ bound from the :class:`quop_mpi.unitary` instance:
      - Operator variational parameters (only for parameterised operators)
    * - ``initial_state``
      - ndarray[complex128]
-     - Local partition of input state to this unitary
+     - Legacy explicit Python input buffer for custom Unitary subclasses
    * - ``final_state``
      - ndarray[complex128]
-     - Local partition of output state from this unitary
+     - Legacy explicit Python output buffer for custom Unitary subclasses
 
 .. note::
 
    Attributes marked "(shared)" have the same values in both Ansatz and
    Unitary contexts. Unitary-specific attributes like ``variational_parameters``
    are only meaningful for Operator Functions that define parameterised operators.
+
+   Built-in propagators do not bind operator functions to Python-side
+   ``Unitary.initial_state`` / ``Unitary.final_state`` arrays. They evolve
+   through backend-owned native context buffers. The Unitary-level state names
+   are retained only for custom legacy subclasses that explicitly manage their
+   own Python buffers.
 
 .. glossary::
 

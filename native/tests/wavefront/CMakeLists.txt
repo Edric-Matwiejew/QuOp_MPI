@@ -42,14 +42,14 @@ target_link_directories(wavefront_test_lib PUBLIC
 if(HIP_PLATFORM STREQUAL nvidia)
     target_link_libraries(wavefront_test_lib PUBLIC
         ${CUDA_PATH}/lib64/libcudart.so
-        hipfort::hipfort
+        ${QUOP_HIPFORT_TARGET}
         MPI::MPI_Fortran
         ${NUMA_LIBRARY}
     )
 else()
     target_link_libraries(wavefront_test_lib PUBLIC
         ${ROCM_PATH}/lib/libamdhip64.so
-        hipfort::hipfort
+        ${QUOP_HIPFORT_TARGET}
         MPI::MPI_Fortran
         ${NUMA_LIBRARY}
     )
@@ -330,14 +330,14 @@ target_link_directories(wavefront_context_test_lib PUBLIC
 if(HIP_PLATFORM STREQUAL nvidia)
     target_link_libraries(wavefront_context_test_lib PUBLIC
         ${CUDA_PATH}/lib64/libcudart.so
-        hipfort::hipfort
+        ${QUOP_HIPFORT_TARGET}
         MPI::MPI_Fortran
         ${NUMA_LIBRARY}
     )
 else()
     target_link_libraries(wavefront_context_test_lib PUBLIC
         ${ROCM_PATH}/lib/libamdhip64.so
-        hipfort::hipfort
+        ${QUOP_HIPFORT_TARGET}
         MPI::MPI_Fortran
         ${NUMA_LIBRARY}
     )
@@ -378,3 +378,87 @@ add_gpu_test(wavefront_context_4proc test_wavefront_context 4)
 set_tests_properties(wavefront_context_4proc PROPERTIES
     ENVIRONMENT "QUOP_RANKS_PER_GPU=4"
 )
+
+# ============================================================================
+# Test 5: Wavefront Transverse-Field Regression Test
+#
+# Exercises the transverse-field propagator on a layout where only one rank per
+# node participates in DEVCOMM while all ranks remain in SUBCOMM. That covers
+# the host/device partition mismatch that previously broke operator generation.
+# ============================================================================
+add_library(wavefront_transverse_field_test_lib STATIC
+    $<TARGET_OBJECTS:wavefront_context>
+    $<TARGET_OBJECTS:wavefront_transverse_field>
+    $<TARGET_OBJECTS:transverse_field_common>
+    $<TARGET_OBJECTS:hip_transverse_field_kernels>
+    $<TARGET_OBJECTS:tf_hip_kernels>
+    $<TARGET_OBJECTS:wf_communicators>
+    $<TARGET_OBJECTS:wf_partitions>
+    $<TARGET_OBJECTS:wf_transfer>
+    $<TARGET_OBJECTS:wf_gpu_topology>
+    $<TARGET_OBJECTS:wf_gpu_transfer>
+    $<TARGET_OBJECTS:hip_kernels>
+)
+
+add_dependencies(wavefront_transverse_field_test_lib
+    wavefront_context
+    wavefront_transverse_field
+    transverse_field_common
+    hip_transverse_field_kernels
+    tf_hip_kernels
+    wf_communicators
+    wf_partitions
+    wf_transfer
+    wf_gpu_topology
+    wf_gpu_transfer
+    hip_kernels
+)
+
+target_include_directories(wavefront_transverse_field_test_lib PUBLIC
+    ${ROCM_INCLUDE_DIR}
+    ${WAVEFRONT_MODULE_DIR}
+)
+
+target_link_directories(wavefront_transverse_field_test_lib PUBLIC
+    ${ROCM_LIB_DIR}
+)
+
+if(HIP_PLATFORM STREQUAL nvidia)
+    target_link_libraries(wavefront_transverse_field_test_lib PUBLIC
+        ${CUDA_PATH}/lib64/libcudart.so
+        ${QUOP_HIPFORT_TARGET}
+        MPI::MPI_Fortran
+        ${NUMA_LIBRARY}
+    )
+else()
+    target_link_libraries(wavefront_transverse_field_test_lib PUBLIC
+        ${ROCM_PATH}/lib/libamdhip64.so
+        ${QUOP_HIPFORT_TARGET}
+        MPI::MPI_Fortran
+        ${NUMA_LIBRARY}
+    )
+endif()
+
+if(TARGET CrayGTL::CrayGTL)
+    target_link_libraries(wavefront_transverse_field_test_lib PUBLIC CrayGTL::CrayGTL)
+endif()
+
+add_executable(test_wavefront_transverse_field
+    test_wavefront_transverse_field.f90
+)
+
+set_target_properties(test_wavefront_transverse_field PROPERTIES LINKER_LANGUAGE Fortran)
+
+target_include_directories(test_wavefront_transverse_field PRIVATE
+    ${WAVEFRONT_MODULE_DIR}
+)
+
+target_link_libraries(test_wavefront_transverse_field PRIVATE
+    wavefront_transverse_field_test_lib
+    comm_info_mod
+    ci_gpu_topology
+    ci_communicators
+)
+
+add_gpu_test(wavefront_transverse_field_2proc test_wavefront_transverse_field 2)
+add_gpu_test(wavefront_transverse_field_4proc test_wavefront_transverse_field 4)

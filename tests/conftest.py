@@ -11,10 +11,12 @@ Use --backend to select the backend:
 
 import math
 import os
+import signal
 import sys
 import tempfile
+import time
+import traceback
 from ctypes import CDLL
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +32,11 @@ try:
     _LIBC = CDLL(None)
 except OSError:
     _LIBC = None
+
+
+# Default timeout (seconds) for per-test MPI deadlock detection.
+# Override with ``--mpi-timeout`` on the pytest command line.
+_MPI_TEST_TIMEOUT: int = 120
 
 
 def _flush_process_output() -> None:
@@ -49,6 +56,37 @@ def _flush_process_output() -> None:
             _LIBC.fflush(None)
         except Exception:
             pass
+
+
+def _timed_barrier(comm, timeout_seconds: int = 30, label: str = "") -> None:
+    """Non-blocking barrier with timeout to prevent deadlocks.
+
+    Polls ``Ibarrier`` in a loop.  If *timeout_seconds* elapses before
+    all ranks arrive, the current rank dumps its Python thread stacks to
+    stderr and calls ``MPI.COMM_WORLD.Abort(1)`` so the entire job
+    terminates instead of hanging forever.
+    """
+    req = comm.Ibarrier()
+    deadline = time.monotonic() + timeout_seconds
+    while not req.Test():
+        if time.monotonic() > deadline:
+            rank = comm.Get_rank()
+            _flush_process_output()
+            lines = [
+                f"\n{'='*60}",
+                f"BARRIER TIMEOUT on rank {rank} after {timeout_seconds}s",
+            ]
+            if label:
+                lines.append(f"  context: {label}")
+            lines.append("Stack traces of all threads:")
+            for thread_id, frame in sys._current_frames().items():
+                lines.append(f"\n--- Thread {thread_id} ---")
+                lines.extend(traceback.format_stack(frame))
+            lines.append(f"{'='*60}\n")
+            print("\n".join(lines), file=sys.stderr, flush=True)
+            _flush_process_output()
+            MPI.COMM_WORLD.Abort(1)
+        time.sleep(0.1)
 
 def _system_tmp_is_shared() -> bool:
     """Return True if the system temp directory is writable AND on a shared filesystem.
@@ -111,13 +149,24 @@ def _configure_temp_fallback_if_needed(config):
 
 
 def pytest_addoption(parser):
-    """Add --backend option to pytest."""
+    """Add --backend and --mpi-timeout options to pytest."""
     parser.addoption(
         "--backend",
         action="store",
         default=None,
         choices=["mpi", "wavefront"],
         help="Set the QuOp backend: mpi or wavefront",
+    )
+    parser.addoption(
+        "--mpi-timeout",
+        action="store",
+        type=int,
+        default=_MPI_TEST_TIMEOUT,
+        help=(
+            "Per-test timeout in seconds for MPI deadlock detection. "
+            "When a test exceeds this limit the rank dumps its stack "
+            "traces and calls MPI_Abort. Default: %(default)s"
+        ),
     )
 
 
@@ -357,15 +406,60 @@ def _mpi_barrier_teardown(request):
     ranks are synchronised before the next test begins. Flush each rank's
     Python and C stdio buffers first so the barrier marker better reflects
     the output that preceded it.
+
+    Uses a non-blocking barrier with timeout so that if a test fails on
+    one rank (leaving other ranks stuck in a collective), the job aborts
+    with full stack traces instead of hanging forever.
     """
+    timeout = request.config.getoption("--mpi-timeout", default=_MPI_TEST_TIMEOUT)
     yield
     if MPI.Is_initialized() and not MPI.Is_finalized():
         _flush_process_output()
-        MPI.COMM_WORLD.Barrier()
-        if MPI.COMM_WORLD.Get_rank() == 0:
-            print(f"[BARRIER] after {request.node.nodeid}", file=sys.stderr, flush=True)
+        _timed_barrier(MPI.COMM_WORLD, timeout, label=f"teardown of {request.node.nodeid}")
         _flush_process_output()
-        MPI.COMM_WORLD.Barrier()
+        _timed_barrier(MPI.COMM_WORLD, timeout, label=f"teardown-flush of {request.node.nodeid}")
+
+
+def _mpi_test_timeout_handler(signum, frame):
+    """Signal handler that fires when a test exceeds --mpi-timeout."""
+    rank = MPI.COMM_WORLD.Get_rank() if MPI.Is_initialized() else "?"
+    _flush_process_output()
+    lines = [
+        f"\n{'='*60}",
+        f"MPI TEST TIMEOUT on rank {rank} (SIGALRM)",
+        "Stack traces of all threads:",
+    ]
+    for thread_id, frame in sys._current_frames().items():
+        lines.append(f"\n--- Thread {thread_id} ---")
+        lines.extend(traceback.format_stack(frame))
+    lines.append(f"{'='*60}\n")
+    print("\n".join(lines), file=sys.stderr, flush=True)
+    _flush_process_output()
+    if MPI.Is_initialized() and not MPI.Is_finalized():
+        MPI.COMM_WORLD.Abort(1)
+    sys.exit(1)
+
+
+@pytest.fixture(autouse=True)
+def _mpi_test_timeout(request):
+    """Per-test alarm that fires if a test body deadlocks.
+
+    Sets SIGALRM before the test and cancels it afterwards.  On timeout
+    the handler prints stack traces for every thread on this rank, then
+    calls ``MPI_Abort`` so the entire job terminates with useful output.
+    Only active on Unix (SIGALRM is not available on Windows).
+    """
+    if not hasattr(signal, "SIGALRM"):
+        yield
+        return
+    timeout = request.config.getoption("--mpi-timeout", default=_MPI_TEST_TIMEOUT)
+    old_handler = signal.signal(signal.SIGALRM, _mpi_test_timeout_handler)
+    signal.alarm(timeout)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 @pytest.fixture(scope="session")
@@ -673,100 +767,6 @@ def gather_state_probabilities(alg, comm):
 # =============================================================================
 # Algorithm Factory Functions
 # =============================================================================
-
-
-@contextmanager
-def patch_qaoa_mixer(complete_graph_operator_func):
-    """
-    Context manager to temporarily replace QAOA's hypercube mixer with a complete graph.
-
-    This allows testing the actual qaoa class with Grover-like behavior by
-    monkey-patching the sparse.operator.hypercube function during setup.
-
-    Parameters
-    ----------
-    complete_graph_operator_func : callable
-        A function with the same signature as sparse.operator.hypercube
-        that returns a complete graph CSR partition.
-
-    Usage
-    -----
-    >>> complete_op = make_complete_graph_operator(system_size)
-    >>> alg = QAOA(system_size, comm)
-    >>> alg.set_qualities(oracle.qualities_function())
-    >>> alg.set_depth(1)
-    >>> with patch_qaoa_mixer(complete_op):
-    ...     alg.setup()
-    >>> # alg now uses complete graph mixer
-    """
-    from quop_mpi.propagator.sparse import operator as sparse_operator
-
-    # Save original
-    original_hypercube = sparse_operator.hypercube
-
-    # Patch
-    sparse_operator.hypercube = complete_graph_operator_func
-
-    try:
-        yield
-    finally:
-        # Restore
-        sparse_operator.hypercube = original_hypercube
-
-
-def make_complete_graph_operator(system_size: int):
-    """
-    Create a complete graph operator function compatible with sparse.operator.hypercube.
-
-    The returned function has the same signature as hypercube() and can be
-    used to replace it via patch_qaoa_mixer.
-
-    Parameters
-    ----------
-    system_size : int
-        Number of basis states
-
-    Returns
-    -------
-    callable
-        Function compatible with sparse.operator.hypercube signature
-    """
-    from scipy.sparse import csr_matrix
-
-    # Pre-build the complete graph adjacency matrix
-    rows = []
-    cols = []
-    for i in range(system_size):
-        for j in range(system_size):
-            if i != j:
-                rows.append(i)
-                cols.append(j)
-
-    data = np.ones(len(rows), dtype=np.float64)
-    complete_graph = csr_matrix((data, (rows, cols)), shape=(system_size, system_size))
-
-    def complete_graph_operator(partition_table, MPI_COMM, *args, **kwargs):  # noqa: N803
-        """
-        Complete graph operator with same signature as sparse.operator.hypercube.
-
-        Returns CSR partition for a complete graph (all-to-all connectivity).
-        """
-        from quop_mpi._utils._mpi import __scatter_sparse
-
-        rank = MPI_COMM.Get_rank()
-
-        if rank == 0:
-            row_starts = [(complete_graph.tocsr()).indptr + 1]
-            col_indexes = [(complete_graph.tocsr()).indices + 1]
-            values = [(complete_graph.tocsr()).data]
-        else:
-            row_starts = None
-            col_indexes = None
-            values = None
-
-        return __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
-
-    return complete_graph_operator
 
 
 def create_qaoa_complete_graph(system_size: int, comm, oracle: TestOracle = None):

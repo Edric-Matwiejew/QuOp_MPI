@@ -12,8 +12,9 @@ module mpi_backend
     type mpi_context
         real(real64) :: expectation_value
 
-        complex(real64), dimension(:), pointer :: initial_state => null()
-        complex(real64), dimension(:), pointer :: final_state => null()
+        complex(real64), dimension(:), pointer :: state => null()
+        ! Optional host work buffer for out-of-place propagators (e.g. sparse).
+        complex(real64), dimension(:), pointer :: work => null()
         real(real64), dimension(:), allocatable :: observables
 
         ! Pointer to the shared quop_mpi_layout_t (owned by caller, not freed here)
@@ -53,9 +54,13 @@ contains
 
         local_error = 0
 
-        allocate (self%initial_state(ci_alloc_local), stat=alloc_status)
+        allocate (self%state(ci_alloc_local), stat=alloc_status)
         if (alloc_status /= 0) then
             local_error = 1
+        end if
+
+        if (local_error == 0) then
+            self%state = cmplx(0.0_real64, 0.0_real64, real64)
         end if
 
         if (local_error == 0) then
@@ -80,16 +85,16 @@ contains
     subroutine context_destroy(self)
         class(mpi_context), intent(inout) :: self
 
-        if (associated(self%initial_state)) then
-            deallocate (self%initial_state)
-            self%initial_state => null()
+        if (associated(self%state)) then
+            deallocate (self%state)
+            self%state => null()
         end if
         if (allocated(self%observables)) then
             deallocate (self%observables)
         end if
-        if (associated(self%final_state)) then
-            deallocate (self%final_state)
-            self%final_state => null()
+        if (associated(self%work)) then
+            deallocate (self%work)
+            self%work => null()
         end if
 
         self%ci => null()
@@ -122,11 +127,11 @@ contains
         end if
         if (ci_subcomm == MPI_COMM_NULL) then
             local_error = 1
-        else if (.not. associated(self%initial_state)) then
+        else if (.not. associated(self%state)) then
             local_error = 1
         else if (.not. allocated(self%observables)) then
             local_error = 1
-        else if (size(self%initial_state) < ci_local_i) then
+        else if (size(self%state) < ci_local_i) then
             local_error = 1
         else if (size(self%observables) < ci_local_i) then
             local_error = 1
@@ -144,7 +149,7 @@ contains
         error_code = synced_error
         if (synced_error /= 0) return
 
-        local_expectation_value = dot_product(abs(self%initial_state(:ci_local_i))**2, self%observables(:ci_local_i))
+        local_expectation_value = dot_product(abs(self%state(:ci_local_i))**2, self%observables(:ci_local_i))
 
         call MPI_Allreduce(local_expectation_value, &
                            self%expectation_value, &
@@ -183,9 +188,9 @@ contains
         end if
         if (ci_subcomm == MPI_COMM_NULL) then
             local_error = 1
-        else if (.not. associated(self%initial_state)) then
+        else if (.not. associated(self%state)) then
             local_error = 1
-        else if (size(self%initial_state) < ci_local_i) then
+        else if (size(self%state) < ci_local_i) then
             local_error = 1
         end if
 
@@ -201,7 +206,7 @@ contains
         error_code = synced_error
         if (synced_error /= 0) return
 
-        local_probs = sum(abs(self%initial_state(:ci_local_i))**2)
+        local_probs = sum(abs(self%state(:ci_local_i))**2)
 
         call MPI_Allreduce(local_probs, &
                            context_get_state_norm, &
@@ -321,11 +326,11 @@ contains
         end if
         if (ci_subcomm == MPI_COMM_NULL) then
             local_error = 1
-        else if (.not. associated(self%initial_state)) then
+        else if (.not. associated(self%state)) then
             local_error = 2
         else if (size(state) < ci_local_i) then
             local_error = 1
-        else if (size(state) > size(self%initial_state)) then
+        else if (size(state) > size(self%state)) then
             local_error = 3
         end if
 
@@ -336,7 +341,10 @@ contains
         error_code = synced_error
         if (synced_error /= 0) return
 
-        self%initial_state(:size(state)) = state
+        self%state(:size(state)) = state
+        if (size(state) < size(self%state)) then
+            self%state(size(state) + 1:) = cmplx(0.0_real64, 0.0_real64, real64)
+        end if
     end subroutine context_set_state
 
     subroutine context_get_state(self, state, error_code)
@@ -363,11 +371,11 @@ contains
         end if
         if (ci_subcomm == MPI_COMM_NULL) then
             local_error = 1
-        else if (.not. associated(self%initial_state)) then
+        else if (.not. associated(self%state)) then
             local_error = 2
         else if (size(state) < ci_local_i) then
             local_error = 1
-        else if (size(state) > size(self%initial_state)) then
+        else if (size(state) > size(self%state)) then
             local_error = 3
         end if
 
@@ -378,7 +386,7 @@ contains
         error_code = synced_error
         if (synced_error /= 0) return
 
-        state = self%initial_state(:size(state))
+        state = self%state(:size(state))
     end subroutine context_get_state
 
 end module mpi_backend
