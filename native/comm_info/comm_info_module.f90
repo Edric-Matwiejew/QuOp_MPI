@@ -2341,23 +2341,33 @@ contains
             return
         end if
 
+        integer(int32) :: jac_key
+
         if (si%worker_id > 0) then
-            ! Worker subcomm: ALL ranks participate in Jacobian evaluation
+            ! Worker subcomm: ALL ranks participate in Jacobian evaluation.
+            ! Use world rank + 1 as key so the optimizer leader (key = -1)
+            ! always sorts to JACCOMM rank 0.
             color = 0
+            jac_key = mpi_rank + 1
         else if (si%worker_id == 0) then
-            ! Optimizer subcomm: only rank 0 (the optimizer) joins JACCOMM
+            ! Optimizer subcomm: only rank 0 (the optimizer) joins JACCOMM.
+            ! Give it key = -1 so it is always assigned JACCOMM rank 0,
+            ! regardless of its world rank.
             call MPI_Comm_rank(ci%SUBCOMM, subcomm_rank, ierr)
             if (subcomm_rank == 0) then
                 color = 0
+                jac_key = -1
             else
                 color = MPI_UNDEFINED
+                jac_key = mpi_rank
             end if
         else
             ! Inactive rank (excluded during negotiate)
             color = MPI_UNDEFINED
+            jac_key = mpi_rank
         end if
 
-        call MPI_Comm_split(MPI_COMM, color, mpi_rank, si%JACCOMM, ierr)
+        call MPI_Comm_split(MPI_COMM, color, jac_key, si%JACCOMM, ierr)
     end subroutine create_jaccomm
 
     subroutine create_rootcomm(MPI_COMM, split_ptr, layout_ptr)
