@@ -89,6 +89,8 @@ from __future__ import annotations
 import functools
 from typing import Callable
 
+from ._collective import mpi_check
+
 # ---------------------------------------------------------------------------
 # Scope hierarchy
 # ---------------------------------------------------------------------------
@@ -107,6 +109,31 @@ _SCOPE_CHECKS: dict[str, Callable] = {
     "world": lambda self: True,
     "subcomm": lambda self: (self.subcomms is not None and self.subcomms.in_subcomm()),
     "jaccomm": lambda self: (self.subcomms is not None and self.subcomms.jaccomm is not None),
+}
+
+
+# ---------------------------------------------------------------------------
+# Comm resolvers: scope name  ->  callable(self) -> Intracomm | None
+# ---------------------------------------------------------------------------
+#
+# Used only when ``collective_raise=True`` is requested on a decorated
+# method.  Returns the actual MPI communicator object on which the
+# method's collective error broadcast should run, or ``None`` if this
+# rank is not a member of the relevant comm (in which case the wrapper
+# falls back to the existing short-circuit behaviour).
+
+_SCOPE_COMMS: dict[str, Callable] = {
+    "world": lambda self: getattr(self, "MPI_COMM_WORLD", None),
+    "subcomm": lambda self: (
+        self.subcomms.SUBCOMM
+        if self.subcomms is not None and self.subcomms.in_subcomm()
+        else None
+    ),
+    "jaccomm": lambda self: (
+        self.subcomms.JACCOMM
+        if self.subcomms is not None and self.subcomms.jaccomm is not None
+        else None
+    ),
 }
 
 _VALID_RETURNS = {"none", "all", "root"}
@@ -155,7 +182,7 @@ def _pop_scope(self) -> None:
 # ---------------------------------------------------------------------------
 
 
-def scope(comm_name: str, *, returns: str = "none"):
+def scope(comm_name: str, *, returns: str = "none", collective_raise: bool = False):
     """Decorator factory for MPI communicator scope classification.
 
     Parameters
@@ -164,6 +191,16 @@ def scope(comm_name: str, *, returns: str = "none"):
         The MPI scope in which the decorated method operates.
     returns : ``{'none', 'all', 'root'}``, optional
         Metadata classifier describing the return semantics.
+    collective_raise : bool, optional
+        When ``True`` the wrapper enforces the contract "either every
+        rank of the named scope returns successfully or every rank
+        raises".  Implemented via :func:`quop_mpi._collective.mpi_check`,
+        which performs an ``allgather`` after the body to detect any
+        per-rank failures and re-raise them everywhere.  Default
+        ``False`` to preserve the cost profile of hot inner methods;
+        set to ``True`` on outer entry points (``execute``,
+        ``evolve_state``, ``setup``, ``destroy`` ...) so asymmetric
+        raises in their inner call chain are lifted to the full scope.
 
     Returns
     -------
@@ -188,6 +225,7 @@ def scope(comm_name: str, *, returns: str = "none"):
             f"Unknown returns classifier {returns!r}; " f"choose from {_VALID_RETURNS}"
         )
     check = _SCOPE_CHECKS[comm_name]
+    resolve_comm = _SCOPE_COMMS[comm_name]
     level = _SCOPE_LEVELS[comm_name]
 
     def decorator(method):
@@ -197,6 +235,9 @@ def scope(comm_name: str, *, returns: str = "none"):
                 return None
             _push_scope(self, level, method.__qualname__)
             try:
+                if collective_raise:
+                    comm = resolve_comm(self)
+                    return mpi_check(comm, method, self, *args, **kwargs)
                 return method(self, *args, **kwargs)
             finally:
                 _pop_scope(self)
@@ -205,6 +246,7 @@ def scope(comm_name: str, *, returns: str = "none"):
         wrapper._scope = comm_name
         wrapper._scope_level = level
         wrapper._returns = returns
+        wrapper._collective_raise = collective_raise
         return wrapper
 
     return decorator

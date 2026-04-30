@@ -337,12 +337,12 @@ class TestParameterMapValidation:
 
         initial_params = np.array([np.pi, 0.4])
 
-        # The ValueError fires inside subcomm-scoped __to_full() on every
-        # subcomm rank (via __evolve_state). The simple_oracle fixture sizes
-        # the system so all ranks participate in the subcomm; calling all
-        # ranks under pytest.raises keeps cleanup symmetric and avoids the
-        # rank-asymmetric path that previously left collective state
-        # inconsistent for subsequent tests.
+        # ``execute`` is decorated with ``collective_raise=True``, so an
+        # asymmetric ValueError raised inside ``__to_full`` on the
+        # optimiser-leader rank is broadcast over MPI_COMM_WORLD: every
+        # rank (subcomm members and excluded ranks alike) raises the
+        # same exception class.  A plain ``pytest.raises`` therefore
+        # holds collectively without any rank-conditional branching.
         with pytest.raises(ValueError):
             alg.execute(initial_params)
 

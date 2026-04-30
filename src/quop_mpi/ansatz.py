@@ -1341,7 +1341,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self._objective_function_raw is not None:
             self._dirty |= _Dirty.OBJECTIVE
 
-    @scope("world")
+    @scope("world", collective_raise=True)
     def evolve_state(self, variational_parameters: list[float] | np.ndarray[float]) -> None:
         """Compute the :term:`system state` under the action of the
         :term:`ansatz unitary`.
@@ -1444,7 +1444,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         return self.subcomms.SUBCOMM.bcast(expectation_value, root=0)
 
-    @scope("world")
+    @scope("world", collective_raise=True)
     def execute(
         self,
         variational_parameters: list[float] | np.ndarray[float] | None = None,
