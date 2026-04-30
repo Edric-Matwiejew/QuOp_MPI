@@ -28,18 +28,18 @@
 #
 # Per-algorithm keys inherit from [benchmarks] and can be overridden in the
 # sub-table.  For example [benchmarks.qaoa] may define its own ranks_per_node.
-# qaoa_transverse_field reuses the [benchmarks.qaoa] configuration.
+# qaoa_sparse and qaoa_transverse_field reuse the [benchmarks.qaoa] configuration.
 #
 # Examples (SLURM cluster):
 #   source /scratch/pawsey0123/quop/activate-pawsey-setonix-wavefront.sh
 #   $QUOP_BENCHMARKS_DIR/submit_scaling.sh --account pawsey0123 qwoa 1048576 intra
-#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh --account pawsey0123 qaoa all intra
-#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh --account pawsey0123 qaoa 65536,131072 intra
+#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh --account pawsey0123 qaoa_sparse all intra
+#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh --account pawsey0123 qaoa_sparse 65536,131072 intra
 #
 # Examples (local workstation):
 #   source ~/quop-install/activate-ubuntu-24-mpi.sh
-#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh qaoa 65536 intra
-#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh qaoa all intra
+#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh qaoa_sparse 65536 intra
+#   $QUOP_BENCHMARKS_DIR/submit_scaling.sh qaoa_sparse all intra
 #
 set -euo pipefail
 
@@ -100,9 +100,9 @@ usage() {
     echo "       $0 clean"
     echo ""
     echo "The profile environment must be activated first."
-    echo "  algorithm : qaoa | qaoa_transverse_field | qwoa | qmoa"
+    echo "  algorithm : qaoa_sparse | qaoa_transverse_field | qwoa | qmoa"
     echo "  size_arg  : system size, comma-separated sizes, or 'all' for profile defaults"
-    echo "              qaoa/qaoa_transverse_field/qwoa: integer(s)"
+    echo "              qaoa_sparse/qaoa_transverse_field/qwoa: integer(s)"
     echo "                            e.g. 1048576 or 65536,131072,262144"
     echo "              qmoa:     exponent list(s)    e.g. \"3 3 3 3 3\" or \"3 3 3,4 4 4 4\""
     echo "              'all':    use sizes from [benchmarks.<algo>].args_<phase> in config.toml"
@@ -171,9 +171,9 @@ PHASE="${POSITIONAL[2]}"
 
 # Validate algorithm
 case "$ALGORITHM" in
-    qaoa|qaoa_transverse_field|qwoa|qmoa) ;;
+    qaoa_sparse|qaoa_transverse_field|qwoa|qmoa) ;;
     *)
-        echo "Error: algorithm must be one of qaoa, qaoa_transverse_field, qwoa, qmoa; got '$ALGORITHM'" >&2
+        echo "Error: algorithm must be one of qaoa_sparse, qaoa_transverse_field, qwoa, qmoa; got '$ALGORITHM'" >&2
         exit 1
         ;;
 esac
@@ -199,7 +199,7 @@ esac
 # resolve_array  TARGET KEY   -> populates the TARGET array
 # ---------------------------------------------------------------------------
 CONFIG_ALGORITHM="$ALGORITHM"
-if [[ "$ALGORITHM" == "qaoa_transverse_field" ]]; then
+if [[ "$ALGORITHM" == "qaoa_sparse" || "$ALGORITHM" == "qaoa_transverse_field" ]]; then
     CONFIG_ALGORITHM="qaoa"
 fi
 

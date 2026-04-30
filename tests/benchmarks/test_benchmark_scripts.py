@@ -43,13 +43,13 @@ def test_qmoa_benchmark_metadata_uses_size_spec_and_tensor_dims():
 def test_non_qmoa_benchmark_metadata_keeps_legacy_filename_shape():
     bench = load_bench_module()
 
-    assert bench.parse_size_arg("qaoa", "1024") == [1024]
-    assert bench.size_spec("qaoa", [1024]) == "1024"
-    assert bench.tensor_dims_spec("qaoa", [1024]) == ""
+    assert bench.parse_size_arg("qaoa_sparse", "1024") == [1024]
+    assert bench.size_spec("qaoa_sparse", [1024]) == "1024"
+    assert bench.tensor_dims_spec("qaoa_sparse", [1024]) == ""
     result = bench.csv_filename(
-        "qaoa", "mpi", 1024, "1024", 16, "multi",
+        "qaoa_sparse", "mpi", 1024, "1024", 16, "multi",
     )
-    assert result == "qaoa_mpi_1024_multi_16.csv"
+    assert result == "qaoa_sparse_mpi_1024_multi_16.csv"
 
     assert bench.parse_size_arg("qaoa_transverse_field", "1024") == [1024]
     assert bench.size_spec("qaoa_transverse_field", [1024]) == "1024"
@@ -71,7 +71,7 @@ def test_parse_size_arg_rejects_non_positive_system_size_for_qaoa_qwoa():
     bench = load_bench_module()
 
     with pytest.raises(ValueError, match="positive integer"):
-        bench.parse_size_arg("qaoa", "0")
+        bench.parse_size_arg("qaoa_sparse", "0")
 
     with pytest.raises(ValueError, match="positive integer"):
         bench.parse_size_arg("qwoa", "-8")
@@ -123,9 +123,10 @@ def test_csv_header_includes_profile_column():
         assert col in source
 
 
-def test_submit_scaling_accepts_qaoa_transverse_field_and_reuses_qaoa_config():
+def test_submit_scaling_accepts_qaoa_variants_and_reuses_qaoa_config():
     project_root = Path(__file__).resolve().parents[2]
     script = (project_root / "benchmarks" / "submit_scaling.sh").read_text()
 
+    assert "qaoa_sparse" in script
     assert "qaoa_transverse_field" in script
     assert 'CONFIG_ALGORITHM="qaoa"' in script

@@ -19,7 +19,7 @@ def test_compute_speedup_rows_includes_program_wall_time():
     summary = pd.DataFrame(
         [
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "system_size": 1024,
                 "phase": "intra",
@@ -29,7 +29,7 @@ def test_compute_speedup_rows_includes_program_wall_time():
                 "program_wall_s": 40.0,
             },
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "system_size": 1024,
                 "phase": "intra",
@@ -54,7 +54,7 @@ def test_normalise_metadata_adds_program_wall_column_for_legacy_csvs():
     summary = pd.DataFrame(
         [
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "system_size": 1024,
                 "phase": "intra",
@@ -77,7 +77,7 @@ def test_normalise_metadata_adds_profile_column_for_legacy_csvs():
     summary = pd.DataFrame(
         [
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "system_size": 1024,
                 "phase": "intra",
@@ -100,7 +100,7 @@ def test_compute_speedup_rows_groups_by_profile_when_present():
     summary = pd.DataFrame(
         [
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "profile": "generic",
                 "system_size": 1024,
@@ -111,7 +111,7 @@ def test_compute_speedup_rows_groups_by_profile_when_present():
                 "program_wall_s": 40.0,
             },
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "profile": "generic",
                 "system_size": 1024,
@@ -122,7 +122,7 @@ def test_compute_speedup_rows_groups_by_profile_when_present():
                 "program_wall_s": 20.0,
             },
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "profile": "pawsey-setonix",
                 "system_size": 1024,
@@ -133,7 +133,7 @@ def test_compute_speedup_rows_groups_by_profile_when_present():
                 "program_wall_s": 50.0,
             },
             {
-                "algorithm": "qaoa",
+                "algorithm": "qaoa_sparse",
                 "backend": "mpi",
                 "profile": "pawsey-setonix",
                 "system_size": 1024,
