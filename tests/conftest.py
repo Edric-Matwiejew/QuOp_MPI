@@ -417,8 +417,6 @@ def _mpi_barrier_teardown(request):
     if MPI.Is_initialized() and not MPI.Is_finalized():
         _flush_process_output()
         _timed_barrier(MPI.COMM_WORLD, timeout, label=f"teardown of {request.node.nodeid}")
-        if MPI.COMM_WORLD.Get_rank() == 0:
-            print(f"[BARRIER] after {request.node.nodeid}", file=sys.stderr, flush=True)
         _flush_process_output()
         _timed_barrier(MPI.COMM_WORLD, timeout, label=f"teardown-flush of {request.node.nodeid}")
 
