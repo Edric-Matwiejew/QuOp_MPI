@@ -279,9 +279,8 @@ class Jacobian:
 
         elif self.subcomms.SUBCOMM.Get_rank() == 0:
             jacobian = None
-            # The optimizer leader is the world rank stored at roots[0],
-            # not necessarily world rank 0.
-            optimizer_world_rank = self.subcomms.get_subcomm_roots()[0]
+            # The optimiser leader is at this world rank, not necessarily 0.
+            optimizer_world_rank = self.subcomms.optimiser_leader_world_rank()
             for part, mapping in zip(
                 partials, self.var_map[self.subcomms.get_subcomm_index()], strict=True
             ):

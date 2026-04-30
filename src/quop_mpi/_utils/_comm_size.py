@@ -683,6 +683,36 @@ class QuopMpiLayout:
             return False
         return self.subcomm.Get_rank() == 0
 
+    def is_optimiser_leader(self):
+        """True on the rank that drives the scipy optimiser.
+
+        The optimiser leader is rank 0 of the optimiser subcomm
+        (``worker_id == 0``).  It is also JACCOMM rank 0 and ROOTCOMM
+        rank 0 by construction (see ``create_jaccomm`` /
+        ``create_rootcomm`` in ``comm_info_module.f90``), but it is not
+        necessarily world rank 0.
+
+        Use this to gate result population, log writes, and any other
+        action that should happen exactly once on the optimiser-owning
+        rank, regardless of where it sits in ``MPI_COMM_WORLD``.
+        """
+        return (
+            self._worker_id == 0
+            and self.subcomm is not None
+            and self.subcomm.Get_rank() == 0
+        )
+
+    def optimiser_leader_world_rank(self):
+        """World rank of the optimiser leader.
+
+        This is the destination rank for sends from worker SUBCOMM
+        leaders during parallel jacobian gathering, and the equivalent
+        of ``get_subcomm_roots()[0]``.  Triggers an Allgather the first
+        time it is called (cached afterwards).
+        """
+        roots = self.get_subcomm_roots()
+        return roots[0] if roots else 0
+
     def assert_matches_comm(self, MPI_COMM, label=""):  # noqa: N803
         """Raise ``RuntimeError`` if *MPI_COMM* does not match the root comm."""
         if self._comm == MPI.COMM_NULL or MPI_COMM == MPI.COMM_NULL:

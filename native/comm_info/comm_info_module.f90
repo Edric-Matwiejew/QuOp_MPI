@@ -2383,6 +2383,7 @@ contains
         type(split_info_t), pointer :: si
         type(quop_mpi_layout_t), pointer :: ci
         integer(int32) :: mpi_rank, subcomm_rank, color, ierr
+        integer(int32) :: root_key
 
         call c_f_pointer(split_ptr, si)
         call MPI_Comm_rank(MPI_COMM, mpi_rank, ierr)
@@ -2411,20 +2412,31 @@ contains
             return
         end if
 
-        ! Determine if this rank is the leader of its SUBCOMM
+        ! Determine if this rank is the leader of its SUBCOMM.
+        ! Use a key that forces the optimizer leader (worker_id == 0,
+        ! subcomm_rank == 0) to ROOTCOMM rank 0 regardless of its world
+        ! rank, matching the convention in _signal_parallel_jacobian_command
+        ! and create_jaccomm.
         if (ci%SUBCOMM /= MPI_COMM_NULL) then
             call MPI_Comm_rank(ci%SUBCOMM, subcomm_rank, ierr)
             if (subcomm_rank == 0) then
                 color = 0
+                if (si%worker_id == 0) then
+                    root_key = -1
+                else
+                    root_key = mpi_rank + 1
+                end if
             else
                 color = MPI_UNDEFINED
+                root_key = mpi_rank
             end if
         else
             ! Inactive rank (excluded during negotiate)
             color = MPI_UNDEFINED
+            root_key = mpi_rank
         end if
 
-        call MPI_Comm_split(MPI_COMM, color, mpi_rank, si%ROOTCOMM, ierr)
+        call MPI_Comm_split(MPI_COMM, color, root_key, si%ROOTCOMM, ierr)
     end subroutine create_rootcomm
 
     subroutine create_split_from_subcomm(si_out, MPI_COMM, SUBCOMM, &

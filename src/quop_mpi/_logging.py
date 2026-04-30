@@ -94,7 +94,10 @@ class Logging:
 
         self.n_log_fields = 6
 
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
+        # Log file lives on the optimiser leader (subcomm 0, SUBCOMM rank 0)
+        # so that _log_update can write to it directly without an extra
+        # cross-comm transfer.  This rank is not necessarily world rank 0.
+        if self.subcomms is not None and self.subcomms.is_optimiser_leader():
 
             if os.path.exists(self.filename) and self.log_action == "a":
                 self.logfile = open(self.filename, "a", newline="")
@@ -137,7 +140,8 @@ class Logging:
 
         state_norm = self.get_state_norm()
 
-        if self.MPI_COMM_WORLD.Get_rank() != 0:
+        # Only the optimiser leader holds the open logfile handle.
+        if self.subcomms is None or not self.subcomms.is_optimiser_leader():
             return
 
         log_output = [
@@ -170,7 +174,11 @@ class Logging:
     def _post_log(self) -> None:
         """Close the results log file on simulation completion."""
 
-        if self.MPI_COMM_WORLD.Get_rank() == 0 and self.log:
+        if (
+            self.subcomms is not None
+            and self.subcomms.is_optimiser_leader()
+            and self.log
+        ):
             self.logfile.close()
 
     @scope("subcomm", returns="none")

@@ -1570,7 +1570,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def print_result(self) -> None:
         """Print a summary of the results of the last :term:`QVA` simulation."""
 
-        if self.MPI_COMM_WORLD.Get_rank() != 0:
+        # quop_result is only populated on the optimiser leader
+        # (subcomm 0, SUBCOMM rank 0) and broadcast within subcomm 0.
+        if self.subcomms is None or not self.subcomms.is_optimiser_leader():
             return
 
         print("\nQuOp_MPI Simulation Summary", flush=True)
@@ -1593,7 +1595,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def print_optimiser_result(self) -> None:
         """Print the result returned from the :term:`optimiser` for the last
         :term:`QVA` simulation."""
-        if self.MPI_COMM_WORLD.Get_rank() == 0:
+        if self.subcomms is not None and self.subcomms.is_optimiser_leader():
             print("\nOptimisation Result", flush=True)
             print("===================\n", flush=True)
             print(self.result, flush=True)
