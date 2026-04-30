@@ -396,7 +396,7 @@ contains
         end do
 
         nullify (w_km1, w_k, w_kp1, w_swap)
-        deallocate (work1, work2, coeffs)
+        deallocate (work1, work2, work3, coeffs)
 
     end subroutine chebyshev_multiply
 
