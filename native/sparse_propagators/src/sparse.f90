@@ -30,7 +30,7 @@ module sparse
     use hipfort_check
     use hipfort_types, only: dim3
     use hip_sparse_expm_kernels, only: &
-        launch_complex_scale_kernel, launch_pack_send_buf_kernel, launch_reorder_recv_buf_kernel, &
+        launch_complex_scale_kernel, launch_pack_send_buf_kernel, &
         launch_spmv_local_unit_kernel, launch_spmv_local_weighted_kernel, launch_spmv_remote_unit_kernel, &
         launch_spmv_remote_weighted_kernel
 #endif
@@ -45,10 +45,6 @@ module sparse
 #ifdef USE_HIP
     public :: csr_to_device, csr_free_device, csr_update_values_device, spmv_gpu
 #endif
-
-    ! Hash table constants (Knuth's golden ratio multiplier)
-    integer(int64), parameter :: HASH_MULT = 2654435769_int64
-    integer(int64), parameter :: MASK32 = int(Z'FFFFFFFF', int64)
 
     !> @brief Compressed sparse rows (CSR) complex matrix derived type.
     !
@@ -83,10 +79,6 @@ module sparse
         ! Local copies of row_starts and col_indexes (0-based for C/GPU interop)
         integer(int64), dimension(:), pointer :: row_starts_local => null()
         integer(int64), dimension(:), pointer :: col_indexes_local => null()
-        ! Hash table for O(1) remote column lookup
-        integer(int64), dimension(:), pointer :: hash_keys => null()
-        integer(int64), dimension(:), pointer :: hash_vals => null()
-        integer(int64) :: hash_size = 0
         ! Persistent communication buffers
         complex(real64), dimension(:), pointer :: send_buf => null()
         complex(real64), dimension(:), pointer :: recv_buf => null()
@@ -108,10 +100,11 @@ module sparse
         integer(int64), dimension(:), pointer :: col_halo => null()
         integer(int64), dimension(:), pointer :: diag_lo => null()
         integer(int64), dimension(:), pointer :: diag_hi => null()
-        ! True when col_halo owns freshly allocated storage (GPU build,
-        ! which keeps col_indexes_local intact for csr_to_device); false
-        ! when col_halo aliases col_indexes_local (CPU build, mutated in
-        ! place after halo metadata is built).
+        ! True when col_halo owns freshly allocated storage; false when
+        ! col_halo aliases col_indexes_local (the in-place mutated borrowed
+        ! Python CSR buffer or the legacy globally-indexed copy).  In the
+        ! current design col_halo always aliases col_indexes_local, so this
+        ! is always false; the flag is retained for forward compatibility.
         logical :: owns_col_halo = .false.
         ! Flag to indicate if graph comm is set up
         logical :: graph_comm_ready = .false.
@@ -123,19 +116,20 @@ module sparse
         ! HIP/GPU device memory (only used when GPU backend is active)
         ! These are c_ptr to device memory, initialized to c_null_ptr
         !----------------------------------------------------------------------
-        ! CSR structure on device
+        ! CSR structure on device.  col_indexes_dev holds the rewritten
+        ! col_halo offsets uploaded by csr_to_device (matching the CPU path).
         type(c_ptr) :: row_starts_dev = c_null_ptr
         type(c_ptr) :: col_indexes_dev = c_null_ptr
         type(c_ptr) :: values_dev = c_null_ptr
+        ! Per-row diagonal-block delimiters on device (0-based half-open
+        ! ranges into col_indexes_dev / values_dev: diagonal entries are
+        ! [diag_lo_dev[i], diag_hi_dev[i]] inclusive; off-diagonal entries
+        ! occupy the rest of the row).  Allocated alongside the CSR.
+        type(c_ptr) :: diag_lo_dev = c_null_ptr
+        type(c_ptr) :: diag_hi_dev = c_null_ptr
         ! Communication buffers on device
         type(c_ptr) :: send_buf_dev = c_null_ptr
         type(c_ptr) :: recv_buf_dev = c_null_ptr
-        type(c_ptr) :: recv_buf_sorted_dev = c_null_ptr
-        ! Hash table on device (for remote column lookup)
-        type(c_ptr) :: hash_keys_dev = c_null_ptr
-        type(c_ptr) :: hash_vals_dev = c_null_ptr
-        ! Sort permutation on device
-        type(c_ptr) :: sort_perm_dev = c_null_ptr
         ! Send offsets on device
         type(c_ptr) :: send_offsets_dev = c_null_ptr
         ! Intermediate result for Chebyshev recurrence: Aw_k from local phase
@@ -198,46 +192,6 @@ contains
         end do
         pos = lo
     end function upper_bound
-
-    !--------------------------------------------------------------------------
-    ! Compute hash index for a column (returns 0-based position)
-    !--------------------------------------------------------------------------
-    pure function compute_hash(col, hash_size) result(hash_pos)
-        integer(int64), intent(in) :: col, hash_size
-        integer(int64) :: hash_pos
-        integer(int64) :: folded
-
-        folded = iand(ieor(col, ishft(col, -32)), MASK32)
-        hash_pos = mod(folded * HASH_MULT, hash_size)
-        if (hash_pos < 0) hash_pos = hash_pos + hash_size
-    end function compute_hash
-
-    !--------------------------------------------------------------------------
-    ! Look up a column in the hash table
-    ! hash_keys/hash_vals are 1-based arrays, hash_keys stores 0-based columns
-    ! hash_vals stores 1-based positions, returns 0 if not found
-    !--------------------------------------------------------------------------
-    pure function hash_lookup(col, hash_keys, hash_vals, hash_size) result(pos)
-        integer(int64), intent(in) :: col ! 0-based column to look up
-        integer(int64), intent(in) :: hash_keys(:) ! 1-based array, stores 0-based columns
-        integer(int64), intent(in) :: hash_vals(:) ! 1-based array, stores 1-based positions
-        integer(int64), intent(in) :: hash_size
-        integer(int64) :: pos
-        integer(int64) :: hash_pos, probe, idx
-
-        pos = 0_int64 ! Not found sentinel (0 = invalid 1-based position)
-        hash_pos = compute_hash(col, hash_size)
-        do probe = 0, hash_size - 1
-            idx = hash_pos + 1 ! Convert to 1-based index
-            if (hash_keys(idx) == col) then
-                pos = hash_vals(idx) ! 1-based position
-                return
-            else if (hash_keys(idx) < 0) then
-                return
-            end if
-            hash_pos = mod(hash_pos + 1, hash_size)
-        end do
-    end function hash_lookup
 
     !--------------------------------------------------------------------------
     ! Find owner rank for a column index
@@ -676,77 +630,28 @@ contains
     end subroutine setup_graph_comm
 
     !--------------------------------------------------------------------------
-    ! Build hash table for O(1) average remote column lookup
-    ! hash_keys stores 0-based column values (matching col_indexes_local data)
-    ! hash_vals stores 1-based positions into recv_buf_sorted
-    !--------------------------------------------------------------------------
-    subroutine build_hash_table(recv_indices_sorted, total_recv, &
-                                hash_keys, hash_vals, hash_size)
-        integer(int64), intent(in) :: recv_indices_sorted(:) ! 1-based array, 0-based column values
-        integer(int64), intent(in) :: total_recv
-        integer(int64), pointer, intent(out) :: hash_keys(:)
-        integer(int64), pointer, intent(out) :: hash_vals(:)
-        integer(int64), intent(out) :: hash_size
-
-        integer(int64) :: i, hash_pos, probe, idx
-
-        hash_size = 2_int64 * total_recv + 1_int64
-        if (mod(hash_size, 2_int64) == 0) hash_size = hash_size + 1_int64
-
-        ! Allocate 1-based arrays (normal Fortran)
-        allocate (hash_keys(hash_size), hash_vals(hash_size))
-        hash_keys = -1_int64 ! -1 means empty slot
-        hash_vals = 0_int64 ! 0 means not found (invalid 1-based position)
-
-        do i = 1, total_recv
-            ! recv_indices_sorted(i) contains 0-based column value
-            hash_pos = compute_hash(recv_indices_sorted(i), hash_size)
-            do probe = 0, hash_size - 1
-                idx = hash_pos + 1 ! Convert to 1-based index
-                if (hash_keys(idx) < 0) then
-                    hash_keys(idx) = recv_indices_sorted(i) ! Store 0-based column
-                    hash_vals(idx) = i ! Store 1-based position
-                    exit
-                end if
-                hash_pos = mod(hash_pos + 1, hash_size)
-            end do
-        end do
-    end subroutine build_hash_table
-
-    !--------------------------------------------------------------------------
-    ! Build halo metadata for spmv_cpu: col_halo + diag_lo + diag_hi.
+    ! Build halo metadata for spmv_cpu / spmv_gpu: col_halo + diag_lo + diag_hi.
     !
-    ! Pre-conditions: A%row_starts_local, A%col_indexes_local, A%lb_graph,
-    !                 A%ub_graph have been populated, and the CSR is
-    !                 column-sorted within each row.
+    ! Pre-conditions:
+    !   - A%row_starts_local, A%col_indexes_local, A%lb_graph, A%ub_graph
+    !     populated; the CSR is column-sorted within each row.
+    !   - A%recv_indices_sorted and A%sort_perm populated.
     !
-    ! On CPU-only builds (#ifndef USE_HIP):
-    !   - A%recv_indices_sorted and A%sort_perm must be populated.
-    !   - col_halo aliases col_indexes_local; the borrowed CSR column array
-    !     is rewritten in place to hold halo offsets.  This saves
-    !     8 * local_nnz bytes of permanent metadata per rank.  Remote-column
-    !     lookup uses a binary search over A%recv_indices_sorted, so the
-    !     hash table is never built.
+    ! col_halo aliases A%col_indexes_local; the borrowed CSR column array is
+    ! rewritten in place to hold halo offsets.  This saves 8 * local_nnz
+    ! bytes of permanent metadata per rank.  Remote-column lookup uses a
+    ! binary search over A%recv_indices_sorted; no hash table is built.
     !
-    ! On GPU builds (#ifdef USE_HIP):
-    !   - A%hash_keys, A%hash_vals, A%hash_size and A%sort_perm must be
-    !     populated by build_hash_table.
-    !   - col_halo is freshly allocated so col_indexes_local stays intact
-    !     for csr_to_device, which copies it to device memory.  The hash
-    !     table is also retained for the device-side SpMV path.
+    ! On GPU builds the rewritten col_indexes_local is later uploaded to the
+    ! device by csr_to_device, so col_indexes_dev holds the halo offsets and
+    ! the device-side SpMV reuses the same metadata as the CPU path.
     !--------------------------------------------------------------------------
     subroutine build_halo_metadata(A, n_local)
         type(CSR), intent(inout) :: A
         integer(int64), intent(in) :: n_local
 
-        integer(int64) :: i, j, row_lo, row_hi, local_nnz, col, sorted_pos
+        integer(int64) :: i, j, row_lo, row_hi, col, sorted_pos
 
-        local_nnz = size(A%col_indexes_local, kind=int64)
-
-#ifdef USE_HIP
-        allocate (A%col_halo(max(local_nnz, 1_int64)))
-        A%owns_col_halo = .true.
-#else
         ! Alias col_halo to col_indexes_local; the loop below rewrites the
         ! columns in place. col_indexes_local itself either borrows the
         ! Python CSR buffer or owns storage from the legacy globally-indexed
@@ -754,7 +659,6 @@ contains
         ! the existing owns_local_arrays logic handle the underlying memory.
         A%col_halo => A%col_indexes_local
         A%owns_col_halo = .false.
-#endif
 
         allocate (A%diag_lo(max(n_local, 1_int64)))
         allocate (A%diag_hi(max(n_local, 1_int64)))
@@ -776,17 +680,12 @@ contains
                     ! Owned column: 0-based local index in [0, n_local)
                     A%col_halo(j) = col - A%lb_graph
                 else
-#ifdef USE_HIP
-                    ! Remote column: hash gives 1-based pos in
-                    ! recv_indices_sorted, sort_perm maps that back to a
-                    ! 1-based pos in recv_buf.
-                    sorted_pos = hash_lookup(col, A%hash_keys, A%hash_vals, A%hash_size)
-#else
                     ! Remote column: binary search the sorted recv index
-                    ! array directly, then translate via sort_perm.
+                    ! array directly, then translate via sort_perm into a
+                    ! 0-based offset into recv_buf, biased by n_local so a
+                    ! single index distinguishes diagonal vs halo entries.
                     sorted_pos = lower_bound(A%recv_indices_sorted, &
                                              1_int64, A%total_recv, col)
-#endif
                     A%col_halo(j) = n_local + A%sort_perm(sorted_pos) - 1
                 end if
             end do
@@ -1395,32 +1294,22 @@ contains
                               A%total_recv, A%total_send, A%lb_graph, A%ub_graph)
 
 #ifdef USE_HIP
-        ! Build hash table for O(1) remote column lookup on the device.
-        ! hash_keys stores 0-based columns, hash_vals stores 1-based positions.
-        call build_hash_table(A%recv_indices_sorted, A%total_recv, &
-                              A%hash_keys, A%hash_vals, A%hash_size)
-
-        ! recv_indices_sorted is only needed to populate the hash table; the
-        ! GPU SpMV path looks up remote columns via the hash, so release the
-        ! sorted index array now.
-        if (allocated(A%recv_indices_sorted)) deallocate (A%recv_indices_sorted)
+        ! No hash table is built any more: the GPU SpMV reuses the col_halo
+        ! offsets uploaded via csr_to_device, exactly like the CPU path.
 #endif
 
-        ! Build halo metadata. On CPU build, col_halo aliases the borrowed
-        ! col_indexes_local (mutated in place); remote columns are resolved
-        ! by binary search over recv_indices_sorted, so the hash table is
-        ! never built. On GPU build, col_halo is allocated separately and
-        ! the hash table services the lookup.
+        ! Build halo metadata. col_halo aliases the borrowed col_indexes_local
+        ! and is mutated in place to hold halo offsets; remote columns are
+        ! resolved by binary search over recv_indices_sorted. On GPU builds
+        ! csr_to_device later uploads the rewritten col_indexes_local so the
+        ! device-side SpMV reuses the same metadata.
         call build_halo_metadata(A, n_local)
 
-#ifndef USE_HIP
-        ! CPU build: recv_indices_sorted and sort_perm are no longer needed
-        ! once col_halo is populated. Release them to recover ~2*total_recv
-        ! int64 entries per rank. Under USE_HIP the hash table and sort_perm
-        ! are retained for csr_to_device / spmv_gpu.
+        ! recv_indices_sorted and sort_perm are no longer needed once
+        ! col_halo is populated. Release them to recover ~2*total_recv int64
+        ! entries per rank on both CPU and GPU builds.
         if (allocated(A%recv_indices_sorted)) deallocate (A%recv_indices_sorted)
         if (associated(A%sort_perm)) deallocate (A%sort_perm)
-#endif
 
         ! Allocate persistent communication buffers on host (1-based)
         ! Always needed: CPU path uses them directly, GPU path uses them for
@@ -1553,8 +1442,6 @@ contains
         if (allocated(A%graph_send_disps)) deallocate (A%graph_send_disps)
         if (allocated(A%in_neighbors)) deallocate (A%in_neighbors)
         if (allocated(A%out_neighbors)) deallocate (A%out_neighbors)
-        if (associated(A%hash_keys)) deallocate (A%hash_keys)
-        if (associated(A%hash_vals)) deallocate (A%hash_vals)
         if (associated(A%send_buf)) deallocate (A%send_buf)
         if (associated(A%recv_buf)) deallocate (A%recv_buf)
         if (A%owns_col_halo) then
@@ -1600,7 +1487,6 @@ contains
     subroutine csr_to_device(A)
         type(CSR), intent(inout) :: A
         integer(c_size_t) :: n_local, nnz_local
-        integer(int64), allocatable, target :: send_offsets_0based(:), sort_perm_0based(:)
         integer(int32) :: i
 
         if (.not. A%graph_comm_ready) then
@@ -1614,12 +1500,22 @@ contains
         n_local = size(A%row_starts_local) - 1
         nnz_local = size(A%col_indexes_local)
 
-        ! Allocate CSR structure on device
+        ! Allocate CSR structure on device.  col_indexes_dev holds halo
+        ! offsets (col_halo) -- col_indexes_local was rewritten in place by
+        ! build_halo_metadata, so a direct copy gives us the same metadata
+        ! the CPU SpMV uses.
         call hipCheck(hipMalloc(A%row_starts_dev, int((n_local + 1) * 8, c_size_t)))
         call hipCheck(hipMalloc(A%col_indexes_dev, int(nnz_local * 8, c_size_t)))
         if (A%has_values) then
             call hipCheck(hipMalloc(A%values_dev, int(nnz_local * 16, c_size_t)))
         end if
+
+        ! Per-row diagonal-block delimiters (1-based inclusive ranges into
+        ! col_indexes_dev / values_dev, matching A%diag_lo / A%diag_hi on the
+        ! host).  Allocated even when n_local == 0 so the device pointers
+        ! are always valid for kernel launches with zero rows.
+        call hipCheck(hipMalloc(A%diag_lo_dev, int(max(n_local, 1_c_size_t) * 8, c_size_t)))
+        call hipCheck(hipMalloc(A%diag_hi_dev, int(max(n_local, 1_c_size_t) * 8, c_size_t)))
 
         ! Allocate communication buffers on device.
         ! These buffers are exchanged via GPU-aware MPI and consumed by kernels.
@@ -1632,21 +1528,15 @@ contains
         end if
         if (A%total_recv > 0) then
             call hipCheck(hipMalloc(A%recv_buf_dev, int(A%total_recv * 16, c_size_t)))
-            call hipCheck(hipMalloc(A%recv_buf_sorted_dev, int(A%total_recv * 16, c_size_t)))
-            call hipCheck(hipMalloc(A%sort_perm_dev, int(A%total_recv * 8, c_size_t)))
-        end if
-
-        ! Allocate hash table on device
-        if (A%hash_size > 0) then
-            call hipCheck(hipMalloc(A%hash_keys_dev, int(A%hash_size * 8, c_size_t)))
-            call hipCheck(hipMalloc(A%hash_vals_dev, int(A%hash_size * 8, c_size_t)))
         end if
 
         ! Allocate intermediate Aw_k buffer for Chebyshev
         call hipCheck(hipMalloc(A%Aw_k_dev, int(n_local * 16, c_size_t)))
 
-        ! Copy CSR data to device - values are already 0-based, copy directly
-        ! Fortran 1-based array becomes 0-based on GPU (element 1 -> index 0)
+        ! Copy CSR data to device.  row_starts_local stores 0-based offsets;
+        ! col_indexes_local stores the halo offsets produced by
+        ! build_halo_metadata (0-based indices into the virtual halo'd
+        ! vector of length n_local + total_recv).
         call hipCheck(hipMemcpy(A%row_starts_dev, c_loc(A%row_starts_local(1)), &
                                 int((n_local + 1) * 8, c_size_t), hipMemcpyHostToDevice))
         call hipCheck(hipMemcpy(A%col_indexes_dev, c_loc(A%col_indexes_local(1)), &
@@ -1656,46 +1546,28 @@ contains
                                     int(nnz_local * 16, c_size_t), hipMemcpyHostToDevice))
         end if
 
-        ! Copy communication metadata to device (convert to 0-based for GPU)
-        if (A%total_send > 0) then
-            allocate (send_offsets_0based(A%total_send))
-            do i = 1, int(A%total_send)
-                send_offsets_0based(i) = A%send_offsets(i) - 1
-            end do
-            call hipCheck(hipMemcpy(A%send_offsets_dev, c_loc(send_offsets_0based(1)), &
-                                    int(A%total_send * 8, c_size_t), hipMemcpyHostToDevice))
-            deallocate (send_offsets_0based)
-        end if
-        if (A%total_recv > 0) then
-            allocate (sort_perm_0based(A%total_recv))
-            do i = 1, int(A%total_recv)
-                sort_perm_0based(i) = A%sort_perm(i) - 1
-            end do
-            call hipCheck(hipMemcpy(A%sort_perm_dev, c_loc(sort_perm_0based(1)), &
-                                    int(A%total_recv * 8, c_size_t), hipMemcpyHostToDevice))
-            deallocate (sort_perm_0based)
+        ! Copy diagonal-block delimiters.  The host arrays are 1-based
+        ! inclusive Fortran indices; the kernels treat the lower bound as
+        ! 1-based and convert internally so the device sees the same
+        ! semantics.
+        if (n_local > 0) then
+            call hipCheck(hipMemcpy(A%diag_lo_dev, c_loc(A%diag_lo(1)), &
+                                    int(n_local * 8, c_size_t), hipMemcpyHostToDevice))
+            call hipCheck(hipMemcpy(A%diag_hi_dev, c_loc(A%diag_hi(1)), &
+                                    int(n_local * 8, c_size_t), hipMemcpyHostToDevice))
         end if
 
-        ! Copy hash table to device
-        ! hash_keys: 0-based column values (same as col_indexes_local), copy directly
-        ! hash_vals: 1-based positions, convert to 0-based for GPU
-        if (A%hash_size > 0) then
-            block
-                integer(int64), allocatable, target :: hash_vals_0based(:)
-                allocate (hash_vals_0based(A%hash_size))
-                do i = 1, int(A%hash_size)
-                    if (A%hash_vals(i) > 0) then
-                        hash_vals_0based(i) = A%hash_vals(i) - 1 ! Convert pos to 0-based
-                    else
-                        hash_vals_0based(i) = -1 ! Not found sentinel for GPU
-                    end if
-                end do
-                call hipCheck(hipMemcpy(A%hash_keys_dev, c_loc(A%hash_keys(1)), &
-                                        int(A%hash_size * 8, c_size_t), hipMemcpyHostToDevice))
-                call hipCheck(hipMemcpy(A%hash_vals_dev, c_loc(hash_vals_0based(1)), &
-                                        int(A%hash_size * 8, c_size_t), hipMemcpyHostToDevice))
-                deallocate (hash_vals_0based)
-            end block
+        ! Copy communication metadata to device.  setup_graph_comm produced
+        ! 1-based send_offsets for the legacy CPU path; mutate them in place
+        ! to 0-based so the GPU upload skips a temporary buffer.  After this
+        ! point the host send_offsets are owned by the GPU path only and the
+        ! 0-based representation is the canonical one.
+        if (A%total_send > 0) then
+            do i = 1, int(A%total_send)
+                A%send_offsets(i) = A%send_offsets(i) - 1
+            end do
+            call hipCheck(hipMemcpy(A%send_offsets_dev, c_loc(A%send_offsets(1)), &
+                                    int(A%total_send * 8, c_size_t), hipMemcpyHostToDevice))
         end if
 
         ! Create a HIP stream for async operations
@@ -1726,6 +1598,14 @@ contains
             call hipCheck(hipFree(A%values_dev))
             A%values_dev = c_null_ptr
         end if
+        if (c_associated(A%diag_lo_dev)) then
+            call hipCheck(hipFree(A%diag_lo_dev))
+            A%diag_lo_dev = c_null_ptr
+        end if
+        if (c_associated(A%diag_hi_dev)) then
+            call hipCheck(hipFree(A%diag_hi_dev))
+            A%diag_hi_dev = c_null_ptr
+        end if
 
         ! Free communication buffers
         if (c_associated(A%send_buf_dev)) then
@@ -1736,27 +1616,9 @@ contains
             call hipCheck(hipFree(A%recv_buf_dev))
             A%recv_buf_dev = c_null_ptr
         end if
-        if (c_associated(A%recv_buf_sorted_dev)) then
-            call hipCheck(hipFree(A%recv_buf_sorted_dev))
-            A%recv_buf_sorted_dev = c_null_ptr
-        end if
-        if (c_associated(A%sort_perm_dev)) then
-            call hipCheck(hipFree(A%sort_perm_dev))
-            A%sort_perm_dev = c_null_ptr
-        end if
         if (c_associated(A%send_offsets_dev)) then
             call hipCheck(hipFree(A%send_offsets_dev))
             A%send_offsets_dev = c_null_ptr
-        end if
-
-        ! Free hash table
-        if (c_associated(A%hash_keys_dev)) then
-            call hipCheck(hipFree(A%hash_keys_dev))
-            A%hash_keys_dev = c_null_ptr
-        end if
-        if (c_associated(A%hash_vals_dev)) then
-            call hipCheck(hipFree(A%hash_vals_dev))
-            A%hash_vals_dev = c_null_ptr
         end if
 
         ! Free Aw_k buffer
@@ -1795,37 +1657,32 @@ contains
     end subroutine csr_update_values_device
 
     !--------------------------------------------------------------------------
-    ! GPU-accelerated SpMV with MPI communication
-    ! Uses HIP kernels for local/remote SpMV
+    ! GPU-accelerated SpMV with MPI communication.
+    ! Uses the same halo-based two-phase design as spmv_cpu: a single
+    ! col_halo array drives both the diagonal phase (read x_local) and the
+    ! off-diagonal phase (read recv_buf), with diag_lo / diag_hi delimiting
+    ! the contiguous diagonal-block segment of each row.
     !
     ! Flow (standard MPI with host staging):
     !   1. Pack send buffer on device (pack_send_buf kernel)
     !   2. D->H transfer of send buffer
     !   3. MPI non-blocking neighbor alltoallv (host buffers)
-    !   4. Local SpMV on device (while MPI proceeds)
+    !   4. Diagonal SpMV on device (overlaps with MPI)
     !   5. Wait for MPI
     !   6. H->D transfer of recv buffer
-    !   7. Reorder recv buffer on device (reorder_recv_buf kernel)
-    !   8. Remote SpMV on device (adds to local result)
+    !   7. Off-diagonal SpMV on device (adds to y, applies scalar)
     !
     ! Flow (GPU-aware MPI, when QUOP_GPU_AWARE_MPI is defined):
-    !   1. Pack send buffer on device (pack_send_buf kernel)
-    !   2. (eliminated) - MPI reads directly from device
-    !   3. MPI non-blocking neighbor alltoallv (device buffers)
-    !   4. Local SpMV on device (while MPI proceeds)
-    !   5. Wait for MPI
-    !   6. (eliminated) - MPI wrote directly to device
-    !   7. Reorder recv buffer on device (reorder_recv_buf kernel)
-    !   8. Remote SpMV on device (adds to local result)
+    !   Steps 2 and 6 are eliminated; MPI reads/writes recv_buf_dev directly.
     !
     ! x_local and y_local are assumed to be device-allocated arrays.
     ! Uses c_loc to get device pointers.
     !--------------------------------------------------------------------------
     subroutine spmv_gpu(A, x_local, y_local, scalar)
         use hip_sparse_expm_kernels, only: &
-            launch_complex_scale_kernel, launch_pack_send_buf_kernel, launch_reorder_recv_buf_kernel, &
-            launch_spmv_local_unit_kernel, launch_spmv_local_weighted_kernel, launch_spmv_remote_unit_kernel, &
-            launch_spmv_remote_weighted_kernel
+            launch_complex_scale_kernel, launch_pack_send_buf_kernel, &
+            launch_spmv_local_unit_kernel, launch_spmv_local_weighted_kernel, &
+            launch_spmv_remote_unit_kernel, launch_spmv_remote_weighted_kernel
         use hipfort_types, only: dim3
 
         type(CSR), intent(inout) :: A
@@ -1835,7 +1692,7 @@ contains
 
         type(c_ptr) :: x_dev, y_dev
         integer(int32) :: ierr, request, status(MPI_STATUS_SIZE)
-        integer(int64) :: n_local, lb_0, ub_0
+        integer(int64) :: n_local
         integer, parameter :: BLOCKSIZE = 256
         type(dim3) :: grid, block
 #ifdef QUOP_GPU_AWARE_MPI
@@ -1850,10 +1707,6 @@ contains
         y_dev = c_loc(y_local(1))
 
         n_local = A%ub_graph - A%lb_graph + 1
-
-        ! lb_graph and ub_graph are already 0-based (from setup_graph_comm)
-        lb_0 = A%lb_graph
-        ub_0 = A%ub_graph
 
         ! Set up kernel launch configuration
         block = dim3(BLOCKSIZE, 1, 1)
@@ -1879,8 +1732,6 @@ contains
         ! Step 3: Start non-blocking MPI exchange
 #ifdef QUOP_GPU_AWARE_MPI
         ! GPU-aware MPI: communicate directly with device buffers.
-        ! Convert c_ptr to Fortran pointers so MPI receives the device address,
-        ! not the host address of the c_ptr variable.
         call c_f_pointer(A%send_buf_dev, send_buf_fptr, [A%total_send])
         call c_f_pointer(A%recv_buf_dev, recv_buf_fptr, [A%total_recv])
         call MPI_Ineighbor_alltoallv(send_buf_fptr, A%graph_send_counts, A%graph_send_disps, &
@@ -1897,16 +1748,16 @@ contains
                                      A%graph_comm, request, ierr)
 #endif
 
-        ! Step 4: Local SpMV on device (overlaps with MPI)
-        ! Computes y = A_local * x (scalar applied in remote phase or after)
+        ! Step 4: Diagonal SpMV on device (overlaps with MPI)
+        ! y = A_diag * x_local (scalar applied in remote phase or after)
         if (A%has_values) then
             call launch_spmv_local_weighted_kernel(grid, block, 0, A%stream, &
                                                    A%row_starts_dev, A%col_indexes_dev, A%values_dev, &
-                                                   x_dev, y_dev, lb_0, ub_0, n_local)
+                                                   A%diag_lo_dev, A%diag_hi_dev, x_dev, y_dev, n_local)
         else
             call launch_spmv_local_unit_kernel(grid, block, 0, A%stream, &
                                                A%row_starts_dev, A%col_indexes_dev, &
-                                               x_dev, y_dev, lb_0, ub_0, n_local)
+                                               A%diag_lo_dev, A%diag_hi_dev, x_dev, y_dev, n_local)
         end if
 
         ! Step 5: Wait for MPI to complete
@@ -1924,23 +1775,18 @@ contains
                                          int(A%total_recv * 16, c_size_t), hipMemcpyHostToDevice, A%stream))
 #endif
 
-            ! Step 7: Reorder recv buffer on device
-            call launch_reorder_recv_buf_kernel(grid, block, 0, A%stream, &
-                                                A%recv_buf_dev, A%sort_perm_dev, A%recv_buf_sorted_dev, A%total_recv)
-
-            ! Step 8: Remote SpMV on device (adds remote contributions to y)
-            ! The remote kernel reads from recv_buf_sorted using hash table lookup
-            ! and applies: y = scalar * (y + A_remote * recv_buf)
+            ! Step 7: Off-diagonal SpMV on device (adds remote contributions to y,
+            ! applies scalar). Reads recv_buf via col_halo - n_local.
             if (A%has_values) then
                 call launch_spmv_remote_weighted_kernel(grid, block, 0, A%stream, &
                                                         A%row_starts_dev, A%col_indexes_dev, A%values_dev, &
-                                                 A%recv_buf_sorted_dev, A%hash_keys_dev, A%hash_vals_dev, A%hash_size, &
-                                                        y_dev, scalar, lb_0, ub_0, n_local)
+                                                        A%diag_lo_dev, A%diag_hi_dev, A%recv_buf_dev, &
+                                                        y_dev, scalar, n_local, n_local)
             else
                 call launch_spmv_remote_unit_kernel(grid, block, 0, A%stream, &
                                                     A%row_starts_dev, A%col_indexes_dev, &
-                                                 A%recv_buf_sorted_dev, A%hash_keys_dev, A%hash_vals_dev, A%hash_size, &
-                                                    y_dev, scalar, lb_0, ub_0, n_local)
+                                                    A%diag_lo_dev, A%diag_hi_dev, A%recv_buf_dev, &
+                                                    y_dev, scalar, n_local, n_local)
             end if
         end if
 

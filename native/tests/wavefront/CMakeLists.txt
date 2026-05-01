@@ -462,3 +462,172 @@ target_link_libraries(test_wavefront_transverse_field PRIVATE
 
 add_gpu_test(wavefront_transverse_field_2proc test_wavefront_transverse_field 2)
 add_gpu_test(wavefront_transverse_field_4proc test_wavefront_transverse_field 4)
+
+# ============================================================================
+# Test 6: Sparse GPU SpMV Regression Test
+#
+# GPU companion to native/tests/mpi/test_sparse_cpu_spmv. Builds the same
+# four deterministic CSRs (basic / scalar / empty_rows / wide_stencil),
+# uploads them to the device via csr_to_device, and validates that
+# spmv_graph routed to spmv_gpu produces alpha * A * x to within 1e-12 of
+# a host-side reference.
+#
+# The test honours QUOP_RANKS_PER_GPU so multiple ranks can share a single
+# GPU on systems where ngpus < nprocs.
+# ============================================================================
+add_library(wavefront_sparse_test_lib STATIC
+    $<TARGET_OBJECTS:sparse_hip>
+    $<TARGET_OBJECTS:chebyshev_hip>
+    $<TARGET_OBJECTS:hip_sparse_expm_kernels>
+    $<TARGET_OBJECTS:sparse_expm_kernels>
+    $<TARGET_OBJECTS:hip_kernels>
+    $<TARGET_OBJECTS:wf_communicators>
+    $<TARGET_OBJECTS:wf_partitions>
+    $<TARGET_OBJECTS:wf_transfer>
+    $<TARGET_OBJECTS:wf_gpu_topology>
+    $<TARGET_OBJECTS:wf_gpu_transfer>
+)
+
+add_dependencies(wavefront_sparse_test_lib
+    sparse_hip
+    chebyshev_hip
+    hip_sparse_expm_kernels
+    sparse_expm_kernels
+    hip_kernels
+    wf_communicators
+    wf_partitions
+    wf_transfer
+    wf_gpu_topology
+    wf_gpu_transfer
+)
+
+target_include_directories(wavefront_sparse_test_lib PUBLIC
+    ${ROCM_INCLUDE_DIR}
+    ${WAVEFRONT_MODULE_DIR}
+)
+
+target_link_directories(wavefront_sparse_test_lib PUBLIC
+    ${ROCM_LIB_DIR}
+)
+
+if(HIP_PLATFORM STREQUAL nvidia)
+    target_link_libraries(wavefront_sparse_test_lib PUBLIC
+        ${CUDA_PATH}/lib64/libcudart.so
+        ${QUOP_HIPFORT_TARGET}
+        MPI::MPI_Fortran
+        ${NUMA_LIBRARY}
+    )
+else()
+    target_link_libraries(wavefront_sparse_test_lib PUBLIC
+        ${ROCM_PATH}/lib/libamdhip64.so
+        ${QUOP_HIPFORT_TARGET}
+        MPI::MPI_Fortran
+        ${NUMA_LIBRARY}
+    )
+endif()
+
+if(TARGET CrayGTL::CrayGTL)
+    target_link_libraries(wavefront_sparse_test_lib PUBLIC CrayGTL::CrayGTL)
+endif()
+
+add_executable(test_sparse_gpu_spmv
+    test_sparse_gpu_spmv.f90
+)
+
+set_target_properties(test_sparse_gpu_spmv PROPERTIES LINKER_LANGUAGE Fortran)
+
+target_include_directories(test_sparse_gpu_spmv PRIVATE
+    ${WAVEFRONT_MODULE_DIR}
+)
+
+target_link_libraries(test_sparse_gpu_spmv PRIVATE
+    wavefront_sparse_test_lib
+)
+
+# Register one test per process count.  When nprocs > available GPUs the
+# QUOP_RANKS_PER_GPU env var lets all ranks share a single device.
+add_gpu_test(sparse_gpu_spmv_1proc test_sparse_gpu_spmv 1)
+
+add_test(
+    NAME sparse_gpu_spmv_2proc
+    COMMAND ${CMAKE_COMMAND} -E env QUOP_RANKS_PER_GPU=2
+            ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+            ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_sparse_gpu_spmv> ${MPIEXEC_POSTFLAGS}
+)
+set_tests_properties(sparse_gpu_spmv_2proc PROPERTIES
+    PROCESSORS 2
+    TIMEOUT 60
+    LABELS "GPU"
+)
+
+add_test(
+    NAME sparse_gpu_spmv_4proc
+    COMMAND ${CMAKE_COMMAND} -E env QUOP_RANKS_PER_GPU=4
+            ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
+            ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_sparse_gpu_spmv> ${MPIEXEC_POSTFLAGS}
+)
+set_tests_properties(sparse_gpu_spmv_4proc PROPERTIES
+    PROCESSORS 4
+    TIMEOUT 60
+    LABELS "GPU"
+)
+
+add_test(
+    NAME sparse_gpu_spmv_8proc
+    COMMAND ${CMAKE_COMMAND} -E env QUOP_RANKS_PER_GPU=8
+            ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 8
+            ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_sparse_gpu_spmv> ${MPIEXEC_POSTFLAGS}
+)
+set_tests_properties(sparse_gpu_spmv_8proc PROPERTIES
+    PROCESSORS 8
+    TIMEOUT 60
+    LABELS "GPU"
+)
+
+# ============================================================================
+# Test 7: Sparse GPU Chebyshev Regression Test
+#
+# Drives `chebyshev_multiply` directly on a small distributed CSR with both
+# the CPU and GPU back-ends and asserts that the resulting C vector matches
+# element-wise to within 1e-10.  Isolates the Chebyshev recurrence kernels
+# from the higher-level QAOASparse / wavefront state-redistribution paths.
+# ============================================================================
+add_executable(test_sparse_gpu_chebyshev
+    test_sparse_gpu_chebyshev.f90
+)
+
+set_target_properties(test_sparse_gpu_chebyshev PROPERTIES LINKER_LANGUAGE Fortran)
+
+target_include_directories(test_sparse_gpu_chebyshev PRIVATE
+    ${WAVEFRONT_MODULE_DIR}
+)
+
+target_link_libraries(test_sparse_gpu_chebyshev PRIVATE
+    wavefront_sparse_test_lib
+)
+
+add_gpu_test(sparse_gpu_chebyshev_1proc test_sparse_gpu_chebyshev 1)
+
+add_test(
+    NAME sparse_gpu_chebyshev_2proc
+    COMMAND ${CMAKE_COMMAND} -E env QUOP_RANKS_PER_GPU=2
+            ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+            ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_sparse_gpu_chebyshev> ${MPIEXEC_POSTFLAGS}
+)
+set_tests_properties(sparse_gpu_chebyshev_2proc PROPERTIES
+    PROCESSORS 2
+    TIMEOUT 60
+    LABELS "GPU"
+)
+
+add_test(
+    NAME sparse_gpu_chebyshev_4proc
+    COMMAND ${CMAKE_COMMAND} -E env QUOP_RANKS_PER_GPU=4
+            ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
+            ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_sparse_gpu_chebyshev> ${MPIEXEC_POSTFLAGS}
+)
+set_tests_properties(sparse_gpu_chebyshev_4proc PROPERTIES
+    PROCESSORS 4
+    TIMEOUT 60
+    LABELS "GPU"
+)

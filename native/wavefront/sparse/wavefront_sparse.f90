@@ -14,7 +14,7 @@
 !------------------------------------------------------------------------------
 module wavefront_sparse
 
-    use iso_fortran_env, only: real32, real64, int32, int64
+    use iso_fortran_env, only: real32, real64, int32, int64, error_unit
     use iso_c_binding, only: c_f_pointer, c_ptr
     use mpi
     use hipfort
@@ -113,10 +113,6 @@ contains
         integer(int64), dimension(:), pointer :: local_col_indexes
         complex(real64), dimension(:), pointer :: local_values
 
-        ! Redistributed arrays for DEVCOMM layout
-        integer(int64), dimension(:), allocatable :: dev_row_starts
-        integer(int64), dimension(:), allocatable :: dev_col_indexes
-        complex(real64), dimension(:), allocatable :: dev_values
         integer(int32) :: i, j, n_arrays
         integer(int32) :: n_local_subcomm, nnz_local_subcomm
         integer(int32) :: n_local_dev
@@ -309,42 +305,38 @@ contains
             col_displs_recv(i) = col_displs_recv(i - 1) + col_counts_recv(i - 1)
         end do
 
-        ! Allocate device CSR arrays
+        ! Allocate the persistent CSR storage directly so the redistribution
+        ! Alltoallv writes straight into the long-lived buffers (no temporary
+        ! dev_* copies).  At N > 2^31 this saves ~32 bytes/nnz of peak
+        ! gen_operator overhead.
         if (n_local_dev > 0) then
-            allocate (dev_row_starts(n_local_dev + 1))
-            allocate (dev_col_indexes(dev_nnz_total))
+            allocate (self%row_starts_0based(n_local_dev + 1))
+            allocate (self%col_indexes_0based(dev_nnz_total))
             if (self%generator%has_values) then
-                allocate (dev_values(dev_nnz_total))
+                allocate (self%values_copy(dev_nnz_total))
             end if
         else
-            allocate (dev_row_starts(1))
-            dev_row_starts(1) = 0
-            allocate (dev_col_indexes(1))
+            allocate (self%row_starts_0based(1))
+            self%row_starts_0based(1) = 0
+            allocate (self%col_indexes_0based(1))
+            self%col_indexes_0based(1) = 0
             if (self%generator%has_values) then
-                allocate (dev_values(1))
+                allocate (self%values_copy(1))
             end if
         end if
 
-        ! Redistribute col_indexes (convert to 0-based during send)
-        block
-            integer(int64), dimension(:), allocatable :: col_indexes_send
-            allocate (col_indexes_send(nnz_local_subcomm))
-            do i = 1, nnz_local_subcomm
-                col_indexes_send(i) = local_col_indexes(i) - 1 ! Convert to 0-based
-            end do
-
-            call MPI_Alltoallv(col_indexes_send, &
-                               int(col_counts_send), &
-                               int(col_displs_send), &
-                               MPI_INTEGER8, &
-                               dev_col_indexes, &
-                               int(col_counts_recv), &
-                               int(col_displs_recv), &
-                               MPI_INTEGER8, &
-                               ci_nodecomm, &
-                               ierr)
-            deallocate (col_indexes_send)
-        end block
+        ! Redistribute col_indexes (Python pre-normalizes to 0-based via
+        ! _normalize_sparse_csr_operator_args; pass through unchanged).
+        call MPI_Alltoallv(local_col_indexes, &
+                           int(col_counts_send), &
+                           int(col_displs_send), &
+                           MPI_INTEGER8, &
+                           self%col_indexes_0based, &
+                           int(col_counts_recv), &
+                           int(col_displs_recv), &
+                           MPI_INTEGER8, &
+                           ci_nodecomm, &
+                           ierr)
 
         ! Redistribute values if present
         if (self%generator%has_values) then
@@ -352,7 +344,7 @@ contains
                                int(col_counts_send), &
                                int(col_displs_send), &
                                MPI_DOUBLE_COMPLEX, &
-                               dev_values, &
+                               self%values_copy, &
                                int(col_counts_recv), &
                                int(col_displs_recv), &
                                MPI_DOUBLE_COMPLEX, &
@@ -360,11 +352,15 @@ contains
                                ierr)
         end if
 
-        ! Build row_starts from nnz_per_row_dev (0-based offsets)
-        dev_row_starts(1) = 0
-        do i = 2, n_local_dev + 1
-            dev_row_starts(i) = dev_row_starts(i - 1) + nnz_per_row_dev(i - 1)
-        end do
+        ! Build row_starts from nnz_per_row_dev (0-based offsets) directly
+        ! into the persistent buffer.
+        if (n_local_dev > 0) then
+            self%row_starts_0based(1) = 0
+            do i = 2, n_local_dev + 1
+                self%row_starts_0based(i) = &
+                    self%row_starts_0based(i - 1) + nnz_per_row_dev(i - 1)
+            end do
+        end if
 
         ! Build partition table over DEVCOMM
         if (ci_devcomm /= MPI_COMM_NULL) then
@@ -391,24 +387,6 @@ contains
             self%partition_table(1) = 1_int64
         end if
 
-        ! Copy to persistent storage and set up CSR pointers
-        if (n_local_dev > 0) then
-            allocate (self%row_starts_0based(n_local_dev + 1))
-            allocate (self%col_indexes_0based(dev_nnz_total))
-            self%row_starts_0based = dev_row_starts
-            self%col_indexes_0based = dev_col_indexes
-
-            if (self%generator%has_values) then
-                allocate (self%values_copy(dev_nnz_total))
-                self%values_copy = dev_values
-            end if
-        else
-            allocate (self%row_starts_0based(1))
-            self%row_starts_0based(1) = 0
-            allocate (self%col_indexes_0based(1))
-            self%col_indexes_0based(1) = 0
-        end if
-
         ! Set up CSR structure
         self%generator%rows = int(ci_system_size, int32)
         self%generator%columns = int(ci_system_size, int32)
@@ -419,6 +397,18 @@ contains
             self%generator%values => self%values_copy
         else
             nullify (self%generator%values)
+        end if
+
+        ! Validate the CSR sort precondition required by halo metadata and
+        ! GPU SpMV.  Alltoallv preserves intra-row ordering, but only if the
+        ! sender's rows arrive contiguously to a single destination; if a row
+        ! were ever split across recv blocks, ordering would break.  Catch
+        ! that here rather than in the kernel.
+        if (self%context%has_device .and. n_local_dev > 0) then
+            call check_csr_sorted(self%row_starts_0based, &
+                                  self%col_indexes_0based, &
+                                  n_local_dev, error_code)
+            if (error_code /= 0) return
         end if
 
         ! Setup graph communicator on DEVCOMM (GPU processes only)
@@ -451,9 +441,6 @@ contains
         deallocate (nnz_per_row_dev)
         deallocate (col_counts_send, col_displs_send)
         deallocate (col_counts_recv, col_displs_recv)
-        if (allocated(dev_row_starts)) deallocate (dev_row_starts)
-        if (allocated(dev_col_indexes)) deallocate (dev_col_indexes)
-        if (allocated(dev_values)) deallocate (dev_values)
 
         call MPI_Barrier(ci_subcomm, ierr)
 
@@ -528,5 +515,35 @@ contains
         self%generator%values => null()
 
     end subroutine wavefront_sparse_destroy
+
+    subroutine check_csr_sorted(row_starts, col_indexes, n_local, error_code)
+        !! Validate that column indices within each CSR row are sorted in
+        !! ascending order (precondition for halo metadata and GPU SpMV).
+        !! Mirrors mpi_sparse: row_starts and col_indexes are 0-based.
+        integer(int64), intent(in) :: row_starts(:)
+        integer(int64), intent(in) :: col_indexes(:)
+        integer(int32), intent(in) :: n_local
+        integer(int32), intent(out) :: error_code
+
+        integer(int32) :: row, j
+        integer(int64) :: lo, hi
+
+        error_code = 0
+
+        do row = 1, n_local
+            lo = row_starts(row) + 1
+            hi = row_starts(row + 1)
+            do j = int(lo) + 1, int(hi)
+                if (col_indexes(j) < col_indexes(j - 1)) then
+                    write (error_unit, '(A,I0,A)') &
+                        'wavefront_sparse: CSR column indices in row ', row, &
+                        ' are not sorted in ascending order after redistribution.'
+                    error_code = 1
+                    return
+                end if
+            end do
+        end do
+
+    end subroutine check_csr_sorted
 
 end module wavefront_sparse

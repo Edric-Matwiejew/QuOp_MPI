@@ -34,7 +34,6 @@ module hip_sparse_expm_kernels
     public :: launch_spmv_local_unit_kernel
     public :: launch_spmv_remote_weighted_kernel
     public :: launch_spmv_remote_unit_kernel
-    public :: launch_reorder_recv_buf_kernel
     public :: launch_pack_send_buf_kernel
 
     ! Two-phase distributed Chebyshev recurrence kernels
@@ -168,15 +167,17 @@ module hip_sparse_expm_kernels
         end subroutine launch_vec_copy_kernel
 
         !======================================================================
-        ! TWO-PHASE DISTRIBUTED SpMV KERNELS
+        ! TWO-PHASE DISTRIBUTED SpMV KERNELS (halo-based)
         !======================================================================
 
         !----------------------------------------------------------------------
         ! Phase 1 Local SpMV (weighted): y = A_local * x_local
-        ! Computes contributions from columns in [lb, ub] range
+        ! Reads diagonal entries from x_local using col_halo (0-based local
+        ! indices) and the precomputed [diag_lo, diag_hi] range.
         !----------------------------------------------------------------------
         subroutine launch_spmv_local_weighted_kernel(grid, block, shmem, stream, &
-                                                     row_starts, col_indexes, values, x_local, y, lb, ub, local_rows) &
+                                                     row_starts, col_halo, values, diag_lo, diag_hi, &
+                                                     x_local, y, local_rows) &
             bind(c, name='launch_spmv_local_weighted_kernel')
             import :: c_ptr, c_int, c_long, dim3
             implicit none
@@ -184,18 +185,21 @@ module hip_sparse_expm_kernels
             integer(c_int), value :: shmem
             type(c_ptr), value :: stream
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
+            type(c_ptr), value :: col_halo ! long*
             type(c_ptr), value :: values ! hipDoubleComplex*
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
             type(c_ptr), value :: x_local ! hipDoubleComplex*
             type(c_ptr), value :: y ! hipDoubleComplex*
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: local_rows
         end subroutine launch_spmv_local_weighted_kernel
 
         !----------------------------------------------------------------------
         ! Phase 1 Local SpMV (unit weight): y = A_local * x_local
         !----------------------------------------------------------------------
         subroutine launch_spmv_local_unit_kernel(grid, block, shmem, stream, &
-                                                 row_starts, col_indexes, x_local, y, lb, ub, local_rows) &
+                                                 row_starts, col_halo, diag_lo, diag_hi, x_local, y, &
+                                                 local_rows) &
             bind(c, name='launch_spmv_local_unit_kernel')
             import :: c_ptr, c_int, c_long, dim3
             implicit none
@@ -203,19 +207,21 @@ module hip_sparse_expm_kernels
             integer(c_int), value :: shmem
             type(c_ptr), value :: stream
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
+            type(c_ptr), value :: col_halo ! long*
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
             type(c_ptr), value :: x_local ! hipDoubleComplex*
             type(c_ptr), value :: y ! hipDoubleComplex*
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: local_rows
         end subroutine launch_spmv_local_unit_kernel
 
         !----------------------------------------------------------------------
-        ! Phase 2 Remote SpMV (weighted): y = scalar * (y + A_remote * recv_buf)
-        ! Adds contributions from columns outside [lb, ub] using hash lookup
+        ! Phase 2 Remote SpMV (weighted): y = scalar * (y + A_off * recv_buf)
+        ! Reads off-diagonal entries from recv_buf using col_halo - n_local.
         !----------------------------------------------------------------------
         subroutine launch_spmv_remote_weighted_kernel(grid, block, shmem, stream, &
-                                                      row_starts, col_indexes, values, recv_buf_sorted, &
-                                                      hash_keys, hash_vals, hash_size, y, scalar, lb, ub, local_rows) &
+                                                      row_starts, col_halo, values, diag_lo, diag_hi, &
+                                                      recv_buf, y, scalar, n_local, local_rows) &
             bind(c, name='launch_spmv_remote_weighted_kernel')
             import :: c_ptr, c_int, c_long, c_double_complex, dim3
             implicit none
@@ -223,23 +229,22 @@ module hip_sparse_expm_kernels
             integer(c_int), value :: shmem
             type(c_ptr), value :: stream
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
+            type(c_ptr), value :: col_halo ! long*
             type(c_ptr), value :: values ! hipDoubleComplex*
-            type(c_ptr), value :: recv_buf_sorted ! hipDoubleComplex*
-            type(c_ptr), value :: hash_keys ! long*
-            type(c_ptr), value :: hash_vals ! long*
-            integer(c_long), value :: hash_size
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
+            type(c_ptr), value :: recv_buf ! hipDoubleComplex*
             type(c_ptr), value :: y ! hipDoubleComplex*
             complex(c_double_complex), value :: scalar
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: n_local, local_rows
         end subroutine launch_spmv_remote_weighted_kernel
 
         !----------------------------------------------------------------------
-        ! Phase 2 Remote SpMV (unit weight): y = scalar * (y + A_remote * recv_buf)
+        ! Phase 2 Remote SpMV (unit weight)
         !----------------------------------------------------------------------
         subroutine launch_spmv_remote_unit_kernel(grid, block, shmem, stream, &
-                                                  row_starts, col_indexes, recv_buf_sorted, &
-                                                  hash_keys, hash_vals, hash_size, y, scalar, lb, ub, local_rows) &
+                                                  row_starts, col_halo, diag_lo, diag_hi, recv_buf, y, &
+                                                  scalar, n_local, local_rows) &
             bind(c, name='launch_spmv_remote_unit_kernel')
             import :: c_ptr, c_int, c_long, c_double_complex, dim3
             implicit none
@@ -247,32 +252,14 @@ module hip_sparse_expm_kernels
             integer(c_int), value :: shmem
             type(c_ptr), value :: stream
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
-            type(c_ptr), value :: recv_buf_sorted ! hipDoubleComplex*
-            type(c_ptr), value :: hash_keys ! long*
-            type(c_ptr), value :: hash_vals ! long*
-            integer(c_long), value :: hash_size
+            type(c_ptr), value :: col_halo ! long*
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
+            type(c_ptr), value :: recv_buf ! hipDoubleComplex*
             type(c_ptr), value :: y ! hipDoubleComplex*
             complex(c_double_complex), value :: scalar
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: n_local, local_rows
         end subroutine launch_spmv_remote_unit_kernel
-
-        !----------------------------------------------------------------------
-        ! Reorder recv_buf: recv_buf_sorted[i] = recv_buf[sort_perm[i]]
-        !----------------------------------------------------------------------
-        subroutine launch_reorder_recv_buf_kernel(grid, block, shmem, stream, &
-                                                  recv_buf, sort_perm, recv_buf_sorted, total_recv) &
-            bind(c, name='launch_reorder_recv_buf_kernel')
-            import :: c_ptr, c_int, c_long, dim3
-            implicit none
-            type(dim3), intent(in) :: grid, block
-            integer(c_int), value :: shmem
-            type(c_ptr), value :: stream
-            type(c_ptr), value :: recv_buf ! hipDoubleComplex*
-            type(c_ptr), value :: sort_perm ! long*
-            type(c_ptr), value :: recv_buf_sorted ! hipDoubleComplex*
-            integer(c_long), value :: total_recv
-        end subroutine launch_reorder_recv_buf_kernel
 
         !----------------------------------------------------------------------
         ! Pack send buffer: send_buf[i] = x_local[send_offsets[i]]
@@ -299,8 +286,8 @@ module hip_sparse_expm_kernels
         ! Chebyshev Phase 1 Local (weighted): Aw_k = A_local * w_k_local
         !----------------------------------------------------------------------
         subroutine launch_chebyshev_local_weighted_kernel(grid, block, shmem, stream, &
-                                                          inv_M, row_starts, col_indexes, values, w_k_local, Aw_k, &
-                                                          lb, ub, local_rows) &
+                                                          inv_M, row_starts, col_halo, values, diag_lo, &
+                                                          diag_hi, w_k_local, Aw_k, local_rows) &
             bind(c, name='launch_chebyshev_local_weighted_kernel')
             import :: c_ptr, c_int, c_long, c_double, dim3
             implicit none
@@ -309,19 +296,21 @@ module hip_sparse_expm_kernels
             type(c_ptr), value :: stream
             real(c_double), value :: inv_M
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
+            type(c_ptr), value :: col_halo ! long*
             type(c_ptr), value :: values ! hipDoubleComplex*
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
             type(c_ptr), value :: w_k_local ! hipDoubleComplex*
             type(c_ptr), value :: Aw_k ! hipDoubleComplex*
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: local_rows
         end subroutine launch_chebyshev_local_weighted_kernel
 
         !----------------------------------------------------------------------
         ! Chebyshev Phase 1 Local (unit): Aw_k = A_local * w_k_local
         !----------------------------------------------------------------------
         subroutine launch_chebyshev_local_unit_kernel(grid, block, shmem, stream, &
-                                                      inv_M, row_starts, col_indexes, w_k_local, Aw_k, &
-                                                      lb, ub, local_rows) &
+                                                      inv_M, row_starts, col_halo, diag_lo, diag_hi, &
+                                                      w_k_local, Aw_k, local_rows) &
             bind(c, name='launch_chebyshev_local_unit_kernel')
             import :: c_ptr, c_int, c_long, c_double, dim3
             implicit none
@@ -330,20 +319,22 @@ module hip_sparse_expm_kernels
             type(c_ptr), value :: stream
             real(c_double), value :: inv_M
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
+            type(c_ptr), value :: col_halo ! long*
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
             type(c_ptr), value :: w_k_local ! hipDoubleComplex*
             type(c_ptr), value :: Aw_k ! hipDoubleComplex*
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: local_rows
         end subroutine launch_chebyshev_local_unit_kernel
 
         !----------------------------------------------------------------------
         ! Chebyshev Phase 2 Remote (weighted):
-        !   w_kp1 = 2 * inv_M * (Aw_k + A_remote * recv_buf) - w_km1
+        !   w_kp1 = 2 * inv_M * (Aw_k + A_off * recv_buf) - w_km1
         !----------------------------------------------------------------------
         subroutine launch_chebyshev_remote_weighted_kernel(grid, block, shmem, stream, &
-                                                           inv_M, row_starts, col_indexes, values, recv_buf_sorted, &
-                                                           hash_keys, hash_vals, hash_size, Aw_k, w_km1, w_kp1, &
-                                                           lb, ub, local_rows) &
+                                                           inv_M, row_starts, col_halo, values, diag_lo, &
+                                                           diag_hi, recv_buf, Aw_k, w_km1, w_kp1, n_local, &
+                                                           local_rows) &
             bind(c, name='launch_chebyshev_remote_weighted_kernel')
             import :: c_ptr, c_int, c_long, c_double, dim3
             implicit none
@@ -352,26 +343,24 @@ module hip_sparse_expm_kernels
             type(c_ptr), value :: stream
             real(c_double), value :: inv_M
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
+            type(c_ptr), value :: col_halo ! long*
             type(c_ptr), value :: values ! hipDoubleComplex*
-            type(c_ptr), value :: recv_buf_sorted ! hipDoubleComplex*
-            type(c_ptr), value :: hash_keys ! long*
-            type(c_ptr), value :: hash_vals ! long*
-            integer(c_long), value :: hash_size
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
+            type(c_ptr), value :: recv_buf ! hipDoubleComplex*
             type(c_ptr), value :: Aw_k ! hipDoubleComplex*
             type(c_ptr), value :: w_km1 ! hipDoubleComplex*
             type(c_ptr), value :: w_kp1 ! hipDoubleComplex*
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: n_local, local_rows
         end subroutine launch_chebyshev_remote_weighted_kernel
 
         !----------------------------------------------------------------------
         ! Chebyshev Phase 2 Remote (unit):
-        !   w_kp1 = 2 * inv_M * (Aw_k + A_remote * recv_buf) - w_km1
+        !   w_kp1 = 2 * inv_M * (Aw_k + A_off * recv_buf) - w_km1
         !----------------------------------------------------------------------
         subroutine launch_chebyshev_remote_unit_kernel(grid, block, shmem, stream, &
-                                                       inv_M, row_starts, col_indexes, recv_buf_sorted, &
-                                                       hash_keys, hash_vals, hash_size, Aw_k, w_km1, w_kp1, &
-                                                       lb, ub, local_rows) &
+                                                       inv_M, row_starts, col_halo, diag_lo, diag_hi, &
+                                                       recv_buf, Aw_k, w_km1, w_kp1, n_local, local_rows) &
             bind(c, name='launch_chebyshev_remote_unit_kernel')
             import :: c_ptr, c_int, c_long, c_double, dim3
             implicit none
@@ -380,15 +369,14 @@ module hip_sparse_expm_kernels
             type(c_ptr), value :: stream
             real(c_double), value :: inv_M
             type(c_ptr), value :: row_starts ! long*
-            type(c_ptr), value :: col_indexes ! long*
-            type(c_ptr), value :: recv_buf_sorted ! hipDoubleComplex*
-            type(c_ptr), value :: hash_keys ! long*
-            type(c_ptr), value :: hash_vals ! long*
-            integer(c_long), value :: hash_size
+            type(c_ptr), value :: col_halo ! long*
+            type(c_ptr), value :: diag_lo ! long*
+            type(c_ptr), value :: diag_hi ! long*
+            type(c_ptr), value :: recv_buf ! hipDoubleComplex*
             type(c_ptr), value :: Aw_k ! hipDoubleComplex*
             type(c_ptr), value :: w_km1 ! hipDoubleComplex*
             type(c_ptr), value :: w_kp1 ! hipDoubleComplex*
-            integer(c_long), value :: lb, ub, local_rows
+            integer(c_long), value :: n_local, local_rows
         end subroutine launch_chebyshev_remote_unit_kernel
 
         !----------------------------------------------------------------------

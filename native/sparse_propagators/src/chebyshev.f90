@@ -61,7 +61,6 @@ module chebyshev
                                        launch_chebyshev_remote_unit_kernel, &
                                        launch_chebyshev_accumulate_kernel, &
                                        launch_pack_send_buf_kernel, &
-                                       launch_reorder_recv_buf_kernel, &
                                        launch_spmv_local_weighted_kernel, &
                                        launch_spmv_local_unit_kernel, &
                                        launch_spmv_remote_weighted_kernel, &
@@ -422,7 +421,7 @@ contains
         integer(int64), intent(in) :: n_local
 
         integer(int32) :: rank, ierr, request, status(MPI_STATUS_SIZE)
-        integer(int64) :: n_local_64, lb_0, ub_0
+        integer(int64) :: n_local_64
         integer(int32) :: k, m_order
         real(real64) :: z, Jk, inv_M
         complex(real64), allocatable :: coeffs(:)
@@ -445,8 +444,6 @@ contains
         n_local_64 = int(n_local, int64)
 
         ! lb_graph and ub_graph are 0-based
-        lb_0 = A%lb_graph
-        ub_0 = A%ub_graph
 
         ! Get device pointers from the target arrays (already on device)
         B_dev = c_loc(B(1))
@@ -559,22 +556,24 @@ contains
                                          A%graph_comm, request, ierr)
 #endif
 
-            ! Phase 1: Local SpMV (overlaps with MPI)
-            ! Computes Aw_k (local contribution only)
+            ! Phase 1: Diagonal SpMV (overlaps with MPI)
+            ! Computes Aw_k (diagonal-block contribution only)
             if (A%has_values) then
                 call launch_chebyshev_local_weighted_kernel(grid, block, 0, A%stream, &
                                                             inv_M, A%row_starts_dev, A%col_indexes_dev, A%values_dev, &
-                                                            w_k_dev, A%Aw_k_dev, lb_0, ub_0, n_local_64)
+                                                            A%diag_lo_dev, A%diag_hi_dev, &
+                                                            w_k_dev, A%Aw_k_dev, n_local_64)
             else
                 call launch_chebyshev_local_unit_kernel(grid, block, 0, A%stream, &
                                                         inv_M, A%row_starts_dev, A%col_indexes_dev, &
-                                                        w_k_dev, A%Aw_k_dev, lb_0, ub_0, n_local_64)
+                                                        A%diag_lo_dev, A%diag_hi_dev, &
+                                                        w_k_dev, A%Aw_k_dev, n_local_64)
             end if
 
             ! Wait for MPI to complete
             call MPI_Wait(request, status, ierr)
 
-            ! H->D transfer of recv buffer (only needed for non-GPU-aware MPI) and reorder
+            ! H->D transfer of recv buffer (only needed for non-GPU-aware MPI)
             if (A%total_recv > 0) then
 #ifdef QUOP_GPU_AWARE_MPI
                 ! GPU-aware MPI: ensure RDMA writes are visible before kernels
@@ -585,24 +584,23 @@ contains
                 call hipCheck(hipMemcpyAsync(A%recv_buf_dev, c_loc(A%recv_buf(1)), &
                                              int(A%total_recv * 16, c_size_t), hipMemcpyHostToDevice, A%stream))
 #endif
-
-                ! Reorder recv buffer on device
-                call launch_reorder_recv_buf_kernel(grid, block, 0, A%stream, &
-                                                   A%recv_buf_dev, A%sort_perm_dev, A%recv_buf_sorted_dev, A%total_recv)
             end if
 
-            ! Phase 2: Remote SpMV + Chebyshev recurrence
-            ! w_km1 = 2*inv_M*(Aw_k + remote) - w_km1  (overwrites T_{k-1} with T_{k+1})
+            ! Phase 2: Off-diagonal SpMV + Chebyshev recurrence
+            ! w_km1 = 2*inv_M*(Aw_k + A_off * recv_buf) - w_km1  (overwrites T_{k-1} with T_{k+1})
+            ! Reads recv_buf via col_halo - n_local. When total_recv == 0 the
+            ! off-diagonal segments are empty by construction, so the kernel still
+            ! correctly applies the Chebyshev recurrence.
             if (A%has_values) then
                 call launch_chebyshev_remote_weighted_kernel(grid, block, 0, A%stream, &
                                                              inv_M, A%row_starts_dev, A%col_indexes_dev, A%values_dev, &
-                                                 A%recv_buf_sorted_dev, A%hash_keys_dev, A%hash_vals_dev, A%hash_size, &
-                                                             A%Aw_k_dev, w_km1_dev, w_km1_dev, lb_0, ub_0, n_local_64)
+                                                             A%diag_lo_dev, A%diag_hi_dev, A%recv_buf_dev, &
+                                                             A%Aw_k_dev, w_km1_dev, w_km1_dev, n_local_64, n_local_64)
             else
                 call launch_chebyshev_remote_unit_kernel(grid, block, 0, A%stream, &
                                                          inv_M, A%row_starts_dev, A%col_indexes_dev, &
-                                                 A%recv_buf_sorted_dev, A%hash_keys_dev, A%hash_vals_dev, A%hash_size, &
-                                                         A%Aw_k_dev, w_km1_dev, w_km1_dev, lb_0, ub_0, n_local_64)
+                                                         A%diag_lo_dev, A%diag_hi_dev, A%recv_buf_dev, &
+                                                         A%Aw_k_dev, w_km1_dev, w_km1_dev, n_local_64, n_local_64)
             end if
 
             ! Accumulate: C += coeff(k) * T_{k+1}

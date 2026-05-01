@@ -1,46 +1,50 @@
 // HIP SpMV kernels for distributed sparse matrix-vector multiplication
-// Two-phase approach: LOCAL computation overlaps with MPI, then REMOTE contributions
+// Two-phase halo-based approach: LOCAL computation overlaps with MPI, then
+// REMOTE contributions are added.
+//
+// All "col_indexes" arrays passed below contain halo offsets, not raw global
+// column indices: col_halo[j] in [0, n_local) -> diagonal entry, indexes
+// x_local; col_halo[j] in [n_local, n_local + total_recv) -> off-diagonal
+// entry, indexes recv_buf at offset (col_halo[j] - n_local).
+//
+// row_starts is 0-based half-open ([row_starts[i], row_starts[i+1])) and
+// arrays passed from Fortran are 1-indexed; col_halo is 0-based for direct
+// vector indexing.  diag_lo/diag_hi are populated as 1-based inclusive
+// Fortran indices; the local kernel converts to 0-based via diag_lo - 1 and
+// the remote kernel uses the same convention.
 
 #include "hip_common.hpp"
 
 //==============================================================================
-// TWO-PHASE DISTRIBUTED SpMV KERNELS
-// These match the CPU implementation in sparse.f90:
-//   Phase 1 (LOCAL): Compute contributions from local columns while MPI runs
-//   Phase 2 (REMOTE): Add contributions from received remote data
+// TWO-PHASE DISTRIBUTED SpMV KERNELS (halo-based)
+//   Phase 1 (LOCAL): contributions from columns in [diag_lo[i], diag_hi[i]]
+//   Phase 2 (REMOTE): contributions from the off-diagonal segments, scaled by
+//   `scalar` along with the local contribution.
 //==============================================================================
 
 //------------------------------------------------------------------------------
-// Phase 1: LOCAL contributions only (run while MPI communication proceeds)
-// Weighted version with explicit edge values
+// Phase 1 LOCAL (weighted): y[i] = sum over diagonal entries
 //------------------------------------------------------------------------------
-__global__ void spmv_local_weighted(long* row_starts, long* col_indexes, hipDoubleComplex* values,
-                                    hipDoubleComplex* x_local, hipDoubleComplex* y, long lb, long ub,
-                                    long local_rows) {
+__global__ void spmv_local_weighted(long* row_starts, long* col_halo, hipDoubleComplex* values,
+                                    long* diag_lo, long* diag_hi, hipDoubleComplex* x_local,
+                                    hipDoubleComplex* y, long local_rows) {
 
   size_t grid_size = blockDim.x * gridDim.x;
   size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   for (size_t i = idx; i < local_rows; i += grid_size) {
-    long start_j = row_starts[i];
-    long end_j = row_starts[i + 1] - 1;
+    // diag_lo / diag_hi are 1-based inclusive; convert to 0-based half-open.
+    long lo = diag_lo[i] - 1;
+    long hi = diag_hi[i]; // exclusive in 0-based form
 
     hipDoubleComplex row_sum = {0.0, 0.0};
 
-    if (start_j <= end_j) {
-      // Find local column range using binary search
-      long local_start = lower_bound_dev(col_indexes, start_j, end_j + 1, lb);
-      long local_end = upper_bound_dev(col_indexes, start_j, end_j + 1, ub) - 1;
-
-      // Sum contributions from local columns only
-      for (long j = local_start; j <= local_end; j++) {
-        long col = col_indexes[j];
-        long local_col = col - lb; // Convert to 0-based local index
-        hipDoubleComplex val = values[j];
-        hipDoubleComplex xj = x_local[local_col];
-        row_sum.x += val.x * xj.x - val.y * xj.y;
-        row_sum.y += val.x * xj.y + val.y * xj.x;
-      }
+    for (long j = lo; j < hi; j++) {
+      long local_col = col_halo[j]; // 0-based local index into x_local
+      hipDoubleComplex val = values[j];
+      hipDoubleComplex xj = x_local[local_col];
+      row_sum.x += val.x * xj.x - val.y * xj.y;
+      row_sum.y += val.x * xj.y + val.y * xj.x;
     }
 
     y[i] = row_sum;
@@ -48,30 +52,24 @@ __global__ void spmv_local_weighted(long* row_starts, long* col_indexes, hipDoub
 }
 
 //------------------------------------------------------------------------------
-// Phase 1: LOCAL contributions only - Unit weight version
+// Phase 1 LOCAL (unit weight)
 //------------------------------------------------------------------------------
-__global__ void spmv_local_unit(long* row_starts, long* col_indexes, hipDoubleComplex* x_local,
-                                hipDoubleComplex* y, long lb, long ub, long local_rows) {
+__global__ void spmv_local_unit(long* row_starts, long* col_halo, long* diag_lo, long* diag_hi,
+                                hipDoubleComplex* x_local, hipDoubleComplex* y, long local_rows) {
 
   size_t grid_size = blockDim.x * gridDim.x;
   size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   for (size_t i = idx; i < local_rows; i += grid_size) {
-    long start_j = row_starts[i];
-    long end_j = row_starts[i + 1] - 1;
+    long lo = diag_lo[i] - 1;
+    long hi = diag_hi[i];
 
     hipDoubleComplex row_sum = {0.0, 0.0};
 
-    if (start_j <= end_j) {
-      long local_start = lower_bound_dev(col_indexes, start_j, end_j + 1, lb);
-      long local_end = upper_bound_dev(col_indexes, start_j, end_j + 1, ub) - 1;
-
-      for (long j = local_start; j <= local_end; j++) {
-        long col = col_indexes[j];
-        long local_col = col - lb;
-        row_sum.x += x_local[local_col].x;
-        row_sum.y += x_local[local_col].y;
-      }
+    for (long j = lo; j < hi; j++) {
+      long local_col = col_halo[j];
+      row_sum.x += x_local[local_col].x;
+      row_sum.y += x_local[local_col].y;
     }
 
     y[i] = row_sum;
@@ -79,131 +77,82 @@ __global__ void spmv_local_unit(long* row_starts, long* col_indexes, hipDoubleCo
 }
 
 //------------------------------------------------------------------------------
-// Phase 2: REMOTE contributions (run after MPI communication completes)
-// Adds remote contributions to y (which already has local contributions)
-// Uses hash table to find position in recv_buf for each remote column
-// Weighted version
+// Phase 2 REMOTE (weighted): adds off-diagonal contributions and applies scalar.
+//   y[i] = scalar * (y[i] + sum over off-diagonal entries reading recv_buf)
 //------------------------------------------------------------------------------
-__global__ void spmv_remote_weighted(long* row_starts, long* col_indexes, hipDoubleComplex* values,
-                                     hipDoubleComplex* recv_buf_sorted, long* hash_keys, long* hash_vals,
-                                     long hash_size, hipDoubleComplex* y, hipDoubleComplex scalar, long lb,
-                                     long ub, long local_rows) {
+__global__ void spmv_remote_weighted(long* row_starts, long* col_halo, hipDoubleComplex* values,
+                                     long* diag_lo, long* diag_hi, hipDoubleComplex* recv_buf,
+                                     hipDoubleComplex* y, hipDoubleComplex scalar, long n_local,
+                                     long local_rows) {
 
   size_t grid_size = blockDim.x * gridDim.x;
   size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   for (size_t i = idx; i < local_rows; i += grid_size) {
-    long start_j = row_starts[i];
-    long end_j = row_starts[i + 1] - 1;
+    long row_lo = row_starts[i];           // 0-based first
+    long row_hi = row_starts[i + 1];       // 0-based exclusive last
+    long diag_first = diag_lo[i] - 1;      // 0-based first diagonal entry
+    long diag_last = diag_hi[i];           // 0-based exclusive last diagonal entry
 
-    hipDoubleComplex row_sum = y[i]; // Start with local contributions
+    hipDoubleComplex row_sum = y[i]; // pre-loaded with local contribution
 
-    if (start_j <= end_j) {
-      // Check if row has any remote columns
-      if (col_indexes[start_j] >= lb && col_indexes[end_j] <= ub) {
-        // All columns are local, just apply scalar
-        y[i].x = scalar.x * row_sum.x - scalar.y * row_sum.y;
-        y[i].y = scalar.x * row_sum.y + scalar.y * row_sum.x;
-        continue;
-      }
-
-      long local_start = lower_bound_dev(col_indexes, start_j, end_j + 1, lb);
-      long local_end = upper_bound_dev(col_indexes, start_j, end_j + 1, ub) - 1;
-
-      // Add contributions from remote columns BEFORE local range
-      for (long j = start_j; j < local_start; j++) {
-        long col = col_indexes[j];
-        long sorted_pos = hash_lookup_dev(col, hash_keys, hash_vals, hash_size);
-        if (sorted_pos >= 0) {
-          hipDoubleComplex val = values[j];
-          hipDoubleComplex xj = recv_buf_sorted[sorted_pos]; // 0-based position
-          row_sum.x += val.x * xj.x - val.y * xj.y;
-          row_sum.y += val.x * xj.y + val.y * xj.x;
-        }
-      }
-
-      // Add contributions from remote columns AFTER local range
-      for (long j = local_end + 1; j <= end_j; j++) {
-        long col = col_indexes[j];
-        long sorted_pos = hash_lookup_dev(col, hash_keys, hash_vals, hash_size);
-        if (sorted_pos >= 0) {
-          hipDoubleComplex val = values[j];
-          hipDoubleComplex xj = recv_buf_sorted[sorted_pos];
-          row_sum.x += val.x * xj.x - val.y * xj.y;
-          row_sum.y += val.x * xj.y + val.y * xj.x;
-        }
-      }
+    // Off-lower segment
+    for (long j = row_lo; j < diag_first; j++) {
+      long off = col_halo[j] - n_local; // 0-based offset into recv_buf
+      hipDoubleComplex val = values[j];
+      hipDoubleComplex xj = recv_buf[off];
+      row_sum.x += val.x * xj.x - val.y * xj.y;
+      row_sum.y += val.x * xj.y + val.y * xj.x;
     }
 
-    // Apply scalar
+    // Off-upper segment
+    for (long j = diag_last; j < row_hi; j++) {
+      long off = col_halo[j] - n_local;
+      hipDoubleComplex val = values[j];
+      hipDoubleComplex xj = recv_buf[off];
+      row_sum.x += val.x * xj.x - val.y * xj.y;
+      row_sum.y += val.x * xj.y + val.y * xj.x;
+    }
+
     y[i].x = scalar.x * row_sum.x - scalar.y * row_sum.y;
     y[i].y = scalar.x * row_sum.y + scalar.y * row_sum.x;
   }
 }
 
 //------------------------------------------------------------------------------
-// Phase 2: REMOTE contributions - Unit weight version
+// Phase 2 REMOTE (unit weight)
 //------------------------------------------------------------------------------
-__global__ void spmv_remote_unit(long* row_starts, long* col_indexes, hipDoubleComplex* recv_buf_sorted,
-                                 long* hash_keys, long* hash_vals, long hash_size, hipDoubleComplex* y,
-                                 hipDoubleComplex scalar, long lb, long ub, long local_rows) {
+__global__ void spmv_remote_unit(long* row_starts, long* col_halo, long* diag_lo, long* diag_hi,
+                                 hipDoubleComplex* recv_buf, hipDoubleComplex* y,
+                                 hipDoubleComplex scalar, long n_local, long local_rows) {
 
   size_t grid_size = blockDim.x * gridDim.x;
   size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   for (size_t i = idx; i < local_rows; i += grid_size) {
-    long start_j = row_starts[i];
-    long end_j = row_starts[i + 1] - 1;
+    long row_lo = row_starts[i];
+    long row_hi = row_starts[i + 1];
+    long diag_first = diag_lo[i] - 1;
+    long diag_last = diag_hi[i];
 
     hipDoubleComplex row_sum = y[i];
 
-    if (start_j <= end_j) {
-      if (col_indexes[start_j] >= lb && col_indexes[end_j] <= ub) {
-        y[i].x = scalar.x * row_sum.x - scalar.y * row_sum.y;
-        y[i].y = scalar.x * row_sum.y + scalar.y * row_sum.x;
-        continue;
-      }
+    for (long j = row_lo; j < diag_first; j++) {
+      long off = col_halo[j] - n_local;
+      hipDoubleComplex xj = recv_buf[off];
+      row_sum.x += xj.x;
+      row_sum.y += xj.y;
+    }
 
-      long local_start = lower_bound_dev(col_indexes, start_j, end_j + 1, lb);
-      long local_end = upper_bound_dev(col_indexes, start_j, end_j + 1, ub) - 1;
-
-      for (long j = start_j; j < local_start; j++) {
-        long col = col_indexes[j];
-        long sorted_pos = hash_lookup_dev(col, hash_keys, hash_vals, hash_size);
-        if (sorted_pos >= 0) {
-          hipDoubleComplex xj = recv_buf_sorted[sorted_pos]; // 0-based position
-          row_sum.x += xj.x;
-          row_sum.y += xj.y;
-        }
-      }
-
-      for (long j = local_end + 1; j <= end_j; j++) {
-        long col = col_indexes[j];
-        long sorted_pos = hash_lookup_dev(col, hash_keys, hash_vals, hash_size);
-        if (sorted_pos >= 0) {
-          hipDoubleComplex xj = recv_buf_sorted[sorted_pos];
-          row_sum.x += xj.x;
-          row_sum.y += xj.y;
-        }
-      }
+    for (long j = diag_last; j < row_hi; j++) {
+      long off = col_halo[j] - n_local;
+      hipDoubleComplex xj = recv_buf[off];
+      row_sum.x += xj.x;
+      row_sum.y += xj.y;
     }
 
     y[i].x = scalar.x * row_sum.x - scalar.y * row_sum.y;
     y[i].y = scalar.x * row_sum.y + scalar.y * row_sum.x;
-  }
-}
-
-//------------------------------------------------------------------------------
-// Reorder recv_buf according to sort_perm (sort_perm is 0-based)
-//------------------------------------------------------------------------------
-__global__ void reorder_recv_buf(hipDoubleComplex* recv_buf, long* sort_perm,
-                                 hipDoubleComplex* recv_buf_sorted, long total_recv) {
-
-  size_t grid_size = blockDim.x * gridDim.x;
-  size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-  for (size_t i = idx; i < total_recv; i += grid_size) {
-    recv_buf_sorted[i] = recv_buf[sort_perm[i]]; // sort_perm is 0-based
   }
 }
 
@@ -218,7 +167,7 @@ __global__ void pack_send_buf(hipDoubleComplex* x_local, long* send_offsets, hip
   size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   for (size_t i = idx; i < total_send; i += grid_size) {
-    send_buf[i] = x_local[send_offsets[i]]; // send_offsets is 0-based
+    send_buf[i] = x_local[send_offsets[i]];
   }
 }
 
@@ -335,50 +284,41 @@ __global__ void unpack_rec_values(hipDoubleComplex* target, hipDoubleComplex* re
 
 extern "C" {
 void launch_spmv_local_weighted_kernel(dim3* grid, dim3* block, int shmem, hipStream_t stream,
-                                       long* row_starts, long* col_indexes, hipDoubleComplex* values,
-                                       hipDoubleComplex* x_local, hipDoubleComplex* y, long lb, long ub,
-                                       long local_rows) {
-  hipLaunchKernelGGL((spmv_local_weighted), *grid, *block, shmem, stream, row_starts, col_indexes, values,
-                     x_local, y, lb, ub, local_rows);
+                                       long* row_starts, long* col_halo, hipDoubleComplex* values,
+                                       long* diag_lo, long* diag_hi, hipDoubleComplex* x_local,
+                                       hipDoubleComplex* y, long local_rows) {
+  hipLaunchKernelGGL((spmv_local_weighted), *grid, *block, shmem, stream, row_starts, col_halo, values,
+                     diag_lo, diag_hi, x_local, y, local_rows);
 }
 }
 
 extern "C" {
 void launch_spmv_local_unit_kernel(dim3* grid, dim3* block, int shmem, hipStream_t stream, long* row_starts,
-                                   long* col_indexes, hipDoubleComplex* x_local, hipDoubleComplex* y, long lb,
-                                   long ub, long local_rows) {
-  hipLaunchKernelGGL((spmv_local_unit), *grid, *block, shmem, stream, row_starts, col_indexes, x_local, y, lb,
-                     ub, local_rows);
+                                   long* col_halo, long* diag_lo, long* diag_hi, hipDoubleComplex* x_local,
+                                   hipDoubleComplex* y, long local_rows) {
+  hipLaunchKernelGGL((spmv_local_unit), *grid, *block, shmem, stream, row_starts, col_halo, diag_lo, diag_hi,
+                     x_local, y, local_rows);
 }
 }
 
 extern "C" {
 void launch_spmv_remote_weighted_kernel(dim3* grid, dim3* block, int shmem, hipStream_t stream,
-                                        long* row_starts, long* col_indexes, hipDoubleComplex* values,
-                                        hipDoubleComplex* recv_buf_sorted, long* hash_keys, long* hash_vals,
-                                        long hash_size, hipDoubleComplex* y, hipDoubleComplex scalar, long lb,
-                                        long ub, long local_rows) {
-  hipLaunchKernelGGL((spmv_remote_weighted), *grid, *block, shmem, stream, row_starts, col_indexes, values,
-                     recv_buf_sorted, hash_keys, hash_vals, hash_size, y, scalar, lb, ub, local_rows);
+                                        long* row_starts, long* col_halo, hipDoubleComplex* values,
+                                        long* diag_lo, long* diag_hi, hipDoubleComplex* recv_buf,
+                                        hipDoubleComplex* y, hipDoubleComplex scalar, long n_local,
+                                        long local_rows) {
+  hipLaunchKernelGGL((spmv_remote_weighted), *grid, *block, shmem, stream, row_starts, col_halo, values,
+                     diag_lo, diag_hi, recv_buf, y, scalar, n_local, local_rows);
 }
 }
 
 extern "C" {
 void launch_spmv_remote_unit_kernel(dim3* grid, dim3* block, int shmem, hipStream_t stream, long* row_starts,
-                                    long* col_indexes, hipDoubleComplex* recv_buf_sorted, long* hash_keys,
-                                    long* hash_vals, long hash_size, hipDoubleComplex* y,
-                                    hipDoubleComplex scalar, long lb, long ub, long local_rows) {
-  hipLaunchKernelGGL((spmv_remote_unit), *grid, *block, shmem, stream, row_starts, col_indexes,
-                     recv_buf_sorted, hash_keys, hash_vals, hash_size, y, scalar, lb, ub, local_rows);
-}
-}
-
-extern "C" {
-void launch_reorder_recv_buf_kernel(dim3* grid, dim3* block, int shmem, hipStream_t stream,
-                                    hipDoubleComplex* recv_buf, long* sort_perm,
-                                    hipDoubleComplex* recv_buf_sorted, long total_recv) {
-  hipLaunchKernelGGL((reorder_recv_buf), *grid, *block, shmem, stream, recv_buf, sort_perm, recv_buf_sorted,
-                     total_recv);
+                                    long* col_halo, long* diag_lo, long* diag_hi, hipDoubleComplex* recv_buf,
+                                    hipDoubleComplex* y, hipDoubleComplex scalar, long n_local,
+                                    long local_rows) {
+  hipLaunchKernelGGL((spmv_remote_unit), *grid, *block, shmem, stream, row_starts, col_halo, diag_lo,
+                     diag_hi, recv_buf, y, scalar, n_local, local_rows);
 }
 }
 

@@ -522,7 +522,6 @@ contains
         A_temp%graph_comm = A%graph_comm
         A_temp%total_recv = A%total_recv
         A_temp%total_send = A%total_send
-        A_temp%hash_size = A%hash_size
         A_temp%lb_graph = A%lb_graph
         A_temp%ub_graph = A%ub_graph
         A_temp%graph_comm_ready = A%graph_comm_ready
@@ -558,14 +557,6 @@ contains
         if (allocated(A%out_neighbors)) then
             allocate (A_temp%out_neighbors, source=A%out_neighbors)
         end if
-        if (associated(A%hash_keys)) then
-            allocate (A_temp%hash_keys(size(A%hash_keys)))
-            A_temp%hash_keys = A%hash_keys
-        end if
-        if (associated(A%hash_vals)) then
-            allocate (A_temp%hash_vals(size(A%hash_vals)))
-            A_temp%hash_vals = A%hash_vals
-        end if
         if (associated(A%send_buf)) then
             allocate (A_temp%send_buf(size(A%send_buf)))
             A_temp%send_buf = A%send_buf
@@ -581,6 +572,17 @@ contains
         if (associated(A%col_indexes_local)) then
             allocate (A_temp%col_indexes_local(size(A%col_indexes_local)))
             A_temp%col_indexes_local = A%col_indexes_local
+            ! col_halo aliases col_indexes_local in the halo-based design
+            A_temp%col_halo => A_temp%col_indexes_local
+            A_temp%owns_col_halo = .false.
+        end if
+        if (associated(A%diag_lo)) then
+            allocate (A_temp%diag_lo(size(A%diag_lo)))
+            A_temp%diag_lo = A%diag_lo
+        end if
+        if (associated(A%diag_hi)) then
+            allocate (A_temp%diag_hi(size(A%diag_hi)))
+            A_temp%diag_hi = A%diag_hi
         end if
 
         allocate (A_temp%values(A%row_starts(partition_table(rank + 1)): &
@@ -644,12 +646,14 @@ contains
         if (allocated(A_temp%graph_send_disps)) deallocate (A_temp%graph_send_disps)
         if (allocated(A_temp%in_neighbors)) deallocate (A_temp%in_neighbors)
         if (allocated(A_temp%out_neighbors)) deallocate (A_temp%out_neighbors)
-        if (associated(A_temp%hash_keys)) deallocate (A_temp%hash_keys)
-        if (associated(A_temp%hash_vals)) deallocate (A_temp%hash_vals)
         if (associated(A_temp%send_buf)) deallocate (A_temp%send_buf)
         if (associated(A_temp%recv_buf)) deallocate (A_temp%recv_buf)
         if (associated(A_temp%row_starts_local)) deallocate (A_temp%row_starts_local)
+        ! col_halo aliases col_indexes_local; only deallocate the underlying buffer.
+        nullify (A_temp%col_halo)
         if (associated(A_temp%col_indexes_local)) deallocate (A_temp%col_indexes_local)
+        if (associated(A_temp%diag_lo)) deallocate (A_temp%diag_lo)
+        if (associated(A_temp%diag_hi)) deallocate (A_temp%diag_hi)
         if (associated(A_temp%values_local)) deallocate (A_temp%values_local)
 
         deallocate (A_temp%values)
