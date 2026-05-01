@@ -88,3 +88,22 @@ target_include_directories(test_comm_info_entry_points
 add_mpi_test(comm_info_entry_1proc test_comm_info_entry_points 1)
 add_mpi_test(comm_info_entry_2proc test_comm_info_entry_points 2)
 add_mpi_test(comm_info_entry_4proc test_comm_info_entry_points 4)
+
+# ============================================================================
+# CPU sparse SpMV correctness test (non-symmetric A, non-uniform x)
+# ============================================================================
+add_executable(test_sparse_cpu_spmv
+    test_sparse_cpu_spmv.f90
+)
+target_link_libraries(test_sparse_cpu_spmv
+    sparse
+    MPI::MPI_Fortran
+)
+target_include_directories(test_sparse_cpu_spmv
+    PRIVATE "${CMAKE_Fortran_MODULE_DIRECTORY}"
+)
+
+add_mpi_test(sparse_cpu_spmv_1proc test_sparse_cpu_spmv 1)
+add_mpi_test(sparse_cpu_spmv_2proc test_sparse_cpu_spmv 2)
+add_mpi_test(sparse_cpu_spmv_4proc test_sparse_cpu_spmv 4)
+add_mpi_test(sparse_cpu_spmv_8proc test_sparse_cpu_spmv 8)

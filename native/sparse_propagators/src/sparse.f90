@@ -96,6 +96,23 @@ module sparse
         ! globally-indexed path); false when they alias the borrowed
         ! row_starts/col_indexes/values buffers (locally-indexed path).
         logical :: owns_local_arrays = .false.
+        ! Halo SpMV metadata (built once in setup_graph_communications, used
+        ! by spmv_cpu in place of the hash lookup + recv_buf reorder).
+        ! col_halo(j) is a 0-based index into a virtual halo'd vector of
+        ! length n_local + total_recv: values in [0, n_local) reference
+        ! x_local; values in [n_local, n_local+total_recv) reference recv_buf
+        ! at offset (col_halo(j) - n_local). diag_lo/diag_hi delimit the
+        ! contiguous run of locally-owned columns within each row (1-based
+        ! inclusive indices into col_indexes_local / col_halo / values_local;
+        ! diag_lo > diag_hi means the row has no diagonal-block entries).
+        integer(int64), dimension(:), pointer :: col_halo => null()
+        integer(int64), dimension(:), pointer :: diag_lo => null()
+        integer(int64), dimension(:), pointer :: diag_hi => null()
+        ! True when col_halo owns freshly allocated storage (GPU build,
+        ! which keeps col_indexes_local intact for csr_to_device); false
+        ! when col_halo aliases col_indexes_local (CPU build, mutated in
+        ! place after halo metadata is built).
+        logical :: owns_col_halo = .false.
         ! Flag to indicate if graph comm is set up
         logical :: graph_comm_ready = .false.
         ! Flag to indicate if values are explicit (false = all ones)
@@ -697,8 +714,98 @@ contains
     end subroutine build_hash_table
 
     !--------------------------------------------------------------------------
-    ! CPU SpMV using graph communicator and prebuilt hash table (OpenMP)
-    ! Uses 0-based data values in 1-based Fortran arrays
+    ! Build halo metadata for spmv_cpu: col_halo + diag_lo + diag_hi.
+    !
+    ! Pre-conditions: A%row_starts_local, A%col_indexes_local, A%lb_graph,
+    !                 A%ub_graph have been populated, and the CSR is
+    !                 column-sorted within each row.
+    !
+    ! On CPU-only builds (#ifndef USE_HIP):
+    !   - A%recv_indices_sorted and A%sort_perm must be populated.
+    !   - col_halo aliases col_indexes_local; the borrowed CSR column array
+    !     is rewritten in place to hold halo offsets.  This saves
+    !     8 * local_nnz bytes of permanent metadata per rank.  Remote-column
+    !     lookup uses a binary search over A%recv_indices_sorted, so the
+    !     hash table is never built.
+    !
+    ! On GPU builds (#ifdef USE_HIP):
+    !   - A%hash_keys, A%hash_vals, A%hash_size and A%sort_perm must be
+    !     populated by build_hash_table.
+    !   - col_halo is freshly allocated so col_indexes_local stays intact
+    !     for csr_to_device, which copies it to device memory.  The hash
+    !     table is also retained for the device-side SpMV path.
+    !--------------------------------------------------------------------------
+    subroutine build_halo_metadata(A, n_local)
+        type(CSR), intent(inout) :: A
+        integer(int64), intent(in) :: n_local
+
+        integer(int64) :: i, j, row_lo, row_hi, local_nnz, col, sorted_pos
+
+        local_nnz = size(A%col_indexes_local, kind=int64)
+
+#ifdef USE_HIP
+        allocate (A%col_halo(max(local_nnz, 1_int64)))
+        A%owns_col_halo = .true.
+#else
+        ! Alias col_halo to col_indexes_local; the loop below rewrites the
+        ! columns in place. col_indexes_local itself either borrows the
+        ! Python CSR buffer or owns storage from the legacy globally-indexed
+        ! path; cleanup_graph_communications will nullify col_halo and let
+        ! the existing owns_local_arrays logic handle the underlying memory.
+        A%col_halo => A%col_indexes_local
+        A%owns_col_halo = .false.
+#endif
+
+        allocate (A%diag_lo(max(n_local, 1_int64)))
+        allocate (A%diag_hi(max(n_local, 1_int64)))
+
+        ! Per row: locate the contiguous diagonal-block segment using binary
+        ! search on the column-sorted CSR, then translate every entry's
+        ! global column into a halo offset.
+        !$omp parallel do private(row_lo, row_hi, j, col, sorted_pos)
+        do i = 1, n_local
+            row_lo = A%row_starts_local(i) + 1            ! 1-based first
+            row_hi = A%row_starts_local(i + 1)            ! 1-based last (inclusive)
+
+            A%diag_lo(i) = lower_bound(A%col_indexes_local, row_lo, row_hi, A%lb_graph)
+            A%diag_hi(i) = upper_bound(A%col_indexes_local, row_lo, row_hi, A%ub_graph) - 1
+
+            do j = row_lo, row_hi
+                col = A%col_indexes_local(j)
+                if (col >= A%lb_graph .and. col <= A%ub_graph) then
+                    ! Owned column: 0-based local index in [0, n_local)
+                    A%col_halo(j) = col - A%lb_graph
+                else
+#ifdef USE_HIP
+                    ! Remote column: hash gives 1-based pos in
+                    ! recv_indices_sorted, sort_perm maps that back to a
+                    ! 1-based pos in recv_buf.
+                    sorted_pos = hash_lookup(col, A%hash_keys, A%hash_vals, A%hash_size)
+#else
+                    ! Remote column: binary search the sorted recv index
+                    ! array directly, then translate via sort_perm.
+                    sorted_pos = lower_bound(A%recv_indices_sorted, &
+                                             1_int64, A%total_recv, col)
+#endif
+                    A%col_halo(j) = n_local + A%sort_perm(sorted_pos) - 1
+                end if
+            end do
+        end do
+        !$omp end parallel do
+    end subroutine build_halo_metadata
+
+    !--------------------------------------------------------------------------
+    ! CPU SpMV using graph communicator and prebuilt halo metadata (OpenMP)
+    !
+    ! Each row's entries split into three contiguous segments by column:
+    !   off-lower   : col < lb_graph                  (j in [row_lo, diag_lo - 1])
+    !   diagonal    : lb_graph <= col <= ub_graph     (j in [diag_lo, diag_hi])
+    !   off-upper   : col > ub_graph                  (j in [diag_hi + 1, row_hi])
+    !
+    ! col_halo(j) carries the appropriate halo offset:
+    !   diagonal entries -> 0-based local index into x_local
+    !   off entries      -> n_local + 0-based offset into recv_buf
+    ! eliminating the per-SpMV hash lookup and recv_buf reorder.
     !--------------------------------------------------------------------------
     subroutine spmv_cpu(A, x_local, y_local, scalar)
         type(CSR), intent(inout) :: A
@@ -707,11 +814,10 @@ contains
         complex(real64), intent(in) :: scalar
 
         integer(int32) :: ierr, request
-        integer(int64) :: i, n_local, col, start_j, end_j, j
-        integer(int64) :: local_start, local_end, sorted_pos
+        integer(int64) :: i, n_local, j, idx
+        integer(int64) :: row_lo, row_hi, diag_first, diag_last
         complex(real64) :: row_sum
         integer(int32) :: status(MPI_STATUS_SIZE)
-        complex(real64), allocatable :: recv_buf_sorted(:)
 
         n_local = A%ub_graph - A%lb_graph + 1
 
@@ -729,42 +835,31 @@ contains
                                      MPI_DOUBLE_COMPLEX, &
                                      A%graph_comm, request, ierr)
 
-        ! Compute LOCAL contributions while communication proceeds
-        ! row_starts_local contains 0-based offsets, add 1 for 1-based array indexing
-        ! col_indexes_local contains 0-based column values
+        ! Diagonal-block phase: only locally-owned columns.  Runs while
+        ! comms is in flight.  diag_first > diag_last skips empty rows.
         if (A%has_values) then
-            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end)
+            !$omp parallel do private(diag_first, diag_last, row_sum, j, idx)
             do i = 1, n_local
-                start_j = A%row_starts_local(i) + 1 ! Convert to 1-based
-                end_j = A%row_starts_local(i + 1) ! Already the last index (1-based)
+                diag_first = A%diag_lo(i)
+                diag_last = A%diag_hi(i)
                 row_sum = (0.0_real64, 0.0_real64)
-
-                local_start = lower_bound(A%col_indexes_local, start_j, end_j, A%lb_graph)
-                local_end = upper_bound(A%col_indexes_local, start_j, end_j, A%ub_graph) - 1
-
-                do j = local_start, local_end
-                    col = A%col_indexes_local(j) ! 0-based column value
-                    row_sum = row_sum + A%values_local(j) * x_local(col - A%lb_graph + 1)
+                do j = diag_first, diag_last
+                    idx = A%col_halo(j)                ! 0-based local index
+                    row_sum = row_sum + A%values_local(j) * x_local(idx + 1)
                 end do
-
                 y_local(i) = row_sum
             end do
             !$omp end parallel do
         else
-            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end)
+            !$omp parallel do private(diag_first, diag_last, row_sum, j, idx)
             do i = 1, n_local
-                start_j = A%row_starts_local(i) + 1 ! Convert to 1-based
-                end_j = A%row_starts_local(i + 1) ! Already the last index (1-based)
+                diag_first = A%diag_lo(i)
+                diag_last = A%diag_hi(i)
                 row_sum = (0.0_real64, 0.0_real64)
-
-                local_start = lower_bound(A%col_indexes_local, start_j, end_j, A%lb_graph)
-                local_end = upper_bound(A%col_indexes_local, start_j, end_j, A%ub_graph) - 1
-
-                do j = local_start, local_end
-                    col = A%col_indexes_local(j) ! 0-based column value
-                    row_sum = row_sum + x_local(col - A%lb_graph + 1)
+                do j = diag_first, diag_last
+                    idx = A%col_halo(j)
+                    row_sum = row_sum + x_local(idx + 1)
                 end do
-
                 y_local(i) = row_sum
             end do
             !$omp end parallel do
@@ -773,93 +868,46 @@ contains
         ! Wait for communication
         call MPI_Wait(request, status, ierr)
 
-        ! Reorder recv_buf to sorted order
-        allocate (recv_buf_sorted(max(A%total_recv, 1_int64)))
-        !$omp parallel do
-        do i = 1, A%total_recv
-            recv_buf_sorted(i) = A%recv_buf(A%sort_perm(i))
-        end do
-        !$omp end parallel do
-
-        ! Add REMOTE contributions
-        ! row_starts_local contains 0-based offsets, hash_lookup returns 1-based positions
+        ! Off-diagonal phase: remaining columns.  col_halo(j) - n_local is a
+        ! 0-based offset into recv_buf, valid because halo offsets were
+        ! populated in recv_buf order at setup time.
         if (A%has_values) then
-            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, sorted_pos)
+            !$omp parallel do private(row_lo, row_hi, diag_first, diag_last, row_sum, j, idx)
             do i = 1, n_local
-                start_j = A%row_starts_local(i) + 1 ! Convert to 1-based
-                end_j = A%row_starts_local(i + 1) ! Already the last index (1-based)
-
-                if (start_j > end_j) then
-                    y_local(i) = scalar * y_local(i)
-                    cycle
-                end if
-
-                if (A%col_indexes_local(start_j) >= A%lb_graph .and. &
-                    A%col_indexes_local(end_j) <= A%ub_graph) then
-                    y_local(i) = scalar * y_local(i)
-                    cycle
-                end if
-
+                row_lo = A%row_starts_local(i) + 1
+                row_hi = A%row_starts_local(i + 1)
+                diag_first = A%diag_lo(i)
+                diag_last = A%diag_hi(i)
                 row_sum = y_local(i)
 
-                local_start = lower_bound(A%col_indexes_local, start_j, end_j, A%lb_graph)
-                local_end = upper_bound(A%col_indexes_local, start_j, end_j, A%ub_graph) - 1
-
-                do j = start_j, local_start - 1
-                    col = A%col_indexes_local(j)
-                    sorted_pos = hash_lookup(col, A%hash_keys, A%hash_vals, A%hash_size)
-                    if (sorted_pos > 0) then
-                        row_sum = row_sum + A%values_local(j) * recv_buf_sorted(sorted_pos)
-                    end if
+                do j = row_lo, diag_first - 1
+                    idx = A%col_halo(j) - n_local      ! 0-based recv_buf offset
+                    row_sum = row_sum + A%values_local(j) * A%recv_buf(idx + 1)
                 end do
-
-                do j = local_end + 1, end_j
-                    col = A%col_indexes_local(j)
-                    sorted_pos = hash_lookup(col, A%hash_keys, A%hash_vals, A%hash_size)
-                    if (sorted_pos > 0) then
-                        row_sum = row_sum + A%values_local(j) * recv_buf_sorted(sorted_pos)
-                    end if
+                do j = diag_last + 1, row_hi
+                    idx = A%col_halo(j) - n_local
+                    row_sum = row_sum + A%values_local(j) * A%recv_buf(idx + 1)
                 end do
 
                 y_local(i) = scalar * row_sum
             end do
             !$omp end parallel do
         else
-            !$omp parallel do private(start_j, end_j, row_sum, j, col, local_start, local_end, sorted_pos)
+            !$omp parallel do private(row_lo, row_hi, diag_first, diag_last, row_sum, j, idx)
             do i = 1, n_local
-                start_j = A%row_starts_local(i) + 1 ! Convert to 1-based
-                end_j = A%row_starts_local(i + 1) ! Already the last index (1-based)
-
-                if (start_j > end_j) then
-                    y_local(i) = scalar * y_local(i)
-                    cycle
-                end if
-
-                if (A%col_indexes_local(start_j) >= A%lb_graph .and. &
-                    A%col_indexes_local(end_j) <= A%ub_graph) then
-                    y_local(i) = scalar * y_local(i)
-                    cycle
-                end if
-
+                row_lo = A%row_starts_local(i) + 1
+                row_hi = A%row_starts_local(i + 1)
+                diag_first = A%diag_lo(i)
+                diag_last = A%diag_hi(i)
                 row_sum = y_local(i)
 
-                local_start = lower_bound(A%col_indexes_local, start_j, end_j, A%lb_graph)
-                local_end = upper_bound(A%col_indexes_local, start_j, end_j, A%ub_graph) - 1
-
-                do j = start_j, local_start - 1
-                    col = A%col_indexes_local(j)
-                    sorted_pos = hash_lookup(col, A%hash_keys, A%hash_vals, A%hash_size)
-                    if (sorted_pos > 0) then
-                        row_sum = row_sum + recv_buf_sorted(sorted_pos)
-                    end if
+                do j = row_lo, diag_first - 1
+                    idx = A%col_halo(j) - n_local
+                    row_sum = row_sum + A%recv_buf(idx + 1)
                 end do
-
-                do j = local_end + 1, end_j
-                    col = A%col_indexes_local(j)
-                    sorted_pos = hash_lookup(col, A%hash_keys, A%hash_vals, A%hash_size)
-                    if (sorted_pos > 0) then
-                        row_sum = row_sum + recv_buf_sorted(sorted_pos)
-                    end if
+                do j = diag_last + 1, row_hi
+                    idx = A%col_halo(j) - n_local
+                    row_sum = row_sum + A%recv_buf(idx + 1)
                 end do
 
                 y_local(i) = scalar * row_sum
@@ -867,7 +915,6 @@ contains
             !$omp end parallel do
         end if
 
-        deallocate (recv_buf_sorted)
     end subroutine spmv_cpu
 
     !--------------------------------------------------------------------------
@@ -1038,6 +1085,15 @@ contains
     end subroutine merge_sort_dagger
 
     !> @brief Returns the distributed conjugate transpose of CSR matrix A.
+    !>
+    !> @warning Reads `A%col_indexes` directly, NOT `A%col_indexes_local`.
+    !> On CPU builds (`#ifndef USE_HIP`), `setup_graph_communications` rewrites
+    !> `col_indexes_local` (which aliases `col_indexes` for the locally-indexed
+    !> Python path) in place to hold halo offsets rather than global column
+    !> indices.  Therefore `csr_dagger` must only be called BEFORE
+    !> `setup_graph_communications`, or on an `A` whose `col_indexes` array is
+    !> known to be untouched (the legacy globally-indexed `expm.f90` path).
+    !> The live Chebyshev pipeline does not call this routine.
 
     subroutine csr_dagger(A, partition_table, A_T, MPI_communicator)
 
@@ -1338,16 +1394,33 @@ contains
                               A%in_neighbors, A%out_neighbors, &
                               A%total_recv, A%total_send, A%lb_graph, A%ub_graph)
 
-        ! Build hash table for O(1) remote column lookup
-        ! hash_keys stores 0-based columns, hash_vals stores 1-based positions
+#ifdef USE_HIP
+        ! Build hash table for O(1) remote column lookup on the device.
+        ! hash_keys stores 0-based columns, hash_vals stores 1-based positions.
         call build_hash_table(A%recv_indices_sorted, A%total_recv, &
                               A%hash_keys, A%hash_vals, A%hash_size)
 
         ! recv_indices_sorted is only needed to populate the hash table; the
-        ! SpMV path looks up remote columns via A%hash_keys/A%hash_vals, so
-        ! release the sorted index array now to avoid carrying total_recv
-        ! int64 entries for the propagator's lifetime.
+        ! GPU SpMV path looks up remote columns via the hash, so release the
+        ! sorted index array now.
         if (allocated(A%recv_indices_sorted)) deallocate (A%recv_indices_sorted)
+#endif
+
+        ! Build halo metadata. On CPU build, col_halo aliases the borrowed
+        ! col_indexes_local (mutated in place); remote columns are resolved
+        ! by binary search over recv_indices_sorted, so the hash table is
+        ! never built. On GPU build, col_halo is allocated separately and
+        ! the hash table services the lookup.
+        call build_halo_metadata(A, n_local)
+
+#ifndef USE_HIP
+        ! CPU build: recv_indices_sorted and sort_perm are no longer needed
+        ! once col_halo is populated. Release them to recover ~2*total_recv
+        ! int64 entries per rank. Under USE_HIP the hash table and sort_perm
+        ! are retained for csr_to_device / spmv_gpu.
+        if (allocated(A%recv_indices_sorted)) deallocate (A%recv_indices_sorted)
+        if (associated(A%sort_perm)) deallocate (A%sort_perm)
+#endif
 
         ! Allocate persistent communication buffers on host (1-based)
         ! Always needed: CPU path uses them directly, GPU path uses them for
@@ -1484,6 +1557,14 @@ contains
         if (associated(A%hash_vals)) deallocate (A%hash_vals)
         if (associated(A%send_buf)) deallocate (A%send_buf)
         if (associated(A%recv_buf)) deallocate (A%recv_buf)
+        if (A%owns_col_halo) then
+            if (associated(A%col_halo)) deallocate (A%col_halo)
+        else
+            nullify (A%col_halo)
+        end if
+        A%owns_col_halo = .false.
+        if (associated(A%diag_lo)) deallocate (A%diag_lo)
+        if (associated(A%diag_hi)) deallocate (A%diag_hi)
         if (A%owns_local_arrays) then
             if (associated(A%row_starts_local)) deallocate (A%row_starts_local)
             if (associated(A%col_indexes_local)) deallocate (A%col_indexes_local)
