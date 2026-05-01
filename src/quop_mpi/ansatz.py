@@ -212,7 +212,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self.expectation: float | None = None  # expectation value of the system
         self.initial_state_input: object | None = None
         self.ansatz_initial_state: np.ndarray | None = None
-        self.final_state: np.ndarray | None = None
+        self._final_state_override: np.ndarray | None = None
         self.last_evaluated: np.ndarray = np.empty(
             0, dtype=np.float64
         )  # last set of variational parameters passed to 'evolve_state'.
@@ -279,16 +279,30 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     @property
     def ansatz_final_state(self) -> np.ndarray | None:
-        """Preferred name for the current/final ansatz state vector.
+        """Local partition of the current ansatz state vector.
 
-        This aliases :attr:`final_state`, which is kept for backward
-        compatibility with earlier releases and existing user code.
+        Fetched lazily from the underlying context on access; on GPU this
+        triggers a device->host copy, so callers that need the array more
+        than once should bind it to a local name.
         """
-        return self.final_state
+        if self._final_state_override is not None:
+            return self._final_state_override
+        if self.context is None:
+            return None
+        return self.context.state
 
     @ansatz_final_state.setter
     def ansatz_final_state(self, value: np.ndarray | None) -> None:
-        self.final_state = value
+        self._final_state_override = value
+
+    @property
+    def final_state(self) -> np.ndarray | None:
+        """Backward-compatible alias for :attr:`ansatz_final_state`."""
+        return self.ansatz_final_state
+
+    @final_state.setter
+    def final_state(self, value: np.ndarray | None) -> None:
+        self._final_state_override = value
 
     # -- Dirty-flag proxy properties --------------------------------
     # These expose individual _Dirty bits as boolean attributes so that
@@ -1085,7 +1099,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                     " no diagonal unitary defined"
                 )
 
-        self.context.observables = self.local_observables.astype(np.float64)
+        self.context.observables = np.ascontiguousarray(
+            self.local_observables, dtype=np.float64
+        )
 
     @scope("subcomm")
     def __gen_optimiser(self) -> None:
@@ -1379,7 +1395,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             x = np.array(x, dtype=np.float64)
 
         x = self.__to_full(x)  # apply parameter mapping if present
-        self.context.state = self.ansatz_initial_state.astype(np.complex128)
+        self.context.state = np.ascontiguousarray(
+            self.ansatz_initial_state, dtype=np.complex128
+        )
         params_split = np.split(x, self.ansatz_depth)
 
         for params in params_split:
@@ -1404,7 +1422,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.SUBCOMM.Get_rank() == 0:
             self.n_evolutions += 1
-        self.ansatz_final_state = self.context.state
         self.last_evaluated = copy(x)
 
     @scope("subcomm", returns="all")
@@ -1645,7 +1662,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.get_subcomm_index() == 0:
             return gather_array(
-                np.abs(self.context.state) ** 2,
+                np.abs(self.context.state[: self.local_i]) ** 2,
                 self.unitaries[0].partition_table,
                 self.subcomms.SUBCOMM,
             )
@@ -1738,9 +1755,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             1-D array containing :meth:`~quop_mpi.ansatz.local_i` state probabilities with
             global index offset :meth:`~quop_mpi.ansatz.local_i_offset`
         """
-        self.local_probabilities = (np.abs(self.context.state[: self.local_i]) ** 2).astype(
-            np.float64
-        )
+        self.local_probabilities = np.abs(self.context.state[: self.local_i]) ** 2
         return self.local_probabilities
 
     @scope("subcomm")
