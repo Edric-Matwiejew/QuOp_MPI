@@ -39,7 +39,7 @@ class Unitary(UnitaryBase):
 
         self.context = None
 
-        self.comm_size_constraints = [np.array(Ns, dtype=np.int32)]
+        self.comm_size_constraints = [self.Ns]
 
         self.planner = True
 
@@ -53,7 +53,7 @@ class Unitary(UnitaryBase):
         self.propagators[0].plan(self.context)
         self.planned = True  # Mark as planned so destroy() is called during cleanup
         super().gen_operator(*args)
-        self.propagators[0].gen_operator([self.Ns, self.operator.flatten()])
+        self.propagators[0].gen_operator([self.Ns, self.operator.ravel()])
 
     def propagate(self, t: np.ndarray) -> None:
         """Apply the composite propagator with parameters ``t``."""

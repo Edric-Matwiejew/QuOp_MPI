@@ -122,14 +122,13 @@ def array(
         global index offset :literal:`local_i_offset` (see :class:`quop_mpi.ansatz`)
     """
     initial_state = np.empty(local_i, dtype=np.complex128)
-
-    initial_state[:local_i] = np.array(
-        state[local_i_offset : local_i_offset + local_i], np.complex128
-    )
+    # Single dtype-casting copy from the global slice into the local buffer.
+    initial_state[:] = state[local_i_offset : local_i_offset + local_i]
 
     if normalize:
-        normalization = MPI_COMM.allreduce(np.dot(np.conjugate(state), state), op=MPI.SUM)
-        initial_state = initial_state / np.sqrt(normalization)
+        local_norm = np.vdot(initial_state, initial_state).real
+        normalization = MPI_COMM.allreduce(local_norm, op=MPI.SUM)
+        initial_state /= np.sqrt(normalization)
 
     return initial_state
 

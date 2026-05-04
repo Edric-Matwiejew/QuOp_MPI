@@ -91,7 +91,7 @@ class Unitary(UnitaryBase):
 
         self.unitary_type = "momentum"
         self.context = None
-        self.comm_size_constraints = [np.array(Ns, dtype=np.int32)]
+        self.comm_size_constraints = [self.Ns]
         self.planner = True
 
     def assign_backend(self, backend: ModuleType) -> None:

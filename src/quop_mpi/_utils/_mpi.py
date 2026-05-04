@@ -80,7 +80,12 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
         disps = partition_table[:-1] - 1
 
         if rank == 0:
-            sends = [row_starts[i].astype(np.int64), counts, disps, _MPI_INT64]
+            sends = [
+                np.ascontiguousarray(row_starts[i], dtype=np.int64),
+                counts,
+                disps,
+                _MPI_INT64,
+            ]
         else:
             sends = None  # [None, counts, disps, MPI.INT]
 
@@ -99,7 +104,12 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
             disps[j] = disps[j - 1] + counts[j - 1]
 
         if rank == 0:
-            send_indexes = [col_indexes[i].astype(np.int64), counts, disps, _MPI_INT64]
+            send_indexes = [
+                np.ascontiguousarray(col_indexes[i], dtype=np.int64),
+                counts,
+                disps,
+                _MPI_INT64,
+            ]
         else:
             send_indexes = None
 
@@ -115,7 +125,7 @@ def __scatter_sparse(row_starts, col_indexes, values, partition_table, MPI_COMM)
                         "pass all-None values or provide arrays for every term"
                     )
                 send_values = [
-                    v.astype(np.complex128),
+                    np.ascontiguousarray(v, dtype=np.complex128),
                     counts,
                     disps,
                     MPI.DOUBLE_COMPLEX,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from types import ModuleType
 from typing import Any
 
@@ -37,7 +38,22 @@ class Unitary(UnitaryBase):
         self.propagators[0].plan(self.context)
         self.planned = True  # Mark as planned so destroy() is called during cleanup
         super().gen_operator(*args)
-        self.propagators[0].gen_operator([np.real(self.operator).astype(np.float64)])
+        operator = np.asarray(self.operator)
+        compliant = (
+            operator.dtype == np.float64
+            and operator.flags.c_contiguous
+            and not np.iscomplexobj(operator)
+        )
+        if not compliant:
+            warnings.warn(
+                "Circulant operator function returned a non-contiguous or "
+                "non-float64 array; expected a contiguous ndarray[float64]. "
+                "A local copy will be made.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            operator = np.ascontiguousarray(np.real(operator), dtype=np.float64)
+        self.propagators[0].gen_operator([operator])
 
     def propagate(self, t: np.ndarray) -> None:
         """Apply the circulant propagator with parameter ``t``."""
