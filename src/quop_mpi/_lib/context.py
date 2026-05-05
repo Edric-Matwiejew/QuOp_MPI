@@ -118,7 +118,7 @@ class Context:
         """Collectively fetch the host observable buffer over ``SUBCOMM``."""
         if self.initialised:
             observables, error_code = self.context_wrapper.get_observables(
-                self._ctx, self.host_local_i
+                self._ctx
             )
             self._raise_context_status(
                 "fetch context observables",
@@ -241,6 +241,19 @@ class Context:
         recomputed from the current state vector.  The buffer's
         lifetime is bound to the Context — it is released by
         :meth:`destroy`.
+
+        .. warning::
+
+            The returned array aliases the context-internal storage
+            and is **invalidated by any subsequent call to this
+            method** (the contents are recomputed in place from the
+            current state).  Callers that need to retain the
+            probabilities across a state mutation or another
+            ``get_local_probabilities`` call must take an explicit
+            ``.copy()``.  In-tree call sites
+            (:meth:`quop_mpi.ansatz.Ansatz.__get_expectation_value`,
+            :mod:`quop_mpi._sampling`) consume the array within a
+            single iteration and so do not need a copy.
 
         Returns
         -------

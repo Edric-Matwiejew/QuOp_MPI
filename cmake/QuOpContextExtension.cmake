@@ -67,9 +67,10 @@ function(add_context_extension)
     message(FATAL_ERROR "add_context_extension: INSTALL_SUBDIR is required")
   endif()
 
-  set(_shim_target "${CTX_NAME}_shim")
-  set(_shim_src    "${CMAKE_SOURCE_DIR}/native/context_wrapper_c.f90")
-  set(_ext_src     "${CMAKE_SOURCE_DIR}/native/context_wrapper_ext.c")
+  set(_target       "${CTX_INSTALL_SUBDIR}_${CTX_NAME}")
+  set(_shim_target  "${_target}_shim")
+  set(_shim_src     "${CMAKE_SOURCE_DIR}/native/context_wrapper_c.f90")
+  set(_ext_src      "${CMAKE_SOURCE_DIR}/native/context_wrapper_ext.c")
 
   # ----- Per-backend Fortran shim (bind(C) entry points) -----
   add_library(${_shim_target} OBJECT ${_shim_src})
@@ -87,21 +88,27 @@ function(add_context_extension)
   endif()
 
   # ----- Python extension module -----
-  Python3_add_library(${CTX_NAME} MODULE WITH_SOABI ${_ext_src})
-  target_include_directories(${CTX_NAME} PRIVATE
+  # The CMake target is namespaced by INSTALL_SUBDIR so that multiple
+  # backends can install a module of the same Python-facing NAME (e.g.
+  # both `mpi` and `wavefront` produce a module called `context_wrapper`)
+  # without colliding in CMake's target registry.  OUTPUT_NAME restores
+  # the unprefixed library basename used by the Python loader.
+  Python3_add_library(${_target} MODULE WITH_SOABI ${_ext_src})
+  set_target_properties(${_target} PROPERTIES OUTPUT_NAME "${CTX_NAME}")
+  target_include_directories(${_target} PRIVATE
     ${Python3_INCLUDE_DIRS}
     ${Python3_NumPy_INCLUDE_DIRS}
   )
-  target_link_libraries(${CTX_NAME} PRIVATE
+  target_link_libraries(${_target} PRIVATE
     ${_shim_target}
     ${CTX_DEPENDS}
     ${CTX_LIBRARIES}
     MPI::MPI_Fortran
   )
-  set_target_properties(${CTX_NAME} PROPERTIES
+  set_target_properties(${_target} PROPERTIES
     LINKER_LANGUAGE Fortran
   )
-  install(TARGETS ${CTX_NAME}
+  install(TARGETS ${_target}
     LIBRARY DESTINATION "quop_mpi/_lib/${CTX_INSTALL_SUBDIR}"
   )
 endfunction()

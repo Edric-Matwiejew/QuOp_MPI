@@ -76,8 +76,12 @@ contains
     ! cw_destroy
     !
     ! Destroy and deallocate the context referred to by context_ptr_val.
-    ! Assumes the context still owns its state buffer (no attach was made,
-    ! or cw_detach_state was called first).
+    ! Assumes the context still owns its state and observables buffers
+    ! (i.e. no cw_attach_* has been performed).  This entry point is
+    ! used by the C extension's failure-cleanup paths in cw_setup and
+    ! py_setup, before any attach has occurred; once the Python-owned
+    ! buffers are attached, callers must use cw_destroy_external
+    ! instead so the Python pointers are nullified before destroy().
     ! ------------------------------------------------------------------
     subroutine cw_destroy(context_ptr_val) bind(C, name="cw_destroy")
         integer(c_int64_t), value, intent(in) :: context_ptr_val
@@ -225,54 +229,6 @@ contains
         call ctx%set_state(state, error_code)
 
     end subroutine cw_set_state
-
-    ! ------------------------------------------------------------------
-    ! cw_get_observables
-    !
-    ! Collectively gather the host observables buffer into the
-    ! caller-supplied real(real64) buffer of length size_obs.
-    ! ------------------------------------------------------------------
-    subroutine cw_get_observables(context_ptr_val, size_obs, obs_data, error_code) &
-            bind(C, name="cw_get_observables")
-        integer(c_int64_t), value, intent(in)  :: context_ptr_val
-        integer(c_int64_t), value, intent(in)  :: size_obs
-        type(c_ptr),        value, intent(in)  :: obs_data
-        integer(c_int32_t),        intent(out) :: error_code
-
-        type(c_ptr)                 :: ctx_ptr
-        type(context_type), pointer :: ctx
-        real(real64),       pointer :: obs(:)
-
-        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
-        call c_f_pointer(ctx_ptr, ctx)
-        call c_f_pointer(obs_data, obs, [size_obs])
-        call ctx%get_observables(obs, error_code)
-
-    end subroutine cw_get_observables
-
-    ! ------------------------------------------------------------------
-    ! cw_set_observables
-    !
-    ! Collectively scatter the caller-supplied real(real64) buffer of
-    ! length size_obs into the context observables.
-    ! ------------------------------------------------------------------
-    subroutine cw_set_observables(context_ptr_val, size_obs, obs_data, error_code) &
-            bind(C, name="cw_set_observables")
-        integer(c_int64_t), value, intent(in)  :: context_ptr_val
-        integer(c_int64_t), value, intent(in)  :: size_obs
-        type(c_ptr),        value, intent(in)  :: obs_data
-        integer(c_int32_t),        intent(out) :: error_code
-
-        type(c_ptr)                 :: ctx_ptr
-        type(context_type), pointer :: ctx
-        real(real64),       pointer :: obs(:)
-
-        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
-        call c_f_pointer(ctx_ptr, ctx)
-        call c_f_pointer(obs_data, obs, [size_obs])
-        call ctx%set_observables(obs, error_code)
-
-    end subroutine cw_set_observables
 
     ! ------------------------------------------------------------------
     ! cw_get_expectation_value

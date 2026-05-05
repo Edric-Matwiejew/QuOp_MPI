@@ -46,10 +46,9 @@
  *       SIGNATURE CHANGE vs. f2py: no size argument; returns the cached
  *       zero-copy view.
  *   set_state(ctx, state)              -> error_code
- *   get_observables(ctx, size)         -> (ndarray[float64], 0)
- *       SIGNATURE CHANGE vs. f2py: returns the cached zero-copy view
- *       (the size argument is accepted for API compatibility and must
- *       match the cached length).
+ *   get_observables(ctx)               -> (ndarray[float64], 0)
+ *       SIGNATURE CHANGE vs. f2py: no size argument; returns the cached
+ *       zero-copy view.
  *   set_observables(ctx, obs)          -> error_code
  *   get_expectation_value(ctx)         -> (float, error_code)
  *   get_state_norm(ctx)                -> (float, error_code)
@@ -339,24 +338,10 @@ py_set_state(PyObject *module, PyObject *args)
  * cached buffer.  No Fortran call is required for either operation.
  * ========================================================================= */
 static PyObject *
-py_get_observables(PyObject *module, PyObject *args)
+py_get_observables(PyObject *module, PyObject *arg)
 {
-    PyObject *ctx_obj;
-    int64_t   size_obs;
-
-    if (!PyArg_ParseTuple(args, "OL", &ctx_obj, &size_obs))
-        return NULL;
-
-    Context *ctx = as_context(ctx_obj, "get_observables");
+    Context *ctx = as_context(arg, "get_observables");
     if (!ctx) return NULL;
-
-    if (size_obs != ctx->local_i) {
-        PyErr_Format(PyExc_ValueError,
-                     "get_observables: requested size %lld does not match "
-                     "cached observables length %lld",
-                     (long long)size_obs, (long long)ctx->local_i);
-        return NULL;
-    }
 
     Py_INCREF(ctx->observables);
     return Py_BuildValue("Ni", (PyObject *)ctx->observables, 0);
@@ -484,8 +469,8 @@ static PyMethodDef ContextWrapperMethods[] = {
      "get_state(ctx) -> (ndarray[complex128], 0)  -- zero-copy view"},
     {"set_state",             py_set_state,             METH_VARARGS,
      "set_state(ctx, state) -> error_code"},
-    {"get_observables",       py_get_observables,       METH_VARARGS,
-     "get_observables(ctx, size) -> (ndarray[float64], error_code)"},
+    {"get_observables",       py_get_observables,       METH_O,
+     "get_observables(ctx) -> (ndarray[float64], 0)  -- zero-copy view"},
     {"set_observables",       py_set_observables,       METH_VARARGS,
      "set_observables(ctx, obs) -> error_code"},
     {"get_expectation_value", py_get_expectation_value, METH_O,

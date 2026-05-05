@@ -338,3 +338,48 @@ class TestContextStateRoundTrip:
 
         ctx.destroy()
         layout.destroy()
+
+    def test_state_view_aliases_native_buffer(
+        self, mpi_comm, context_regular_system_size
+    ):
+        """In-place mutation of ``ctx.state`` is visible to Fortran.
+
+        Locks the zero-copy invariant: the NumPy view returned by
+        ``Context.state`` shares storage with the Fortran ``ctx%state``
+        pointer attached at setup, so writes through the view must be
+        observed by collective routines that read through the pointer
+        (here, ``get_state_norm`` and ``get_expectation_value``, which
+        compute over ``self%state(:ci_local_i)`` in Fortran).
+        """
+        layout = _make_layout(context_regular_system_size, mpi_comm)
+        ctx = Context(_get_backend(), comm_info=layout)
+
+        local_i = ctx.host_local_i
+
+        # Fetch the cached buffer view, then mutate in place WITHOUT
+        # going through the ctx.state setter (which would still copy).
+        view = ctx.state
+        amplitude = 1.0 / np.sqrt(context_regular_system_size)
+        view[:local_i] = amplitude + 0j
+
+        # A second fetch should return the SAME ndarray object — the
+        # Context caches a single PyArrayObject across get_state calls.
+        view_again = ctx.state
+        assert view_again is view
+
+        # Fortran reads through self%state must see the in-place write.
+        norm = ctx.get_state_norm()
+        assert norm == pytest.approx(1.0, rel=1e-10)
+
+        # Mutate observables in place too and confirm Fortran sees it.
+        obs_view = ctx.observables
+        obs_view[:local_i] = np.full(local_i, 2.0, dtype=np.float64)
+        # Re-fetch returns the same object.
+        assert ctx.observables is obs_view
+
+        # <obs> = sum_i p_i * obs_i = 2.0 * sum_i p_i = 2.0 (norm=1).
+        exp_val = ctx.get_expectation_value()
+        assert exp_val == pytest.approx(2.0, rel=1e-10)
+
+        ctx.destroy()
+        layout.destroy()

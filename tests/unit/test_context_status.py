@@ -81,9 +81,9 @@ class _FakeContextWrapper:
         self.set_state_calls.append((ctx, state.copy()))
         return self.set_state_status
 
-    def get_observables(self, ctx, size):
-        self.get_observables_calls.append((ctx, size))
-        return np.arange(size, dtype=np.float64), self.get_observables_status
+    def get_observables(self, ctx):
+        self.get_observables_calls.append(ctx)
+        return np.arange(ctx.local_i, dtype=np.float64), self.get_observables_status
 
     def set_observables(self, ctx, obs):
         self.set_observables_calls.append((ctx, obs.copy()))
@@ -144,7 +144,7 @@ class TestContextStatusTranslation:
             np.arange(comm_info.local_i, dtype=np.float64),
         )
         assert wrapper.get_state_calls == [ctx._ctx]
-        assert wrapper.get_observables_calls == [(ctx._ctx, comm_info.local_i)]
+        assert wrapper.get_observables_calls == [ctx._ctx]
 
     def test_scalar_getters_return_values_on_zero_status(self):
         wrapper = _FakeContextWrapper()
@@ -186,7 +186,7 @@ class TestContextStatusTranslation:
         with pytest.raises(RuntimeError, match="Cannot fetch context observables"):
             _ = ctx.observables
 
-        assert wrapper.get_observables_calls == [(ctx._ctx, comm_info.local_i)]
+        assert wrapper.get_observables_calls == [ctx._ctx]
 
     def test_observables_setter_raises_on_nonzero_status(self):
         wrapper = _FakeContextWrapper(set_observables_status=1)
