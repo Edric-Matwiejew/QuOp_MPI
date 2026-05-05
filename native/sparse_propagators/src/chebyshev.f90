@@ -299,7 +299,6 @@ contains
         else
             call estimate_spectral_radius(A, partition_table, MPI_communicator, M)
         end if
-
         ! Get convergence tolerance
         if (present(epsilon)) then
             eps = epsilon

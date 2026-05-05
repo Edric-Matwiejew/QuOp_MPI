@@ -50,6 +50,7 @@ build.targets = [
     "mpi_circulant_propagator_f2py",
     "mpi_diagonal_propagator_f2py",
     "mpi_context_f2py",
+    "context_wrapper",
     "mpi_composite_propagator_f2py",
     "mpi_momentum_propagator_f2py",
     "mpi_sparse_propagator_f2py",

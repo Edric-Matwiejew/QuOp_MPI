@@ -1085,7 +1085,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                     " no diagonal unitary defined"
                 )
 
-        self.context.observables = self.local_observables.astype(np.float64)
+        self.context.observables = self.local_observables
 
     @scope("subcomm")
     def __gen_optimiser(self) -> None:
@@ -1379,7 +1379,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             x = np.array(x, dtype=np.float64)
 
         x = self.__to_full(x)  # apply parameter mapping if present
-        self.context.state = self.ansatz_initial_state.astype(np.complex128)
+        self.context.state = self.ansatz_initial_state
         params_split = np.split(x, self.ansatz_depth)
 
         for params in params_split:
@@ -1643,7 +1643,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         if self.subcomms.get_subcomm_index() == 0:
             return gather_array(
-                np.abs(self.context.state) ** 2,
+                self.context.get_local_probabilities(),
                 self.unitaries[0].partition_table,
                 self.subcomms.SUBCOMM,
             )
@@ -1730,15 +1730,17 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     def _get_local_probabilities(self) -> np.ndarray[np.float64]:
         """Compute the probabilities of states local to each MPI process.
 
+        Delegates to the context's cached ``local_probabilities`` buffer
+        so the float64 array is allocated once per context and reused on
+        every call rather than reallocated.
+
         Returns
         -------
         ndarray[float64]
             1-D array containing :meth:`~quop_mpi.ansatz.local_i` state probabilities with
             global index offset :meth:`~quop_mpi.ansatz.local_i_offset`
         """
-        self.local_probabilities = (np.abs(self.context.state[: self.local_i]) ** 2).astype(
-            np.float64
-        )
+        self.local_probabilities = self.context.get_local_probabilities()
         return self.local_probabilities
 
     @scope("subcomm")
@@ -1767,11 +1769,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self.sampling:
             return self._sample_expectation_value()
 
-        self._get_local_probabilities()
-
-        local_expectation = np.dot(self.local_probabilities, self.local_observables)
-
-        return np.real(self.subcomms.SUBCOMM.allreduce(local_expectation, op=MPI.SUM))
+        return self.context.get_expectation_value()
 
     @scope("subcomm")
     def __objective(self, variational_parameters: list[float] | np.ndarray[float]) -> float | None:

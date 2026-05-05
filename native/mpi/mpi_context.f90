@@ -15,7 +15,9 @@ module mpi_backend
         complex(real64), dimension(:), pointer :: state => null()
         ! Optional host work buffer for out-of-place propagators (e.g. sparse).
         complex(real64), dimension(:), pointer :: work => null()
-        real(real64), dimension(:), allocatable :: observables
+        ! Pointer (not allocatable) so it can be rebound to a Python-owned
+        ! buffer via cw_attach_observables for zero-copy transfers.
+        real(real64), dimension(:), pointer :: observables => null()
 
         ! Pointer to the shared quop_mpi_layout_t (owned by caller, not freed here)
         type(quop_mpi_layout_t), pointer :: ci => null()
@@ -89,8 +91,9 @@ contains
             deallocate (self%state)
             self%state => null()
         end if
-        if (allocated(self%observables)) then
+        if (associated(self%observables)) then
             deallocate (self%observables)
+            self%observables => null()
         end if
         if (associated(self%work)) then
             deallocate (self%work)
@@ -129,7 +132,7 @@ contains
             local_error = 1
         else if (.not. associated(self%state)) then
             local_error = 1
-        else if (.not. allocated(self%observables)) then
+        else if (.not. associated(self%observables)) then
             local_error = 1
         else if (size(self%state) < ci_local_i) then
             local_error = 1
@@ -242,7 +245,7 @@ contains
         end if
         if (ci_subcomm == MPI_COMM_NULL) then
             local_error = 1
-        else if (.not. allocated(self%observables)) then
+        else if (.not. associated(self%observables)) then
             local_error = 2
         else if (size(obs) < ci_local_i) then
             local_error = 1
@@ -284,7 +287,7 @@ contains
         end if
         if (ci_subcomm == MPI_COMM_NULL) then
             local_error = 1
-        else if (.not. allocated(self%observables)) then
+        else if (.not. associated(self%observables)) then
             local_error = 2
         else if (size(obs) < ci_local_i) then
             local_error = 1

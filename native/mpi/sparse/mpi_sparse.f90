@@ -203,7 +203,6 @@ contains
         real(real64), intent(in) :: ts(:)
         integer(int32), intent(out) :: error_code
         real(real64) :: t
-        complex(real64), dimension(:), pointer :: ptr_tmp
 
         error_code = 0
 
@@ -217,9 +216,15 @@ contains
                                 self%context%ci%get_SUBCOMM(), &
                                 self%spectral_radius)
 
-        ptr_tmp => self%context%state
-        self%context%state => self%context%work
-        self%context%work => ptr_tmp
+        ! Copy the propagated state back into ctx%state.  We deliberately
+        ! avoid pointer-swapping ctx%state and ctx%work: the CPython context
+        ! wrapper attaches a Python-owned NumPy buffer to ctx%state via
+        ! cw_attach_state and caches that pointer for zero-copy access from
+        ! Python.  Swapping would silently rebind ctx%state to a Fortran-
+        ! allocated buffer, so subsequent get_state/set_state calls (and
+        ! ctx%destroy) would operate on the wrong memory.  The O(n) copy is
+        ! negligible relative to the O(m_order * spmv) Chebyshev cost.
+        self%context%state(:) = self%context%work(:)
 
     end subroutine mpi_sparse_propagate
 

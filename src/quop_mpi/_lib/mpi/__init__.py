@@ -4,6 +4,7 @@ from importlib import import_module
 
 _MODULE_ALIASES = {
     "context": "mpi_context",
+    "context_wrapper": "context_wrapper",
     "diagonal_propagator": "mpi_diagonal_propagator",
     "sparse_propagator": "mpi_sparse_propagator",
     "circulant_propagator": "mpi_circulant_propagator",

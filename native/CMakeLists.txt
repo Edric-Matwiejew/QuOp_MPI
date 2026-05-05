@@ -1,5 +1,6 @@
 include(QuOpFortranPreprocess)
 include(QuOpF2pyLibrary)
+include(QuOpContextExtension)
 
 # =============================================================================
 # Fortran module dependencies
