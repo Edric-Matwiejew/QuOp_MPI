@@ -401,12 +401,9 @@ contains
             call hipCheck(hipDeviceSynchronize())
         end if
 
-        ! Re-set buffers for SHAFFT before the backward FFT.
-        ! After the forward FFT, shafftGetBuffers may have swapped the state
-        ! and work pointers (e.g. for non-power-of-2 sizes).  The phase shift
-        ! was applied to the updated context%state, but SHAFFT's internal
-        ! buffer references are stale.  We must call shafftSetBuffers again
-        ! so the backward FFT reads from the correct (phase-shifted) buffer.
+        ! Re-bind SHAFFT buffers before backward FFT: forward FFT may have
+        ! swapped state/work pointers (non-power-of-2 sizes), leaving SHAFFT's
+        ! references stale relative to the phase-shifted context%state.
         call shafftSetBuffers(self%shafft_plan, self%context%state, self%context%work, ierr_c)
         if (ierr_c /= SHAFFT_SUCCESS) then
             write (error_unit, '(A,I0)') &

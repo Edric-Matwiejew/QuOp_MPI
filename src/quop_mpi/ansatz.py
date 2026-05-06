@@ -716,7 +716,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     # Logging methods (set_log, save, etc.) are inherited from Logging mixin
 
     # Bindable attributes for QuOp Functions - used for documentation and validation.
-    # Subclasses can extend this by defining their own BINDABLE_ATTRIBUTES dict.
     BINDABLE_ATTRIBUTES: dict[str, str] = {
         # Core partitioning
         "system_size": "Total number of quantum basis states",

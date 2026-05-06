@@ -122,9 +122,6 @@ class Context:
 
     def destroy(self):
         if self.initialised and self._ctx is not None:
-            # destroy() releases the Fortran-side context and drops the
-            # Python state-buffer reference.  Equivalent to letting the
-            # Context object be garbage collected, but deterministic.
             self.context_wrapper.destroy(self._ctx)
         # Mirror the Ansatz destroy path: once native cleanup completes,
         # release borrowed Python-side references to the negotiated layout

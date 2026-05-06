@@ -128,11 +128,8 @@ def mpi_check(
     if first is None:
         return local_result
 
-    # Diagnostic: when more than one rank failed, log every failure to
-    # stderr from rank 0 of ``comm`` before propagating only the
-    # earliest one.  This preserves the single-exception contract that
-    # ``pytest.raises(ExcClass)`` and ``except ExcClass`` rely on, while
-    # ensuring no failure is silently dropped.
+    # Log all failures from rank 0; propagate only the earliest to preserve
+    # a single-exception contract (pytest.raises / except ExcClass).
     all_failures = [p for p in failures if p is not None]
     if len(all_failures) > 1 and comm.Get_rank() == 0:
         lines = [
@@ -166,11 +163,8 @@ def mpi_check(
         # full traceback (the unpickled copy would lose the frames).
         raise local_exc
 
-    # On every other rank, raise the unpickled exception so the
-    # exception class and message match across the comm.  This lets
-    # ``pytest.raises(ExcClass)`` and ``except ExcClass`` work uniformly
-    # on every rank.  The originating rank/comm context is preserved in
-    # ``__cause__`` for diagnostics.
+    # Raise the unpickled exception on non-origin ranks so class/message
+    # match across the comm; origin context attached via __cause__.
     raise origin_exc from CollectiveError(
         f"originated on rank {origin} of comm "
         f"(size={comm.Get_size()}, this_rank={comm.Get_rank()})"

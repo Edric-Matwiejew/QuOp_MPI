@@ -208,14 +208,10 @@ contains
                                 self%context%ci%get_SUBCOMM(), &
                                 self%spectral_radius)
 
-        ! Copy the propagated state back into ctx%state.  We deliberately
-        ! avoid pointer-swapping ctx%state and ctx%work: the CPython context
-        ! wrapper attaches a Python-owned NumPy buffer to ctx%state via
-        ! cw_attach_state and caches that pointer for zero-copy access from
-        ! Python.  Swapping would silently rebind ctx%state to a Fortran-
-        ! allocated buffer, so subsequent get_state/set_state calls (and
-        ! ctx%destroy) would operate on the wrong memory.  The O(n) copy is
-        ! negligible relative to the O(m_order * spmv) Chebyshev cost.
+        ! Copy (do not pointer-swap) into ctx%state: the CPython wrapper attaches
+        ! a Python-owned buffer there via cw_attach_state; swapping would rebind
+        ! to Fortran storage and break get/set/destroy. O(n) copy is negligible
+        ! vs O(m_order * spmv) Chebyshev cost.
         self%context%state(:) = self%context%work(:)
 
     end subroutine mpi_sparse_propagate

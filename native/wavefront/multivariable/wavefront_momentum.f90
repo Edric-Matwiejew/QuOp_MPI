@@ -369,13 +369,7 @@ contains
 
         error_code = 0
 
-        ! Unpack arrays from pointers
-        ! array_ptrs(1) = Ns
-        ! array_ptrs(2) = minsq
-        ! array_ptrs(3) = minsk
-        ! array_ptrs(4) = deltasq
-        ! array_ptrs(5) = deltask
-
+        ! array_ptrs = [Ns, minsq, minsk, deltasq, deltask]
         array_ptr = transfer(array_ptrs(1), array_ptr)
         call c_f_pointer(array_ptr, Ns, [array_sizes(1)])
 

@@ -180,7 +180,6 @@ class UnitaryBase(Bindable):
         self.comm_size_constraints = [np.array([1], dtype=int)]
 
     # Bindable attributes for QuOp Functions bound to Unitary instances.
-    # Subclasses (propagators) can extend this by defining their own BINDABLE_ATTRIBUTES dict.
     BINDABLE_ATTRIBUTES = {
         # Core partitioning (shared with Ansatz)
         "system_size": "Total number of quantum basis states",

@@ -184,18 +184,10 @@ contains
         ! Number of local rows for DEVCOMM distribution (on this GPU)
         n_local_dev = int(ci_device_local_i, int32)
 
-        ! ----- Compute row redistribution using per-rank overlap -----
-        ! Redistribute rows from NODECOMM (host) layout to DEVCOMM_NODE (device) layout.
-        !
-        ! Previously this called counts_and_displs() which indexed send counts
-        ! by DEVCOMM_NODE rank but used MPI_Alltoall on NODECOMM.  That assumed
-        ! DEVCOMM_NODE rank k == NODECOMM rank k, which breaks when GPU ranks
-        ! are non-contiguous in NODECOMM (e.g. Setonix NUMA binding places GPU
-        ! ranks at NODECOMM positions {0,8} rather than {0,1}).
-        !
-        ! The fix uses the same overlap-based approach as gpu_transfer routines:
-        ! context%NODECOMM_counts/displs and DEVCOMM_NODE_counts/displs are
-        ! per-NODECOMM-rank arrays populated by Allgather in context_setup.
+        ! Per-rank overlap redistribution NODECOMM(host) -> DEVCOMM_NODE(device).
+        ! Indexed by NODECOMM rank (not DEVCOMM_NODE rank) because GPU ranks may
+        ! be non-contiguous in NODECOMM (e.g. Setonix NUMA: positions {0,8}).
+        ! Uses NODECOMM_counts/displs and DEVCOMM_NODE_counts/displs from context_setup.
 
         allocate (self%row_counts_send(NODECOMM_size))
         allocate (self%row_displs_send(NODECOMM_size))

@@ -218,17 +218,11 @@ contains
         ! Determine NODECOMM size for transfer metadata arrays.
         call MPI_Comm_size(ci_nodecomm, NODECOMM_size, ierr)
 
-        ! Build per-rank distribution arrays for GPU<->host transfers.
-        ! These describe how many elements each NODECOMM rank holds on host
-        ! and device, plus their global offsets, so the overlap computation
-        ! in gpu_allgatherv_dtoh / gpu_allscatterv_htod works correctly.
-        !
-        ! Previously this called counts_and_displs() which produced per-partner
-        ! transfer-schedule counts -- a different semantic than the per-rank
-        ! distribution arrays expected by gpu_transfer routines.  The mismatch
-        ! caused incorrect transfers when host and device partitions did not
-        ! align (e.g. prime system sizes where SHAFFT assigns all elements to
-        ! one GPU).
+        ! Per-rank host/device counts + global offsets over NODECOMM, consumed
+        ! by gpu_allgatherv_dtoh / gpu_allscatterv_htod overlap computation.
+        ! Must be per-rank distribution (not per-partner schedule); matters when
+        ! host/device partitions misalign, e.g. prime sizes where SHAFFT assigns
+        ! all elements to one GPU.
 
         local_error = 0
         allocate (self%NODECOMM_counts(NODECOMM_size), stat=alloc_status)

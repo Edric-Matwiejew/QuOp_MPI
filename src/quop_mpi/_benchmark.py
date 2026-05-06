@@ -158,9 +158,8 @@ class Benchmark:
             if self.subcomms.get_subcomm_index() == 0:
                 # Choose starting vector
                 if self._has_param_map:
-                    # With a parameter map, the free vector size is constant across all depths.
-                    # The mapping function handles expansion via bound ansatz_depth/total_params.
-                    # param_persist just means "use the best free vector found so far".
+                    # Param map: free vector size is constant across depths;
+                    # mapping expands via bound ansatz_depth/total_params.
                     if param_persist and previous_params is not None:
                         self.variational_parameters = previous_params.copy()
                     else:

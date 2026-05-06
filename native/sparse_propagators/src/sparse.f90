@@ -100,11 +100,8 @@ module sparse
         integer(int64), dimension(:), pointer :: col_halo => null()
         integer(int64), dimension(:), pointer :: diag_lo => null()
         integer(int64), dimension(:), pointer :: diag_hi => null()
-        ! True when col_halo owns freshly allocated storage; false when
-        ! col_halo aliases col_indexes_local (the in-place mutated borrowed
-        ! Python CSR buffer or the legacy globally-indexed copy).  In the
-        ! current design col_halo always aliases col_indexes_local, so this
-        ! is always false; the flag is retained for forward compatibility.
+        ! Always .false. in current design (col_halo aliases col_indexes_local);
+        ! retained for forward compatibility with freshly-allocated halo storage.
         logical :: owns_col_halo = .false.
         ! Flag to indicate if graph comm is set up
         logical :: graph_comm_ready = .false.
@@ -1517,11 +1514,8 @@ contains
         call hipCheck(hipMalloc(A%diag_lo_dev, int(max(n_local, 1_c_size_t) * 8, c_size_t)))
         call hipCheck(hipMalloc(A%diag_hi_dev, int(max(n_local, 1_c_size_t) * 8, c_size_t)))
 
-        ! Allocate communication buffers on device.
-        ! These buffers are exchanged via GPU-aware MPI and consumed by kernels.
-        ! We keep default coarse-grained allocations and use explicit
-        ! hipDeviceSynchronize points around MPI communication in spmv_gpu and
-        ! chebyshev_multiply_gpu_impl.
+        ! Coarse-grained device allocations for GPU-aware MPI buffers; explicit
+        ! hipDeviceSynchronize points guard MPI in spmv_gpu / chebyshev_multiply_gpu_impl.
         if (A%total_send > 0) then
             call hipCheck(hipMalloc(A%send_buf_dev, int(A%total_send * 16, c_size_t)))
             call hipCheck(hipMalloc(A%send_offsets_dev, int(A%total_send * 8, c_size_t)))
