@@ -3,7 +3,7 @@
 from importlib import import_module
 
 _MODULE_ALIASES = {
-    "context": "wavefront_context",
+    "context_wrapper": "context_wrapper",
     "diagonal_propagator": "wavefront_diagonal_propagator",
     "sparse_propagator": "wavefront_sparse_propagator",
     "circulant_propagator": "wavefront_circulant_propagator",

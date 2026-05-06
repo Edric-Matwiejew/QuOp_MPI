@@ -69,47 +69,15 @@ set(_depends
 )
 set(_definitions context=wavefront context_type=wavefront_context)
 
-set(CONTEXT_WRAPPER "${CMAKE_SOURCE_DIR}/native/context_wrapper.f90")
-
-quop_preprocess_fortran_source(
-  _context_wrapper_src
-  NAME
-  "context_wrapper_mod"
-  SOURCE
-  "${CONTEXT_WRAPPER}"
-  DEFINITIONS
-  ${_definitions}
+# -----------------------------------------------------------------------------
+# Backend-agnostic CPython context-wrapper extension (zero-copy state buffer).
+# Mirrors the MPI backend's invocation in native/mpi/CMakeLists.txt.
+# -----------------------------------------------------------------------------
+add_context_extension(
+  NAME           context_wrapper
+  INSTALL_SUBDIR wavefront
+  DEFINITIONS    ${_definitions}
+  DEPENDS        ${_depends}
+  LIBRARIES      ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
+                 ${ROCM_PATH}/lib/libamdhip64.so
 )
-
-add_library(context_wrapper_mod OBJECT "${_context_wrapper_src}")
-target_include_directories(context_wrapper_mod PRIVATE "${CMAKE_Fortran_MODULE_DIRECTORY}")
-set_target_properties(context_wrapper_mod PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(context_wrapper_mod MPI::MPI_Fortran ${QUOP_HIPFORT_TARGET})
-add_dependencies(context_wrapper_mod wavefront_context comm_info_mod)
-
-add_f2py_library(
-  MODULE_NAME
-  wavefront_context
-  DEPENDS
-  "${_depends}"
-  DEFINITIONS
-  "${_definitions}"
-  SRC
-  ${CONTEXT_WRAPPER}
-  INSTALL_SUBDIR
-  wavefront
-  LIBRARIES
-  ${MPI_Fortran_LIBRARIES}
-  ${QUOP_HIPFORT_TARGET}
-  ${NUMA_LIBRARY}
-)
-
-add_dependencies(wavefront_contextwrapper context_wrapper_mod)
-add_dependencies(wavefront_contextmodule context_wrapper_mod)
-
-target_link_libraries(
-  wavefront_context_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device ${ROCM_PATH}/lib/libamdhip64.so
-)
-if(TARGET CrayGTL::CrayGTL)
-  target_link_libraries(wavefront_context_f2py PRIVATE CrayGTL::CrayGTL)
-endif()

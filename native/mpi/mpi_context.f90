@@ -1,5 +1,6 @@
 module mpi_backend
     use, intrinsic :: iso_fortran_env, only: real32, real64, real128, int32, int64, int32, int64
+    use, intrinsic :: iso_c_binding, only: c_ptr, c_f_pointer, c_int64_t
     use MPI
     use comm_info_module, only: quop_mpi_layout_t
 
@@ -12,12 +13,24 @@ module mpi_backend
     type mpi_context
         real(real64) :: expectation_value
 
+        ! Backend-internal state buffer.  On the MPI backend this lives in
+        ! host memory and the host-side mirror (host_state) aliases it; on
+        ! GPU backends the two are distinct (device vs. host).
         complex(real64), dimension(:), pointer :: state => null()
         ! Optional host work buffer for out-of-place propagators (e.g. sparse).
         complex(real64), dimension(:), pointer :: work => null()
         ! Pointer (not allocatable) so it can be rebound to a Python-owned
-        ! buffer via cw_attach_observables for zero-copy transfers.
+        ! buffer via cw_attach_host_observables for zero-copy transfers.
         real(real64), dimension(:), pointer :: observables => null()
+
+        ! ----- Host-side mirrors (owned by the CPython extension) -----
+        ! On MPI these alias %state / %observables (same memory); they are
+        ! attached during cw_attach_host_* and refreshed in place by the
+        ! sync_host_* methods (which are no-ops on this backend because
+        ! the authoritative copy already lives in host memory).
+        complex(real64), dimension(:), pointer :: host_state => null()
+        real(real64),    dimension(:), pointer :: host_observables => null()
+        real(real64),    dimension(:), pointer :: host_local_probabilities => null()
 
         ! Pointer to the shared quop_mpi_layout_t (owned by caller, not freed here)
         type(quop_mpi_layout_t), pointer :: ci => null()
@@ -32,6 +45,17 @@ module mpi_backend
         procedure :: get_state => context_get_state
         procedure :: set_observables => context_set_observables
         procedure :: get_observables => context_get_observables
+
+        ! ----- Host/device mirror contract (shared with wavefront) ------
+        procedure :: attach_host_state => context_attach_host_state
+        procedure :: attach_host_observables => context_attach_host_observables
+        procedure :: attach_host_local_probabilities => context_attach_host_local_probabilities
+        procedure :: sync_host_state => context_sync_host_state
+        procedure :: sync_device_state => context_sync_device_state
+        procedure :: sync_host_observables => context_sync_host_observables
+        procedure :: sync_device_observables => context_sync_device_observables
+        procedure :: compute_local_probabilities => context_compute_local_probabilities
+        procedure :: detach_host_buffers => context_detach_host_buffers
 
     end type mpi_context
 
@@ -82,6 +106,13 @@ contains
             return
         end if
 
+        ! Establish the host-side mirrors: on MPI these alias the
+        ! backend-internal buffers (single host copy).  cw_attach_host_*
+        ! may later rebind state/observables to Python-owned memory; in
+        ! that case the aliases are refreshed there.
+        self%host_state => self%state
+        self%host_observables => self%observables
+
     end subroutine context_setup
 
     subroutine context_destroy(self)
@@ -99,6 +130,14 @@ contains
             deallocate (self%work)
             self%work => null()
         end if
+
+        ! host_state / host_observables aliased %state / %observables, which
+        ! we just deallocated (or which detach_host_buffers nullified before
+        ! cw_destroy_external on the Python-owned-buffer path).  Nullify the
+        ! mirror references unconditionally; never deallocate them here.
+        self%host_state => null()
+        self%host_observables => null()
+        self%host_local_probabilities => null()
 
         self%ci => null()
         self%expectation_value = 0.0_real64
@@ -391,5 +430,143 @@ contains
 
         state = self%state(:size(state))
     end subroutine context_get_state
+
+    ! ====================================================================
+    ! Host/device mirror contract (cw_attach_host_*, cw_sync_*,
+    ! cw_compute_local_probabilities).  The MPI backend has no device
+    ! memory: host_state / host_observables alias the backend-internal
+    ! buffers, sync_host_*/sync_device_* are no-ops, and
+    ! compute_local_probabilities runs the |psi|^2 loop directly on the
+    ! host buffer.
+    ! ====================================================================
+
+    subroutine context_attach_host_state(self, ptr, n)
+        !! Replace the backend-internal state buffer with a caller-owned
+        !! (Python-allocated) buffer of length `n` and refresh the host
+        !! mirror to alias it.  The previous Fortran-allocated buffer is
+        !! deallocated so it does not leak.  After this call the caller
+        !! owns the memory; cw_destroy_external must be used in lieu of
+        !! cw_destroy so detach_host_buffers nullifies %state before
+        !! ctx%destroy() runs.
+        class(mpi_context), intent(inout) :: self
+        type(c_ptr), value, intent(in) :: ptr
+        integer(c_int64_t), value, intent(in) :: n
+
+        if (associated(self%state)) deallocate (self%state)
+        call c_f_pointer(ptr, self%state, [n])
+        self%host_state => self%state
+    end subroutine context_attach_host_state
+
+    subroutine context_attach_host_observables(self, ptr, n)
+        !! Mirror of attach_host_state for the observables buffer.
+        class(mpi_context), intent(inout) :: self
+        type(c_ptr), value, intent(in) :: ptr
+        integer(c_int64_t), value, intent(in) :: n
+
+        if (associated(self%observables)) deallocate (self%observables)
+        call c_f_pointer(ptr, self%observables, [n])
+        self%host_observables => self%observables
+    end subroutine context_attach_host_observables
+
+    subroutine context_attach_host_local_probabilities(self, ptr, n)
+        !! Bind the caller-owned (Python-allocated) local-probabilities
+        !! buffer.  Unlike state/observables, the MPI backend has no
+        !! prior allocation for this field; it is purely a Python-owned
+        !! scratch buffer that compute_local_probabilities fills in
+        !! place each call.
+        class(mpi_context), intent(inout) :: self
+        type(c_ptr), value, intent(in) :: ptr
+        integer(c_int64_t), value, intent(in) :: n
+
+        self%host_local_probabilities => null()
+        call c_f_pointer(ptr, self%host_local_probabilities, [n])
+    end subroutine context_attach_host_local_probabilities
+
+    subroutine context_sync_host_state(self, error_code)
+        !! No-op on MPI: host_state aliases the authoritative state.
+        class(mpi_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+        if (.false.) self%expectation_value = 0.0_real64  ! quiet unused-arg
+        error_code = 0
+    end subroutine context_sync_host_state
+
+    subroutine context_sync_device_state(self, error_code)
+        !! No-op on MPI: there is no device buffer.
+        class(mpi_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+        if (.false.) self%expectation_value = 0.0_real64
+        error_code = 0
+    end subroutine context_sync_device_state
+
+    subroutine context_sync_host_observables(self, error_code)
+        !! No-op on MPI.
+        class(mpi_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+        if (.false.) self%expectation_value = 0.0_real64
+        error_code = 0
+    end subroutine context_sync_host_observables
+
+    subroutine context_sync_device_observables(self, error_code)
+        !! No-op on MPI.
+        class(mpi_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+        if (.false.) self%expectation_value = 0.0_real64
+        error_code = 0
+    end subroutine context_sync_device_observables
+
+    subroutine context_compute_local_probabilities(self, error_code)
+        !! Fill host_local_probabilities(1:local_i) with |state(i)|^2.
+        !! Performs sync_host_state first (no-op on MPI, dtoh on GPU).
+        class(mpi_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+        integer(int64) :: i, ci_local_i
+
+        error_code = 0
+        call self%sync_host_state(error_code)
+        if (error_code /= 0) return
+
+        if (.not. associated(self%ci)) then
+            error_code = 1
+            return
+        end if
+        ci_local_i = self%ci%get_local_i()
+
+        if (.not. associated(self%host_local_probabilities)) then
+            error_code = 2
+            return
+        end if
+        if (.not. associated(self%host_state)) then
+            error_code = 2
+            return
+        end if
+        if (size(self%host_local_probabilities, kind=int64) < ci_local_i) then
+            error_code = 1
+            return
+        end if
+        if (size(self%host_state, kind=int64) < ci_local_i) then
+            error_code = 1
+            return
+        end if
+
+        do i = 1, ci_local_i
+            self%host_local_probabilities(i) = real(self%host_state(i) * &
+                                                    conjg(self%host_state(i)), real64)
+        end do
+    end subroutine context_compute_local_probabilities
+
+    subroutine context_detach_host_buffers(self)
+        !! Nullify all pointers to Python-owned buffers so the subsequent
+        !! ctx%destroy() does not deallocate them.  On MPI %state and
+        !! %observables alias the host mirrors, so they must also be
+        !! nullified (not deallocated) here -- their backing storage is
+        !! NumPy memory.
+        class(mpi_context), intent(inout) :: self
+
+        self%state => null()
+        self%observables => null()
+        self%host_state => null()
+        self%host_observables => null()
+        self%host_local_probabilities => null()
+    end subroutine context_detach_host_buffers
 
 end module mpi_backend

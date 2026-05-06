@@ -311,9 +311,9 @@ def test_pyproject_build_targets_are_backend_aware_without_install_sh():
     targets = pyproject["tool"]["scikit-build"]["build"]["targets"]
 
     assert "comm_info_wrapper_f2py" in targets
-    assert "mpi_context_f2py" in targets
+    assert "mpi_context_wrapper" in targets
     assert "mpi_transverse_field_propagator_f2py" in targets
-    assert "wavefront_context_f2py" in targets
+    assert "wavefront_context_wrapper" in targets
     assert "quop_f2py_targets" not in targets
 
 
@@ -321,7 +321,7 @@ def test_native_cmakelists_keeps_wavefront_placeholders_for_direct_builds():
     native_cmake_text = NATIVE_CMAKE_LISTS.read_text()
 
     assert "if(${WAVEFRONT_BACKEND})" in native_cmake_text
-    assert "add_custom_target(wavefront_context_f2py)" in native_cmake_text
+    assert "add_custom_target(wavefront_context_wrapper)" in native_cmake_text
     assert "add_custom_target(wavefront_sparse_propagator_f2py)" in native_cmake_text
 
 def test_top_level_cmake_uses_native_subdir_for_compiled_sources():
@@ -798,10 +798,10 @@ def test_validate_install_accepts_extension_suffix_matches():
         package_root = Path(tmpdir) / "quop_mpi"
         extension_dir = package_root / "_lib" / "wavefront"
         extension_dir.mkdir(parents=True)
-        extension_file = extension_dir / f"wavefront_context{validator.EXTENSION_SUFFIXES[0]}"
+        extension_file = extension_dir / f"context_wrapper{validator.EXTENSION_SUFFIXES[0]}"
         extension_file.write_text("")
 
-        assert validator.has_extension_module(package_root, "quop_mpi/_lib/wavefront/wavefront_context")
+        assert validator.has_extension_module(package_root, "quop_mpi/_lib/wavefront/context_wrapper")
 
 
 def test_validate_install_reports_missing_required_extensions():
@@ -818,7 +818,7 @@ def test_validate_install_reports_missing_required_extensions():
             assert "cartesian" in str(exc)
             assert "csr_generators" in str(exc)
             assert "parallel_io" in str(exc)
-            assert "mpi_context" in str(exc)
+            assert "context_wrapper" in str(exc)
             assert "mpi_diagonal_propagator" in str(exc)
             assert "mpi_sparse_propagator" in str(exc)
             assert "mpi_circulant_propagator" in str(exc)
@@ -839,7 +839,7 @@ def test_validate_install_requires_full_mpi_backend():
         "quop_mpi/_lib/comm_info_wrapper",
         "quop_mpi/_lib/csr_generators",
         "quop_mpi/_lib/parallel_io",
-        "quop_mpi/_lib/mpi/mpi_context",
+        "quop_mpi/_lib/mpi/context_wrapper",
         "quop_mpi/_lib/mpi/mpi_diagonal_propagator",
         "quop_mpi/_lib/mpi/mpi_sparse_propagator",
         "quop_mpi/_lib/mpi/mpi_circulant_propagator",
@@ -859,7 +859,7 @@ def test_validate_install_requires_full_wavefront_backend():
         "quop_mpi/_lib/comm_info_wrapper",
         "quop_mpi/_lib/csr_generators",
         "quop_mpi/_lib/parallel_io",
-        "quop_mpi/_lib/wavefront/wavefront_context",
+        "quop_mpi/_lib/wavefront/context_wrapper",
         "quop_mpi/_lib/wavefront/wavefront_diagonal_propagator",
         "quop_mpi/_lib/wavefront/wavefront_sparse_propagator",
         "quop_mpi/_lib/wavefront/wavefront_circulant_propagator",

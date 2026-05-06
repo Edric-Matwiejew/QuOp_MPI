@@ -38,14 +38,6 @@ endif()
 set(_depends mpi_context comm_info_mod ${_COMM_INFO_EXTRA})
 set(_definitions context=mpi_backend context_type=mpi_context)
 
-add_f2py_library(
-  MODULE_NAME mpi_context
-  DEPENDS "${_depends}" 
-  DEFINITIONS ${_definitions}
-  SRC ${CONTEXT_WRAPPER}
-  INSTALL_SUBDIR mpi
-  )
-
 # -----------------------------------------------------------------------------
 # Backend-agnostic CPython context-wrapper extension (zero-copy state buffer).
 #
@@ -57,7 +49,7 @@ add_context_extension(
   NAME           context_wrapper
   INSTALL_SUBDIR mpi
   DEFINITIONS    ${_definitions}
-  DEPENDS        mpi_context comm_info_mod ${_COMM_INFO_EXTRA}
+  DEPENDS        ${_depends}
 )
 
 add_library(mpi_circulant_operators OBJECT mpi_circulant_operators.f90)

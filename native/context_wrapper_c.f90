@@ -1,16 +1,38 @@
 ! context_wrapper_c.f90
 !
 ! bind(C) shim providing a stable C ABI for the CPython extension
-! context_wrapper_ext.c.  Compiled with the same preprocessor definitions
-! as context_wrapper.f90 so that `context` and `context_type` resolve to the
-! correct backend (e.g. -Dcontext=mpi_backend -Dcontext_type=mpi_context for
-! the MPI build).
+! context_wrapper_ext.c.  Compiled per backend with preprocessor
+! definitions selecting the backend module and derived type, e.g.
+! `-Dcontext=mpi_backend -Dcontext_type=mpi_context` for the MPI build
+! and `-Dcontext=wavefront -Dcontext_type=wavefront_context` for the
+! wavefront build.
 !
-! None of the f2py directives in context_wrapper.f90 are needed here; the C
-! extension calls these symbols directly via the stable names below.
+! Contract
+! --------
+! The CPython extension owns three Python-allocated NumPy arrays per
+! Context: state (complex128, length alloc_local), observables (float64,
+! length local_i), and (lazily) local_probabilities (float64, length
+! local_i).  Each is bound into the Fortran context as a `host_*` mirror
+! pointer via the cw_attach_host_* entry points.
 !
-! Naming convention: every entry point is prefixed cw_ to avoid collisions
-! with the existing context_wrapper Fortran module symbols.
+! Each backend's `context_type` exposes a sync_host_* / sync_device_*
+! pair that keeps the host mirror coherent with the authoritative copy:
+!
+!   * On the MPI backend the host mirror IS the authoritative copy, so
+!     all sync_* routines are no-ops.
+!
+!   * On a GPU backend (e.g. wavefront) sync_host_* performs a
+!     device->host gather into the attached host mirror, and
+!     sync_device_* performs a host->device scatter from the attached
+!     host mirror.
+!
+! compute_local_probabilities is implemented in Fortran (host-side
+! |psi|^2 loop after sync_host_state) so the algorithm and reduction
+! semantics are identical across backends.
+!
+! Naming convention: every entry point is prefixed cw_ to keep the
+! exported symbols visibly distinct from the underlying backend
+! context_type's type-bound procedures.
 
 module context_wrapper_c
 
@@ -29,12 +51,6 @@ contains
     !
     ! Allocate a context_type on the heap, initialise it against the
     ! supplied quop_mpi_layout_t, and return an opaque handle.
-    !
-    ! Arguments
-    !   ci_ptr_val      [in]  int64 opaque handle for quop_mpi_layout_t
-    !   context_ptr_out [out] int64 opaque handle for the new context
-    !   error_code      [out] 0 on success, 100 on allocation failure,
-    !                         non-zero backend status otherwise
     ! ------------------------------------------------------------------
     subroutine cw_setup(ci_ptr_val, context_ptr_out, error_code) &
             bind(C, name="cw_setup")
@@ -75,13 +91,12 @@ contains
     ! ------------------------------------------------------------------
     ! cw_destroy
     !
-    ! Destroy and deallocate the context referred to by context_ptr_val.
-    ! Assumes the context still owns its state and observables buffers
-    ! (i.e. no cw_attach_* has been performed).  This entry point is
-    ! used by the C extension's failure-cleanup paths in cw_setup and
-    ! py_setup, before any attach has occurred; once the Python-owned
-    ! buffers are attached, callers must use cw_destroy_external
-    ! instead so the Python pointers are nullified before destroy().
+    ! Destroy a context that still owns its internal buffers (i.e. no
+    ! cw_attach_host_* call has rebound them to Python memory).  Used by
+    ! the C extension's pre-attach failure-cleanup paths in py_setup.
+    ! Once Python-owned buffers are attached, callers must use
+    ! cw_destroy_external instead so detach_host_buffers nullifies the
+    ! Python pointers before ctx%destroy() runs.
     ! ------------------------------------------------------------------
     subroutine cw_destroy(context_ptr_val) bind(C, name="cw_destroy")
         integer(c_int64_t), value, intent(in) :: context_ptr_val
@@ -97,42 +112,12 @@ contains
     end subroutine cw_destroy
 
     ! ------------------------------------------------------------------
-    ! cw_attach_state
-    !
-    ! Replace the context's internally-allocated state buffer with a
-    ! caller-owned (Python-owned) buffer of length `size_state`.
-    !
-    ! The currently-associated Fortran-allocated buffer is deallocated
-    ! first; the new pointer is then bound via c_f_pointer.  Ownership of
-    ! the new memory remains with the caller — cw_destroy must NOT be
-    ! used after this call; use cw_destroy_external instead, which
-    ! nullifies the pointer before invoking ctx%destroy().
-    ! ------------------------------------------------------------------
-    subroutine cw_attach_state(context_ptr_val, state_data, size_state) &
-            bind(C, name="cw_attach_state")
-        integer(c_int64_t), value, intent(in) :: context_ptr_val
-        type(c_ptr),        value, intent(in) :: state_data
-        integer(c_int64_t), value, intent(in) :: size_state
-
-        type(c_ptr)                 :: ctx_ptr
-        type(context_type), pointer :: ctx
-
-        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
-        call c_f_pointer(ctx_ptr, ctx)
-
-        if (associated(ctx%state)) then
-            deallocate(ctx%state)
-        end if
-        call c_f_pointer(state_data, ctx%state, [size_state])
-
-    end subroutine cw_attach_state
-
-    ! ------------------------------------------------------------------
     ! cw_destroy_external
     !
-    ! Destroy a context whose state buffer is externally owned.  The
-    ! state pointer is nullified first so that ctx%destroy() does not
-    ! deallocate Python-managed memory.
+    ! Destroy a context whose host mirrors are bound to Python-owned
+    ! memory.  detach_host_buffers nullifies all host_* pointers (and,
+    ! on the MPI backend, the aliased %state / %observables) so that
+    ! ctx%destroy() does not call deallocate() on Python memory.
     ! ------------------------------------------------------------------
     subroutine cw_destroy_external(context_ptr_val) &
             bind(C, name="cw_destroy_external")
@@ -144,97 +129,149 @@ contains
         ctx_ptr = transfer(context_ptr_val, ctx_ptr)
         call c_f_pointer(ctx_ptr, ctx)
 
-        ctx%state => null()
-        ctx%observables => null()
+        call ctx%detach_host_buffers()
         call ctx%destroy()
         deallocate(ctx)
 
     end subroutine cw_destroy_external
 
     ! ------------------------------------------------------------------
-    ! cw_attach_observables
+    ! cw_attach_host_state / cw_attach_host_observables /
+    ! cw_attach_host_local_probabilities
     !
-    ! Replace the context's internally-allocated observables buffer with
-    ! a caller-owned (Python-owned) real(real64) buffer of length
-    ! `size_obs`.  Mirrors cw_attach_state: the existing pointer (if
-    ! associated) is deallocated first, then rebound to the supplied
-    ! address via c_f_pointer.  Ownership of the new memory remains with
-    ! the caller; cw_destroy_external nullifies the pointer before
-    ! invoking ctx%destroy() so Fortran does not free Python memory.
+    ! Bind a Python-owned buffer of length `n` as the host mirror of the
+    ! corresponding context field.  Per-backend behaviour is described
+    ! on each context_type%attach_host_* type-bound procedure.
     ! ------------------------------------------------------------------
-    subroutine cw_attach_observables(context_ptr_val, obs_data, size_obs) &
-            bind(C, name="cw_attach_observables")
+    subroutine cw_attach_host_state(context_ptr_val, data, n) &
+            bind(C, name="cw_attach_host_state")
         integer(c_int64_t), value, intent(in) :: context_ptr_val
-        type(c_ptr),        value, intent(in) :: obs_data
-        integer(c_int64_t), value, intent(in) :: size_obs
+        type(c_ptr),        value, intent(in) :: data
+        integer(c_int64_t), value, intent(in) :: n
 
         type(c_ptr)                 :: ctx_ptr
         type(context_type), pointer :: ctx
 
         ctx_ptr = transfer(context_ptr_val, ctx_ptr)
         call c_f_pointer(ctx_ptr, ctx)
+        call ctx%attach_host_state(data, n)
+    end subroutine cw_attach_host_state
 
-        if (associated(ctx%observables)) then
-            deallocate(ctx%observables)
-        end if
-        call c_f_pointer(obs_data, ctx%observables, [size_obs])
+    subroutine cw_attach_host_observables(context_ptr_val, data, n) &
+            bind(C, name="cw_attach_host_observables")
+        integer(c_int64_t), value, intent(in) :: context_ptr_val
+        type(c_ptr),        value, intent(in) :: data
+        integer(c_int64_t), value, intent(in) :: n
 
-    end subroutine cw_attach_observables
+        type(c_ptr)                 :: ctx_ptr
+        type(context_type), pointer :: ctx
+
+        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
+        call c_f_pointer(ctx_ptr, ctx)
+        call ctx%attach_host_observables(data, n)
+    end subroutine cw_attach_host_observables
+
+    subroutine cw_attach_host_local_probabilities(context_ptr_val, data, n) &
+            bind(C, name="cw_attach_host_local_probabilities")
+        integer(c_int64_t), value, intent(in) :: context_ptr_val
+        type(c_ptr),        value, intent(in) :: data
+        integer(c_int64_t), value, intent(in) :: n
+
+        type(c_ptr)                 :: ctx_ptr
+        type(context_type), pointer :: ctx
+
+        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
+        call c_f_pointer(ctx_ptr, ctx)
+        call ctx%attach_host_local_probabilities(data, n)
+    end subroutine cw_attach_host_local_probabilities
 
     ! ------------------------------------------------------------------
-    ! cw_get_state
+    ! cw_sync_host_state / cw_sync_device_state /
+    ! cw_sync_host_observables / cw_sync_device_observables
     !
-    ! Collectively gather the host state buffer into the caller-supplied
-    ! complex(real64) buffer of length size_state.  The buffer is owned
-    ! by Python; no allocation occurs inside Fortran.
+    ! Refresh the host or device side of the corresponding mirror.
+    ! No-ops on the MPI backend; collective gather/scatter on GPU
+    ! backends.  Each is collective over the active SUBCOMM on backends
+    ! where it does work.
     ! ------------------------------------------------------------------
-    subroutine cw_get_state(context_ptr_val, size_state, state_data, error_code) &
-            bind(C, name="cw_get_state")
+    subroutine cw_sync_host_state(context_ptr_val, error_code) &
+            bind(C, name="cw_sync_host_state")
         integer(c_int64_t), value, intent(in)  :: context_ptr_val
-        integer(c_int64_t), value, intent(in)  :: size_state
-        type(c_ptr),        value, intent(in)  :: state_data
         integer(c_int32_t),        intent(out) :: error_code
 
         type(c_ptr)                 :: ctx_ptr
         type(context_type), pointer :: ctx
-        complex(real64),    pointer :: state(:)
 
         ctx_ptr = transfer(context_ptr_val, ctx_ptr)
         call c_f_pointer(ctx_ptr, ctx)
-        call c_f_pointer(state_data, state, [size_state])
-        call ctx%get_state(state, error_code)
+        call ctx%sync_host_state(error_code)
+    end subroutine cw_sync_host_state
 
-    end subroutine cw_get_state
-
-    ! ------------------------------------------------------------------
-    ! cw_set_state
-    !
-    ! Collectively scatter the caller-supplied complex(real64) buffer of
-    ! length size_state into the context state.
-    ! ------------------------------------------------------------------
-    subroutine cw_set_state(context_ptr_val, size_state, state_data, error_code) &
-            bind(C, name="cw_set_state")
+    subroutine cw_sync_device_state(context_ptr_val, error_code) &
+            bind(C, name="cw_sync_device_state")
         integer(c_int64_t), value, intent(in)  :: context_ptr_val
-        integer(c_int64_t), value, intent(in)  :: size_state
-        type(c_ptr),        value, intent(in)  :: state_data
         integer(c_int32_t),        intent(out) :: error_code
 
         type(c_ptr)                 :: ctx_ptr
         type(context_type), pointer :: ctx
-        complex(real64),    pointer :: state(:)
 
         ctx_ptr = transfer(context_ptr_val, ctx_ptr)
         call c_f_pointer(ctx_ptr, ctx)
-        call c_f_pointer(state_data, state, [size_state])
-        call ctx%set_state(state, error_code)
+        call ctx%sync_device_state(error_code)
+    end subroutine cw_sync_device_state
 
-    end subroutine cw_set_state
+    subroutine cw_sync_host_observables(context_ptr_val, error_code) &
+            bind(C, name="cw_sync_host_observables")
+        integer(c_int64_t), value, intent(in)  :: context_ptr_val
+        integer(c_int32_t),        intent(out) :: error_code
+
+        type(c_ptr)                 :: ctx_ptr
+        type(context_type), pointer :: ctx
+
+        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
+        call c_f_pointer(ctx_ptr, ctx)
+        call ctx%sync_host_observables(error_code)
+    end subroutine cw_sync_host_observables
+
+    subroutine cw_sync_device_observables(context_ptr_val, error_code) &
+            bind(C, name="cw_sync_device_observables")
+        integer(c_int64_t), value, intent(in)  :: context_ptr_val
+        integer(c_int32_t),        intent(out) :: error_code
+
+        type(c_ptr)                 :: ctx_ptr
+        type(context_type), pointer :: ctx
+
+        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
+        call c_f_pointer(ctx_ptr, ctx)
+        call ctx%sync_device_observables(error_code)
+    end subroutine cw_sync_device_observables
 
     ! ------------------------------------------------------------------
-    ! cw_get_expectation_value
+    ! cw_compute_local_probabilities
     !
-    ! Collectively compute the expectation value and return it as a
-    ! double scalar.
+    ! Fill host_local_probabilities(1:local_i) with |psi(i)|^2.  The
+    ! implementation first does sync_host_state (no-op on MPI, dtoh
+    ! gather on wavefront) so the same host loop runs on every backend.
+    ! ------------------------------------------------------------------
+    subroutine cw_compute_local_probabilities(context_ptr_val, error_code) &
+            bind(C, name="cw_compute_local_probabilities")
+        integer(c_int64_t), value, intent(in)  :: context_ptr_val
+        integer(c_int32_t),        intent(out) :: error_code
+
+        type(c_ptr)                 :: ctx_ptr
+        type(context_type), pointer :: ctx
+
+        ctx_ptr = transfer(context_ptr_val, ctx_ptr)
+        call c_f_pointer(ctx_ptr, ctx)
+        call ctx%compute_local_probabilities(error_code)
+    end subroutine cw_compute_local_probabilities
+
+    ! ------------------------------------------------------------------
+    ! cw_get_expectation_value / cw_get_state_norm
+    !
+    ! Return the collectively-reduced scalar.  Each backend reads from
+    ! whichever copy is authoritative on its side (host on MPI, device
+    ! on wavefront), so no explicit sync is required here.
     ! ------------------------------------------------------------------
     subroutine cw_get_expectation_value(context_ptr_val, expectation_value, error_code) &
             bind(C, name="cw_get_expectation_value")
@@ -251,12 +288,6 @@ contains
 
     end subroutine cw_get_expectation_value
 
-    ! ------------------------------------------------------------------
-    ! cw_get_state_norm
-    !
-    ! Collectively compute the state norm and return it as a double
-    ! scalar.
-    ! ------------------------------------------------------------------
     subroutine cw_get_state_norm(context_ptr_val, state_norm, error_code) &
             bind(C, name="cw_get_state_norm")
         integer(c_int64_t), value, intent(in)  :: context_ptr_val

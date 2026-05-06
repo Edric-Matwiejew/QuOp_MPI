@@ -71,10 +71,14 @@
 extern void cw_setup            (int64_t ci_ptr_val, int64_t *ctx_out, int32_t *err);
 extern void cw_destroy          (int64_t ctx);
 extern void cw_destroy_external (int64_t ctx);
-extern void cw_attach_state     (int64_t ctx, void *data, int64_t size);
-extern void cw_attach_observables(int64_t ctx, void *data, int64_t size);
-extern void cw_get_state        (int64_t ctx, int64_t size, void *data, int32_t *err);
-extern void cw_set_state        (int64_t ctx, int64_t size, const void *data, int32_t *err);
+extern void cw_attach_host_state              (int64_t ctx, void *data, int64_t n);
+extern void cw_attach_host_observables        (int64_t ctx, void *data, int64_t n);
+extern void cw_attach_host_local_probabilities(int64_t ctx, void *data, int64_t n);
+extern void cw_sync_host_state         (int64_t ctx, int32_t *err);
+extern void cw_sync_device_state       (int64_t ctx, int32_t *err);
+extern void cw_sync_host_observables   (int64_t ctx, int32_t *err);
+extern void cw_sync_device_observables (int64_t ctx, int32_t *err);
+extern void cw_compute_local_probabilities(int64_t ctx, int32_t *err);
 extern void cw_get_expectation_value(int64_t ctx, double *val, int32_t *err);
 extern void cw_get_state_norm   (int64_t ctx, double *val, int32_t *err);
 
@@ -229,9 +233,12 @@ py_setup(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    /* Step 4: rebind ctx%state and ctx%observables to the Python buffers. */
-    cw_attach_state(handle, PyArray_DATA(state), (int64_t)alloc_local);
-    cw_attach_observables(handle, PyArray_DATA(observables), (int64_t)local_i);
+    /* Step 4: rebind ctx%host_state and ctx%host_observables to the
+     * Python buffers.  On MPI this also retargets ctx%state /
+     * ctx%observables (single host copy); on wavefront the device
+     * buffers are left intact and host_* becomes the host mirror. */
+    cw_attach_host_state(handle, PyArray_DATA(state), (int64_t)alloc_local);
+    cw_attach_host_observables(handle, PyArray_DATA(observables), (int64_t)local_i);
 
     /* Step 5: assemble the Context PyObject. */
     Context *ctx = PyObject_New(Context, &ContextType);
@@ -269,9 +276,11 @@ py_destroy(PyObject *module, PyObject *arg)
 
 
 /* =========================================================================
- * get_state(ctx) -> (ndarray[complex128], 0)
+ * get_state(ctx) -> (ndarray[complex128], error_code)
  *
- * True zero-copy: returns a new reference to the cached buffer.
+ * Refreshes the host mirror from the authoritative copy (no-op on MPI;
+ * device->host gather on wavefront), then returns a new reference to
+ * the cached buffer.  Truly zero-copy when error_code == 0.
  * ========================================================================= */
 static PyObject *
 py_get_state(PyObject *module, PyObject *arg)
@@ -279,16 +288,20 @@ py_get_state(PyObject *module, PyObject *arg)
     Context *ctx = as_context(arg, "get_state");
     if (!ctx) return NULL;
 
+    int32_t error_code = 0;
+    cw_sync_host_state(ctx->handle, &error_code);
+
     Py_INCREF(ctx->state);
-    return Py_BuildValue("Ni", (PyObject *)ctx->state, 0);
+    return Py_BuildValue("Ni", (PyObject *)ctx->state, (int)error_code);
 }
 
 
 /* =========================================================================
  * set_state(ctx, state) -> error_code
  *
- * Identity short-circuits; otherwise copies into the cached buffer.
- * Never touches the Fortran side — the buffer is shared.
+ * Writes into the cached buffer (identity short-circuits when given the
+ * cached array), then pushes the host mirror to the authoritative copy
+ * (no-op on MPI; host->device scatter on wavefront).
  * ========================================================================= */
 static PyObject *
 py_set_state(PyObject *module, PyObject *args)
@@ -302,40 +315,41 @@ py_set_state(PyObject *module, PyObject *args)
     Context *ctx = as_context(ctx_obj, "set_state");
     if (!ctx) return NULL;
 
-    if ((PyObject *)arr == (PyObject *)ctx->state)
-        return PyLong_FromLong(0);
+    if ((PyObject *)arr != (PyObject *)ctx->state) {
+        PyArrayObject *src = (PyArrayObject *)PyArray_FROM_OTF(
+            (PyObject *)arr, NPY_COMPLEX128, NPY_ARRAY_IN_ARRAY);
+        if (!src) return NULL;
 
-    PyArrayObject *src = (PyArrayObject *)PyArray_FROM_OTF(
-        (PyObject *)arr, NPY_COMPLEX128, NPY_ARRAY_IN_ARRAY);
-    if (!src) return NULL;
+        npy_intp src_size = PyArray_SIZE(src);
+        if (src_size > ctx->alloc_local) {
+            Py_DECREF(src);
+            return PyLong_FromLong(3); /* matches existing wrapper status code */
+        }
 
-    npy_intp src_size = PyArray_SIZE(src);
-    if (src_size > ctx->alloc_local) {
+        const size_t elt = sizeof(npy_complex128);
+        memcpy(PyArray_DATA(ctx->state), PyArray_DATA(src), (size_t)src_size * elt);
+        if (src_size < ctx->alloc_local) {
+            memset((char *)PyArray_DATA(ctx->state) + (size_t)src_size * elt,
+                   0,
+                   (size_t)(ctx->alloc_local - src_size) * elt);
+        }
         Py_DECREF(src);
-        return PyLong_FromLong(3); /* matches existing wrapper status code */
     }
 
-    const size_t elt = sizeof(npy_complex128);
-    memcpy(PyArray_DATA(ctx->state), PyArray_DATA(src), (size_t)src_size * elt);
-    if (src_size < ctx->alloc_local) {
-        memset((char *)PyArray_DATA(ctx->state) + (size_t)src_size * elt,
-               0,
-               (size_t)(ctx->alloc_local - src_size) * elt);
-    }
-
-    Py_DECREF(src);
-    return PyLong_FromLong(0);
+    int32_t error_code = 0;
+    cw_sync_device_state(ctx->handle, &error_code);
+    return PyLong_FromLong((long)error_code);
 }
 
 
 /* =========================================================================
  * Observables (zero-copy: same pattern as state).
  *
- * The cached observables buffer is attached to ctx%observables at
- * setup() and never reallocated.  get_observables returns a new
- * reference to the cached array; set_observables identity-shortcuts
- * when given the cached array, otherwise memcpy-s the source into the
- * cached buffer.  No Fortran call is required for either operation.
+ * get_observables triggers a host-side refresh (no-op on MPI; dtoh on
+ * GPU backends) and returns a new reference to the cached buffer.
+ * set_observables identity-shortcuts when given the cached array,
+ * otherwise memcpy-s the source in, then triggers a device-side push
+ * (no-op on MPI; htod on GPU).
  * ========================================================================= */
 static PyObject *
 py_get_observables(PyObject *module, PyObject *arg)
@@ -343,8 +357,11 @@ py_get_observables(PyObject *module, PyObject *arg)
     Context *ctx = as_context(arg, "get_observables");
     if (!ctx) return NULL;
 
+    int32_t error_code = 0;
+    cw_sync_host_observables(ctx->handle, &error_code);
+
     Py_INCREF(ctx->observables);
-    return Py_BuildValue("Ni", (PyObject *)ctx->observables, 0);
+    return Py_BuildValue("Ni", (PyObject *)ctx->observables, (int)error_code);
 }
 
 
@@ -360,30 +377,31 @@ py_set_observables(PyObject *module, PyObject *args)
     Context *ctx = as_context(ctx_obj, "set_observables");
     if (!ctx) return NULL;
 
-    if ((PyObject *)arr == (PyObject *)ctx->observables)
-        return PyLong_FromLong(0);
+    if ((PyObject *)arr != (PyObject *)ctx->observables) {
+        PyArrayObject *src = (PyArrayObject *)PyArray_FROM_OTF(
+            (PyObject *)arr, NPY_FLOAT64, NPY_ARRAY_IN_ARRAY);
+        if (!src) return NULL;
 
-    PyArrayObject *src = (PyArrayObject *)PyArray_FROM_OTF(
-        (PyObject *)arr, NPY_FLOAT64, NPY_ARRAY_IN_ARRAY);
-    if (!src) return NULL;
+        npy_intp src_size = PyArray_SIZE(src);
+        if (src_size > ctx->local_i) {
+            Py_DECREF(src);
+            return PyLong_FromLong(3); /* matches existing wrapper status code */
+        }
 
-    npy_intp src_size = PyArray_SIZE(src);
-    if (src_size > ctx->local_i) {
+        const size_t elt = sizeof(double);
+        memcpy(PyArray_DATA(ctx->observables), PyArray_DATA(src),
+               (size_t)src_size * elt);
+        if (src_size < ctx->local_i) {
+            memset((char *)PyArray_DATA(ctx->observables) + (size_t)src_size * elt,
+                   0,
+                   (size_t)(ctx->local_i - src_size) * elt);
+        }
         Py_DECREF(src);
-        return PyLong_FromLong(3); /* matches existing wrapper status code */
     }
 
-    const size_t elt = sizeof(double);
-    memcpy(PyArray_DATA(ctx->observables), PyArray_DATA(src),
-           (size_t)src_size * elt);
-    if (src_size < ctx->local_i) {
-        memset((char *)PyArray_DATA(ctx->observables) + (size_t)src_size * elt,
-               0,
-               (size_t)(ctx->local_i - src_size) * elt);
-    }
-
-    Py_DECREF(src);
-    return PyLong_FromLong(0);
+    int32_t error_code = 0;
+    cw_sync_device_observables(ctx->handle, &error_code);
+    return PyLong_FromLong((long)error_code);
 }
 
 
@@ -420,9 +438,12 @@ py_get_state_norm(PyObject *module, PyObject *arg)
  * Local probabilities (lazy zero-copy buffer owned by Context).
  *
  * Returns the cached float64 buffer of length local_i, populated with
- * |state[i]|**2 for i in [0, local_i).  Allocated on first call and
- * reused thereafter; freed by Context_release alongside the state and
- * observables buffers.
+ * |state[i]|**2 for i in [0, local_i).  Allocated and attached on the
+ * first call (Fortran side keeps a host_local_probabilities pointer to
+ * the same memory) and reused thereafter; freed by Context_release
+ * alongside the state and observables buffers.  The |psi|^2 fill is
+ * performed by cw_compute_local_probabilities (host-side loop after a
+ * sync_host_state, identical algorithm on every backend).
  * ========================================================================= */
 static PyObject *
 py_get_local_probabilities(PyObject *module, PyObject *arg)
@@ -435,21 +456,18 @@ py_get_local_probabilities(PyObject *module, PyObject *arg)
         PyArrayObject *buf =
             (PyArrayObject *)PyArray_EMPTY(1, dims, NPY_FLOAT64, 0);
         if (!buf) return NULL;
+        cw_attach_host_local_probabilities(ctx->handle, PyArray_DATA(buf),
+                                            (int64_t)ctx->local_i);
         ctx->local_probabilities = buf;
     }
 
-    /* Recompute |state|^2 over the first local_i entries.  We treat the
-     * complex128 buffer as interleaved (real, imag) doubles to avoid the
-     * NumPy 1.x/2.x divergence in npy_complex128's struct layout. */
-    if (ctx->local_i > 0) {
-        const double *src = (const double *)PyArray_DATA(ctx->state);
-        double *dst = (double *)PyArray_DATA(ctx->local_probabilities);
-        const int64_t n = ctx->local_i;
-        for (int64_t i = 0; i < n; ++i) {
-            const double re = src[2 * i];
-            const double im = src[2 * i + 1];
-            dst[i] = re * re + im * im;
-        }
+    int32_t error_code = 0;
+    cw_compute_local_probabilities(ctx->handle, &error_code);
+    if (error_code != 0) {
+        PyErr_Format(PyExc_RuntimeError,
+                     "compute_local_probabilities failed (status %d)",
+                     (int)error_code);
+        return NULL;
     }
 
     Py_INCREF(ctx->local_probabilities);

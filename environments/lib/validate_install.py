@@ -16,7 +16,7 @@ BASE_EXTENSION_STEMS = (
 
 BACKEND_EXTENSION_STEMS = {
     "mpi": (
-        "quop_mpi/_lib/mpi/mpi_context",
+        "quop_mpi/_lib/mpi/context_wrapper",
         "quop_mpi/_lib/mpi/mpi_diagonal_propagator",
         "quop_mpi/_lib/mpi/mpi_sparse_propagator",
         "quop_mpi/_lib/mpi/mpi_circulant_propagator",
@@ -25,7 +25,7 @@ BACKEND_EXTENSION_STEMS = {
         "quop_mpi/_lib/mpi/mpi_transverse_field_propagator",
     ),
     "wavefront": (
-        "quop_mpi/_lib/wavefront/wavefront_context",
+        "quop_mpi/_lib/wavefront/context_wrapper",
         "quop_mpi/_lib/wavefront/wavefront_diagonal_propagator",
         "quop_mpi/_lib/wavefront/wavefront_sparse_propagator",
         "quop_mpi/_lib/wavefront/wavefront_circulant_propagator",
