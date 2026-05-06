@@ -7,9 +7,32 @@ class Context:
     - ``state`` uses ``alloc_local``
     - ``observables`` uses ``local_i``
 
-    These accessors are collective over ``SUBCOMM``. Backends may satisfy that
-    contract trivially (MPI host-only case) or via internal MPI/device transfer
-    steps (wavefront).
+    These accessors -- and :meth:`get_local_probabilities` -- are
+    **collective over** ``SUBCOMM``: every rank in the layout's SUBCOMM
+    must enter together.  Backends may satisfy that contract trivially
+    (the MPI backend's host mirrors alias the authoritative buffers) or
+    via internal device-to-host / host-to-device transfers plus a
+    SUBCOMM-scoped error reduction (the wavefront backend).  Calling
+    these accessors from a subset of SUBCOMM ranks is undefined.
+
+    Read-only view contract: the ndarrays returned by ``state`` and
+    ``observables`` are cached zero-copy views onto the host mirror and
+    are marked ``writeable=False``. To replace the buffer contents,
+    assign through the property setter (``ctx.state = arr`` /
+    ``ctx.observables = arr``); the setter performs a memcpy into the
+    cached buffer and -- on backends that need it -- a host-to-device
+    push.  In-place mutation through the view is rejected at the NumPy
+    layer because on GPU backends the host mirror is just a snapshot
+    refreshed on every getter call from the device-side authoritative
+    buffer, so silent in-place writes would be lost on the next sync.
+
+    The state buffer has shape ``(alloc_local,)`` so backends with
+    extra padding on the trailing slice can use it as scratch.  Only
+    ``state[:local_i]`` carries the rank's share of the wavefunction;
+    ``state[local_i:alloc_local]`` is implementation-defined padding
+    and its value is unspecified after any sync (in particular, the
+    wavefront backend may overwrite it during ``gpu_allgatherv_dtoh``).
+    Callers must not rely on the padded region's contents.
     """
 
     @staticmethod
@@ -115,7 +138,15 @@ class Context:
 
     @property
     def observables(self):
-        """Collectively fetch the host observable buffer over ``SUBCOMM``."""
+        """Collectively fetch the host observable buffer over ``SUBCOMM``.
+
+        Returns a read-only zero-copy NumPy view onto the cached
+        observables buffer (length ``local_i``).  Mutate by assignment
+        to the property: ``ctx.observables = arr``.  In-place writes
+        through the returned view are rejected by NumPy (the array is
+        marked ``writeable=False``); see the class docstring for the
+        rationale.
+        """
         if self.initialised:
             observables, error_code = self.context_wrapper.get_observables(
                 self._ctx
@@ -177,9 +208,22 @@ class Context:
     def state(self):
         """Collectively fetch the host state buffer over ``SUBCOMM``.
 
-        Returns a zero-copy NumPy view onto the cached state buffer owned
-        by the native ``Context`` object.  The view is invalidated when
-        ``destroy()`` is called.
+        Returns a read-only zero-copy NumPy view onto the cached state
+        buffer owned by the native ``Context`` object.  The view has
+        length ``alloc_local``; only ``state[:local_i]`` is the rank's
+        share of the wavefunction, and ``state[local_i:alloc_local]``
+        is implementation-defined padding (see the class docstring).
+
+        On GPU backends the cached buffer is refreshed from the
+        device-side authoritative copy before being returned
+        (unconditional ``gpu_allgatherv_dtoh`` on wavefront); on the
+        MPI backend the buffer *is* the authoritative copy.
+
+        Mutate by assignment to the property: ``ctx.state = arr``.
+        In-place writes through the returned view are rejected by
+        NumPy (the array is marked ``writeable=False``).
+
+        The view is invalidated when ``destroy()`` is called.
         """
         if self.initialised:
             state, error_code = self.context_wrapper.get_state(self._ctx)
@@ -235,6 +279,14 @@ class Context:
     def get_local_probabilities(self):
         """Return ``|state[:local_i]|**2`` from a context-owned host buffer.
 
+        Collective over ``SUBCOMM`` -- on the wavefront backend the
+        underlying ``compute_local_probabilities`` first runs
+        ``sync_host_state`` (a NODECOMM-scoped device-to-host gather
+        wrapped in a SUBCOMM-scoped error reduction).  On the MPI
+        backend the operation is local but callers must still treat
+        the call as SUBCOMM-collective so the same call site is
+        correct on every backend.
+
         The buffer is allocated lazily by the native extension on the
         first call (length ``host_local_i``, dtype ``float64``) and
         reused on every subsequent call: only the contents are
@@ -258,7 +310,8 @@ class Context:
         Returns
         -------
         ndarray[float64]
-            Zero-copy view onto the cached buffer.
+            Read-only zero-copy view onto the cached buffer (marked
+            ``writeable=False``).
         """
         self._require_initialised("compute local probabilities")
         return self.context_wrapper.get_local_probabilities(self._ctx)

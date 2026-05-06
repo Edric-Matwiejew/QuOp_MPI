@@ -342,40 +342,58 @@ class TestContextStateRoundTrip:
     def test_state_view_aliases_native_buffer(
         self, mpi_comm, context_regular_system_size
     ):
-        """In-place mutation of ``ctx.state`` is visible to Fortran.
+        """The Python ``ctx.state`` view aliases the native host buffer.
 
-        Locks the zero-copy invariant: the NumPy view returned by
-        ``Context.state`` shares storage with the Fortran ``ctx%state``
-        pointer attached at setup, so writes through the view must be
-        observed by collective routines that read through the pointer
-        (here, ``get_state_norm`` and ``get_expectation_value``, which
-        compute over ``self%state(:ci_local_i)`` in Fortran).
+        Zero-copy contract (asserted on every backend): the ndarray
+        returned by ``Context.state`` is a cached ``PyArrayObject``
+        backed by the host-resident state buffer attached at setup, so
+        successive ``ctx.state`` accesses return the *same* object —
+        no Python-side duplicate allocation. Same contract applies to
+        ``Context.observables``.
+
+        Read-only contract (asserted on every backend): the cached
+        view is marked ``writeable=False``. Mutation goes through the
+        property setter (``ctx.state = arr``), which memcpys into the
+        cached buffer and — on GPU backends — pushes host→device.
+        After such a setter call the Fortran reductions
+        (``get_state_norm``, ``get_expectation_value``) see the new
+        contents on every backend.
         """
         layout = _make_layout(context_regular_system_size, mpi_comm)
         ctx = Context(_get_backend(), comm_info=layout)
 
         local_i = ctx.host_local_i
+        alloc_local = ctx.host_alloc_local
 
-        # Fetch the cached buffer view, then mutate in place WITHOUT
-        # going through the ctx.state setter (which would still copy).
+        # The cached view is read-only by contract.
         view = ctx.state
-        amplitude = 1.0 / np.sqrt(context_regular_system_size)
-        view[:local_i] = amplitude + 0j
+        assert view.flags.writeable is False
 
-        # A second fetch should return the SAME ndarray object — the
-        # Context caches a single PyArrayObject across get_state calls.
+        # A second fetch must return the SAME ndarray object — the
+        # Context caches a single PyArrayObject across get_state calls
+        # on every backend.
         view_again = ctx.state
         assert view_again is view
 
-        # Fortran reads through self%state must see the in-place write.
+        # Same caching + read-only contract for observables.
+        obs_view = ctx.observables
+        assert obs_view.flags.writeable is False
+        assert ctx.observables is obs_view
+
+        # Mutation goes through the setter: build a host-side array,
+        # populate it, assign. On wavefront this triggers htod; on MPI
+        # it memcpys into the same host buffer the view aliases.
+        amplitude = 1.0 / np.sqrt(context_regular_system_size)
+        new_state = np.zeros(alloc_local, dtype=np.complex128)
+        new_state[:local_i] = amplitude + 0j
+        ctx.state = new_state
+
+        new_obs = np.full(local_i, 2.0, dtype=np.float64)
+        ctx.observables = new_obs
+
+        # Reductions now see the post-setter contents on every backend.
         norm = ctx.get_state_norm()
         assert norm == pytest.approx(1.0, rel=1e-10)
-
-        # Mutate observables in place too and confirm Fortran sees it.
-        obs_view = ctx.observables
-        obs_view[:local_i] = np.full(local_i, 2.0, dtype=np.float64)
-        # Re-fetch returns the same object.
-        assert ctx.observables is obs_view
 
         # <obs> = sum_i p_i * obs_i = 2.0 * sum_i p_i = 2.0 (norm=1).
         exp_val = ctx.get_expectation_value()

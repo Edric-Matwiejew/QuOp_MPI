@@ -853,6 +853,11 @@ contains
 
     subroutine context_sync_host_state(self, error_code)
         !! Refresh host_state from the device buffer (device->host gather).
+        !!
+        !! Collective over SUBCOMM.  The actual data movement is a
+        !! NODECOMM-scoped gpu_allgatherv_dtoh; SUBCOMM-scoped
+        !! MPI_Allreduce / MPI_Barrier in self%get_state synchronise
+        !! error_code and ordering across nodes.
         class(wavefront_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
 
@@ -866,6 +871,7 @@ contains
 
     subroutine context_sync_device_state(self, error_code)
         !! Push host_state to the device buffer (host->device scatter).
+        !! Collective over SUBCOMM (see sync_host_state).
         class(wavefront_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
 
@@ -879,6 +885,7 @@ contains
 
     subroutine context_sync_host_observables(self, error_code)
         !! Refresh host_observables from the device buffer.
+        !! Collective over SUBCOMM (see sync_host_state).
         class(wavefront_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
 
@@ -892,6 +899,7 @@ contains
 
     subroutine context_sync_device_observables(self, error_code)
         !! Push host_observables to the device buffer.
+        !! Collective over SUBCOMM (see sync_host_state).
         class(wavefront_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
 
@@ -910,6 +918,8 @@ contains
         !! magnitude-squared loop.  Keeping the |psi|^2 reduction on
         !! host avoids tying up device memory for an extra real64
         !! buffer of length local_i.
+        !!
+        !! Collective over SUBCOMM (inherits from sync_host_state).
         class(wavefront_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
         integer(int64) :: i, ci_local_i

@@ -94,9 +94,12 @@ contains
     ! Destroy a context that still owns its internal buffers (i.e. no
     ! cw_attach_host_* call has rebound them to Python memory).  Used by
     ! the C extension's pre-attach failure-cleanup paths in py_setup.
-    ! Once Python-owned buffers are attached, callers must use
-    ! cw_destroy_external instead so detach_host_buffers nullifies the
-    ! Python pointers before ctx%destroy() runs.
+    !
+    ! Precondition: MUST NOT be called once the context's host mirrors
+    ! have been attached to Python-owned memory; on the MPI backend
+    ! host_state aliases %state, so a post-attach cw_destroy would
+    ! deallocate Python memory.  After cw_attach_host_*, callers must
+    ! use cw_destroy_external instead.
     ! ------------------------------------------------------------------
     subroutine cw_destroy(context_ptr_val) bind(C, name="cw_destroy")
         integer(c_int64_t), value, intent(in) :: context_ptr_val
@@ -190,9 +193,11 @@ contains
     ! cw_sync_host_observables / cw_sync_device_observables
     !
     ! Refresh the host or device side of the corresponding mirror.
-    ! No-ops on the MPI backend; collective gather/scatter on GPU
-    ! backends.  Each is collective over the active SUBCOMM on backends
-    ! where it does work.
+    ! Local no-ops on the MPI backend (the host mirror aliases the
+    ! authoritative buffer); collective dtoh/htod transfers on GPU
+    ! backends.  Callers MUST treat each entry point as collective
+    ! over the active SUBCOMM regardless of backend so the same call
+    ! site is correct everywhere.
     ! ------------------------------------------------------------------
     subroutine cw_sync_host_state(context_ptr_val, error_code) &
             bind(C, name="cw_sync_host_state")
@@ -252,6 +257,8 @@ contains
     ! Fill host_local_probabilities(1:local_i) with |psi(i)|^2.  The
     ! implementation first does sync_host_state (no-op on MPI, dtoh
     ! gather on wavefront) so the same host loop runs on every backend.
+    !
+    ! Collective over SUBCOMM (inherits from sync_host_state).
     ! ------------------------------------------------------------------
     subroutine cw_compute_local_probabilities(context_ptr_val, error_code) &
             bind(C, name="cw_compute_local_probabilities")

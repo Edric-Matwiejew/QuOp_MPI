@@ -483,40 +483,59 @@ contains
     end subroutine context_attach_host_local_probabilities
 
     subroutine context_sync_host_state(self, error_code)
-        !! No-op on MPI: host_state aliases the authoritative state.
+        !! Refresh the host mirror from the authoritative state buffer.
+        !!
+        !! Collective contract: callers MUST treat this as collective
+        !! over SUBCOMM.  On the MPI backend host_state aliases %state
+        !! so the operation is local; on GPU backends it stages a
+        !! device->host gather over NODECOMM with SUBCOMM-scoped error
+        !! synchronisation.  A SUBCOMM-collective caller (ansatz hot
+        !! path) is therefore correct on every backend.
         class(mpi_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
-        if (.false.) self%expectation_value = 0.0_real64  ! quiet unused-arg
+
         error_code = 0
+        ! self deliberately unused on MPI -- host_state aliases %state.
+        associate (unused_self => self); end associate
     end subroutine context_sync_host_state
 
     subroutine context_sync_device_state(self, error_code)
-        !! No-op on MPI: there is no device buffer.
+        !! Push the host mirror to the authoritative state buffer.
+        !! Collective contract: same as sync_host_state -- callers MUST
+        !! invoke from every SUBCOMM rank.  No-op on MPI; host->device
+        !! scatter on GPU backends.
         class(mpi_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
-        if (.false.) self%expectation_value = 0.0_real64
+
         error_code = 0
+        associate (unused_self => self); end associate
     end subroutine context_sync_device_state
 
     subroutine context_sync_host_observables(self, error_code)
-        !! No-op on MPI.
+        !! Refresh the host observables mirror from the authoritative
+        !! buffer.  Collective contract: SUBCOMM (see sync_host_state).
         class(mpi_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
-        if (.false.) self%expectation_value = 0.0_real64
+
         error_code = 0
+        associate (unused_self => self); end associate
     end subroutine context_sync_host_observables
 
     subroutine context_sync_device_observables(self, error_code)
-        !! No-op on MPI.
+        !! Push the host observables mirror to the authoritative buffer.
+        !! Collective contract: SUBCOMM (see sync_host_state).
         class(mpi_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
-        if (.false.) self%expectation_value = 0.0_real64
+
         error_code = 0
+        associate (unused_self => self); end associate
     end subroutine context_sync_device_observables
 
     subroutine context_compute_local_probabilities(self, error_code)
         !! Fill host_local_probabilities(1:local_i) with |state(i)|^2.
         !! Performs sync_host_state first (no-op on MPI, dtoh on GPU).
+        !!
+        !! Collective contract: SUBCOMM (inherits from sync_host_state).
         class(mpi_context), intent(inout) :: self
         integer(int32), intent(out) :: error_code
         integer(int64) :: i, ci_local_i

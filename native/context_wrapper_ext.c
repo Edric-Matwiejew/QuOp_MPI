@@ -240,6 +240,16 @@ py_setup(PyObject *module, PyObject *args)
     cw_attach_host_state(handle, PyArray_DATA(state), (int64_t)alloc_local);
     cw_attach_host_observables(handle, PyArray_DATA(observables), (int64_t)local_i);
 
+    /* Step 4b: the cached arrays handed back from get_state/get_observables
+     * are read-only by contract.  On wavefront the host mirror is just a
+     * snapshot of the device buffer (refreshed on every getter via the
+     * unconditional sync_host_* dtoh), so silent in-place writes through
+     * the Python view would be lost on the next sync.  Mutations must go
+     * through the property setters (which memcpy via PyArray_DATA and
+     * trigger the htod), so writes from the C side here are unaffected. */
+    PyArray_CLEARFLAGS(state,       NPY_ARRAY_WRITEABLE);
+    PyArray_CLEARFLAGS(observables, NPY_ARRAY_WRITEABLE);
+
     /* Step 5: assemble the Context PyObject. */
     Context *ctx = PyObject_New(Context, &ContextType);
     if (!ctx) {
@@ -458,6 +468,10 @@ py_get_local_probabilities(PyObject *module, PyObject *arg)
         if (!buf) return NULL;
         cw_attach_host_local_probabilities(ctx->handle, PyArray_DATA(buf),
                                             (int64_t)ctx->local_i);
+        /* Cached read-only view: Fortran rewrites the buffer in place on
+         * every call via the raw data pointer (unaffected by this flag);
+         * Python callers must not mutate the result. */
+        PyArray_CLEARFLAGS(buf, NPY_ARRAY_WRITEABLE);
         ctx->local_probabilities = buf;
     }
 

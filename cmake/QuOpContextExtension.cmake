@@ -105,6 +105,13 @@ function(add_context_extension)
     ${CTX_LIBRARIES}
     MPI::MPI_Fortran
   )
+  # Match the wavefront f2py targets: link CrayGTL when present so the
+  # extension resolves the Cray GPU Transport Layer symbols pulled in
+  # by hipfort/HIP on Cray-EX systems.  No-op when the imported target
+  # is absent (e.g. macOS / non-Cray builds).
+  if(TARGET CrayGTL::CrayGTL)
+    target_link_libraries(${_target} PRIVATE CrayGTL::CrayGTL)
+  endif()
   set_target_properties(${_target} PROPERTIES
     LINKER_LANGUAGE Fortran
   )
