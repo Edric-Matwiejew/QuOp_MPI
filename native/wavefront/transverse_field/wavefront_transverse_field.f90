@@ -569,16 +569,14 @@ contains
 
         ! Remote qubits: every pair crosses ranks; the entire local array
         ! exchanges with a single partner rank determined by the rank-bit
-        ! flipped at position (q - n_local_qubits).
+        ! flipped at position (q - n_local_qubits). exchange_remote_segment
+        ! only reads g0/g1/owner, so leave delta/exchange_key at default.
         do q = self%n_local_qubits, self%n_qubits - 1
             partner_rank = ieor(self%rank, ishft(1_int32, q - self%n_local_qubits))
 
             seg%g0 = self%lb_global
             seg%g1 = self%ub_global
-            seg%delta = ishft(1_int64, q)
-            if (iand(self%lb_global, seg%delta) /= 0_int64) seg%delta = -seg%delta
             seg%owner = partner_rank
-            seg%exchange_key = min(self%lb_global, ieor(self%lb_global, ishft(1_int64, q)))
 
             call wf_transverse_field_exchange_remote_segment( &
                 self, psi_dev, q, seg, coeff_diag, coeff_offdiag, error_code)
