@@ -844,11 +844,13 @@ class TestJacobianCorrectness:
             serial_result_fun = alg_serial.result.fun
             serial_result_x = alg_serial.result.x.copy()
 
-        # Broadcast so the comparison can run on the parallel optimiser leader,
-        # which may not coincide with world rank 0 (and is not guaranteed to be
-        # the serial optimiser leader either).
-        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=0)
-        serial_result_x = mpi_comm.bcast(serial_result_x, root=0)
+        # Broadcast from the rank that actually holds the serial result
+        # (the serial run's optimiser leader, which is not guaranteed to
+        # coincide with world rank 0) so the comparison can run on the
+        # parallel optimiser leader.
+        serial_root = alg_serial.subcomms.optimiser_leader_world_rank()
+        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=serial_root)
+        serial_result_x = mpi_comm.bcast(serial_result_x, root=serial_root)
 
         mpi_comm.barrier()
 
@@ -919,9 +921,11 @@ class TestJacobianCorrectness:
         if alg_serial.subcomms.is_optimiser_leader():
             serial_result_fun = alg_serial.result.fun
 
-        # Make the serial reference available on the parallel optimiser leader,
-        # which is not guaranteed to be world rank 0.
-        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=0)
+        # Broadcast from the serial optimiser leader (not guaranteed to
+        # be world rank 0) so the parallel optimiser leader -- also not
+        # guaranteed to be world rank 0 -- can compare against it.
+        serial_root = alg_serial.subcomms.optimiser_leader_world_rank()
+        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=serial_root)
 
         mpi_comm.barrier()
 
@@ -983,9 +987,11 @@ class TestJacobianCorrectness:
         if alg_serial.subcomms.is_optimiser_leader():
             serial_result_fun = alg_serial.result.fun
 
-        # Make the serial reference available on the parallel optimiser leader,
-        # which is not guaranteed to be world rank 0.
-        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=0)
+        # Broadcast from the serial optimiser leader (not guaranteed to
+        # be world rank 0) so the parallel optimiser leader -- also not
+        # guaranteed to be world rank 0 -- can compare against it.
+        serial_root = alg_serial.subcomms.optimiser_leader_world_rank()
+        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=serial_root)
 
         mpi_comm.barrier()
 
@@ -1044,10 +1050,13 @@ class TestJacobianCorrectness:
 
         parallel_gradient = alg._mpi_jacobian(test_params.copy())
         reference_gradient = approx_fprime(test_params, objective_for_approx_fprime, alg.h)
+        is_leader = alg.subcomms.is_optimiser_leader()
         alg.destroy()
 
-        if mpi_comm.Get_rank() == 0:
-            assert parallel_gradient is not None, "Rank 0 should receive the gathered jacobian"
+        if is_leader:
+            assert parallel_gradient is not None, (
+                "Optimiser leader should receive the gathered jacobian"
+            )
             assert np.all(np.isfinite(parallel_gradient)), parallel_gradient
             assert np.all(np.isfinite(reference_gradient)), reference_gradient
             np.testing.assert_allclose(

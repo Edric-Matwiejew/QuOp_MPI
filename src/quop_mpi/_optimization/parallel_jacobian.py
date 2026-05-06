@@ -223,8 +223,11 @@ class Jacobian:
         Returns
         -------
         ndarray[float64] or None
-            returns the objective function gradient to rank 0 in
-            :attr:`~quop_mpi.ansatz.MPI_COMM_WORLD`, None otherwise
+            The gathered objective-function gradient on the optimiser
+            leader (``JACCOMM`` rank 0, i.e.
+            :meth:`~quop_mpi._utils._comm_size.SubComms.optimiser_leader_world_rank`),
+            ``None`` on every other rank.  The optimiser leader is not
+            guaranteed to coincide with world rank 0.
         """
         # Guard: if JACCOMM is None, fall back to scipy's default jacobian
         if self.subcomms.JACCOMM is None:
