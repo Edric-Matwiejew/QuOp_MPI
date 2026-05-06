@@ -68,7 +68,13 @@ def _timed_barrier(comm, timeout_seconds: int = 30, label: str = "") -> None:
     """
     req = comm.Ibarrier()
     deadline = time.monotonic() + timeout_seconds
-    while not req.Test():
+    while True:
+        # ``Request.Test`` returned ``(bool, status)`` in mpi4py < 4.0
+        # but returns a plain ``bool`` from 4.0 onwards.  Accept either.
+        result = req.Test()
+        done = result[0] if isinstance(result, tuple) else result
+        if done:
+            break
         if time.monotonic() > deadline:
             rank = comm.Get_rank()
             _flush_process_output()

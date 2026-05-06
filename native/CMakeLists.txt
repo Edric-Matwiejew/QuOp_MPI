@@ -1,5 +1,6 @@
 include(QuOpFortranPreprocess)
 include(QuOpF2pyLibrary)
+include(QuOpContextExtension)
 
 # =============================================================================
 # Fortran module dependencies
@@ -9,7 +10,6 @@ include(QuOpF2pyLibrary)
 # Ninja and Make.
 
 set(PROPAGATOR_WRAPPER ${CMAKE_CURRENT_SOURCE_DIR}/propagator_wrapper.f90)
-set(CONTEXT_WRAPPER ${CMAKE_CURRENT_SOURCE_DIR}/context_wrapper.f90)
 
 add_subdirectory(comm_info)
 add_subdirectory(io)
@@ -25,7 +25,7 @@ else()
   # scikit-build-core can be asked to build an explicit target list from pyproject.toml. Provide no-op placeholders for
   # optional wavefront targets so MPI-only builds can reuse the same build.targets list.
   add_custom_target(wavefront_circulant_propagator_f2py)
-  add_custom_target(wavefront_context_f2py)
+  add_custom_target(wavefront_context_wrapper)
   add_custom_target(wavefront_diagonal_propagator_f2py)
   add_custom_target(wavefront_composite_propagator_f2py)
   add_custom_target(wavefront_momentum_propagator_f2py)

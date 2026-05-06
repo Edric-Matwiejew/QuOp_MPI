@@ -219,6 +219,8 @@ class TestSwarmExecution:
 
     def test_swarm_with_param_map(self, mpi_comm, swarm_system_size):
         """Verify swarm execute works with a parameter map."""
+        from mpi4py import MPI
+
         from quop_mpi.algorithm.combinatorial import QAOA
         from quop_mpi.meta import Swarm
 
@@ -260,7 +262,7 @@ class TestSwarmExecution:
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        def custom_obj(local_probabilities, local_observables, MPI_COMM):  # noqa: N803
+        def custom_obj(local_probabilities, local_observables, MPI_COMM):
             local_exp = np.sum(local_probabilities * local_observables)
             return MPI_COMM.allreduce(local_exp, op=MPI.SUM)
 
@@ -324,9 +326,7 @@ class TestSwarmMultipleSubcomms:
         gathered = mpi_comm.gather(local_result, root=0)
 
         if mpi_comm.Get_rank() == 0:
-            subcomm_results = {
-                idx: value for item in gathered if item is not None for idx, value in [item]
-            }
+            subcomm_results = {idx: value for item in gathered if item is not None for idx, value in [item]}
             assert len(subcomm_results) == 2
             reference = next(iter(subcomm_results.values()))
             for value in subcomm_results.values():

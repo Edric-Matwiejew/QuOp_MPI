@@ -38,13 +38,19 @@ endif()
 set(_depends mpi_context comm_info_mod ${_COMM_INFO_EXTRA})
 set(_definitions context=mpi_backend context_type=mpi_context)
 
-add_f2py_library(
-  MODULE_NAME mpi_context
-  DEPENDS "${_depends}" 
-  DEFINITIONS ${_definitions}
-  SRC ${CONTEXT_WRAPPER}
+# -----------------------------------------------------------------------------
+# Backend-agnostic CPython context-wrapper extension (zero-copy state buffer).
+#
+# The shim sources (native/context_wrapper_c.f90, native/context_wrapper_ext.c)
+# are shared with future backend builds; only the DEFINITIONS and DEPENDS
+# differ between backends.  See cmake/QuOpContextExtension.cmake.
+# -----------------------------------------------------------------------------
+add_context_extension(
+  NAME           context_wrapper
   INSTALL_SUBDIR mpi
-  )
+  DEFINITIONS    ${_definitions}
+  DEPENDS        ${_depends}
+)
 
 add_library(mpi_circulant_operators OBJECT mpi_circulant_operators.f90)
 target_link_libraries(mpi_circulant_operators PUBLIC MPI::MPI_Fortran)

@@ -1,7 +1,7 @@
 module wavefront
 
     use, intrinsic :: iso_fortran_env, only: real32, real64, real128, int32, int64, error_unit
-    use, intrinsic :: iso_c_binding, only: c_size_t
+    use, intrinsic :: iso_c_binding, only: c_size_t, c_ptr, c_f_pointer, c_int64_t, c_int
     use MPI
     use hipfort
     use hipfort_check
@@ -59,6 +59,15 @@ module wavefront
         complex(real64), dimension(:), pointer :: work => null()
         logical :: work_allocated = .false.
 
+        ! Host-side mirrors of the device state and observables.  These
+        ! point at NumPy-owned buffers attached via attach_host_*; the
+        ! sync_host_*/sync_device_* methods stage data between the host
+        ! mirrors and the authoritative device buffers using the
+        ! existing gpu_allgatherv_dtoh / gpu_allscatterv_htod paths.
+        complex(real64), dimension(:), pointer :: host_state => null()
+        real(real64), dimension(:), pointer :: host_observables => null()
+        real(real64), dimension(:), pointer :: host_local_probabilities => null()
+
         ! Pre-allocated device reduction buffer for get_expectation_value / get_state_norm.
         ! Sized to reduction_num_blocks doubles; allocated once at setup, freed at destroy.
         integer(int32) :: reduction_num_blocks = 1200
@@ -79,6 +88,16 @@ module wavefront
         procedure :: set_state => context_set_state
         procedure :: set_observables => context_set_observables
         procedure :: get_observables => context_get_observables
+
+        procedure :: attach_host_state => context_attach_host_state
+        procedure :: attach_host_observables => context_attach_host_observables
+        procedure :: attach_host_local_probabilities => context_attach_host_local_probabilities
+        procedure :: sync_host_state => context_sync_host_state
+        procedure :: sync_device_state => context_sync_device_state
+        procedure :: sync_host_observables => context_sync_host_observables
+        procedure :: sync_device_observables => context_sync_device_observables
+        procedure :: compute_local_probabilities => context_compute_local_probabilities
+        procedure :: detach_host_buffers => context_detach_host_buffers
 
     end type wavefront_context
 
@@ -353,6 +372,11 @@ contains
         end if
 
         self%device_ID = 0
+
+        ! Nullify host mirrors (Python-owned memory; nothing to free here).
+        self%host_state => null()
+        self%host_observables => null()
+        self%host_local_probabilities => null()
 
         ! Nullify layout pointer (not owned)
         self%ci => null()
@@ -782,6 +806,157 @@ contains
         call MPI_Barrier(ci_subcomm, ierr)
 
     end subroutine context_set_observables
+
+    ! ====================================================================
+    ! Host mirror / sync contract.
+    !
+    ! Wavefront keeps the authoritative state and observables in device
+    ! memory.  Python provides separately-allocated host buffers via
+    ! attach_host_*; sync_host_* refresh them with a device->host gather
+    ! using the same path as get_state / get_observables, and
+    ! sync_device_* push them back with the existing scatter path.
+    ! Local probabilities are computed host-side after a sync_host_state
+    ! to keep device memory free for the simulation buffers.
+    ! ====================================================================
+
+    subroutine context_attach_host_state(self, ptr, n)
+        !! Bind a Python-owned host buffer of length `n` as the host
+        !! mirror for the state.  Does NOT touch %state -- that is the
+        !! device pointer owned by hipMalloc/hipFree.
+        class(wavefront_context), intent(inout) :: self
+        type(c_ptr), value, intent(in) :: ptr
+        integer(c_int64_t), value, intent(in) :: n
+
+        self%host_state => null()
+        call c_f_pointer(ptr, self%host_state, [n])
+    end subroutine context_attach_host_state
+
+    subroutine context_attach_host_observables(self, ptr, n)
+        !! Mirror of attach_host_state for the observables buffer.
+        class(wavefront_context), intent(inout) :: self
+        type(c_ptr), value, intent(in) :: ptr
+        integer(c_int64_t), value, intent(in) :: n
+
+        self%host_observables => null()
+        call c_f_pointer(ptr, self%host_observables, [n])
+    end subroutine context_attach_host_observables
+
+    subroutine context_attach_host_local_probabilities(self, ptr, n)
+        !! Bind a Python-owned host buffer for local probabilities.
+        class(wavefront_context), intent(inout) :: self
+        type(c_ptr), value, intent(in) :: ptr
+        integer(c_int64_t), value, intent(in) :: n
+
+        self%host_local_probabilities => null()
+        call c_f_pointer(ptr, self%host_local_probabilities, [n])
+    end subroutine context_attach_host_local_probabilities
+
+    subroutine context_sync_host_state(self, error_code)
+        !! Refresh host_state from the device buffer (device->host gather).
+        class(wavefront_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+
+        error_code = 0
+        if (.not. associated(self%host_state)) then
+            error_code = 2
+            return
+        end if
+        call self%get_state(self%host_state, error_code)
+    end subroutine context_sync_host_state
+
+    subroutine context_sync_device_state(self, error_code)
+        !! Push host_state to the device buffer (host->device scatter).
+        class(wavefront_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+
+        error_code = 0
+        if (.not. associated(self%host_state)) then
+            error_code = 2
+            return
+        end if
+        call self%set_state(self%host_state, error_code)
+    end subroutine context_sync_device_state
+
+    subroutine context_sync_host_observables(self, error_code)
+        !! Refresh host_observables from the device buffer.
+        class(wavefront_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+
+        error_code = 0
+        if (.not. associated(self%host_observables)) then
+            error_code = 2
+            return
+        end if
+        call self%get_observables(self%host_observables, error_code)
+    end subroutine context_sync_host_observables
+
+    subroutine context_sync_device_observables(self, error_code)
+        !! Push host_observables to the device buffer.
+        class(wavefront_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+
+        error_code = 0
+        if (.not. associated(self%host_observables)) then
+            error_code = 2
+            return
+        end if
+        call self%set_observables(self%host_observables, error_code)
+    end subroutine context_sync_device_observables
+
+    subroutine context_compute_local_probabilities(self, error_code)
+        !! Fill host_local_probabilities(1:local_i) with |state(i)|^2.
+        !! Performs sync_host_state first to bring the device-owned
+        !! state into the host mirror, then runs the host-side
+        !! magnitude-squared loop.  Keeping the |psi|^2 reduction on
+        !! host avoids tying up device memory for an extra real64
+        !! buffer of length local_i.
+        class(wavefront_context), intent(inout) :: self
+        integer(int32), intent(out) :: error_code
+        integer(int64) :: i, ci_local_i
+
+        error_code = 0
+        call self%sync_host_state(error_code)
+        if (error_code /= 0) return
+
+        if (.not. associated(self%ci)) then
+            error_code = 1
+            return
+        end if
+        ci_local_i = self%ci%get_local_i()
+
+        if (.not. associated(self%host_local_probabilities)) then
+            error_code = 2
+            return
+        end if
+        if (.not. associated(self%host_state)) then
+            error_code = 2
+            return
+        end if
+        if (size(self%host_local_probabilities, kind=int64) < ci_local_i) then
+            error_code = 1
+            return
+        end if
+        if (size(self%host_state, kind=int64) < ci_local_i) then
+            error_code = 1
+            return
+        end if
+
+        do i = 1, ci_local_i
+            self%host_local_probabilities(i) = real(self%host_state(i) * &
+                                                    conjg(self%host_state(i)), real64)
+        end do
+    end subroutine context_compute_local_probabilities
+
+    subroutine context_detach_host_buffers(self)
+        !! Nullify host-mirror pointers to Python-owned memory before
+        !! destroy() runs.  The device %state and %observables are
+        !! left intact -- they will be hipFree'd by context_destroy.
+        class(wavefront_context), intent(inout) :: self
+
+        self%host_state => null()
+        self%host_observables => null()
+        self%host_local_probabilities => null()
+    end subroutine context_detach_host_buffers
 
     subroutine read_env_flag(name, default_value, value, env_is_valid, raw_value)
         character(len=*), intent(in) :: name

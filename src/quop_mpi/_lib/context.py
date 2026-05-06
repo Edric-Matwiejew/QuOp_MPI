@@ -42,8 +42,12 @@ class Context:
         """
         self.initialised = False
         self.ptr = 0
+        self._ctx = None  # Live Context PyObject from the native context wrapper.
 
-        self.context_wrapper = backend.context.context_wrapper
+        # The active backend exposes the CPython context-wrapper extension as
+        # ``backend.context_wrapper``.  See ``cmake/QuOpContextExtension.cmake``
+        # for the build-time wiring shared by all backends.
+        self.context_wrapper = backend.context_wrapper
 
         # Store reference to the layout so it stays alive while the context exists
         self._comm_info = comm_info
@@ -55,8 +59,12 @@ class Context:
         self.host_alloc_local = comm_info.alloc_local
         self.SUBCOMM = comm_info.subcomm
 
-        # f2py signature: setup(ci_ptr) -> (context_ptr, error_code)
-        self.ptr, error_code = self.context_wrapper.setup(comm_info.handle)
+        # setup(ci_ptr, alloc_local, local_i) -> (Context, error_code)
+        # The returned Context object owns the Python-side state and
+        # observables buffers (both attached to the Fortran context).
+        ctx_obj, error_code = self.context_wrapper.setup(
+            comm_info.handle, comm_info.alloc_local, comm_info.local_i
+        )
         self._raise_context_status(
             "initialize context",
             error_code,
@@ -67,7 +75,10 @@ class Context:
                 ),
             },
         )
-        self.ptr = int(self.ptr)
+        self._ctx = ctx_obj
+        # Keep the int64 Fortran handle accessible so legacy call sites that
+        # marshal it directly into propagator entry points keep working.
+        self.ptr = int(ctx_obj.handle)
 
         self.SUBCOMM.barrier()
         self.initialised = True
@@ -87,14 +98,18 @@ class Context:
         return False
 
     def destroy(self):
-        if self.initialised and self.ptr not in (None, 0):
-            self.context_wrapper.destroy(self.ptr)
+        if self.initialised and self._ctx is not None:
+            # destroy() releases the Fortran-side context and drops the
+            # Python state-buffer reference.  Equivalent to letting the
+            # Context object be garbage collected, but deterministic.
+            self.context_wrapper.destroy(self._ctx)
         # Mirror the Ansatz destroy path: once native cleanup completes,
         # release borrowed Python-side references to the negotiated layout
         # and communicator so a still-live Context object cannot outlive
         # the layout teardown with stale MPI handles attached.
         self.SUBCOMM = None
         self._comm_info = None
+        self._ctx = None
         self.ptr = 0
         self.initialised = False
 
@@ -103,7 +118,7 @@ class Context:
         """Collectively fetch the host observable buffer over ``SUBCOMM``."""
         if self.initialised:
             observables, error_code = self.context_wrapper.get_observables(
-                self.ptr, self.host_local_i
+                self._ctx
             )
             self._raise_context_status(
                 "fetch context observables",
@@ -134,7 +149,7 @@ class Context:
     def observables(self, obs):
         """Collectively update the host observable buffer over ``SUBCOMM``."""
         self._require_initialised("update context observables")
-        error_code = self.context_wrapper.set_observables(self.ptr, obs)
+        error_code = self.context_wrapper.set_observables(self._ctx, obs)
         self._raise_context_status(
             "update context observables",
             error_code,
@@ -160,9 +175,14 @@ class Context:
 
     @property
     def state(self):
-        """Collectively fetch the host state buffer over ``SUBCOMM``."""
+        """Collectively fetch the host state buffer over ``SUBCOMM``.
+
+        Returns a zero-copy NumPy view onto the cached state buffer owned
+        by the native ``Context`` object.  The view is invalidated when
+        ``destroy()`` is called.
+        """
         if self.initialised:
-            state, error_code = self.context_wrapper.get_state(self.ptr, self.host_alloc_local)
+            state, error_code = self.context_wrapper.get_state(self._ctx)
             self._raise_context_status(
                 "fetch context state",
                 error_code,
@@ -190,7 +210,7 @@ class Context:
     def state(self, state):
         """Collectively update the host state buffer over ``SUBCOMM``."""
         self._require_initialised("update context state")
-        error_code = self.context_wrapper.set_state(self.ptr, state)
+        error_code = self.context_wrapper.set_state(self._ctx, state)
         self._raise_context_status(
             "update context state",
             error_code,
@@ -212,9 +232,40 @@ class Context:
             },
         )
 
+    def get_local_probabilities(self):
+        """Return ``|state[:local_i]|**2`` from a context-owned host buffer.
+
+        The buffer is allocated lazily by the native extension on the
+        first call (length ``host_local_i``, dtype ``float64``) and
+        reused on every subsequent call: only the contents are
+        recomputed from the current state vector.  The buffer's
+        lifetime is bound to the Context — it is released by
+        :meth:`destroy`.
+
+        .. warning::
+
+            The returned array aliases the context-internal storage
+            and is **invalidated by any subsequent call to this
+            method** (the contents are recomputed in place from the
+            current state).  Callers that need to retain the
+            probabilities across a state mutation or another
+            ``get_local_probabilities`` call must take an explicit
+            ``.copy()``.  In-tree call sites
+            (:meth:`quop_mpi.ansatz.Ansatz.__get_expectation_value`,
+            :mod:`quop_mpi._sampling`) consume the array within a
+            single iteration and so do not need a copy.
+
+        Returns
+        -------
+        ndarray[float64]
+            Zero-copy view onto the cached buffer.
+        """
+        self._require_initialised("compute local probabilities")
+        return self.context_wrapper.get_local_probabilities(self._ctx)
+
     def get_expectation_value(self):
         if self.initialised:
-            expectation_value, error_code = self.context_wrapper.get_expectation_value(self.ptr)
+            expectation_value, error_code = self.context_wrapper.get_expectation_value(self._ctx)
             self._raise_context_status(
                 "fetch context expectation value",
                 error_code,
@@ -232,7 +283,7 @@ class Context:
 
     def get_state_norm(self):
         if self.initialised:
-            state_norm, error_code = self.context_wrapper.get_state_norm(self.ptr)
+            state_norm, error_code = self.context_wrapper.get_state_norm(self._ctx)
             self._raise_context_status(
                 "fetch context state norm",
                 error_code,
