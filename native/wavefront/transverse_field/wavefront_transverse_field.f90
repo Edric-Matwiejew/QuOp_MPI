@@ -32,15 +32,18 @@ module wavefront_transverse_field
 
         type(wavefront_context), pointer :: context => null()
 
-        ! Device buffers for MPI exchange
-        type(c_ptr) :: sendbuf_dev = c_null_ptr
+        ! Device buffer for MPI receive (writes from partner before fused
+        ! psi <- c*psi + a*recv update). Send-side reads psi directly.
         type(c_ptr) :: recvbuf_dev = c_null_ptr
 
-        ! Host staging buffers (non-GPU-aware MPI only)
-        complex(real64), pointer, dimension(:) :: sendbuf_host => null()
+        ! Host staging buffer for non-GPU-aware MPI receive only.
         complex(real64), pointer, dimension(:) :: recvbuf_host => null()
 
         integer(int64), allocatable, dimension(:) :: partition_table_0
+
+        ! Persistent remote-segment scratch (reused across propagate calls
+        ! to avoid per-call alloc/free in tf_grow_remote_arrays).
+        type(tf_segment_t), allocatable, dimension(:) :: remote_segs
 
         integer(int32) :: rank = 0
         integer(int32) :: comm_size = 0
@@ -51,6 +54,9 @@ module wavefront_transverse_field
         integer(int64) :: chunk_elems = 0_int64
         integer(int64) :: lb_global = 0_int64
         integer(int64) :: ub_global = -1_int64
+        ! True once partition_table_0/lb/ub have been built; allows gen_operator
+        ! to skip the DEVCOMM allgather on subsequent calls.
+        logical :: partition_built = .false.
 
     contains
 
@@ -68,23 +74,16 @@ contains
     subroutine wf_transverse_field_reset_state(self)
         class(transverse_field_propagator), intent(inout) :: self
 
-        if (c_associated(self%sendbuf_dev)) then
-            call hipCheck(hipFree(self%sendbuf_dev))
-            self%sendbuf_dev = c_null_ptr
-        end if
         if (c_associated(self%recvbuf_dev)) then
             call hipCheck(hipFree(self%recvbuf_dev))
             self%recvbuf_dev = c_null_ptr
-        end if
-        if (associated(self%sendbuf_host)) then
-            deallocate (self%sendbuf_host)
-            nullify (self%sendbuf_host)
         end if
         if (associated(self%recvbuf_host)) then
             deallocate (self%recvbuf_host)
             nullify (self%recvbuf_host)
         end if
         if (allocated(self%partition_table_0)) deallocate (self%partition_table_0)
+        if (allocated(self%remote_segs)) deallocate (self%remote_segs)
 
         self%context => null()
         self%rank = 0
@@ -96,6 +95,7 @@ contains
         self%chunk_elems = 0_int64
         self%lb_global = 0_int64
         self%ub_global = -1_int64
+        self%partition_built = .false.
     end subroutine wf_transverse_field_reset_state
 
     subroutine wf_transverse_field_sync_error(self, local_error, error_code)
@@ -241,14 +241,12 @@ contains
             self%chunk_elems = min(self%local_i, desired_chunk)
             if (self%chunk_elems < 1_int64) self%chunk_elems = 1_int64
 
-            ! Allocate device send/recv buffers
+            ! Allocate device receive buffer only; send side reads psi directly.
             buf_bytes = self%chunk_elems * COMPLEX128_BYTES
-            call hipCheck(hipMalloc(self%sendbuf_dev, buf_bytes))
             call hipCheck(hipMalloc(self%recvbuf_dev, buf_bytes))
 
 #ifndef QUOP_GPU_AWARE_MPI
-            ! Allocate host staging buffers for non-GPU-aware MPI
-            allocate (self%sendbuf_host(self%chunk_elems))
+            ! Host staging buffer for non-GPU-aware MPI receive.
             allocate (self%recvbuf_host(self%chunk_elems))
 #endif
         end if
@@ -296,8 +294,21 @@ contains
 
             self%local_i = device_local_i
 
-            call wf_transverse_field_build_device_partition_table( &
-                self, device_local_i, device_local_i_offset, local_error)
+            ! The DEVCOMM partition is fixed for the lifetime of the propagator;
+            ! only build it (with two MPI_Allgather calls) on first use.
+            if (.not. self%partition_built) then
+                call wf_transverse_field_build_device_partition_table( &
+                    self, device_local_i, device_local_i_offset, local_error)
+                if (local_error == 0) self%partition_built = .true.
+            end if
+
+            ! Pre-allocate persistent remote-segment scratch. The number of
+            ! remote segments per qubit is bounded by 2 * comm_size (at most
+            ! one per partner rank per half-band side at the local-range
+            ! boundary). Allocate that upper bound once.
+            if (local_error == 0 .and. .not. allocated(self%remote_segs)) then
+                allocate (self%remote_segs(max(2 * self%comm_size, 8)))
+            end if
         end if
 
         if (local_error == 0 .and. self%context%has_device .and. alloc_local < device_local_i) then
@@ -334,8 +345,9 @@ contains
         integer(int32) :: count, ierr
         integer(int32) :: ci_devcomm
         integer(int32) :: status(MPI_STATUS_SIZE)
+        type(c_ptr) :: psi_chunk_ptr
 #ifdef QUOP_GPU_AWARE_MPI
-        complex(real64), pointer :: sendbuf_fptr(:), recvbuf_fptr(:)
+        complex(real64), pointer :: psi_send_fptr(:), recvbuf_fptr(:)
 #endif
 
         error_code = 0
@@ -350,32 +362,36 @@ contains
 
             local0 = chunk_g0 - self%lb_global
 
-            ! Pack local data into send buffer on device
-            call launch_tf_pack_send_kernel(self%sendbuf_dev, psi_dev, local0, m, c_null_ptr)
+            ! Device pointer to psi[local0]; used as the send region directly.
+            psi_chunk_ptr = c_loc(self%context%state(local0 + 1_int64))
+
+            ! Ensure prior kernel writes to psi (local pairs and previous
+            ! remote-update for this q) are visible before MPI reads psi.
+            call hipCheck(hipDeviceSynchronize())
 
 #ifdef QUOP_GPU_AWARE_MPI
-            ! GPU-aware: synchronize then MPI directly on device buffers
-            call hipCheck(hipDeviceSynchronize())
-
-            call c_f_pointer(self%sendbuf_dev, sendbuf_fptr, [count])
+            call c_f_pointer(psi_chunk_ptr, psi_send_fptr, [count])
             call c_f_pointer(self%recvbuf_dev, recvbuf_fptr, [count])
 
-            call MPI_Sendrecv(sendbuf_fptr, count, MPI_DOUBLE_COMPLEX, seg%owner, q, &
+            call MPI_Sendrecv(psi_send_fptr, count, MPI_DOUBLE_COMPLEX, seg%owner, q, &
                               recvbuf_fptr, count, MPI_DOUBLE_COMPLEX, seg%owner, q, &
                               ci_devcomm, status, ierr)
-
-            call hipCheck(hipDeviceSynchronize())
 #else
-            ! Host-staged: D→H, MPI on host, H→D
-            call hipCheck(hipMemcpy(c_loc(self%sendbuf_host), self%sendbuf_dev, &
+            ! Host-staged: copy psi chunk D->H into recvbuf_host (used as the
+            ! send buffer), exchange in place, then copy received data H->D
+            ! into recvbuf_dev. hipMemcpy is synchronous, so no extra device
+            ! sync is needed before the remote-update kernel.
+            call hipCheck(hipMemcpy(c_loc(self%recvbuf_host), psi_chunk_ptr, &
                                     buf_bytes, hipMemcpyDeviceToHost))
 
-            call MPI_Sendrecv(self%sendbuf_host, count, MPI_DOUBLE_COMPLEX, seg%owner, q, &
-                              self%recvbuf_host, count, MPI_DOUBLE_COMPLEX, seg%owner, q, &
-                              ci_devcomm, status, ierr)
+            call MPI_Sendrecv_replace(self%recvbuf_host, count, MPI_DOUBLE_COMPLEX, &
+                                      seg%owner, q, seg%owner, q, &
+                                      ci_devcomm, status, ierr)
 
-            call hipCheck(hipMemcpy(self%recvbuf_dev, c_loc(self%recvbuf_host), &
-                                    buf_bytes, hipMemcpyHostToDevice))
+            if (ierr == MPI_SUCCESS) then
+                call hipCheck(hipMemcpy(self%recvbuf_dev, c_loc(self%recvbuf_host), &
+                                        buf_bytes, hipMemcpyHostToDevice))
+            end if
 #endif
 
             if (ierr /= MPI_SUCCESS) then
@@ -391,86 +407,184 @@ contains
         end do
     end subroutine wf_transverse_field_exchange_remote_segment
 
+    !> Walk a sub-range [g_start, g_end] of local memory at qubit q and emit
+    !> local-pair kernel launches for in-range local pairs and append remote
+    !> segments to remote_segs(1:n_remote). Used by the segmented-layout path
+    !> to handle the (small) partial blocks at the boundaries of local memory
+    !> while a single fused strided kernel handles the aligned bulk.
+    subroutine wf_transverse_field_walk_boundary(self, psi_dev, q, &
+                                                 g_start, g_end_arg, &
+                                                 coeff_diag, coeff_offdiag, &
+                                                 n_remote)
+        class(transverse_field_propagator), intent(inout) :: self
+        type(c_ptr), intent(in) :: psi_dev
+        integer(int32), intent(in) :: q
+        integer(int64), intent(in) :: g_start, g_end_arg
+        complex(real64), intent(in) :: coeff_diag, coeff_offdiag
+        integer(int32), intent(inout) :: n_remote
+
+        integer(int32) :: owner, remote_cap
+        integer(int64) :: bit_mask, g, gp, g_end, delta, seg_count
+        logical :: is_lower_half
+
+        if (g_end_arg < g_start) return
+
+        bit_mask = ishft(1_int64, q)
+
+        if (allocated(self%remote_segs)) then
+            remote_cap = int(size(self%remote_segs), int32)
+        else
+            remote_cap = 0
+        end if
+
+        g = g_start
+        do while (g <= g_end_arg)
+            gp = ieor(g, bit_mask)
+            owner = tf_find_owner_0(gp, self%partition_table_0)
+            is_lower_half = (iand(g, bit_mask) == 0_int64)
+            delta = tf_partner_delta(g, bit_mask)
+
+            if (owner == self%rank .and. .not. is_lower_half) then
+                ! Upper-half local pair already done from its lower-half
+                ! partner; advance past the rest of this half-band.
+                g_end = min(g_end_arg, tf_current_half_band_end(g, bit_mask))
+                g = g_end + 1_int64
+                cycle
+            end if
+
+            g_end = tf_max_segment_end( &
+                g, bit_mask, delta, owner, self%ub_global, self%partition_table_0)
+            if (g_end > g_end_arg) g_end = g_end_arg
+
+            if (owner == self%rank) then
+                seg_count = g_end - g + 1_int64
+                call launch_tf_local_pair_kernel(psi_dev, self%lb_global, g, seg_count, &
+                                                delta, coeff_diag, coeff_offdiag, c_null_ptr)
+            else
+                n_remote = n_remote + 1
+                if (n_remote > remote_cap) then
+                    call tf_grow_remote_arrays(self%remote_segs, remote_cap)
+                end if
+                self%remote_segs(n_remote)%g0 = g
+                self%remote_segs(n_remote)%g1 = g_end
+                self%remote_segs(n_remote)%delta = delta
+                self%remote_segs(n_remote)%owner = owner
+                self%remote_segs(n_remote)%exchange_key = min(g, gp)
+            end if
+
+            g = g_end + 1_int64
+        end do
+    end subroutine wf_transverse_field_walk_boundary
+
     subroutine wf_transverse_field_propagate_segmented(self, psi_dev, coeff_diag, coeff_offdiag, error_code)
         class(transverse_field_propagator), intent(inout) :: self
         type(c_ptr), intent(in) :: psi_dev
         complex(real64), intent(in) :: coeff_diag, coeff_offdiag
         integer(int32), intent(out) :: error_code
 
-        integer(int32) :: q, owner, n_remote, remote_idx, remote_cap
-        integer(int64) :: bit_mask, g, gp, g_end, delta, seg_count
-        logical :: is_lower_half
-        type(tf_segment_t), allocatable :: remote_segs(:)
+        integer(int32) :: q, n_remote, remote_idx
+        integer(int64) :: bit_mask, block_size, interior_start, interior_end_plus1
+        integer(int64) :: leading_end, trailing_start
+        integer(int64) :: n_interior_pairs, base_local
 
         error_code = 0
 
-        if (.not. allocated(self%partition_table_0)) then
+        if (.not. allocated(self%partition_table_0) .or. .not. allocated(self%remote_segs)) then
             error_code = 1
             return
         end if
 
-        remote_cap = 0
-
         do q = 0, self%n_qubits - 1
             bit_mask = ishft(1_int64, q)
+            block_size = ishft(1_int64, q + 1)
+
+            ! Aligned-bulk interior: [interior_start, interior_end_plus1 - 1]
+            ! is the largest range covering complete 2*bit_mask blocks fully
+            ! inside [lb_global, ub_global]. May be empty.
+            interior_start = ((self%lb_global + block_size - 1_int64) / block_size) * block_size
+            interior_end_plus1 = ((self%ub_global + 1_int64) / block_size) * block_size
 
             n_remote = 0
-            g = self%lb_global
 
-            do while (g <= self%ub_global)
-                gp = ieor(g, bit_mask)
-                owner = tf_find_owner_0(gp, self%partition_table_0)
-                is_lower_half = (iand(g, bit_mask) == 0_int64)
-                delta = tf_partner_delta(g, bit_mask)
+            ! Leading boundary: any local elements before the first aligned block.
+            if (interior_start > self%lb_global) then
+                leading_end = min(interior_start - 1_int64, self%ub_global)
+                call wf_transverse_field_walk_boundary( &
+                    self, psi_dev, q, self%lb_global, leading_end, &
+                    coeff_diag, coeff_offdiag, n_remote)
+            end if
 
-                if (owner == self%rank .and. .not. is_lower_half) then
-                    g_end = min(self%ub_global, tf_current_half_band_end(g, bit_mask))
-                    g = g_end + 1_int64
-                    cycle
-                end if
+            ! Bulk interior: every pair fully local; one fused launch.
+            if (interior_end_plus1 > interior_start) then
+                n_interior_pairs = (interior_end_plus1 - interior_start) / 2_int64
+                base_local = interior_start - self%lb_global
+                call launch_tf_local_pair_strided_kernel( &
+                    psi_dev, base_local, n_interior_pairs, bit_mask, &
+                    coeff_diag, coeff_offdiag, c_null_ptr)
+            end if
 
-                g_end = tf_max_segment_end( &
-                    g, bit_mask, delta, owner, self%ub_global, self%partition_table_0)
+            ! Trailing boundary: any local elements after the last aligned block.
+            trailing_start = max(interior_end_plus1, interior_start)
+            if (trailing_start <= self%ub_global) then
+                call wf_transverse_field_walk_boundary( &
+                    self, psi_dev, q, trailing_start, self%ub_global, &
+                    coeff_diag, coeff_offdiag, n_remote)
+            end if
 
-                if (owner == self%rank) then
-                    seg_count = g_end - g + 1_int64
-                    call launch_tf_local_pair_kernel(psi_dev, self%lb_global, g, seg_count, &
-                                                    delta, coeff_diag, coeff_offdiag, c_null_ptr)
-                else
-                    n_remote = n_remote + 1
-                    if (n_remote > remote_cap) then
-                        call tf_grow_remote_arrays(remote_segs, remote_cap)
-                    end if
-                    remote_segs(n_remote)%g0 = g
-                    remote_segs(n_remote)%g1 = g_end
-                    remote_segs(n_remote)%delta = delta
-                    remote_segs(n_remote)%owner = owner
-                    remote_segs(n_remote)%exchange_key = min(g, gp)
-                end if
-
-                g = g_end + 1_int64
-            end do
-
-            ! Synchronize after all local kernels before MPI
-            call hipCheck(hipDeviceSynchronize())
-
+            ! Remote exchanges (sorted by exchange_key for symmetric pairing).
             if (n_remote > 1) then
-                call tf_sort_remote_segments(remote_segs, n_remote)
+                call tf_sort_remote_segments(self%remote_segs, n_remote)
             end if
 
             do remote_idx = 1, n_remote
                 call wf_transverse_field_exchange_remote_segment( &
-                    self, psi_dev, q, remote_segs(remote_idx), &
+                    self, psi_dev, q, self%remote_segs(remote_idx), &
                     coeff_diag, coeff_offdiag, error_code)
-                if (error_code /= 0) then
-                    if (allocated(remote_segs)) deallocate (remote_segs)
-                    return
-                end if
+                if (error_code /= 0) return
             end do
         end do
-
-        if (allocated(remote_segs)) deallocate (remote_segs)
     end subroutine wf_transverse_field_propagate_segmented
+
+    subroutine wf_transverse_field_propagate_aligned(self, psi_dev, coeff_diag, coeff_offdiag, error_code)
+        class(transverse_field_propagator), intent(inout) :: self
+        type(c_ptr), intent(in) :: psi_dev
+        complex(real64), intent(in) :: coeff_diag, coeff_offdiag
+        integer(int32), intent(out) :: error_code
+
+        integer(int32) :: q, partner_rank
+        integer(int64) :: n_pairs
+        type(tf_segment_t) :: seg
+
+        error_code = 0
+
+        n_pairs = self%local_i / 2_int64
+
+        ! Local qubits: every pair is local, so a single fused kernel per qubit
+        ! covers local_i/2 butterflies. This avoids the O(local_i) launch storm
+        ! of the segmented path.
+        do q = 0, self%n_local_qubits - 1
+            call launch_tf_local_pair_qubit_kernel(psi_dev, n_pairs, q, &
+                                                   coeff_diag, coeff_offdiag, c_null_ptr)
+        end do
+
+        ! Remote qubits: every pair crosses ranks; the entire local array
+        ! exchanges with a single partner rank determined by the rank-bit
+        ! flipped at position (q - n_local_qubits).
+        do q = self%n_local_qubits, self%n_qubits - 1
+            partner_rank = ieor(self%rank, ishft(1_int32, q - self%n_local_qubits))
+
+            seg%g0 = self%lb_global
+            seg%g1 = self%ub_global
+            seg%delta = ishft(1_int64, q)
+            if (iand(self%lb_global, seg%delta) /= 0_int64) seg%delta = -seg%delta
+            seg%owner = partner_rank
+            seg%exchange_key = min(self%lb_global, ieor(self%lb_global, ishft(1_int64, q)))
+
+            call wf_transverse_field_exchange_remote_segment( &
+                self, psi_dev, q, seg, coeff_diag, coeff_offdiag, error_code)
+            if (error_code /= 0) return
+        end do
+    end subroutine wf_transverse_field_propagate_aligned
 
     subroutine wf_transverse_field_propagate(self, theta, error_code)
         class(transverse_field_propagator), intent(inout) :: self
@@ -496,7 +610,9 @@ contains
             coeff_offdiag = cmplx(0.0_real64, -sin(theta(1) / 2.0_real64), real64)
 
             select case (self%layout_mode)
-            case (TF_MODE_ALIGNED, TF_MODE_SEGMENTED)
+            case (TF_MODE_ALIGNED)
+                call wf_transverse_field_propagate_aligned(self, psi_dev, coeff_diag, coeff_offdiag, local_error)
+            case (TF_MODE_SEGMENTED)
                 call wf_transverse_field_propagate_segmented(self, psi_dev, coeff_diag, coeff_offdiag, local_error)
             case default
                 write (error_unit, '(A,I0)') &
