@@ -455,9 +455,10 @@ class TestParallelJacobianExecution:
 
         alg.execute()
 
-        # Only rank 0 in subcomm 0 should have result
-        if mpi_comm.Get_rank() == 0:
-            assert alg.result is not None, "Rank 0 should have optimization result"
+        # Only rank 0 in subcomm 0 holds the result; that rank is not
+        # guaranteed to be world rank 0 under parallel jacobian.
+        if alg.subcomms.is_optimiser_leader():
+            assert alg.result is not None, "Optimiser leader should have result"
             assert hasattr(alg.result, "fun"), "Result should have 'fun' attribute"
 
     def test_multiple_executions_with_parallel_jacobian(self, mpi_comm, jacobian_system_size):
@@ -684,7 +685,10 @@ class TestVarMapDistribution:
         # var_map is created during execute
         alg.execute()
 
-        if alg.subcomms.get_n_subcomms() > 1 and mpi_comm.Get_rank() == 0:
+        # var_map is only populated on ranks that belong to a SUBCOMM, so gate
+        # on the optimiser leader rather than world rank 0 (which under
+        # parallel jacobian may be excluded from any SUBCOMM).
+        if alg.subcomms.get_n_subcomms() > 1 and alg.subcomms.is_optimiser_leader():
             # Flatten var_map and check all parameters are covered
             all_params = []
             for mapping in alg.var_map:
@@ -836,9 +840,15 @@ class TestJacobianCorrectness:
 
         serial_result_fun = None
         serial_result_x = None
-        if mpi_comm.Get_rank() == 0:
+        if alg_serial.subcomms.is_optimiser_leader():
             serial_result_fun = alg_serial.result.fun
             serial_result_x = alg_serial.result.x.copy()
+
+        # Broadcast so the comparison can run on the parallel optimiser leader,
+        # which may not coincide with world rank 0 (and is not guaranteed to be
+        # the serial optimiser leader either).
+        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=0)
+        serial_result_x = mpi_comm.bcast(serial_result_x, root=0)
 
         mpi_comm.barrier()
 
@@ -853,7 +863,7 @@ class TestJacobianCorrectness:
         alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
         alg_parallel.execute(initial_params.copy())
 
-        if mpi_comm.Get_rank() == 0:
+        if alg_parallel.subcomms.is_optimiser_leader():
             parallel_result_fun = alg_parallel.result.fun
             parallel_result_x = alg_parallel.result.x
 
@@ -906,8 +916,12 @@ class TestJacobianCorrectness:
         alg_serial.execute(initial_params.copy())
 
         serial_result_fun = None
-        if mpi_comm.Get_rank() == 0:
+        if alg_serial.subcomms.is_optimiser_leader():
             serial_result_fun = alg_serial.result.fun
+
+        # Make the serial reference available on the parallel optimiser leader,
+        # which is not guaranteed to be world rank 0.
+        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=0)
 
         mpi_comm.barrier()
 
@@ -922,7 +936,7 @@ class TestJacobianCorrectness:
         alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev", "x"])
         alg_parallel.execute(initial_params.copy())
 
-        if mpi_comm.Get_rank() == 0:
+        if alg_parallel.subcomms.is_optimiser_leader():
             parallel_result_fun = alg_parallel.result.fun
 
             # Central difference should be more accurate, so results should be very close
@@ -966,8 +980,12 @@ class TestJacobianCorrectness:
         alg_serial.execute(initial_params.copy())
 
         serial_result_fun = None
-        if mpi_comm.Get_rank() == 0:
+        if alg_serial.subcomms.is_optimiser_leader():
             serial_result_fun = alg_serial.result.fun
+
+        # Make the serial reference available on the parallel optimiser leader,
+        # which is not guaranteed to be world rank 0.
+        serial_result_fun = mpi_comm.bcast(serial_result_fun, root=0)
 
         mpi_comm.barrier()
 
@@ -982,7 +1000,7 @@ class TestJacobianCorrectness:
         alg_parallel.set_optimiser("scipy", bfgs_options, ["fun", "nfev"])
         alg_parallel.execute(initial_params.copy())
 
-        if mpi_comm.Get_rank() == 0:
+        if alg_parallel.subcomms.is_optimiser_leader():
             parallel_result_fun = alg_parallel.result.fun
 
             # Both should find similar minima
@@ -1259,7 +1277,7 @@ class TestParallelJacobianWithQAOA:
 
         alg.execute()
 
-        if mpi_comm.Get_rank() == 0:
+        if alg.subcomms.is_optimiser_leader():
             assert alg.result is not None, "QAOA should have result"
             assert np.isfinite(alg.result.fun), "Result should be finite"
 
@@ -1390,7 +1408,7 @@ class TestParallelJacobianCombinations:
 
         mpi_comm.barrier()
 
-        if mpi_comm.Get_rank() == 0:
+        if alg.subcomms.is_optimiser_leader():
             assert alg.result is not None
             assert len(alg.result["x"]) == 2
             assert np.isfinite(alg.result["fun"])
@@ -1431,6 +1449,6 @@ class TestParallelJacobianCombinations:
 
         mpi_comm.barrier()
 
-        if mpi_comm.Get_rank() == 0:
+        if alg.subcomms.is_optimiser_leader():
             assert alg.result is not None
             assert alg.result["fun"] >= penalty

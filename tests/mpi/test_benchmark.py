@@ -1127,7 +1127,9 @@ class TestBenchmarkWithParallelJacobian:
                 verbose=False,
             )
 
-            if mpi_comm.Get_rank() == 0:
+            # Under parallel jacobian, the optimiser leader is not necessarily
+            # world rank 0 (see QuopMpiLayout.is_optimiser_leader).
+            if alg.subcomms.is_optimiser_leader():
                 assert alg.result is not None
 
     def test_parallel_jacobian_with_param_map_convergence(
@@ -1177,7 +1179,9 @@ class TestBenchmarkWithParallelJacobian:
                 verbose=False,
             )
 
-            if mpi_comm.Get_rank() == 0:
+            # Under parallel jacobian, the optimiser leader is not necessarily
+            # world rank 0 (see QuopMpiLayout.is_optimiser_leader).
+            if alg.subcomms.is_optimiser_leader():
                 assert alg.result is not None
                 final_objective = alg.result["fun"]
 
