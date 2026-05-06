@@ -5,8 +5,11 @@ These tests verify that the Ansatz.evolve_state() method correctly
 evolves the quantum state according to the variational parameters.
 
 Uses test oracles with analytically known outcomes to verify correctness.
-For Grover-like tests, QAOA is patched to use a complete graph mixer
-to enable direct comparison with QWOA using the same parameters.
+For Grover-like tests, ``QAOASparse`` is patched to use a complete-graph
+operator so the sparse propagator reduces to QWOA, enabling direct
+comparison with QWOA using the same parameters. (Circulant ``QAOA`` is
+exercised in the basic-functionality tests above and elsewhere; the
+correctness suite targets the sparse propagator path.)
 
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_state_evolution.py -v --with-mpi
 """
