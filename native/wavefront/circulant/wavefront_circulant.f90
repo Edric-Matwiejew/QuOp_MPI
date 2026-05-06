@@ -263,7 +263,6 @@ contains
 
         else
             ! General circulant case: convert to sparse and compute eigenvalues
-            ! First, find non-zero elements in the graph array
             nnz = 0
             do i = 1, array_sizes(1)
                 if (abs(graph_array(i)) > epsilon(1.0_real64)) then

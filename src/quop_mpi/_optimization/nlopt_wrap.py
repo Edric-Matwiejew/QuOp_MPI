@@ -95,19 +95,15 @@ def minimize(fun, x0, args=(), method=None, jac=None, bounds=None, constraints=N
     """
     if constraints is None:
         constraints = []
-    # Create NLopt object
     dim = len(x0)
 
-    # If not a NLopt algorithm enum
     if isinstance(method, str):
         method = get_nlopt_enum(method)
 
     opt = nlopt.opt(method, dim)
 
-    # Initialize path
     path = []
 
-    # Create NLOpt objective function
     obj_fun = make_nlopt_fun(fun, jac, args, path)
     opt.set_min_objective(obj_fun)
 

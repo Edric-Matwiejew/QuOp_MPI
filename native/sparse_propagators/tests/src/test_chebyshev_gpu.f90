@@ -325,11 +325,9 @@ contains
         call hipCheck(hipMalloc(B_dev, int(n_local * 16, c_size_t)))
         call hipCheck(hipMalloc(C_dev, int(n_local * 16, c_size_t)))
 
-        ! We need host arrays for initialization
         allocate (B(n_local), C(n_local))
         B = cmplx(1.0_real64, 0.0_real64, real64)
 
-        ! Copy B to device
         call hipCheck(hipMemcpy(B_dev, c_loc(B(1)), int(n_local * 16, c_size_t), hipMemcpyHostToDevice))
 
         ! Evolution time
