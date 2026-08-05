@@ -1,56 +1,75 @@
+name: Documentation
+
 on:
   push:
-    branches: [ main ]
-    
-jobs:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
-  build_docs_job:
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build documentation
     runs-on: ubuntu-latest
-    env:
-      GITHUB_PAT: ${{ secrets.GITHUB.TOKEN }}
-      
+
     steps:
-      - name: Checkout project.
-        uses: actions/checkout@v2.3.4
-          
-      - name: Set up Python.
-        uses: actions/setup-python@v2.2.1
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
         with:
-          python-version: '3.9'
-            
-      - name: Install documentation dependencies.
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install Graphviz
         run: |
-          python -m pip install "docutils<0.18 "
-          python -m pip install "numpy==1.21"
-          python -m pip install "scipy==1.9.1"
-          python -m pip install "sphinx==2.2.1"
-          python -m pip install "sphinxcontrib-bibtex==2.5.0"
-          python -m pip install "sphinx-rtd-theme==1.2.0"
-          python -m pip install "numpydoc==1.5.0"
-          sudo apt-get install -y graphviz
-            
-      - name: Make docs.
+          sudo apt-get update
+          sudo apt-get install --yes graphviz
+
+      - name: Install documentation dependencies
         run: |
-          cd docs
-          make html
-            
-      - name: Init new repo in dist folder and commit generated files.
+          python -m pip install --upgrade pip
+          python -m pip install --requirement docs/requirements.txt
+
+      - name: Build documentation
         run: |
-          cd ./docs/build/html
-          git init
-          touch .nojekyll
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add -A
-          git commit -m 'built html docs'
-             
-      - name: Force push to destination branch.
-        uses: ad-m/github-push-action@master
+          python -m sphinx \
+            --builder html \
+            docs/source \
+            docs/build/html
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: gh-pages
-          force: true
-          directory: ./docs/build/html
-            
-           
-    
+          path: docs/build/html
+
+  deploy:
+    name: Deploy documentation
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
