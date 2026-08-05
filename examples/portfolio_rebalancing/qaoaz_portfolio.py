@@ -1,9 +1,9 @@
 from numpy import sqrt
+from qaoaz_qualities import qaoaz_portfolio
+
 from quop_mpi import Ansatz, state
 from quop_mpi.propagator import diagonal, sparse
-from quop_mpi.toolkit import kron, kron_power
-from quop_mpi.toolkit import string, X, Y
-from qaoaz_qualities import qaoaz_portfolio
+from quop_mpi.toolkit import X, Y, kron, kron_power, string
 
 
 def parity_ring(i, j, n_qubits):
@@ -50,9 +50,9 @@ def parity_state(n_qubits, D):
 n_qubits = 8
 system_size = 2**n_qubits
 
-UQ = diagonal.unitary(diagonal.operator.observables)
+UQ = diagonal.Unitary(diagonal.operator.observables)
 
-UW = sparse.unitary(sparse.operator.serial, operator_dict={"args": [mixer, n_qubits]})
+UW = sparse.Unitary(sparse.operator.serial, operator_dict={"args": [mixer, n_qubits]})
 
 alg = Ansatz(system_size)
 alg.set_unitaries([UQ, UW])
@@ -60,6 +60,4 @@ alg.set_observables(qaoaz_portfolio)
 alg.set_initial_state(state.serial, {"args": [parity_state, n_qubits, 2]})
 alg.verbose_objective = True
 alg.set_log("qaoaz_portfolio_log", "qaoaz", action="w")
-alg.benchmark(
-    range(1, 6), 5, param_persist=True, filename="qaoaz_portfolio", save_action="w"
-)
+alg.benchmark(range(1, 6), 5, param_persist=True, filename="qaoaz_portfolio", save_action="w")

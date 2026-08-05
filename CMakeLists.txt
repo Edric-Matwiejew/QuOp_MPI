@@ -1,10 +1,23 @@
-cmake_minimum_required(VERSION 3.18...3.25)
+cmake_minimum_required(VERSION 3.25...4.0)
 
-project(QuOp_MPI,
-  VERSION 2.0.0
+project(
+  QuOp_MPI
+  VERSION 1.6.0
   DESCRIPTION "QuOp_MPI extension modules."
   LANGUAGES C Fortran
 )
+
+# Add cmake/ directory to module path for HipfortDependency and other modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Store FetchContent dependencies outside build/ so they persist across clean builds This avoids re-downloading and
+# re-building dependencies when doing `rm -rf build`
+if(NOT FETCHCONTENT_BASE_DIR)
+  set(FETCHCONTENT_BASE_DIR
+      "${CMAKE_CURRENT_SOURCE_DIR}/.deps"
+      CACHE PATH "Directory for FetchContent downloads and builds (persists across clean builds)"
+  )
+endif()
 
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   message(
@@ -13,156 +26,276 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   )
 endif()
 
-set(MPI_BACKEND $ENV{MPI_BACKEND} CACHE STRING "Build mpi backend.")
-set(GPU_AWARE_MPI $ENV{GPU_AWARE_MPI} CACHE STRING "Link against GPU-aware MPI.")
-set(MPI_GTL_LIB_DIR $ENV{MPI_GTL_LIB_DIR} CACHE STRING "Link path for GPU-aware MPI.")
-set(WAVEFRONT_BACKEND $ENV{WAVEFRONT_BACKEND} CACHE STRING "Build wavefront backend.")
-set(CXX $ENV{CXX} CACHE STRING "For the wavefront backend CXX must point to the HIP compiler.")
-set(ROCM_PATH $ENV{ROCM_PATH} CACHE STRING "Path to ROCM installation.")
-set(HIPFORT_PATH $ENV{HIPFORT_PATH} CACHE STRING "Path to hipfort installation.")    
-set(HIPFORT_COMPILER $ENV{HIPFORT_COMPILER} CACHE STRING "Fortran MPI compiler-wrapper for hipfort compiler-wrapper, e.g.: ftn (Cray), mpifort (other).")
-set(HIP_PLATFORM $ENV{HIP_PLATFORM} CACHE STRING "HIP platform, nvidia or amd.")
-set(CUDA_PATH $ENV{CUDA_PATH} CACHE STRING "Path to CUDA installation.")
-set(OFFLOAD_ARCH $ENV{OFFLOAD_ARCH} CACHE STRING "Target GPU architecture, e.g.: sm_86.")
-set(SHAFFT_PATH $ENV{SHAFFT_PATH} CACHE STRING "Path to HIFFTND installation.")
-set(BUILD $ENV{BUILD} CACHE STRING "Build type, RELEASE or DEBUG.")
+# =============================================================================
+# User-configurable options (visible in ccmake/cmake-gui)
+# =============================================================================
+# These are the primary configuration variables. They can be set via: 1. Command-line: cmake -DWAVEFRONT_BACKEND=ON ...
+# 2. Build frontend passthrough (e.g., CMAKE_ARGS from environments/install.sh) 3. Interactive tools: ccmake or cmake-gui
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
+# --- Backend Selection ---
+# MPI backend modules are always built; wavefront is optional.
+option(WAVEFRONT_BACKEND "Build the wavefront (GPU) backend for HIP/ROCm" OFF)
+option(GPU_AWARE_MPI "Enable GPU-aware MPI (requires compatible MPI library)" OFF)
 
-if(NOT DEFINED ENV{MPI_BACKEND})
-  set(MPI_BACKEND ON)
+# --- Build Configuration ---
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE
+      Release
+      CACHE STRING "Build type" FORCE
+  )
+endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# --- GPU/HIP Configuration (for WAVEFRONT_BACKEND) ---
+set(ROCM_PATH
+    ""
+    CACHE PATH "Path to ROCm installation (e.g., /opt/rocm)"
+)
+set(HIP_PLATFORM
+    "amd"
+    CACHE STRING "HIP platform: 'amd' for ROCm, 'nvidia' for CUDA"
+)
+set_property(CACHE HIP_PLATFORM PROPERTY STRINGS "amd" "nvidia")
+set(OFFLOAD_ARCH
+    ""
+    CACHE STRING "Target GPU architecture (e.g., gfx90a for MI250X, sm_80 for A100)"
+)
+set(GPU_TARGETS
+    ""
+    CACHE STRING "GPU architectures for hipfort (defaults to OFFLOAD_ARCH)"
+)
+set(CUDA_PATH
+    ""
+    CACHE PATH "Path to CUDA installation (only for HIP_PLATFORM=nvidia)"
+)
+
+# --- Optional Components (for WAVEFRONT_BACKEND) ---
+option(WITH_SHAFFT "Build with SHAFFT support for multivariable operations" OFF)
+
+# --- External Dependency Paths ---
+set(SHAFFT_PATH
+    ""
+    CACHE PATH "Path to SHAFFT installation"
+)
+set(HIPFORT_PATH
+    ""
+    CACHE PATH "Path to hipfort installation (auto-fetched if not found)"
+)
+set(HIPFORT_COMPILER
+    ""
+    CACHE STRING "Fortran compiler for hipfort build (e.g., ftn for Cray, mpifort for others)"
+)
+set(HIPFORT_VERIFY_MOD_COMPAT
+    ON
+    CACHE BOOL "Verify hipfort .mod compatibility with current compiler"
+)
+
+# =============================================================================
+# Apply defaults
+# =============================================================================
+
+# Set sensible defaults for paths if not specified
+if(NOT ROCM_PATH)
+  if(EXISTS "/opt/rocm")
+    set(ROCM_PATH
+        "/opt/rocm"
+        CACHE PATH "" FORCE
+    )
+  endif()
 endif()
 
-if(NOT DEFINED ENV{WAVEFRONT_BACKEND})
-  set(WAVEFRONT_BACKEND OFF)
+# Default hipfort hints to the cached FetchContent install so we avoid the system hipfort unless the user overrides.
+# These are only hints; the dependency module still auto-fetches if nothing usable is found.
+if(NOT hipfort_DIR)
+  set(hipfort_DIR
+      "${FETCHCONTENT_BASE_DIR}/hipfort-install/lib/cmake/hipfort"
+      CACHE PATH "Path to hipfort-config.cmake (defaults to cached .deps install)" FORCE
+  )
+endif()
+if(NOT HIPFORT_PATH)
+  set(HIPFORT_PATH
+      "${FETCHCONTENT_BASE_DIR}/hipfort-install"
+      CACHE PATH "Path to hipfort installation (auto-fetched if not found)" FORCE
+  )
+endif()
+if(NOT HIPFORT_COMPILER)
+  set(HIPFORT_COMPILER
+      "${CMAKE_Fortran_COMPILER}"
+      CACHE STRING "Fortran compiler for hipfort build (e.g., ftn for Cray, mpifort for others)" FORCE
+  )
 endif()
 
-if(NOT DEFINED ENV{GPU_AWARE_MPI})
-  set(GPU_AWARE_MPI OFF)
+# WITH_SHAFFT: default to ON when WAVEFRONT_BACKEND is ON
+if(WAVEFRONT_BACKEND)
+  if(NOT WITH_SHAFFT)
+    set(WITH_SHAFFT
+        ON
+        CACHE BOOL "" FORCE
+    )
+  endif()
 endif()
 
-if(NOT DEFINED ENV{BUILD})
-  set(BUILD RELEASE)
+if(NOT DEFINED CMAKE_VERBOSE_MAKEFILE)
+  set(CMAKE_VERBOSE_MAKEFILE OFF)
 endif()
-
-set(CMAKE_BUILD_TYPE ${BUILD})
 
 include(CMakePrintHelpers)
 
 find_package(MPI REQUIRED COMPONENTS Fortran)
-
-if(MPI_FOUND)
-    message(STATUS "Found MPI: ${MPI_Fortran_INCLUDE_DIRS}")
-    include_directories(${MPI_Fortran_INCLUDE_DIRS})
-    link_directories(${MPI_Fortran_LIBRARY_DIRS})
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${MPI_Fortran_COMPILE_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_Fortran_LINK_FLAGS}")
-else()
-    message(FATAL_ERROR "MPI not found! Ensure OpenMPI/MPICH is installed.")
-endif()
+message(STATUS "Found MPI: ${MPI_Fortran_COMPILER}")
 
 if(DEFINED ENV{CRAYPE_VERSION})
-  message("Cray PE detected")
+  message(STATUS "Cray PE detected")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch -std=gnu")
 endif()
 
-if(${GPU_AWARE_MPI})
-  link_directories(${MPI_GTL_LIB_DIR})
-  link_libraries(-lmpi_gtl_hsa) 
-  set(ENV{MPICH_GPU_SUPPORT_ENABLED} 1)
+if(GPU_AWARE_MPI)
+  if(DEFINED ENV{CRAYPE_VERSION})
+    find_package(CrayGTL)
+    if(CrayGTL_FOUND)
+      message(STATUS "Found Cray GTL: ${CrayGTL_LIBRARIES}")
+    else()
+      message(WARNING "GPU-aware MPI requested but Cray GTL not found")
+    endif()
+  endif()
+  # Intentionally global: every Fortran/C++ translation unit that touches MPI buffers must see this define, so
+  # target-scoping is not practical here.
+  add_compile_definitions(QUOP_GPU_AWARE_MPI)
+  message(STATUS "GPU-aware MPI enabled")
+  message(STATUS "NOTE: Set MPICH_GPU_SUPPORT_ENABLED=1 in your runtime environment for Cray MPICH")
+else()
+  message(STATUS "GPU-aware MPI disabled")
 endif()
 
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
 
-if(${WAVEFRONT_BACKEND})
-  message("-- Wavefront backend selected")
+if(WAVEFRONT_BACKEND)
+  message(STATUS "Configuring wavefront (GPU) backend")
+
+  if(HIP_PLATFORM STREQUAL "nvidia")
+    set(HIP_PLATFORM_DEFINE "-D__HIP_PLATFORM_NVIDIA__")
+  else()
+    set(HIP_PLATFORM_DEFINE "-D__HIP_PLATFORM_AMD__")
+  endif()
+
+  if(NOT CMAKE_CXX_COMPILER OR CMAKE_CXX_COMPILER STREQUAL "/usr/bin/c++")
+    if(EXISTS "${ROCM_PATH}/bin/hipcc")
+      set(CMAKE_CXX_COMPILER
+          "${ROCM_PATH}/bin/hipcc"
+          CACHE FILEPATH "C++ compiler" FORCE
+      )
+    else()
+      message(FATAL_ERROR "HIP compiler not found at ${ROCM_PATH}/bin/hipcc")
+    endif()
+  endif()
+
   set(CMAKE_CXX_COMPILER_WORKS 1)
   enable_language(CXX)
-  message(CHECK_START "Checking whether CXX compiler ${CMAKE_CXX_COMPILER} is configured for HIP.")
-  file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.cpp
+
+  message(CHECK_START "Checking HIP compiler")
+  file(
+    WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.cpp
     "#include <hip/hip_runtime.h>
     int main() {
     hipDeviceProp_t prop;
     hipGetDeviceProperties(&prop, 0);
     return 0;
-  }")
+  }"
+  )
   try_compile(
-    HIP_TEST 
-    ${CMAKE_BINARY_DIR} 
-    ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.cpp 
-    COMPILE_DEFINITIONS "-I${ROCM_PATH}/include"
-    OUTPUT_VARIABLE OUTPUT 
-    ) 
+    HIP_TEST ${CMAKE_BINARY_DIR}
+    ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.cpp
+    CMAKE_FLAGS "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+    COMPILE_DEFINITIONS "-I${ROCM_PATH}/include" "${HIP_PLATFORM_DEFINE}"
+    LINK_LIBRARIES "-L${ROCM_PATH}/lib" "-lamdhip64"
+    OUTPUT_VARIABLE OUTPUT
+  )
   if(NOT HIP_TEST)
     cmake_print_variables(OUTPUT)
     cmake_print_variables(CXX)
     cmake_print_variables(ROCM_PATH)
     cmake_print_variables(HIP_PLATFORM)
-    if(HIP_PLATFORM STREQUAL nvidia)
+    if(HIP_PLATFORM STREQUAL "nvidia")
       cmake_print_variables(CUDA_PATH)
     endif()
     message(FATAL_ERROR "HIP compiler ${CMAKE_CXX_COMPILER} is not configured correctly")
   endif()
   set(WAVEFRONT_CONFIGURED TRUE)
-  if(NOT DEFINED ENV{HIPFORT_PATH})
-    message(SEND_ERROR "HIPFORT_PATH environment variable not set")
+
+  # Find HIP runtime - provides hip::device target for linking
+  find_package(hip REQUIRED CONFIG PATHS "${ROCM_PATH}")
+  if(NOT TARGET hip::device)
+    message(FATAL_ERROR "hip::device target not found - check your ROCm/HIP installation")
+  endif()
+  message(STATUS "Found HIP: ${hip_DIR}")
+
+  # Use HipfortDependency.cmake to find or fetch hipfort automatically This will create the hipfort::hipfort target and
+  # set HIPFORT_PROVIDER
+  include(HipfortDependency)
+
+  # Check that hipfort was configured successfully
+  if(NOT TARGET hipfort::hipfort)
+    message(WARNING "hipfort::hipfort target not available - hipfort configuration failed")
     set(WAVEFRONT_CONFIGURED FALSE)
   endif()
-  if(NOT DEFINED ENV{SHAFFT_PATH})
-    message(SEND_ERROR "SHAFFT_PATH environment variable not set")
+  if(WITH_SHAFFT)
+    # Use SHAFFTDependency.cmake to find or fetch SHAFFT automatically. This will create shafft::shafftc++,
+    # shafft::shafftc, shafft::shafftf03 targets and set SHAFFT_PROVIDER, SHAFFT_VERSION, SHAFFT_INCLUDE_DIR.
+    include(SHAFFTDependency)
+
+    if(NOT TARGET shafft::shafftf03 OR NOT TARGET shafft::shafftc++)
+      message(WARNING "SHAFFT targets not available - SHAFFT configuration failed")
+      set(WAVEFRONT_CONFIGURED FALSE)
+    endif()
+  endif()
+
+  if(NOT OFFLOAD_ARCH)
+    message(WARNING "OFFLOAD_ARCH not set (use -DOFFLOAD_ARCH=..., e.g.: gfx90a)")
     set(WAVEFRONT_CONFIGURED FALSE)
   endif()
-  if(NOT DEFINED ENV{OFFLOAD_ARCH})
-      message(SEND_ERROR "TARGET_ARCH environment variable not set")
-    set(WAVEFRONT_CONFIGURED FALSE)
+  if(NOT WAVEFRONT_CONFIGURED)
+    message(FATAL_ERROR "Wavefront backend configuration failed")
   endif()
-  if(NOT ${WAVEFRONT_CONFIGURED})
-    message(FATAL_ERROR "\nWavefront backend not configured correctly")
+
+  # Platform-specific hipfort target - set once, used by all subdirectories.
+  if(HIP_PLATFORM STREQUAL "nvidia")
+    set(QUOP_HIPFORT_TARGET hipfort::hipfort-nvptx)
+  else()
+    set(QUOP_HIPFORT_TARGET hipfort::hipfort-amdgcn)
   endif()
-  set(HIPFORT_COMPILER ${CMAKE_Fortran_COMPILER})
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-include(FindPython3)
 find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development NumPy)
-
-# Ensure scikit-build modules
-if (NOT DEFINED SKBUILD)
-  # If skbuild is not the driver; include its utilities in CMAKE_MODULE_PATH
-  execute_process(
-    COMMAND "${Python3_EXECUTABLE}"
-    -c "import os, skbuild; print(os.path.dirname(skbuild.__file__))"
-    OUTPUT_VARIABLE SKBLD_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  list(APPEND CMAKE_MODULE_PATH "${SKBLD_DIR}/resources/cmake")
-  message(STATUS "Looking in ${SKBLD_DIR}/resources/cmake for CMake modules")
-  set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR})
-endif()
 
 # F2PY headers
 execute_process(
-  COMMAND "${Python3_EXECUTABLE}"
-  -c "import numpy.f2py; print(numpy.f2py.get_include())"
+  COMMAND "${Python3_EXECUTABLE}" -c "import numpy.f2py; print(numpy.f2py.get_include())"
   OUTPUT_VARIABLE F2PY_INCLUDE_DIR
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-if (CMAKE_BUILD_TYPE STREQUAL DEBUG)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -O0 -Wall")
-	set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ggdb -O0 -Wall -fbounds-check")
-elseif(CMAKE_BUILD_TYPE STREQUAL RELEASE)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-	set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native -fopenmp")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -O0 -Wall")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ggdb -O0 -Wall -fbounds-check")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -march=native -fopenmp")
 endif()
 
-add_subdirectory(src)
+add_subdirectory(native)
+
+option(BUILD_TESTING "Build native tests" OFF)
+if(BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(native/tests)
+endif()
 
 message("-------------------------------------------------")
 message("Build Configuration")
 message("")
-cmake_print_variables(BUILD)
+cmake_print_variables(CMAKE_BUILD_TYPE)
 cmake_print_variables(CMAKE_INSTALL_PREFIX)
 cmake_print_variables(CMAKE_Fortran_COMPILER)
 cmake_print_variables(Python3_EXECUTABLE)
@@ -170,33 +303,51 @@ cmake_print_variables(Python3_INCLUDE_DIRS)
 cmake_print_variables(Python3_NumPy_INCLUDE_DIRS)
 cmake_print_variables(F2PY_INCLUDE_DIR)
 cmake_print_variables(SKBUILD)
-cmake_print_variables(SKBLD_DIR)
 cmake_print_variables(HDF5_Fortran_INCLUDE_DIRS)
 cmake_print_variables(HDF5_Fortran_LIBRARIES)
 cmake_print_variables(GPU_AWARE_MPI)
-if(${GPU_AWARE_MPI})
+if(GPU_AWARE_MPI)
   cmake_print_variables(MPI_GTL_LIB_DIR)
 endif()
-cmake_print_variables(MPI_BACKEND)
-if(${MPI_BACKEND})
-  cmake_print_variables(FFTW_INCLUDE_DIRS)
-  cmake_print_variables(FFTW_DOUBLE_LIB)
-  cmake_print_variables(FFTW_DOUBLE_MPI_LIB)
-endif()
+cmake_print_variables(FFTW_INCLUDE_DIRS)
+cmake_print_variables(FFTW_DOUBLE_LIB)
+cmake_print_variables(FFTW_DOUBLE_MPI_LIB)
 cmake_print_variables(WAVEFRONT_BACKEND)
-if(${WAVEFRONT_BACKEND})
+if(WAVEFRONT_BACKEND)
+  cmake_print_variables(HIP_PLATFORM)
+  cmake_print_variables(CMAKE_CXX_COMPILER)
   cmake_print_variables(ROCM_PATH)
-  cmake_print_variables(HIPFORT_PATH)
+  cmake_print_variables(HIPFORT_PROVIDER)
+  cmake_print_variables(HIPFORT_VERSION)
   cmake_print_variables(HIPFORT_COMPILER)
   cmake_print_variables(OFFLOAD_ARCH)
-  cmake_print_variables(SHAFFT_PATH)
+  cmake_print_variables(WITH_SHAFFT)
+  if(WITH_SHAFFT)
+    cmake_print_variables(SHAFFT_PROVIDER)
+    cmake_print_variables(SHAFFT_VERSION)
+    cmake_print_variables(SHAFFT_PATH)
+  endif()
   if(HIP_PLATFORM STREQUAL nvidia)
     cmake_print_variables(CUDA_PATH)
   endif()
 endif()
+cmake_print_variables(BUILD_TESTING)
 message("")
 message("-------------------------------------------------")
 
-set(LD_LIBRARY_PATH ${ROCM_PATH}/lib:${CUDA_PATH}/lib64:${SHAFFT_PATH}/lib:$LD_LIBRARY_PATH)
-message("\nQuOp_MPI requires that the following environment variable be set:\n")
-message("LD_LIBRARY_PATH=${LD_LIBRARY_PATH}\n\n")
+# Build LD_LIBRARY_PATH with only the relevant paths (wavefront builds only).
+# Note: Linux wheel builds repair SHAFFT into the final artifact via auditwheel,
+# so it does not need to appear here at runtime.
+if(WAVEFRONT_BACKEND)
+  set(_ld_paths "")
+  if(ROCM_PATH)
+    list(APPEND _ld_paths "${ROCM_PATH}/lib")
+  endif()
+  if(HIP_PLATFORM STREQUAL nvidia AND CUDA_PATH)
+    list(APPEND _ld_paths "${CUDA_PATH}/lib64")
+  endif()
+  if(_ld_paths)
+    string(REPLACE ";" ":" LD_LIBRARY_PATH "${_ld_paths}")
+    message("\nSet LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:\$LD_LIBRARY_PATH\n")
+  endif()
+endif()

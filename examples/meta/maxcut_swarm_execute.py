@@ -1,9 +1,10 @@
-from mpi4py import MPI
-from quop_mpi.algorithm.combinatorial import qaoa, serial
-from quop_mpi.toolkit import I, Z
-from quop_mpi.meta import swarm
 import networkx as nx
 import numpy as np
+from mpi4py import MPI
+
+from quop_mpi.algorithm.combinatorial import QAOA, serial
+from quop_mpi.meta import Swarm
+from quop_mpi.toolkit import I, Z
 
 Graph = nx.circular_ladder_graph(4)
 
@@ -22,7 +23,7 @@ def maxcut_qualities(G):
     return -C.diagonal()
 
 
-s = swarm(1, 4, 2, MPI.COMM_WORLD, qaoa, system_size)
+s = Swarm(1, 4, 2, MPI.COMM_WORLD, QAOA, system_size)
 s.set_qualities(serial, {"args": [maxcut_qualities, G]})
 s.set_seed([[i] for i in range(s.subcomms.get_n_subcomms())])
 np.random.seed(0)

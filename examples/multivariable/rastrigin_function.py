@@ -1,5 +1,6 @@
 import numpy as np
-from quop_mpi.algorithm.multivariable import qmoa, cartesian, setup_cartesian
+
+from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
 
 def rastrigin(x):
@@ -11,7 +12,8 @@ bounds = dimension * [[-5.12, 5.12]]  # bounds of the discretised solution space
 Ns = dimension * [4]  # number of qubits per grid dimension
 
 deltas, mins = setup_cartesian(Ns, bounds)
-alg = qmoa(Ns)
+alg = QMOA(Ns)
+alg.verbose_objective = True
 alg.set_qualities(cartesian, {"args": [deltas, mins, rastrigin]})
 alg.set_log("multivariable", "rastrigin", "w")
 alg.set_depth(5)

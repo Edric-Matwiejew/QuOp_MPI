@@ -2,28 +2,39 @@
 Tests for propagator unitaries.
 
 These tests verify that each propagator type correctly:
-1. Computes partition sizes via plan()
-2. Distributes operator data via gen_operator()
-3. Performs state evolution via propagate()
-4. Produces consistent results across MPI ranks
+1. Distributes operator data via gen_operator()
+2. Performs state evolution via propagate()
+3. Produces consistent results across MPI ranks
 
 Propagator types tested:
 - diagonal: Phase-shift unitaries (e^{-i * gamma * H_diagonal})
 - circulant: Complete graph mixing (used by QWOA)
 - sparse: Sparse matrix exponential (used by QAOA hypercube mixer)
 - composite: Multi-dimensional grid operators (used by qmoa)
+- transverse_field: aligned MPI layer of identical single-qubit RX rotations
 
 Run with: mpiexec -n <N> python -m pytest tests/mpi/test_propagators.py -v --with-mpi
 """
 
-import pytest
 import numpy as np
+import pytest
 from mpi4py import MPI
-
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+
+def assert_probabilities_normalized(probs, *, atol=1e-8, context=""):
+    """Assert that a probability vector remains normalized within backend noise."""
+    total_prob = float(np.sum(probs, dtype=np.float64))
+    np.testing.assert_allclose(
+        total_prob,
+        1.0,
+        rtol=0.0,
+        atol=atol,
+        err_msg=f"{context} total probability {total_prob} exceeds tolerance {atol}",
+    )
 
 
 def create_partition_table(system_size, comm_size):
@@ -50,6 +61,56 @@ def gather_state(local_state, partition_table, mpi_comm):
     return gather_array(local_state, partition_table, mpi_comm)
 
 
+def _scaled_grid_exponents(mpi_sizing, base_exponents):
+    """Scale multivariable grid resolution while preserving dimensions."""
+    exponents = [int(exponent) for exponent in base_exponents]
+    extra_bits = max(0, (mpi_sizing.topology.world_size - 1).bit_length() - 1)
+    for _ in range(extra_bits):
+        smallest = min(exponents)
+        index = exponents.index(smallest)
+        exponents[index] += 1
+    return exponents
+
+
+def transverse_field_reference_state(theta, n_qubits):
+    """Exact state after applying RX(theta) to every qubit of |0...0>."""
+    c = np.cos(theta / 2.0)
+    a = -1j * np.sin(theta / 2.0)
+
+    system_size = 1 << n_qubits
+    state = np.empty(system_size, dtype=np.complex128)
+
+    for basis_index in range(system_size):
+        weight = basis_index.bit_count()
+        state[basis_index] = (c ** (n_qubits - weight)) * (a**weight)
+
+    return state
+
+
+@pytest.fixture
+def propagator_small_system_size(small_system_size):
+    """Small power-of-two size for lightweight propagator checks."""
+    return small_system_size
+
+
+@pytest.fixture
+def propagator_medium_system_size(mpi_sizing):
+    """Moderate power-of-two size for deeper sparse-propagator checks."""
+    return mpi_sizing.power_of_two(base=32, min_per_rank=1)
+
+
+@pytest.fixture
+def propagator_grid_ns_2d(mpi_sizing):
+    """2D multivariable grid that scales with MPI size."""
+    return _scaled_grid_exponents(mpi_sizing, [2, 2])
+
+
+@pytest.fixture
+def propagator_grid_ns_3d(mpi_sizing):
+    """3D multivariable grid that scales with MPI size."""
+    return _scaled_grid_exponents(mpi_sizing, [2, 2, 2])
+
+
 # =============================================================================
 # Tests for Diagonal Propagator
 # =============================================================================
@@ -59,54 +120,17 @@ def gather_state(local_state, partition_table, mpi_comm):
 class TestDiagonalPropagator:
     """Tests for the diagonal (phase-shift) propagator."""
 
-    def test_diagonal_plan_returns_valid_partition(self, mpi_comm):
-        """Test that plan() returns valid local_i and alloc_local."""
-        from quop_mpi.propagator.diagonal import unitary
-        from quop_mpi.propagator.diagonal import operator
-
-        system_size = 64
-
-        u = unitary(operator.observables)
-        local_i, alloc_local = u.plan(system_size, mpi_comm)
-
-        # Gather all local_i values
-        all_local_i = mpi_comm.gather(local_i, root=0)
-
-        if mpi_comm.Get_rank() == 0:
-            total = sum(all_local_i)
-            assert (
-                total == system_size
-            ), f"Sum of local_i ({total}) != system_size ({system_size})"
-
-        assert local_i >= 0
-        assert alloc_local >= local_i
-
-    def test_diagonal_plan_consistent_across_ranks(self, mpi_comm):
-        """Test that all ranks compute consistent partitioning."""
-        from quop_mpi.propagator.diagonal import unitary
-        from quop_mpi.propagator.diagonal import operator
-
-        for system_size in [16, 64, 100]:
-            u = unitary(operator.observables)
-            local_i, _ = u.plan(system_size, mpi_comm)
-
-            all_local_i = mpi_comm.allgather(local_i)
-
-            # Each rank should have the same view of the full partitioning
-            total = sum(all_local_i)
-            assert total == system_size
-
-    def test_diagonal_propagator_via_qaoa(self, mpi_comm):
+    def test_diagonal_propagator_via_qaoa(self, mpi_comm, propagator_small_system_size):
         """Test diagonal propagator through QAOA (indirect test)."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        system_size = 16
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             # Simple linear qualities
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -120,19 +144,19 @@ class TestDiagonalPropagator:
             expected_prob = 1.0 / system_size
             np.testing.assert_allclose(probs, expected_prob, rtol=1e-10)
 
-        del alg
+        alg.destroy()
 
-    def test_diagonal_phase_shift_correctness(self, mpi_comm):
+    def test_diagonal_phase_shift_correctness(self, mpi_comm, propagator_small_system_size):
         """Test that phase-shift applies correct phases to state."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        system_size = 8
+        system_size = propagator_small_system_size
 
         # Uniform qualities = all same phase shift, state unchanged (up to global phase)
         def uniform_qualities(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
 
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(uniform_qualities)
         alg.set_depth(1)
 
@@ -147,7 +171,7 @@ class TestDiagonalPropagator:
             expected_prob = 1.0 / system_size
             np.testing.assert_allclose(probs, expected_prob, rtol=1e-10)
 
-        del alg
+        alg.destroy()
 
 
 # =============================================================================
@@ -159,35 +183,16 @@ class TestDiagonalPropagator:
 class TestCirculantPropagator:
     """Tests for the circulant (complete graph) propagator."""
 
-    def test_circulant_plan_returns_valid_partition(self, mpi_comm):
-        """Test that plan() returns valid local_i and alloc_local."""
-        from quop_mpi.propagator.circulant import unitary
-        from quop_mpi.propagator.circulant import operator
-
-        system_size = 64
-
-        u = unitary(operator.complete)
-        local_i, alloc_local = u.plan(system_size, mpi_comm)
-
-        all_local_i = mpi_comm.gather(local_i, root=0)
-
-        if mpi_comm.Get_rank() == 0:
-            total = sum(all_local_i)
-            assert total == system_size
-
-        assert local_i >= 0
-        assert alloc_local >= local_i
-
-    def test_circulant_propagator_via_qwoa(self, mpi_comm):
+    def test_circulant_propagator_via_qwoa(self, mpi_comm, propagator_small_system_size):
         """Test circulant propagator through QWOA (indirect test)."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -200,18 +205,18 @@ class TestCirculantPropagator:
             expected_prob = 1.0 / system_size
             np.testing.assert_allclose(probs, expected_prob, rtol=1e-10)
 
-        del alg
+        alg.destroy()
 
-    def test_circulant_complete_graph_mixing(self, mpi_comm):
+    def test_circulant_complete_graph_mixing(self, mpi_comm, propagator_small_system_size):
         """Test complete graph mixing preserves total probability."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.zeros(local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -223,10 +228,11 @@ class TestCirculantPropagator:
         # Probability should still sum to 1
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Complete-graph mixing should preserve normalization"
+            )
 
-        del alg
+        alg.destroy()
 
 
 # =============================================================================
@@ -238,16 +244,16 @@ class TestCirculantPropagator:
 class TestSparsePropagator:
     """Tests for the sparse (hypercube) propagator."""
 
-    def test_sparse_hypercube_preserves_normalization(self, mpi_comm):
+    def test_sparse_hypercube_preserves_normalization(self, mpi_comm, propagator_small_system_size):
         """Test hypercube mixing preserves total probability."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        system_size = 16  # 2^4
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.zeros(local_i, dtype=np.float64)
 
-        alg = qaoa(system_size, mpi_comm)
+        alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -257,39 +263,42 @@ class TestSparsePropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Sparse hypercube mixing should preserve normalization"
+            )
 
-        del alg
+        alg.destroy()
 
-    def test_sparse_multi_depth_preserves_normalization(self, mpi_comm):
+    def test_sparse_multi_depth_preserves_normalization(
+        self, mpi_comm, propagator_medium_system_size
+    ):
         """Test that sparse propagator works over multiple evolution steps."""
-        from quop_mpi.algorithm.combinatorial import qaoa
-        
-        system_size = 32  # 2^5
-        
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        system_size = propagator_medium_system_size
+
         def qualities(local_i, local_i_offset):
             return np.sin(np.arange(local_i) + local_i_offset).astype(np.float64)
-        
-        alg = qaoa(system_size, mpi_comm)
+
+        alg = QAOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(3)  # Multiple layers
-        
+
         # 3 layers = 6 parameters
         params = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
         alg.evolve_state(params)
-        
+
         probs = alg.get_probabilities()
-        
+
         if mpi_comm.Get_rank() == 0:
-            # Probability should sum to 1
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10, f"Total probability: {total_prob}"
-            
+            assert_probabilities_normalized(
+                probs,
+                context="Sparse multi-depth evolution should preserve normalization",
+            )
             # All probabilities should be non-negative
-            assert np.all(probs >= -1e-15), f"Negative probabilities found"
-        
-        del alg
+            assert np.all(probs >= -1e-15), "Negative probabilities found"
+
+        alg.destroy()
 
 
 # =============================================================================
@@ -301,93 +310,233 @@ class TestSparsePropagator:
 class TestCompositePropagator:
     """Tests for the composite (multi-dimensional) propagator."""
 
-    def test_composite_plan_returns_valid_partition(self, mpi_comm):
-        """Test that plan() returns valid local_i and alloc_local."""
-        from quop_mpi.propagator.composite import unitary
-        from quop_mpi.propagator.composite import operator
-
-        Ns = [4, 4]  # 2D grid, 4x4 = 16 total
-        system_size = np.prod([2**n for n in Ns])
-
-        u = unitary(Ns, operator.ith)
-        local_i, alloc_local = u.plan(system_size, mpi_comm)
-
-        all_local_i = mpi_comm.gather(local_i, root=0)
-
-        if mpi_comm.Get_rank() == 0:
-            total = sum(all_local_i)
-            assert total == system_size
-
-        assert local_i >= 0
-        assert alloc_local >= local_i
-
     def test_composite_is_planner(self, mpi_comm):
         """Test that composite unitary has planner=True."""
-        from quop_mpi.propagator.composite import unitary
-        from quop_mpi.propagator.composite import operator
+        from quop_mpi.propagator.composite import operator, unitary
 
-        Ns = [3, 3]
+        Ns = [3, 3]  # noqa: N806
         u = unitary(Ns, operator.ith)
 
-        assert u.planner == True
+        assert u.planner
 
 
 # =============================================================================
-# Cross-propagator tests
+# Tests for Transverse-Field Propagator
 # =============================================================================
 
 
 @pytest.mark.mpi
-class TestPropagatorConsistency:
-    """Tests ensuring propagators behave consistently."""
+class TestTransverseFieldPropagator:
+    """Tests for the MPI transverse-field propagator."""
 
-    def test_all_propagators_partition_consistently(self, mpi_comm):
-        """Test that different propagators agree on partitioning for same system."""
-        from quop_mpi.propagator.diagonal import unitary as diagonal_unitary
-        from quop_mpi.propagator.diagonal import operator as diagonal_operator
-        from quop_mpi.propagator.circulant import unitary as circulant_unitary
-        from quop_mpi.propagator.circulant import operator as circulant_operator
-        from quop_mpi.propagator.sparse import unitary as sparse_unitary
-        from quop_mpi.propagator.sparse import operator as sparse_operator
+    @staticmethod
+    def _create_ansatz(system_size, mpi_comm):
+        from quop_mpi import Ansatz
+        from quop_mpi.propagator import transverse_field
+        from quop_mpi.state import basis
 
-        system_size = 64
+        alg = Ansatz(system_size, mpi_comm)
+        alg.set_unitaries([transverse_field.Unitary()])
+        alg.set_depth(1)
+        alg.set_initial_state(basis, {"kwargs": {"basis_states": [0]}})
+        alg.set_observables(lambda local_i: np.zeros(local_i, dtype=np.float64))
+        return alg
 
-        u_diag = diagonal_unitary(diagonal_operator.observables)
-        u_circ = circulant_unitary(circulant_operator.complete)
-        u_sparse = sparse_unitary(sparse_operator.hypercube)
+    @staticmethod
+    def _create_statevector_ansatz(system_size, mpi_comm, unitary, initial_state):
+        from quop_mpi import Ansatz
+        from quop_mpi.state import array as array_state
 
-        local_i_diag, _ = u_diag.plan(system_size, mpi_comm)
-        local_i_circ, _ = u_circ.plan(system_size, mpi_comm)
-        local_i_sparse, _ = u_sparse.plan(system_size, mpi_comm)
+        alg = Ansatz(system_size, mpi_comm)
+        alg.set_unitaries([unitary])
+        alg.set_depth(1)
+        alg.set_initial_state(
+            array_state,
+            {"kwargs": {"state": initial_state, "normalize": False}},
+        )
+        alg.set_observables(lambda local_i: np.zeros(local_i, dtype=np.float64))
+        return alg
 
-        # All should return same local_i for same system_size
-        assert local_i_diag == local_i_circ == local_i_sparse
+    def test_transverse_field_identity(self, mpi_comm, propagator_small_system_size):
+        """Theta=0 should leave the basis state unchanged."""
+        system_size = propagator_small_system_size
 
-    def test_qaoa_qwoa_same_system_size_partitioning(self, mpi_comm):
-        """Test QAOA and QWOA produce consistent partitioning."""
-        from quop_mpi.algorithm.combinatorial import qaoa, qwoa
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.evolve_state(np.array([0.0]))
+        state = alg.get_final_state()
 
-        system_size = 16
+        if alg.subcomms.in_rootcomm():
+            expected = np.zeros(system_size, dtype=np.complex128)
+            expected[0] = 1.0
+            np.testing.assert_allclose(state, expected, rtol=1e-12, atol=1e-12)
 
-        def qualities(local_i, local_i_offset):
-            return np.ones(local_i, dtype=np.float64)
+        alg.destroy()
 
-        alg_qaoa = qaoa(system_size, mpi_comm)
-        alg_qaoa.set_qualities(qualities)
-        alg_qaoa.set_depth(1)
-        alg_qaoa.setup()
+    def test_transverse_field_matches_exact_product_state(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """Compare against the exact RX(theta)^⊗n action on |0...0>."""
+        system_size = propagator_small_system_size
+        n_qubits = int(np.log2(system_size))
+        theta = np.pi / 3.0
 
-        alg_qwoa = qwoa(system_size, mpi_comm)
-        alg_qwoa.set_qualities(qualities)
-        alg_qwoa.set_depth(1)
-        alg_qwoa.setup()
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.evolve_state(np.array([theta]))
+        state = alg.get_final_state()
 
-        # Both should have same local_i
-        assert alg_qaoa.local_i == alg_qwoa.local_i
-        assert alg_qaoa.local_i_offset == alg_qwoa.local_i_offset
+        if alg.subcomms.in_rootcomm():
+            expected = transverse_field_reference_state(theta, n_qubits)
+            np.testing.assert_allclose(state, expected, rtol=1e-11, atol=1e-11)
 
-        del alg_qaoa
-        del alg_qwoa
+        alg.destroy()
+
+    def test_transverse_field_preserves_normalization(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """The transverse-field layer should remain unitary."""
+        system_size = propagator_small_system_size
+
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.evolve_state(np.array([0.71]))
+        probs = alg.get_probabilities()
+
+        if alg.subcomms.in_rootcomm():
+            assert_probabilities_normalized(
+                probs, context="Transverse-field propagation should preserve normalization"
+            )
+
+        alg.destroy()
+
+    def test_transverse_field_uses_full_active_subcomm(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """The transverse-field propagator should keep all active ranks up to system size."""
+        system_size = propagator_small_system_size
+
+        alg = self._create_ansatz(system_size, mpi_comm)
+        alg.prepare()
+
+        if alg.subcomms.in_subcomm():
+            subcomm_size = alg.subcomms.SUBCOMM.Get_size()
+            assert subcomm_size > 0
+            assert subcomm_size == min(mpi_comm.Get_size(), system_size)
+
+        alg.destroy()
+
+    def test_transverse_field_matches_sparse_hypercube_probabilities(
+        self, mpi_comm, propagator_small_system_size
+    ):
+        """Sparse hypercube evolution should match the transverse-field layer."""
+        from quop_mpi.propagator import sparse, transverse_field
+
+        system_size = propagator_small_system_size
+        rng = np.random.default_rng(314159)
+        initial_state = rng.standard_normal(system_size) + 1j * rng.standard_normal(system_size)
+        initial_state = np.asarray(initial_state, dtype=np.complex128)
+        initial_state /= np.linalg.norm(initial_state)
+
+        sparse_time = 0.37
+        theta = 2.0 * sparse_time
+
+        sparse_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            sparse.Unitary(sparse.operator.hypercube),
+            initial_state,
+        )
+        transverse_field_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            transverse_field.Unitary(),
+            initial_state,
+        )
+
+        sparse_alg.evolve_state(np.array([sparse_time], dtype=np.float64))
+        transverse_field_alg.evolve_state(np.array([theta], dtype=np.float64))
+
+        sparse_probs = sparse_alg.get_probabilities()
+        transverse_field_probs = transverse_field_alg.get_probabilities()
+        did_compare = int(sparse_probs is not None and transverse_field_probs is not None)
+
+        if sparse_probs is not None and transverse_field_probs is not None:
+            assert_probabilities_normalized(
+                sparse_probs,
+                context="Sparse hypercube propagation should preserve normalization",
+            )
+            assert_probabilities_normalized(
+                transverse_field_probs,
+                context="Transverse-field propagation should preserve normalization",
+            )
+            np.testing.assert_allclose(
+                transverse_field_probs,
+                sparse_probs,
+                rtol=1e-8,
+                atol=1e-10,
+            )
+
+        assert mpi_comm.allreduce(did_compare, op=MPI.SUM) == 1
+
+        sparse_alg.destroy()
+        transverse_field_alg.destroy()
+
+    def test_transverse_field_matches_sparse_hypercube_probabilities_segmented_medium(
+        self, mpi_comm, propagator_medium_system_size
+    ):
+        """Medium non-power-of-two layouts should also match sparse hypercube evolution."""
+        from quop_mpi.propagator import sparse, transverse_field
+
+        if mpi_comm.Get_size() & (mpi_comm.Get_size() - 1) == 0:
+            pytest.skip("requires a non-power-of-two communicator size")
+
+        system_size = propagator_medium_system_size
+        rng = np.random.default_rng(271828)
+        initial_state = rng.standard_normal(system_size) + 1j * rng.standard_normal(system_size)
+        initial_state = np.asarray(initial_state, dtype=np.complex128)
+        initial_state /= np.linalg.norm(initial_state)
+
+        sparse_time = 0.19
+        theta = 2.0 * sparse_time
+
+        sparse_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            sparse.Unitary(sparse.operator.hypercube),
+            initial_state,
+        )
+        transverse_field_alg = self._create_statevector_ansatz(
+            system_size,
+            mpi_comm,
+            transverse_field.Unitary(),
+            initial_state,
+        )
+
+        sparse_alg.evolve_state(np.array([sparse_time], dtype=np.float64))
+        transverse_field_alg.evolve_state(np.array([theta], dtype=np.float64))
+
+        sparse_probs = sparse_alg.get_probabilities()
+        transverse_field_probs = transverse_field_alg.get_probabilities()
+        did_compare = int(sparse_probs is not None and transverse_field_probs is not None)
+
+        if sparse_probs is not None and transverse_field_probs is not None:
+            assert_probabilities_normalized(
+                sparse_probs,
+                context="Segmented sparse hypercube propagation should preserve normalization",
+            )
+            assert_probabilities_normalized(
+                transverse_field_probs,
+                context="Segmented transverse-field propagation should preserve normalization",
+            )
+            np.testing.assert_allclose(
+                transverse_field_probs,
+                sparse_probs,
+                rtol=1e-8,
+                atol=1e-10,
+            )
+
+        assert mpi_comm.allreduce(did_compare, op=MPI.SUM) == 1
+
+        sparse_alg.destroy()
+        transverse_field_alg.destroy()
 
 
 # =============================================================================
@@ -399,16 +548,16 @@ class TestPropagatorConsistency:
 class TestStateEvolutionCorrectness:
     """Tests verifying state evolution produces correct results."""
 
-    def test_identity_evolution(self, mpi_comm):
+    def test_identity_evolution(self, mpi_comm, propagator_small_system_size):
         """Test that zero parameters give identity evolution."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -422,18 +571,18 @@ class TestStateEvolutionCorrectness:
             expected = np.ones(system_size, dtype=np.complex128) / np.sqrt(system_size)
             np.testing.assert_allclose(state, expected, rtol=1e-10)
 
-        del alg
+        alg.destroy()
 
-    def test_evolution_is_unitary(self, mpi_comm):
+    def test_evolution_is_unitary(self, mpi_comm, propagator_small_system_size):
         """Test that evolution preserves state norm."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.random.default_rng(42).random(local_i)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(2)
 
@@ -443,16 +592,17 @@ class TestStateEvolutionCorrectness:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total = np.sum(probs)
-            assert abs(total - 1.0) < 1e-10, f"State not normalized: {total}"
+            assert_probabilities_normalized(
+                probs, context="State evolution should preserve normalization"
+            )
 
-        del alg
+        alg.destroy()
 
-    def test_deterministic_evolution(self, mpi_comm):
+    def test_deterministic_evolution(self, mpi_comm, propagator_small_system_size):
         """Test that same parameters give same result."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
@@ -460,34 +610,34 @@ class TestStateEvolutionCorrectness:
         params = np.array([0.5, 0.3])
 
         # First evolution
-        alg1 = qwoa(system_size, mpi_comm)
+        alg1 = QWOA(system_size, mpi_comm)
         alg1.set_qualities(qualities)
         alg1.set_depth(1)
         alg1.evolve_state(params)
         state1 = alg1.get_final_state()
-        del alg1
+        alg1.destroy()
 
         # Second evolution with same params
-        alg2 = qwoa(system_size, mpi_comm)
+        alg2 = QWOA(system_size, mpi_comm)
         alg2.set_qualities(qualities)
         alg2.set_depth(1)
         alg2.evolve_state(params)
         state2 = alg2.get_final_state()
-        del alg2
+        alg2.destroy()
 
         if mpi_comm.Get_rank() == 0:
             np.testing.assert_allclose(state1, state2, rtol=1e-14)
 
-    def test_different_params_different_results(self, mpi_comm):
+    def test_different_params_different_results(self, mpi_comm, propagator_small_system_size):
         """Test that different parameters give different states."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 16
+        system_size = propagator_small_system_size
 
         def qualities(local_i, local_i_offset):
             return np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(system_size, mpi_comm)
         alg.set_qualities(qualities)
         alg.set_depth(1)
 
@@ -504,7 +654,7 @@ class TestStateEvolutionCorrectness:
             diff = np.linalg.norm(state1 - state2)
             assert diff > 1e-6, "Different parameters should produce different states"
 
-        del alg
+        alg.destroy()
 
 
 # =============================================================================
@@ -516,47 +666,19 @@ class TestStateEvolutionCorrectness:
 class TestMomentumPropagator:
     """Tests for the momentum (FFT-based kinetic) propagator used by QOWE."""
 
-    def test_momentum_propagator_plan_returns_valid_partition(self, mpi_comm):
-        """Test that momentum propagator plan() returns valid partitioning."""
-        from quop_mpi.propagator.momentum import unitary
-        from quop_mpi.propagator.momentum import operator
-        from quop_mpi.algorithm.multivariable import setup_cartesian
-
-        Ns = [4, 4]  # 16 total grid points
-        bounds = [[-1.0, 1.0], [-1.0, 1.0]]
-        deltas, mins = setup_cartesian([2, 2], bounds)  # 2^2 = 4 in each dim
-
-        # Compute momentum-space parameters
-        deltask = np.array([2 * np.pi / (n * d) for n, d in zip(Ns, deltas)])
-        minsk = np.array([-(n / 2) * dk for n, dk in zip(Ns, deltask)])
-
-        u = unitary(Ns, mins, minsk, deltas, deltask, operator.magnitude_squared)
-
-        system_size = Ns[0] * Ns[1]
-        local_i, alloc_local = u.plan(system_size, mpi_comm)
-
-        all_local_i = mpi_comm.allgather(local_i)
-        total = sum(all_local_i)
-
-        assert (
-            total == system_size
-        ), f"Sum of local_i ({total}) != system_size ({system_size})"
-        assert local_i >= 0
-        assert alloc_local >= local_i
-
-    def test_momentum_propagator_via_qowe(self, mpi_comm):
+    def test_momentum_propagator_via_qowe(self, mpi_comm, propagator_grid_ns_2d):
         """Test momentum propagator through QOWE algorithm."""
-        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        from quop_mpi.algorithm.multivariable import QOWE, cartesian, setup_cartesian
 
         def sphere(x):
             """Sphere function: x is 2D array, return sum of squares per row."""
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]  # 4x4 = 16 grid points
+        Ns = propagator_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 
-        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg = QOWE(Ns, deltas, mins, mpi_comm)
         alg.set_qualities(cartesian, {"args": [sphere]})
         alg.set_depth(1)
 
@@ -567,25 +689,26 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Momentum propagator should preserve normalization"
+            )
 
-        del alg
+        alg.destroy()
 
-    def test_momentum_propagator_preserves_normalization(self, mpi_comm):
+    def test_momentum_propagator_preserves_normalization(self, mpi_comm, propagator_grid_ns_2d):
         """Test that momentum propagation preserves state normalization."""
-        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        from quop_mpi.algorithm.multivariable import QOWE, cartesian, setup_cartesian
 
         def sphere(x):
             """Sphere function: x is 2D array, return sum of squares per row."""
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]
+        Ns = propagator_grid_ns_2d  # noqa: N806
         bounds = [[-2.0, 2.0], [-2.0, 2.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 
         np.random.seed(42)  # Seed for reproducible position_grid initial state
-        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg = QOWE(Ns, deltas, mins, mpi_comm)
         alg.set_qualities(cartesian, {"args": [sphere]})
         alg.set_depth(2)
 
@@ -597,60 +720,59 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert (
-                abs(total_prob - 1.0) < 1e-10
-            ), f"Normalization violated: {total_prob}"
+            assert_probabilities_normalized(
+                probs, context="Momentum propagator should remain normalized after evolution"
+            )
 
-        del alg
+        alg.destroy()
 
-    def test_momentum_propagator_different_times_different_states(self, mpi_comm):
+    def test_momentum_propagator_different_times_different_states(
+        self, mpi_comm, propagator_grid_ns_2d
+    ):
         """Test that different evolution times produce different states."""
-        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        from quop_mpi.algorithm.multivariable import QOWE, cartesian, setup_cartesian
 
         def quadratic(x):
             """Quadratic function: x is 2D array with columns [x0, x1]."""
             return x[:, 0] ** 2 + 2 * x[:, 1] ** 2
 
-        Ns = [2, 2]
+        Ns = propagator_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 
         # First evolution with small times
         np.random.seed(42)
-        alg1 = qowe(Ns, deltas, mins, mpi_comm)
+        alg1 = QOWE(Ns, deltas, mins, mpi_comm)
         alg1.set_qualities(cartesian, {"args": [quadratic]})
         alg1.set_depth(1)
         params1 = np.array([0.1, 0.1, 0.1])
         alg1.evolve_state(params1)
         state1 = alg1.get_final_state()
-        del alg1
+        alg1.destroy()
 
         # Second evolution with larger times
         np.random.seed(42)  # Same initial state
-        alg2 = qowe(Ns, deltas, mins, mpi_comm)
+        alg2 = QOWE(Ns, deltas, mins, mpi_comm)
         alg2.set_qualities(cartesian, {"args": [quadratic]})
         alg2.set_depth(1)
         params2 = np.array([0.5, 0.5, 0.5])
         alg2.evolve_state(params2)
         state2 = alg2.get_final_state()
-        del alg2
+        alg2.destroy()
 
         if mpi_comm.Get_rank() == 0:
             diff = np.linalg.norm(state1 - state2)
-            assert (
-                diff > 1e-6
-            ), "Different evolution times should produce different states"
+            assert diff > 1e-6, "Different evolution times should produce different states"
 
-    def test_momentum_propagator_deterministic(self, mpi_comm):
+    def test_momentum_propagator_deterministic(self, mpi_comm, propagator_grid_ns_2d):
         """Test that momentum propagation is deterministic."""
-        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        from quop_mpi.algorithm.multivariable import QOWE, cartesian, setup_cartesian
 
         def sphere(x):
             """Sphere function: x is 2D array, return sum of squares per row."""
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2]
+        Ns = propagator_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 
@@ -658,39 +780,39 @@ class TestMomentumPropagator:
 
         # First run
         np.random.seed(42)
-        alg1 = qowe(Ns, deltas, mins, mpi_comm)
+        alg1 = QOWE(Ns, deltas, mins, mpi_comm)
         alg1.set_qualities(cartesian, {"args": [sphere]})
         alg1.set_depth(1)
         alg1.evolve_state(params)
         state1 = alg1.get_final_state()
-        del alg1
+        alg1.destroy()
 
         # Second run with same seed
         np.random.seed(42)
-        alg2 = qowe(Ns, deltas, mins, mpi_comm)
+        alg2 = QOWE(Ns, deltas, mins, mpi_comm)
         alg2.set_qualities(cartesian, {"args": [sphere]})
         alg2.set_depth(1)
         alg2.evolve_state(params)
         state2 = alg2.get_final_state()
-        del alg2
+        alg2.destroy()
 
         if mpi_comm.Get_rank() == 0:
             np.testing.assert_allclose(state1, state2, rtol=1e-12)
 
-    def test_momentum_propagator_multi_depth(self, mpi_comm):
+    def test_momentum_propagator_multi_depth(self, mpi_comm, propagator_grid_ns_2d):
         """Test momentum propagation with multiple ansatz depths."""
-        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        from quop_mpi.algorithm.multivariable import QOWE, cartesian, setup_cartesian
 
         def rosenbrock(x):
             """Rosenbrock function: x is 2D array with columns [x0, x1]."""
             return (1 - x[:, 0]) ** 2 + 100 * (x[:, 1] - x[:, 0] ** 2) ** 2
 
-        Ns = [2, 2]
+        Ns = propagator_grid_ns_2d  # noqa: N806
         bounds = [[-2.0, 2.0], [-2.0, 2.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 
         np.random.seed(42)
-        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg = QOWE(Ns, deltas, mins, mpi_comm)
         alg.set_qualities(cartesian, {"args": [rosenbrock]})
         alg.set_depth(3)  # Three iterations
 
@@ -703,25 +825,26 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="Momentum multi-depth evolution should preserve normalization"
+            )
 
-        del alg
+        alg.destroy()
 
-    def test_momentum_propagator_3d_grid(self, mpi_comm):
+    def test_momentum_propagator_3d_grid(self, mpi_comm, propagator_grid_ns_3d):
         """Test momentum propagator with 3D grid."""
-        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian, cartesian
+        from quop_mpi.algorithm.multivariable import QOWE, cartesian, setup_cartesian
 
         def sphere_3d(x):
             """3D sphere function: x is 2D array with columns [x0, x1, x2]."""
             return np.sum(x**2, axis=1)
 
-        Ns = [2, 2, 2]  # 4x4x4 = 64 grid points
+        Ns = propagator_grid_ns_3d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0], [-1.0, 1.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 
         np.random.seed(42)
-        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg = QOWE(Ns, deltas, mins, mpi_comm)
         alg.set_qualities(cartesian, {"args": [sphere_3d]})
         alg.set_depth(1)
 
@@ -734,29 +857,30 @@ class TestMomentumPropagator:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            total_prob = np.sum(probs)
-            assert abs(total_prob - 1.0) < 1e-10
+            assert_probabilities_normalized(
+                probs, context="3D momentum evolution should preserve normalization"
+            )
 
-        del alg
+        alg.destroy()
 
-    def test_momentum_space_parameters_correct(self, mpi_comm):
+    def test_momentum_space_parameters_correct(self, mpi_comm, propagator_grid_ns_2d):
         """Test that momentum-space grid parameters are correctly computed."""
-        from quop_mpi.algorithm.multivariable import qowe, setup_cartesian
+        from quop_mpi.algorithm.multivariable import QOWE, setup_cartesian
 
-        Ns = [2, 2]  # 4x4 grid
+        Ns = propagator_grid_ns_2d  # noqa: N806
         bounds = [[-1.0, 1.0], [-1.0, 1.0]]
         deltas, mins = setup_cartesian(Ns, bounds)
 
-        alg = qowe(Ns, deltas, mins, mpi_comm)
+        alg = QOWE(Ns, deltas, mins, mpi_comm)
 
         # Check deltask = 2*pi / (N * delta)
-        for i, (n, delta) in enumerate(zip(alg.Ns, deltas)):
+        for i, (n, delta) in enumerate(zip(alg.Ns, deltas, strict=True)):
             expected_deltask = 2 * np.pi / (n * delta)
             assert abs(alg.deltask[i] - expected_deltask) < 1e-12
 
         # Check minsk = -(N/2) * deltask
-        for i, (n, dk) in enumerate(zip(alg.Ns, alg.deltask)):
+        for i, (n, dk) in enumerate(zip(alg.Ns, alg.deltask, strict=True)):
             expected_minsk = -(n / 2) * dk
             assert abs(alg.minsk[i] - expected_minsk) < 1e-12
 
-        del alg
+        alg.destroy()

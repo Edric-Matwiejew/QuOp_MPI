@@ -1,6 +1,6 @@
 [project]
 name = "QuOp_MPI"
-version = "1.5.0"
+version = "1.6.0"
 requires-python = "~=3.11"
 authors = [
     {name = "Edric Matwiejew", email = "edric_matwiejew@CSIRO.au"}
@@ -27,15 +27,42 @@ dependencies = [
 
 [build-system]
 requires = [
-    "build",
-    "wheel",
-    "ninja",
-    "scikit-build>=0.17",
-    "cmake>=3.18,<4",
+    "scikit-build-core>=0.10",
     "numpy>=2.0",
-    "setuptools>=42"
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.25,<4"
+ninja.version = ">=1.11"
+cmake.build-type = "Release"
+build.tool-args = ["-j1"]
+# scikit-build-core builds each listed target separately. The wavefront targets
+# are real extension targets when WAVEFRONT_BACKEND=ON and no-op placeholders
+# when WAVEFRONT_BACKEND=OFF, so direct `python -m build` remains backend-aware
+# via CMAKE_ARGS without requiring environments/install.sh.
+build.targets = [
+    "cartesian_f2py",
+    "comm_info_wrapper_f2py",
+    "csr_generators_f2py",
+    "parallel_io_f2py",
+    "mpi_circulant_propagator_f2py",
+    "mpi_diagonal_propagator_f2py",
+    "mpi_context_wrapper",
+    "mpi_composite_propagator_f2py",
+    "mpi_momentum_propagator_f2py",
+    "mpi_sparse_propagator_f2py",
+    "mpi_transverse_field_propagator_f2py",
+    "wavefront_circulant_propagator_f2py",
+    "wavefront_context_wrapper",
+    "wavefront_diagonal_propagator_f2py",
+    "wavefront_composite_propagator_f2py",
+    "wavefront_momentum_propagator_f2py",
+    "wavefront_sparse_propagator_f2py",
+    "wavefront_transverse_field_propagator_f2py",
+]
+wheel.packages = ["src/quop_mpi"]
 
 [project.optional-dependencies]
 examples = [
@@ -46,8 +73,10 @@ examples = [
     "jupyter-core>=4.6.3"
 ]
 docs = [
+    "sphinx==6.2.1",
     "numpydoc==1.5.0",
     "sphinxcontrib-bibtex==2.5.0",
+    "sphinxcontrib-mermaid",
     "sphinx-rtd-theme==1.2.0"
 ]
 test = [
@@ -60,6 +89,44 @@ nlopt = [
 dev = [
     "QuOp_MPI[examples,docs,test,nlopt]",
 ]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "ANN"]
+
+[tool.ruff.lint.per-file-ignores]
+# Doctest outputs contain long literal strings that cannot be wrapped.
+"src/quop_mpi/_optimization/nlopt_wrap.py" = ["E501"]
+# Internal modules, tests, and benchmarks are exempt from type-annotation rules.
+"src/quop_mpi/_lib/**" = ["ANN"]
+"src/quop_mpi/_utils/**" = ["ANN"]
+"src/quop_mpi/_optimization/**" = ["ANN"]
+"src/quop_mpi/_profile/**" = ["ANN"]
+"src/quop_mpi/_benchmark.py" = ["ANN"]
+"src/quop_mpi/_communicator.py" = ["ANN"]
+"src/quop_mpi/_logging.py" = ["ANN"]
+"src/quop_mpi/_sampling.py" = ["ANN"]
+"src/quop_mpi/_scope.py" = ["ANN"]
+"src/quop_mpi/config.py" = ["ANN"]
+"src/quop_mpi/observable/**" = ["ANN"]
+"src/quop_mpi/param/**" = ["ANN"]
+"src/quop_mpi/propagator/circulant/operator/**" = ["ANN"]
+"src/quop_mpi/propagator/composite/operator/**" = ["ANN"]
+"src/quop_mpi/propagator/diagonal/operator/**" = ["ANN"]
+"src/quop_mpi/propagator/momentum/operator/**" = ["ANN"]
+"src/quop_mpi/propagator/sparse/operator/**" = ["ANN"]
+"src/quop_mpi/state/**" = ["ANN"]
+"src/quop_mpi/toolkit/**" = ["ANN"]
+"src/quop_mpi/__init__.py" = ["ANN"]
+"tests/**" = ["ANN"]
+"benchmarks/**" = ["ANN"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

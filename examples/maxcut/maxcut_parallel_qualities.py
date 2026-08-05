@@ -1,6 +1,7 @@
-from quop_mpi.algorithm.combinatorial import qaoa
-import numpy as np
 import networkx as nx
+import numpy as np
+
+from quop_mpi.algorithm.combinatorial import QAOA
 
 Graph = nx.circular_ladder_graph(4)
 nodes = len(Graph.nodes)
@@ -24,7 +25,7 @@ def parallel_maxcut_qualities(local_i, local_i_offset, G):
     return qualities
 
 
-alg = qaoa(system_size)
+alg = QAOA(system_size)
 alg.set_qualities(parallel_maxcut_qualities, {"args": [G]})
 alg.set_depth(2)
 alg.execute()

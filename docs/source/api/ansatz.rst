@@ -4,7 +4,7 @@
 Ansatz
 ======
 
-The :class:`~quop_mpi.Ansatz` class is the core building block for quantum variational algorithms in QuOp_MPI. It manages the quantum state, unitary operators, observables, and classical optimization.
+The :class:`~quop_mpi.ansatz` class is the core building block for quantum variational algorithms in QuOp_MPI. It manages the quantum state, unitary operators, observables, and classical optimization.
 
 .. currentmodule:: quop_mpi
 
@@ -13,8 +13,8 @@ Class Reference
 
 .. autoclass:: Ansatz
    :members:
-   :exclude-members: setup, destroy
-   :show-inheritance:
+   :inherited-members:
+   :exclude-members: destroy
 
    .. rubric:: Key Methods
 

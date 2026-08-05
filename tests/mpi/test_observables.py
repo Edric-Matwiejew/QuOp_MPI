@@ -7,9 +7,31 @@ This module tests the observable configuration functionality including:
 - Interaction with state evolution and expectation values
 """
 
-import pytest
 import numpy as np
-from mpi4py import MPI
+import pytest
+
+
+def _scaled_power_of_two_system_size(mpi_sizing, base):
+    """Choose a power-of-two size that keeps observables tests multi-rank aware."""
+    return mpi_sizing.power_of_two(base=base, min_per_rank=1)
+
+
+def _marked_count_from_ratio(system_size, denominator, minimum):
+    """Preserve the original marked-state density while scaling the system."""
+    return max(minimum, system_size // denominator)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale the Grover-style observable tests while preserving M/N = 1/16."""
+    from tests.conftest import TestOracle
+
+    system_size = _scaled_power_of_two_system_size(mpi_sizing, base=64)
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
+        seed=42,
+    )
 
 
 @pytest.mark.mpi
@@ -18,9 +40,9 @@ class TestSetObservablesBasic:
 
     def test_set_observables_accepts_function(self, mpi_comm, simple_oracle):
         """Verify set_observables accepts a callable function."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        alg = qwoa(simple_oracle.system_size, mpi_comm)
+        alg = QWOA(simple_oracle.system_size, mpi_comm)
 
         # Use the oracle's qualities function
         qualities_fn = simple_oracle.qualities_function()
@@ -37,19 +59,17 @@ class TestSetObservablesBasic:
             assert expectation is not None
             assert np.isfinite(expectation)
 
-        del alg
+        alg.destroy()
 
-    def test_set_observables_custom_uniform(self, mpi_comm):
+    def test_set_observables_custom_uniform(self, mpi_comm, small_system_size):
         """Verify custom observable function with uniform values."""
-        from quop_mpi.algorithm.combinatorial import qwoa
-
-        system_size = 8
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         # Observable that returns all zeros (best case)
         def all_zero_observable(local_i, local_i_offset):
             return np.zeros(local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(small_system_size, mpi_comm)
         alg.set_qualities(all_zero_observable)
         alg.set_depth(1)
 
@@ -64,19 +84,17 @@ class TestSetObservablesBasic:
                 abs(expectation) < 1e-10
             ), f"Expected 0 for all-zero observable, got {expectation}"
 
-        del alg
+        alg.destroy()
 
-    def test_set_observables_custom_ones(self, mpi_comm):
+    def test_set_observables_custom_ones(self, mpi_comm, small_system_size):
         """Verify custom observable function with all ones."""
-        from quop_mpi.algorithm.combinatorial import qwoa
-
-        system_size = 8
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         # Observable that returns all ones
         def all_ones_observable(local_i, local_i_offset):
             return np.ones(local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(small_system_size, mpi_comm)
         alg.set_qualities(all_ones_observable)
         alg.set_depth(1)
 
@@ -91,24 +109,22 @@ class TestSetObservablesBasic:
                 abs(expectation - 1.0) < 1e-10
             ), f"Expected 1 for all-ones observable, got {expectation}"
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
 class TestSetObservablesWithFunctionDict:
     """Tests for set_observables with FunctionDict parameter binding."""
 
-    def test_observables_with_extra_args(self, mpi_comm):
+    def test_observables_with_extra_args(self, mpi_comm, small_system_size):
         """Verify observable function can receive extra arguments via FunctionDict."""
-        from quop_mpi.algorithm.combinatorial import qwoa
-
-        system_size = 8
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         # Observable that uses an extra parameter
         def scaled_observable(local_i, local_i_offset, scale_factor):
             return np.ones(local_i, dtype=np.float64) * scale_factor
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(small_system_size, mpi_comm)
         alg.set_qualities(scaled_observable, {"args": [0.5]})
         alg.set_depth(1)
 
@@ -123,13 +139,11 @@ class TestSetObservablesWithFunctionDict:
                 abs(expectation - 0.5) < 1e-10
             ), f"Expected 0.5 for scaled observable, got {expectation}"
 
-        del alg
+        alg.destroy()
 
-    def test_observables_with_kwargs(self, mpi_comm):
+    def test_observables_with_kwargs(self, mpi_comm, small_system_size):
         """Verify observable function receives keyword arguments."""
-        from quop_mpi.algorithm.combinatorial import qwoa
-
-        system_size = 8
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         def marked_observable(local_i, local_i_offset, marked_index=0):
             obs = np.ones(local_i, dtype=np.float64)
@@ -138,7 +152,7 @@ class TestSetObservablesWithFunctionDict:
                     obs[i] = 0.0
             return obs
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(small_system_size, mpi_comm)
         # Mark state 3 using kwargs
         alg.set_qualities(marked_observable, {"kwargs": {"marked_index": 3}})
         alg.set_depth(1)
@@ -148,13 +162,14 @@ class TestSetObservablesWithFunctionDict:
 
         expectation = alg.get_expectation_value()
         if mpi_comm.Get_rank() == 0:
-            # Should have lower expectation than uniform (7/8)
+            uniform_expectation = (small_system_size - 1) / small_system_size
+            # Should have lower expectation than the uniform marked-state baseline.
             assert expectation is not None
             assert (
-                expectation < 0.875
+                expectation < uniform_expectation
             ), f"Expected some probability on marked state, got {expectation}"
 
-        del alg
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -163,11 +178,11 @@ class TestSetObservablesAlgorithmicBehavior:
 
     def test_grover_oracle_concentrates_probability(self, mpi_comm, simple_oracle):
         """Verify Grover oracle leads to probability concentration on marked states."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
 
-        alg = qwoa(oracle.system_size, mpi_comm)
+        alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_depth(1)
 
@@ -186,13 +201,11 @@ class TestSetObservablesAlgorithmicBehavior:
                 f"Got {expectation}, uniform = {uniform_expectation}"
             )
 
-        del alg
+        alg.destroy()
 
-    def test_different_observables_different_expectations(self, mpi_comm):
+    def test_different_observables_different_expectations(self, mpi_comm, small_system_size):
         """Verify different observable functions produce different expectations."""
-        from quop_mpi.algorithm.combinatorial import qwoa
-
-        system_size = 8
+        from quop_mpi.algorithm.combinatorial import QWOA
 
         def obs_half(local_i, local_i_offset):
             return np.full(local_i, 0.5, dtype=np.float64)
@@ -203,14 +216,14 @@ class TestSetObservablesAlgorithmicBehavior:
         params = np.array([0.0, 0.0])  # No evolution
 
         # First observable: 0.5
-        alg1 = qwoa(system_size, mpi_comm)
+        alg1 = QWOA(small_system_size, mpi_comm)
         alg1.set_qualities(obs_half)
         alg1.set_depth(1)
         alg1.evolve_state(params)
         exp1 = alg1.get_expectation_value()
 
         # Second observable: 0.25
-        alg2 = qwoa(system_size, mpi_comm)
+        alg2 = QWOA(small_system_size, mpi_comm)
         alg2.set_qualities(obs_quarter)
         alg2.set_depth(1)
         alg2.evolve_state(params)
@@ -221,14 +234,13 @@ class TestSetObservablesAlgorithmicBehavior:
             assert abs(exp2 - 0.25) < 1e-10
             assert exp1 != exp2
 
-        del alg1
-        del alg2
+        alg1.destroy()
+        alg2.destroy()
 
-    def test_observables_change_triggers_recompute(self, mpi_comm):
+    def test_observables_change_triggers_recompute(self, mpi_comm, small_system_size):
         """Verify changing observables triggers recomputation."""
-        from quop_mpi.algorithm.combinatorial import qwoa
+        from quop_mpi.algorithm.combinatorial import QWOA
 
-        system_size = 8
         params = np.array([0.0, 0.0])
 
         def obs_a(local_i, local_i_offset):
@@ -237,7 +249,7 @@ class TestSetObservablesAlgorithmicBehavior:
         def obs_b(local_i, local_i_offset):
             return np.zeros(local_i, dtype=np.float64)
 
-        alg = qwoa(system_size, mpi_comm)
+        alg = QWOA(small_system_size, mpi_comm)
 
         # First evolution with ones
         alg.set_qualities(obs_a)
@@ -254,4 +266,4 @@ class TestSetObservablesAlgorithmicBehavior:
             assert abs(exp_a - 1.0) < 1e-10
             assert abs(exp_b - 0.0) < 1e-10
 
-        del alg
+        alg.destroy()

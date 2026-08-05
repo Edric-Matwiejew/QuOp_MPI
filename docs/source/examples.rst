@@ -7,7 +7,7 @@ The examples are sized so they may be easily run on most personal computers. The
 
 .. code-block:: bash
 
-    mpiexec -N 4 python3 maxcut.py
+    mpiexec -n 4 python3 maxcut.py
 
 .. _maxcut:
 
@@ -59,9 +59,9 @@ for the graph shown below. The predefined
 
    Graph for the example maxcut problem. The green and purple vertices indicate one of two optimal vertex partitioning.
 
-To generate the graph we use the external package ``networkx``.
-And define the cost function as a Python function using the ``I`` and
-``Z`` functions from :mod:`~quop_mpi.toolkit`, we are able to directly
+To generate the graph we use the external package ``networkx``
+and define the cost function as a Python function. Using the ``I`` and
+``Z`` functions from :mod:`~quop_mpi.toolkit`, we directly
 implement :eq:`maxcut-cost`.
 
 .. literalinclude:: ../../examples/maxcut/maxcut.py
@@ -72,31 +72,31 @@ and the :math:`\text{diag}(\hat{Q})` (the solution qualities) is defined via the
 :meth:`~quop_mpi.algorithm.combinatorial.qaoa.set_qualities` method. For this, we pass the :func:`~quop_mpi.observable.serial`
 :term:`Observables Function` along with a dictionary containing ``maxcut qualities`` and its
 arguments. The ``serial`` function assists with memory-efficient
-simulation, by calling the ``maxcut_qualities`` at the root MPI process and distributing its output over
-Ansatz subcommunicator. The ansatz depth (:math:`D=2`) is defined via the :meth:`~quop_mpi.Ansatz.set_depth`.
+simulation, by calling ``maxcut_qualities`` at the root MPI process and distributing its output over
+the Ansatz subcommunicator. The ansatz depth (:math:`D=2`) is defined via :meth:`~quop_mpi.ansatz.set_depth`.
 
 .. literalinclude:: ../../examples/maxcut/maxcut.py
     :lines: 21-23
 
 Now that the ``qaoa`` instance is fully specified, simulation of the
 algorithm (see :ref:`QAOA`) proceeds via
-:meth:`~quop_mpi.Ansatz.execute`. By calling ``execute`` without specifying
-the initial :term:`variational parameters` we use the default :term:`Parameter Functions <Parameter Function>`, which
-generates `variational parameters` from a uniform distribution over
-:math:`(0 \pi, 2\pi]`.
+:meth:`~quop_mpi.ansatz.execute`. By calling ``execute`` without specifying
+the initial :term:`variational parameters`, the default :term:`Parameter Functions <Parameter Function>` are used, which
+generate variational parameters from a uniform distribution over
+:math:`(0, 2\pi]`.
 
 .. literalinclude:: ../../examples/maxcut/maxcut.py
     :lines: 25
 
 Finally, the optimiser result is displayed using
-:meth:`~quop_mpi.Ansatz.print_result` and the simulation results are saved
-to the HDF5 file ‘maxcut.h5’ under the ‘depth 2’ group. 
+:meth:`~quop_mpi.ansatz.print_result` and the simulation results are saved
+to the HDF5 file 'maxcut.h5' under the 'depth 2' group. 
 
 .. literalinclude:: ../../examples/maxcut/maxcut.py
     :lines: 27-28
 
 The figure below illustrates the initial and final probability distributions with respect
-of the unique values of :math:`q_i` (see :term:`observables`). After application of the QAOA to the
+to the unique values of :math:`q_i` (see :term:`observables`). After application of the QAOA to the
 initial superposition, probability density is concentrated at
 high-quality solutions with the optimal solution
 having the highest probability of measurement.
@@ -119,7 +119,7 @@ QAOA (Parallel Observables Function)
 
 * *examples/maxcut/maxcut_parallel_qualities.py*
 
-Here we consider a variation on the above :ref:`QAOA example <QAOA-maxcut>`, whereby the cost function given in :eq:`maxcut-cost` is computed via a user-defined :term:`Operator Function`. As, previously we require :class:`~quop_mpi.algorithm.combinatorial.qaoa` and ``networkx``. We also import ``NumPy``. 
+Here we consider a variation on the above :ref:`QAOA example <QAOA-maxcut>`, whereby the cost function given in :eq:`maxcut-cost` is computed via a user-defined :term:`Operator Function`. As before, we require :class:`~quop_mpi.algorithm.combinatorial.qaoa` and ``networkx``. We also import NumPy. 
 
 .. literalinclude:: ../../examples/maxcut/maxcut_parallel_qualities.py
     :lines: 1-3
@@ -134,7 +134,7 @@ An :term:`Operator Function` is a :term:`QuOp Function` that returns the matrix 
 .. literalinclude:: ../../examples/maxcut/maxcut_parallel_qualities.py
     :lines: 11-24
 
-The ``parallel_maxcut_qualities`` :term:`Operator Function` is passed to :meth:`~quop_mpi.algorithm.combinatorial.qaoa.set_qualities`. As, its ``local_i`` and ``local_i_offset`` arguments are attributes of the :class:`~quop_mpi.Ansatz` class, they will be passed to the function automatically. The ``G`` argument is specified as an additional positional argument in a corresponding :term:`FunctionDict`.
+The ``parallel_maxcut_qualities`` :term:`Operator Function` is passed to :meth:`~quop_mpi.algorithm.combinatorial.qaoa.set_qualities`. As its ``local_i`` and ``local_i_offset`` arguments are attributes of the :class:`~quop_mpi.ansatz` class, they are passed to the function automatically. The ``G`` argument is specified as an additional positional argument in a corresponding :term:`FunctionDict`.
 
 .. literalinclude:: ../../examples/maxcut/maxcut_parallel_qualities.py
     :lines: 27-32
@@ -144,7 +144,7 @@ Ex-QAOA
 
 * *examples/maxcut_extended/maxcut_extended.py*
 
-Here we address the maxcut problem :ref:`defined above<QAOA-maxcut>` using the :ref:`Ex-QAOA`. We will do this by implementing a :term:`QVA` using the :class:`~quop_mpi.Ansatz` base-class, the :mod:`~quop_mpi.propagator.diagonal` ``propagator`` to simulate the action of the Ex-QAOA :term:`phase-shift unitary` and the :mod:`~quop_mpi.propagator.sparse` ``propagator`` to simulate the action of the Ex-QAOA :term:`mixing unitary`. The :func:`~quop_mpi.observable.serial` :term:`Observables Function` will be used to interface a serial Python function for computation of the maxcut solution qualities (see :eq:`maxcut-cost`) with QuOp_MPI. Finally, the :func:`~quop_mpi.toolkit.Z` Pauli operator function from :mod:`~quop_mpi.toolkit` will be used to efficiently implement the parameterised Ex-QAOA phase-shift unitary matrix :term:`operator`.
+Here we address the maxcut problem :ref:`defined above<QAOA-maxcut>` using the :ref:`Ex-QAOA`. We will do this by implementing a :term:`QVA` using the :class:`~quop_mpi.ansatz` base-class, the :mod:`~quop_mpi.propagator.diagonal` ``propagator`` to simulate the action of the Ex-QAOA :term:`phase-shift unitary` and the :mod:`~quop_mpi.propagator.sparse` ``propagator`` to simulate the action of the Ex-QAOA :term:`mixing unitary`. The :func:`~quop_mpi.observable.serial` :term:`Observables Function` will be used to interface a serial Python function for computation of the maxcut solution qualities (see :eq:`maxcut-cost`) with QuOp_MPI. Finally, the :func:`~quop_mpi.toolkit.Z` Pauli operator function from :mod:`~quop_mpi.toolkit` will be used to efficiently implement the parameterised Ex-QAOA phase-shift unitary matrix :term:`operator`.
 
 .. literalinclude:: ../../examples/maxcut_extended/maxcut_extended.py
     :lines: 1-7
@@ -154,13 +154,13 @@ The problem graph is generated using ``networkx`` and the :term:`system size` co
 .. literalinclude:: ../../examples/maxcut_extended/maxcut_extended.py
     :lines: 9-13
 
-The ``maxcut_terms`` functions implements the Ex-QAOA phase-shift unitary by returning a ``list`` of 1-D arrays that correspond to the non-identity Pauli terms in the problem cost function (see :eq:`maxcut-cost`). Each of these terms will associated with a phase-shift unitary with independently parameterised :term:`operator parameters <operator parameter>`. 
+The ``maxcut_terms`` function implements the Ex-QAOA phase-shift unitary by returning a ``list`` of 1-D arrays that correspond to the non-identity Pauli terms in the problem cost function (see :eq:`maxcut-cost`). Each of these terms is associated with a phase-shift unitary with independently parameterised :term:`operator parameters <operator parameter>`. 
 
 
 .. literalinclude:: ../../examples/maxcut_extended/maxcut_extended.py
     :lines: 14-22
 
-Due to these extra degrees of freedom, the the Ex-QAOA phase-shift unitary does not contain the :term:`QVA` :term:`observables`. As such, the observables are independently computed via the ``max_qualities`` function, which sums the output of ``maxcut_terms`` returning the solution qualities as defined in :eq:`maxcut-cost`.
+Due to these extra degrees of freedom, the Ex-QAOA phase-shift unitary does not contain the :term:`QVA` :term:`observables`. As such, the observables are independently computed via the ``max_qualities`` function, which sums the output of ``maxcut_terms`` returning the solution qualities as defined in :eq:`maxcut-cost`.
 
 .. literalinclude:: ../../examples/maxcut_extended/maxcut_extended.py
     :lines: 24-25
@@ -170,7 +170,7 @@ The phase-shift unitary ``UQ`` is implemented via an instance of the ``diagonal`
 .. literalinclude:: ../../examples/maxcut_extended/maxcut_extended.py
     :lines: 27-33
 
-The :term:`ansatz unitary` is specified by passing ``[UQ, UW]`` to :meth:`~quop_mpi.Ansatz.set_unitaries`. Simulation then proceeds with the default :class:`quop_mpi.Ansatz` :term:`initial state` (an equal superposition).
+The :term:`ansatz unitary` is specified by passing ``[UQ, UW]`` to :meth:`~quop_mpi.ansatz.set_unitaries`. Simulation then proceeds with the default :class:`quop_mpi.ansatz` :term:`initial state` (an equal superposition).
 
 .. literalinclude:: ../../examples/maxcut_extended/maxcut_extended.py
     :lines: 35-41
@@ -198,7 +198,7 @@ the following positions:
 #. Long position: buying and holding the asset with the expectation that
    it will rise in value.
 
-#. No position: taking neither the long or short position.
+#. No position: taking neither a long nor a short position.
 
 A quantum encoding of the possible solutions uses two qubits per asset.
 
@@ -234,7 +234,7 @@ maintain the relative net position with respect to a pre-existing
 portfolio :cite:p:`slate_quantum_2021`.
 
 In the following examples, we demonstrate the application of the QWOA
-and QAOAz to a small ‘portfolio’ consisting of four assets taken from
+and QAOAz to a small 'portfolio' consisting of four assets taken from
 the ASX 100, under the constraint :math:`{\chi_{\text{asset}}(s)} = 2`.
 
 
@@ -256,8 +256,8 @@ subspaces of :math:`\mathcal{H}` as shown below:
     :scale: 25%
     :align: center
 
-Where :math:`{\lvert l\rangle}` denotes a ‘long’ qubit,
-:math:`{\lvert s\rangle}` denotes a ‘short’ qubit, and the numbering
+Where :math:`{\lvert l\rangle}` denotes a 'long' qubit,
+:math:`{\lvert s\rangle}` denotes a 'short' qubit, and the numbering
 indicates the global index of each qubit.
 
 To constrain probability amplitude to :math:`{\mathcal{S}^\prime}`,
@@ -273,7 +273,7 @@ where :math:`A` is the desired value of
 superposition of states across all qubit subgraphs with a net parity of
 :math:`A`.
 
-Here we implement the QAOAz using the :class:`~quop_mpi.Ansatz` base-class, the :mod:`~quop_mpi.propagator.diagonal` ``propagator`` module, the :mod:`~quop_mpi.propagator.sparse` ``propagator`` module and the :mod:`quop_mpi.state` module. The :func:`~quop_mpi.toolkit.string`, :func:`~quop_mpi.toolkit.X`, :func:`~quop_mpi.toolkit.Y`, :func:`~quop_mpi.toolkit.kron` and :func:`~quop_mpi.toolkit.kron_power` functions from :mod:`~quop_mpi.toolkit` are imported to assist with the definition of functions for the QAOAz parity :term:`mixing unitary` and :term:`initial state` (see :eq:`qaoaz-portfolio-state`). The ``qaoaz_portfolio`` function imported from ``qaoaz_qualities`` (*examples/portfolio_rebalancing/qaoaz_qualities.py*) is an :term:`Operator Function` that computes the solution qualities based on adjusted close price historical data obtained from Yahoo Finance.
+Here we implement the QAOAz using the :class:`~quop_mpi.ansatz` base-class, the :mod:`~quop_mpi.propagator.diagonal` ``propagator`` module, the :mod:`~quop_mpi.propagator.sparse` ``propagator`` module and the :mod:`quop_mpi.state` module. The :func:`~quop_mpi.toolkit.string`, :func:`~quop_mpi.toolkit.X`, :func:`~quop_mpi.toolkit.Y`, :func:`~quop_mpi.toolkit.kron` and :func:`~quop_mpi.toolkit.kron_power` functions from :mod:`~quop_mpi.toolkit` are imported to assist with the definition of functions for the QAOAz parity :term:`mixing unitary` and :term:`initial state` (see :eq:`qaoaz-portfolio-state`). The ``qaoaz_portfolio`` function imported from ``qaoaz_qualities`` (*examples/portfolio_rebalancing/qaoaz_qualities.py*) is an :term:`Operator Function` that computes the solution qualities based on adjusted close price historical data obtained from Yahoo Finance.
 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qaoaz_portfolio.py
     :lines: 1-6
@@ -299,20 +299,20 @@ The :term:`phase-shift <phase-shift unitary>` and :term:`mixing <mixing unitary>
 .. literalinclude:: ../../examples/portfolio_rebalancing/qaoaz_portfolio.py
     :lines: 52-57
 
-The :term:`ansatz unitary` is defined by passing ``[UQ, UW]`` to :meth:`~quop_mpi.Ansatz.set_unitaries` and the :term:`observables` defined by passing the index of ``UQ`` to :meth:`~quop_mpi.Ansatz.set_observables`. 
+The :term:`ansatz unitary` is defined by passing ``[UQ, UW]`` to :meth:`~quop_mpi.ansatz.set_unitaries` and the :term:`observables` are set via the ``qaoaz_portfolio`` function passed to :meth:`~quop_mpi.ansatz.set_observables`.
 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qaoaz_portfolio.py
-    :lines: 59-62
+    :lines: 57-62
 
-To assist with the analysis of :term:`QVA` performance, QuOp supports the recording of important simulation metrics in a log file. The :meth:`~quop_mpi.Ansatz.set_log` method specifies the recording of the :term:`system size`, :term:`ansatz depth`, optimised :term:`objective function` value, norm of the :term:`final state`, in-program simulation time, MPI communicator size, number of :term:`objective function` evaluates and the success status of the classical :term:`optimiser` to :literal:`qaoaz_portfolio.csv` for each simulation instance.
-
-.. literalinclude:: ../../examples/portfolio_rebalancing/qaoaz_portfolio.py
-    :lines: 64
-
-We are often interested in evaluating the performance of a :term:`QVA` as a function of the :term:`ansatz depth`. For this, we use :meth:`~quop_mpi.Ansatz.benchmark`, which will carry out a sequence of calls to :meth:`~quop_mpi.Ansatz.execute` over the ansatz depth range of 1 to 5, with 3 repeats per ansatz depth.
+To assist with the analysis of :term:`QVA` performance, QuOp_MPI supports the recording of important simulation metrics in a log file. The :meth:`~quop_mpi.ansatz.set_log` method specifies the recording of the :term:`system size`, :term:`ansatz depth`, optimised :term:`objective function` value, norm of the :term:`final state`, in-program simulation time, MPI communicator size, number of :term:`objective function` evaluations and the success status of the classical :term:`optimiser` to :literal:`qaoaz_portfolio_log.csv` for each simulation instance.
 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qaoaz_portfolio.py
-    :lines: 65-67
+    :lines: 62
+
+We are often interested in evaluating the performance of a :term:`QVA` as a function of the :term:`ansatz depth`. For this, we use :meth:`~quop_mpi.ansatz.benchmark`, which carries out a sequence of calls to :meth:`~quop_mpi.ansatz.execute` over the ansatz depth range of 1 to 5, with 5 repeats per ansatz depth.
+
+.. literalinclude:: ../../examples/portfolio_rebalancing/qaoaz_portfolio.py
+    :lines: 62-63
 
 QWOA
 ^^^^
@@ -325,7 +325,7 @@ Here we address the portfolio optimisation problem using the :ref:`QWOA`, which 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qwoa_portfolio.py
     :lines: 1
 
-The :term:`system state` is set equal to the number of valid solutions (``31``),
+The :term:`system size` is set equal to the number of valid solutions (``30``),
 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qwoa_portfolio.py
     :lines: 3-4
@@ -333,16 +333,16 @@ The :term:`system state` is set equal to the number of valid solutions (``31``),
 and the :term:`observables` and :term:`phase-shift unitary` matrix :term:`operator` specified by :meth:`~quop_mpi.algorithm.combinatorial.qwoa.set_qualities`. The ``'args'`` and ``'kwargs'`` items in the corresponding :term:`FunctionDict` are passed to the pandas `read_csv` function. The solution quality values are retrieved from ``qwoa_qualities.csv``, which have been precomputed using *examples/portfolio_rebalancing/qwoa_qualities.py*.
 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qwoa_portfolio.py
-    :lines: 6-12
+    :lines: 6
 
-Finally, the logging of simulation data is specified and the algorithm simulated from :term:`ansatz depths <ansatz depth>` 1 to 6 with 3 repeats per ansatz depth using :meth:`~quop_mpi.Ansatz.benchmark`.
+Finally, the logging of simulation data is specified and the algorithm simulated from :term:`ansatz depths <ansatz depth>` 1 to 5 with 5 repeats per ansatz depth using :meth:`~quop_mpi.ansatz.benchmark`.
 
 .. literalinclude:: ../../examples/portfolio_rebalancing/qwoa_portfolio.py
-    :lines: 14-21
+    :lines: 8-10
 
 .. figure:: _static/portfolio_rebalancing.png
     :name: qaoaz-vs-qwoa
     :scale: 50%
     :align: center
 
-    Final objective function value achieved by the QAOAz and the QWOA for a portfolio optimisation problem with 4 assets from ansatz depths 1 to 5. each point depicts the average of three repeats.
+    Final objective function value achieved by the QAOAz and the QWOA for a portfolio optimisation problem with 4 assets from ansatz depths 1 to 5. Each point depicts the average of five repeats.

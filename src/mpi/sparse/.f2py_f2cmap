@@ -1,4 +1,0 @@
-dict(integer=dict(dp="long",sp="int"), real=dict(sp="float",dp="double"), complex=dict(sp="complex_float",dp="complex_double"))
-
-
-

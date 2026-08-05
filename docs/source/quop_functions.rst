@@ -4,14 +4,14 @@ QuOp Functions
 
     QuOp Function
         QuOp Functions define the various aspects of a :term:`QVA` or modify the
-        simulation methods used by the :class:`quop_mpi.Ansatz` class.
+        simulation methods used by the :class:`quop_mpi.ansatz` class.
 
         **Implementation patterns**
 
         QuOp Functions can be implemented in three ways, depending on whether
         you need to maintain state between calls:
 
-        1. **Plain function** — simplest, for stateless computations:
+        1. **Plain function** -- simplest, for stateless computations:
 
            .. code-block:: python
 
@@ -25,7 +25,7 @@ QuOp Functions
                # Usage:
                ansatz.set_observables(my_observables, {"args": [2.0]})
 
-        2. **Factory function (closure)** — for caching or stateful behaviour:
+        2. **Factory function (closure)** -- for caching or stateful behaviour:
 
            .. code-block:: python
 
@@ -46,7 +46,7 @@ QuOp Functions
                # Usage:
                ansatz.set_observables(create_my_function(scale=2.0), obs_dict)
 
-        3. **Callable class** — for complex state or easier debugging:
+        3. **Callable class** -- for complex state or easier debugging:
 
            .. code-block:: python
 
@@ -97,9 +97,9 @@ it will automatically receive the value of that attribute.
 **Binding sources differ by function type**:
 
 * **Ansatz-level functions** (Observables, Initial State, Parameter Map,
-  Sampling, Objective): bind to :class:`quop_mpi.Ansatz` attributes
+  Sampling, Objective): bind to :class:`quop_mpi.ansatz` attributes
 * **Unitary-level functions** (Operator, Parameter): bind to
-  :class:`quop_mpi.Unitary` attributes
+  :class:`quop_mpi.unitary` attributes
 
 Many attributes (like ``local_i``, ``system_size``, ``MPI_COMM``) are shared
 between Ansatz and Unitary, so they work in both contexts. However, some
@@ -135,10 +135,13 @@ Sampling, and Objective Functions:
      - Local partition of observable values (available after setup)
    * - ``ansatz_initial_state``
      - ndarray[complex128]
-     - Local partition of the initial state vector
+     - Local partition of the ansatz initial state vector
+   * - ``ansatz_final_state``
+     - ndarray[complex128]
+     - Local partition of the current/final ansatz state vector
    * - ``final_state``
      - ndarray[complex128]
-     - Local partition of current/final state vector
+     - Legacy alias for ``ansatz_final_state``
    * - ``variational_parameters``
      - ndarray[float64]
      - Current variational parameter values
@@ -183,9 +186,9 @@ This prevents accidental collisions with current or future Ansatz attributes
 
 **Runtime discovery**: Use these methods to discover available bindings:
 
-* ``ansatz.print_bindable_attributes()`` — show Ansatz attributes only
-* ``ansatz.print_all_bindable_attributes()`` — show Ansatz AND all Unitary attributes
-* ``unitary.print_bindable_attributes()`` — show attributes for a specific Unitary
+* ``ansatz.print_bindable_attributes()`` -- show Ansatz attributes only
+* ``ansatz.print_all_bindable_attributes()`` -- show Ansatz AND all Unitary attributes
+* ``unitary.print_bindable_attributes()`` -- show attributes for a specific Unitary
 
 For programmatic access, use ``get_bindable_attributes()`` which returns a dictionary.
 
@@ -198,7 +201,7 @@ Unitary Bindable Attributes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 These attributes are available for Operator and Parameter Functions. They are
-bound from the :class:`quop_mpi.Unitary` instance:
+bound from the :class:`quop_mpi.unitary` instance:
 
 .. list-table::
    :header-rows: 1
@@ -248,10 +251,10 @@ bound from the :class:`quop_mpi.Unitary` instance:
      - Operator variational parameters (only for parameterised operators)
    * - ``initial_state``
      - ndarray[complex128]
-     - Local partition of input state to this unitary
+     - Legacy explicit Python input buffer for custom Unitary subclasses
    * - ``final_state``
      - ndarray[complex128]
-     - Local partition of output state from this unitary
+     - Legacy explicit Python output buffer for custom Unitary subclasses
 
 .. note::
 
@@ -259,23 +262,29 @@ bound from the :class:`quop_mpi.Unitary` instance:
    Unitary contexts. Unitary-specific attributes like ``variational_parameters``
    are only meaningful for Operator Functions that define parameterised operators.
 
+   Built-in propagators do not bind operator functions to Python-side
+   ``Unitary.initial_state`` / ``Unitary.final_state`` arrays. They evolve
+   through backend-owned native context buffers. The Unitary-level state names
+   are retained only for custom legacy subclasses that explicitly manage their
+   own Python buffers.
+
 .. glossary::
 
     Observables Function
         Returns a 1-D  real array containing ``local_i`` elements of the
         :term:`observables` with global offset ``local_i_offset``. Passed to the
-        :meth:`quop_mpi.Ansatz.set_observables` method and bound to the
-        attributes of the :class:`quop_mpi.Ansatz` class.
+        :meth:`quop_mpi.ansatz.set_observables` method and bound to the
+        attributes of the :class:`quop_mpi.ansatz` class.
 
         Predefined Observables Functions are included in the
         :mod:`quop_mpi.observable` module.
 
         **Commonly used parameters**:
 
-        * ``local_i`` — number of observables this rank must compute
-        * ``local_i_offset`` — starting global index for this rank
-        * ``system_size`` — total number of basis states
-        * ``partition_table`` — for advanced partitioning schemes
+        * ``local_i`` -- number of observables this rank must compute
+        * ``local_i_offset`` -- starting global index for this rank
+        * ``system_size`` -- total number of basis states
+        * ``partition_table`` -- for advanced partitioning schemes
 
         **Typical structure:**
 
@@ -294,17 +303,17 @@ bound from the :class:`quop_mpi.Unitary` instance:
     Initial State Function
         Returns a 1-D complex array containing ``local_i`` elements of the
         :term:`initial state` with global offset ``local_i_offset``. Passed to
-        the :meth:`quop_mpi.Ansatz.set_initial_state` method and bound to the
-        attributes of the :class:`quop_mpi.Ansatz` class.
+        the :meth:`quop_mpi.ansatz.set_initial_state` method and bound to the
+        attributes of the :class:`quop_mpi.ansatz` class.
 
         Predefined Initial State Functions are included in the
         :mod:`quop_mpi.state` module.
 
         **Commonly used parameters**:
 
-        * ``local_i`` — number of state elements this rank must compute
-        * ``local_i_offset`` — starting global index for this rank
-        * ``system_size`` — total number of basis states
+        * ``local_i`` -- number of state elements this rank must compute
+        * ``local_i_offset`` -- starting global index for this rank
+        * ``system_size`` -- total number of basis states
 
         **Typical structure:**
 
@@ -327,7 +336,7 @@ bound from the :class:`quop_mpi.Unitary` instance:
         optimise over a smaller parameter space while the mapping function
         reconstructs the complete vector internally.
 
-        Passed to :meth:`quop_mpi.Ansatz.set_parameter_map` together with the
+        Passed to :meth:`quop_mpi.ansatz.set_parameter_map` together with the
         number of free parameters and an optional :term:`FunctionDict`.
 
         **Method signature:**
@@ -345,10 +354,10 @@ bound from the :class:`quop_mpi.Unitary` instance:
         The first positional parameter always receives the free parameter vector
         from the optimiser. Additional parameters depend on your mapping logic:
 
-        * ``ansatz_depth`` — number of ansatz iterations (for computing output size)
-        * ``total_params`` — parameters per iteration (for computing output size)
-        * ``observables`` — for normalising parameters by observable statistics
-        * ``MPI_COMM`` — for computing global statistics across ranks
+        * ``ansatz_depth`` -- number of ansatz iterations (for computing output size)
+        * ``total_params`` -- parameters per iteration (for computing output size)
+        * ``observables`` -- for normalising parameters by observable statistics
+        * ``MPI_COMM`` -- for computing global statistics across ranks
 
         **Typical structure:**
 
@@ -402,13 +411,13 @@ bound from the :class:`quop_mpi.Unitary` instance:
         distribution of the wavefunction state vector during simulation together
         with a boolean that specifies whether the :term:`objective function`
         value should be passed to the :term:`optimiser` or more sample batches
-        taken. Passed to :meth:`quop_mpi.Ansatz.set_sampling`.
+        taken. Passed to :meth:`quop_mpi.ansatz.set_sampling`.
 
-        See :class:`quop_mpi.Ansatz` for a selected list of available attributes,
+        See :class:`quop_mpi.ansatz` for a selected list of available attributes,
 
         .. note::
 
-            The :class:`quop_mpi.Ansatz` class computes the expectation value
+            The :class:`quop_mpi.ansatz` class computes the expectation value
             exactly by default.
 
         **Typical Structure**
@@ -435,20 +444,20 @@ bound from the :class:`quop_mpi.Unitary` instance:
         function` gradient. Returns the partial derivative of the
         :term:`objective function` with respect to the variational parameter
         with index ``var``. Used to compute the :term:`objective function`
-        gradient is parallel if using a gradient-informed :term:`optimiser`.
-        Passed to :meth:`quop_mpi.Ansatz.set_parallel_jacobian`.
+        gradient in parallel when using a gradient-informed :term:`optimiser`.
+        Passed to :meth:`quop_mpi.ansatz.set_parallel_jacobian`.
 
-        The :class:`quop_mpi.Ansatz` supports numerical approximation of the
+        The :class:`quop_mpi.ansatz` supports numerical approximation of the
         gradient using the forward and central finite difference methods
-        (specified via :meth:`quop_mpi.Ansatz.set_parallel_jacobian`).  See
-        :class:`quop_mpi.Ansatz` for a list of available attributes.
+        (specified via :meth:`quop_mpi.ansatz.set_parallel_jacobian`).  See
+        :class:`quop_mpi.ansatz` for a list of available attributes.
 
         .. note::
 
-            * The :class:`quop_mpi.Ansatz` class computes the :term:`objective
+            * The :class:`quop_mpi.ansatz` class computes the :term:`objective
               function` gradient sequentially by default. 
             
-            * The default optimisation method of the :class:`quop_mpi.Ansatz`
+            * The default optimisation method of the :class:`quop_mpi.ansatz`
               class, the BFGS algorithm, is gradient informed.
 
         **Typical Structure**
@@ -468,14 +477,14 @@ bound from the :class:`quop_mpi.Unitary` instance:
                 return partial_derivative_value
 
         The ``evaluate`` argument is bound to the
-        :meth:`quop_mpi.Ansatz.evaluate` method which implements lazy
+        :meth:`quop_mpi.ansatz.evaluate` method which implements lazy
         computation of the :term:`objective function`. This is the recommended
         method for use in numerical approximation of the gradient by
         finite-difference methods.
 
     Operator Function
         Returns an :term:`operator` object that is compatible with the propagation method of
-        a specific :class:`unitary` class. See :class:`quop_mpi.Unitary`.
+        a specific :class:`quop_mpi.unitary` subclass.
 
         .. note::
 
@@ -488,10 +497,10 @@ bound from the :class:`quop_mpi.Unitary` instance:
 
         **Commonly used parameters** (bound from Unitary):
 
-        * ``local_i`` — partition size for this rank
-        * ``local_i_offset`` — global index offset
-        * ``system_size`` — total number of basis states
-        * ``variational_parameters`` — only if the operator is parameterised
+        * ``local_i`` -- partition size for this rank
+        * ``local_i_offset`` -- global index offset
+        * ``system_size`` -- total number of basis states
+        * ``variational_parameters`` -- only if the operator is parameterised
 
         **Typical Structure**
 
@@ -514,7 +523,7 @@ bound from the :class:`quop_mpi.Unitary` instance:
 
     Parameter Function
         Returns initial values for the :term:`variational parameters` associated
-        with an instance of the :class:`quop_mpi.Unitary` class.
+        with an instance of the :class:`quop_mpi.unitary` class.
 
         .. note::
 
@@ -526,7 +535,7 @@ bound from the :class:`quop_mpi.Unitary` instance:
 
         **Commonly used parameters** (bound from Unitary):
 
-        * ``n_params`` — number of parameters to generate
+        * ``n_params`` -- number of parameters to generate
 
         **Typical Structure**
 
@@ -545,13 +554,13 @@ bound from the :class:`quop_mpi.Unitary` instance:
     Objective Function
         Called after state-evolution during parameter optimisation. Returns a
         scalar value for minimisation.
-        Passed to :meth:`quop_mpi.Ansatz.set_objective`.
+        Passed to :meth:`quop_mpi.ansatz.set_objective`.
 
         **Commonly used parameters**:
 
-        * ``local_probabilities`` — probability amplitudes for this rank's partition
-        * ``observables`` — observable values for this rank's partition
-        * ``MPI_COMM`` — MPI subcommunicator (for global reductions, e.g., CVaR)
+        * ``local_probabilities`` -- probability amplitudes for this rank's partition
+        * ``observables`` -- observable values for this rank's partition
+        * ``MPI_COMM`` -- MPI subcommunicator (for global reductions, e.g., CVaR)
 
         **Typical Structure**
 

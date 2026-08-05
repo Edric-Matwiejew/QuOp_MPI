@@ -7,7 +7,6 @@ This module contains tests for:
 - string.py: Bit-string to quantum state conversion
 """
 
-import pytest
 import numpy as np
 from scipy import sparse
 
@@ -36,7 +35,7 @@ class TestKronecker:
         """kron of two 2x2 identity matrices gives 4x4 identity."""
         from quop_mpi.toolkit.kronecker import kron
 
-        I2 = sparse.identity(2, format="csr")
+        I2 = sparse.identity(2, format="csr")  # noqa: N806
         result = kron([I2, I2])
 
         expected = sparse.identity(4, format="csr")
@@ -46,7 +45,7 @@ class TestKronecker:
         """Test kronecker product of Pauli Z matrices."""
         from quop_mpi.toolkit.kronecker import kron
 
-        Z = sparse.csr_matrix([[1, 0], [0, -1]])
+        Z = sparse.csr_matrix([[1, 0], [0, -1]])  # noqa: N806
         result = kron([Z, Z])
 
         # Z (x) Z = diag(1, -1, -1, 1)
@@ -68,7 +67,7 @@ class TestKronecker:
         """kron of three matrices."""
         from quop_mpi.toolkit.kronecker import kron
 
-        I2 = sparse.identity(2, format="csr")
+        I2 = sparse.identity(2, format="csr")  # noqa: N806
         result = kron([I2, I2, I2])
 
         expected = sparse.identity(8, format="csr")
@@ -94,7 +93,7 @@ class TestKronecker:
 
     def test_kron_power_two(self):
         """kron_power with n=2 is equivalent to kron([m, m])."""
-        from quop_mpi.toolkit.kronecker import kron_power, kron
+        from quop_mpi.toolkit.kronecker import kron, kron_power
 
         matrix = sparse.csr_matrix([[1, 0], [0, -1]])
         result = kron_power(matrix, 2)
@@ -165,61 +164,59 @@ class TestPauli:
         assert result.shape == (8, 8)
         np.testing.assert_array_almost_equal(result.toarray(), np.eye(8))
 
-    def test_pauli_X_on_first_qubit_two_qubit_system(self):
+    def test_pauli_X_on_first_qubit_two_qubit_system(self):  # noqa: N802
         """X on qubit 0 in 2-qubit system: X (x) I."""
         from quop_mpi.toolkit.pauli import X
 
         result = X(0, 2)
 
         # X (x) I
-        X_mat = np.array([[0, 1], [1, 0]])
-        I_mat = np.eye(2)
+        X_mat = np.array([[0, 1], [1, 0]])  # noqa: N806
+        I_mat = np.eye(2)  # noqa: N806
         expected = np.kron(X_mat, I_mat)
 
         assert result.shape == (4, 4)
         np.testing.assert_array_almost_equal(result.toarray(), expected)
 
-    def test_pauli_X_on_second_qubit_two_qubit_system(self):
+    def test_pauli_X_on_second_qubit_two_qubit_system(self):  # noqa: N802
         """X on qubit 1 in 2-qubit system: I (x) X."""
         from quop_mpi.toolkit.pauli import X
 
         result = X(1, 2)
 
         # I (x) X
-        X_mat = np.array([[0, 1], [1, 0]])
-        I_mat = np.eye(2)
+        X_mat = np.array([[0, 1], [1, 0]])  # noqa: N806
+        I_mat = np.eye(2)  # noqa: N806
         expected = np.kron(I_mat, X_mat)
 
         assert result.shape == (4, 4)
         np.testing.assert_array_almost_equal(result.toarray(), expected)
 
-    def test_pauli_Z_on_middle_qubit_three_qubit_system(self):
+    def test_pauli_Z_on_middle_qubit_three_qubit_system(self):  # noqa: N802
         """Z on qubit 1 in 3-qubit system: I (x) Z (x) I."""
         from quop_mpi.toolkit.pauli import Z
 
         result = Z(1, 3)
 
-        Z_mat = np.array([[1, 0], [0, -1]])
-        I_mat = np.eye(2)
+        Z_mat = np.array([[1, 0], [0, -1]])  # noqa: N806
+        I_mat = np.eye(2)  # noqa: N806
         expected = np.kron(np.kron(I_mat, Z_mat), I_mat)
 
         assert result.shape == (8, 8)
         np.testing.assert_array_almost_equal(result.toarray(), expected)
 
-    def test_pauli_Y_hermitian(self):
+    def test_pauli_Y_hermitian(self):  # noqa: N802
         """Pauli Y is Hermitian."""
         from quop_mpi.toolkit.pauli import Y
 
         result = Y(0, 1)
 
         # Y^dag = Y
-        np.testing.assert_array_almost_equal(
-            result.toarray(), result.toarray().conj().T
-        )
+        np.testing.assert_array_almost_equal(result.toarray(), result.toarray().conj().T)
 
     def test_pauli_matrices_square_to_identity(self):
         """X^2, Y^2, Z^2 = I."""
-        from quop_mpi.toolkit.pauli import X, Y, Z, I
+        from quop_mpi.toolkit.pauli import I, X, Y, Z
 
         n_qubits = 2
         for pauli_op, idx in [(X, 0), (Y, 1), (Z, 0)]:
@@ -227,17 +224,15 @@ class TestPauli:
             op_squared = op @ op
             identity = I(n_qubits)
 
-            np.testing.assert_array_almost_equal(
-                op_squared.toarray(), identity.toarray()
-            )
+            np.testing.assert_array_almost_equal(op_squared.toarray(), identity.toarray())
 
-    def test_pauli_commutation_XY_eq_iZ(self):
+    def test_pauli_commutation_XY_eq_iZ(self):  # noqa: N802
         """[X, Y] = 2iZ for single qubit."""
         from quop_mpi.toolkit.pauli import X, Y, Z
 
-        X_op = X(0, 1)
-        Y_op = Y(0, 1)
-        Z_op = Z(0, 1)
+        X_op = X(0, 1)  # noqa: N806
+        Y_op = Y(0, 1)  # noqa: N806
+        Z_op = Z(0, 1)  # noqa: N806
 
         commutator = X_op @ Y_op - Y_op @ X_op
         expected = 2j * Z_op
@@ -248,8 +243,8 @@ class TestPauli:
         """Pauli matrices anticommute: {X, Y} = 0."""
         from quop_mpi.toolkit.pauli import X, Y
 
-        X_op = X(0, 1)
-        Y_op = Y(0, 1)
+        X_op = X(0, 1)  # noqa: N806
+        Y_op = Y(0, 1)  # noqa: N806
 
         anticommutator = X_op @ Y_op + Y_op @ X_op
 
@@ -257,7 +252,7 @@ class TestPauli:
 
     def test_pauli_returns_csr_matrix(self):
         """Pauli functions return CSR sparse matrices."""
-        from quop_mpi.toolkit.pauli import X, Y, Z, I
+        from quop_mpi.toolkit.pauli import I, X, Y, Z
 
         assert sparse.isspmatrix_csr(X(0, 2))
         assert sparse.isspmatrix_csr(Y(0, 2))
@@ -383,7 +378,7 @@ class TestToolkitIntegration:
         from quop_mpi.toolkit.pauli import Z
         from quop_mpi.toolkit.string import string
 
-        Z_op = Z(0, 1).toarray()
+        Z_op = Z(0, 1).toarray()  # noqa: N806
 
         state_0 = string("0")
         state_1 = string("1")
@@ -401,7 +396,7 @@ class TestToolkitIntegration:
         from quop_mpi.toolkit.pauli import X
         from quop_mpi.toolkit.string import string
 
-        X_op = X(0, 1).toarray()
+        X_op = X(0, 1).toarray()  # noqa: N806
 
         state_0 = string("0")
         state_1 = string("1")

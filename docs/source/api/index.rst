@@ -1,8 +1,8 @@
 .. _api-reference:
 
-========
-Overview
-========
+=============
+API Reference
+=============
 
 This section provides detailed documentation for all QuOp_MPI modules.
 

@@ -1,0 +1,57 @@
+[profile]
+description = "Pawsey Setonix (Cray EX, MI250X)"
+wavefront_supported = true
+python_version = "3.11"
+
+[install]
+root = ".quop-install"
+venv_dir = ".venv_{profile}_{backend}"
+work_dir = ".cache/quop/{profile}/{backend}"
+
+[modules]
+common = [
+    "gcc-native/12.3",
+    "cray-mpich/8.1.32",
+    "cray-hdf5-parallel/1.14.3.7",
+    "fftw/3.3.10",
+    "python/3.11.6",
+    "py-pip/23.1.2-py3.11.6",
+    "py-numpy/2.1.2",
+    "cmake/3.30.5",
+]
+mpi_python = [
+    "py-mpi4py/4.0.1-py3.11.6",
+]
+
+[build]
+mpi_build_type = "Release"
+
+[compilers]
+cc = "gcc"
+cxx = "g++"
+fc = "gfortran"
+mpi_cc_wrapper = "cc"
+mpi_cxx_wrapper = "CC"
+mpi_fc_wrapper = "ftn"
+
+[benchmarks]
+scheduler = "slurm"
+partition = "work"
+walltime = "00:20:00"
+ranks_per_node = 128
+intra_sequence = [1, 2, 4, 8, 16, 32, 64, 128]
+multi_nodes = [1, 2, 4, 8, 16]
+exports = ["MPICH_OFI_STARTUP_CONNECT=1", "MPICH_OFI_VERBOSE=1"]
+srun_extra_args = "-m block:block:block"
+
+[benchmarks.qaoa]
+args_intra = [65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728, 268435456]
+args_multi = [16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824, 2147483648, 4294967296, 8589934592]
+
+[benchmarks.qwoa]
+args_intra = [65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824]
+args_multi = [16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824, 2147483648, 4294967296, 8589934592]
+
+[benchmarks.qmoa]
+args_intra = ["3 3 3 3 3", "4 4 4 4 4", "5 5 5 5 5", "6 6 6 6 6"]
+args_multi = ["4 4 4 4 4", "5 5 5 5 5", "6 6 6 6 6", "7 7 7 7 7"]

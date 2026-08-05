@@ -1,8 +1,9 @@
-import numpy as np
 import networkx as nx
+import numpy as np
+
 from quop_mpi import Ansatz
-from quop_mpi.propagator import diagonal, sparse
 from quop_mpi.observable import serial
+from quop_mpi.propagator import diagonal, sparse
 from quop_mpi.toolkit import Z
 
 Graph = nx.circular_ladder_graph(4)
@@ -27,13 +28,13 @@ def maxcut_qualities(G):
     return np.sum(maxcut_terms(G), axis=0)
 
 
-UQ = diagonal.unitary(
+UQ = diagonal.Unitary(
     diagonal.operator.serial,
     operator_dict={"args": [maxcut_terms, G]},
     unitary_n_params=n_edges,
 )
 
-UW = sparse.unitary(sparse.operator.hypercube)
+UW = sparse.Unitary(sparse.operator.hypercube)
 
 alg = Ansatz(system_size)
 alg.set_unitaries([UQ, UW])

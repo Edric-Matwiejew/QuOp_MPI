@@ -1,0 +1,16 @@
+# QuOp_QUISA HIP/C++ formatting configuration
+# See HIP_STYLE.md §10.1 for rationale
+---
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 110
+PointerAlignment: Left
+UseTab: Never
+BreakBeforeBraces: Attach
+SpaceAfterCStyleCast: false
+SpacesInParentheses: false
+AllowShortFunctionsOnASingleLine: Empty
+AlignAfterOpenBracket: Align
+BinPackParameters: true
+BinPackArguments: true
+AllowAllParametersOfDeclarationOnNextLine: true

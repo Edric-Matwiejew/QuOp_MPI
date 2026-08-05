@@ -1,0 +1,33 @@
+[profile]
+description = "Ubuntu 24.04"
+wavefront_supported = true
+python_version = "3.12"
+
+[install]
+root = ".quop-install"
+venv_dir = ".venv_{profile}_{backend}"
+work_dir = ".cache/quop/{profile}/{backend}"
+
+[build]
+offload_arch = "gfx1100"
+wavefront_build_type = "Release"
+
+[compilers]
+cc = "gcc"
+cxx = "g++"
+fc = "gfortran"
+
+[benchmarks]
+scheduler = "local"
+ranks_per_gcd = 1
+gcds_per_node = 1
+intra_sequence = [1]
+
+[benchmarks.qaoa]
+args_intra = [1024, 4096, 16384]
+
+[benchmarks.qwoa]
+args_intra = [1024, 4096, 16384]
+
+[benchmarks.qmoa]
+args_intra = ["2 2 2 2", "3 3 3"]

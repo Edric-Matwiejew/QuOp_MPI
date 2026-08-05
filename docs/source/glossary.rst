@@ -18,7 +18,7 @@ Glossary
         :term:`variational parameters` and :math:`|\Psi_0\rangle` is the
         :term:`initial state` of the quantum system. 
         
-        See :class:`quop_mpi.Ansatz`.
+        See :class:`quop_mpi.ansatz`.
 
     system state
         The quantum system prior to or after the action of the :term:`ansatz
@@ -27,24 +27,24 @@ Glossary
     system size
         The number of basis states (size) of the simulated quantum system.
 
-        See :class:`quop_mpi.Ansatz`.
+        See :class:`quop_mpi.ansatz`.
 
     initial state
         The starting :term:`system state`, by default an equal superposition
         of all states.
 
-        See :meth:`quop_mpi.Ansatz.set_initial_state`.
+        See :meth:`quop_mpi.ansatz.set_initial_state`.
         
     final state
         The :term:`system state` after the action of the :term:`ansatz unitary`.
 
-        See :meth:`quop_mpi.Ansatz.get_final_state`.
+        See :meth:`quop_mpi.ansatz.get_final_state`.
 
     ansatz unitary
         The sequence of :term:`unitaries <unitary>` that constitute one
         :term:`ansatz iteration <ansatz depth>`.
 
-        See :meth:`quop_mpi.Ansatz.set_unitaries`.
+        See :meth:`quop_mpi.ansatz.set_unitaries`.
 
     unitary 
         A unitary operator parameterised by an arbitrary number of
@@ -59,7 +59,7 @@ Glossary
         :term:`operator`. The :math:`\phi_0` is a :term:`unitary parameter` and
         :math:`(\phi_1,...,\phi_m)` are :term:`operator parameters <operator parameter>`.
 
-        See :class:`quop_mpi.Unitary` and :mod:`quop_mpi.propagator`.
+        See :class:`quop_mpi.unitary` and :mod:`quop_mpi.propagator`.
 
     operator
         The matrix exponent of a :term:`unitary`, parameterised by arbitrary
@@ -69,13 +69,13 @@ Glossary
         A :term:`variational parameter <variational parameters>` that scales the elements of an :term:`operator`
         via multiplication.
 
-        See :class:`quop_mpi.Unitary` and :mod:`quop_mpi.propagator`.
+        See :class:`quop_mpi.unitary` and :mod:`quop_mpi.propagator`.
 
     operator parameter
         :term:`Variational parameter <variational parameters>` that
         parameterise the structure of an :term:`operator`.
 
-        See :class:`quop_mpi.Unitary` and :mod:`quop_mpi.propagator`.
+        See :class:`quop_mpi.unitary` and :mod:`quop_mpi.propagator`.
         
     Phase-Shift Unitary
         A :term:`unitary` with a diagonal :term:`operator`. Typically used to
@@ -99,7 +99,7 @@ Glossary
     ansatz depth
         The number of repeats (or iterations) of the :term:`ansatz unitary`.
 
-        See :meth:`quop_mpi.Ansatz.set_depth`.
+        See :meth:`quop_mpi.ansatz.set_depth`.
 
     variational parameters 
         Classically tunable parameters of an :term:`ansatz unitary`. Each
@@ -113,7 +113,7 @@ Glossary
         A real vector of scalar quality values associated with each simulated basis
         state (lower is better). Defines the diagonal observables operator :math:`\hat{O}`. 
 
-        See :meth:`quop_mpi.Ansatz.set_observables`.
+        See :meth:`quop_mpi.ansatz.set_observables`.
 
     objective function
         The expectation value of the :term:`observables` operator, minimised by
@@ -123,7 +123,7 @@ Glossary
             
             \langle \theta | \hat{O} | \theta \rangle
 
-        See :meth:`quop_mpi.Ansatz.objective_function`.
+        See :meth:`quop_mpi.ansatz.set_objective`.
 
     free parameters
         The subset of :term:`variational parameters` to be tuned via classical
@@ -131,11 +131,11 @@ Glossary
         map, the free parameters are mapped to the full variational parameter
         vector.
 
-        See :meth:`quop_mpi.Ansatz.set_parameter_map`.
+        See :meth:`quop_mpi.ansatz.set_parameter_map`.
 
     optimiser
         The classical optimiser responsible for minimisation of the
         :term:`objective function` via variation of the 
         :term:`free variational parameters <free parameters>`.
 
-        See :meth:`quop_mpi.Ansatz.set_optimiser`.
+        See :meth:`quop_mpi.ansatz.set_optimiser`.

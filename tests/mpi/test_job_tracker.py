@@ -1,7 +1,7 @@
 """
-Tests for job_tracker class used by benchmark() method.
+Tests for JobTracker class used by benchmark() method.
 
-The job_tracker manages:
+The JobTracker manages:
 - Job list generation (repeat, depth pairs)
 - Progress tracking through jobs
 - Suspend/resume functionality via pickle files
@@ -11,30 +11,24 @@ The job_tracker manages:
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_job_tracker.py -v --with-mpi
 """
 
-import pytest
-import numpy as np
 import os
-import tempfile
 import pickle
-from mpi4py import MPI
+import tempfile
 
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import pytest
 
 @pytest.mark.mpi
 class TestJobTrackerBasicInit:
-    """Tests for basic job_tracker initialization."""
+    """Tests for basic JobTracker initialization."""
 
     def test_init_creates_job_list(self, mpi_comm):
-        """Verify job_tracker creates a job list on init."""
-        from quop_mpi._utils._tracker import job_tracker
+        """Verify JobTracker creates a job list on init."""
+        from quop_mpi._utils._tracker import JobTracker
 
         repeats = 3
         max_depth = 2
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=repeats,
             max_depths=max_depth,
             time_limit=None,
@@ -49,12 +43,12 @@ class TestJobTrackerBasicInit:
 
     def test_job_list_structure(self, mpi_comm):
         """Verify job list contains [repeat, depth] pairs."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         repeats = 2
         max_depth = 3
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=repeats,
             max_depths=max_depth,
             time_limit=None,
@@ -77,9 +71,9 @@ class TestJobTrackerBasicInit:
 
     def test_init_not_complete(self, mpi_comm):
         """Verify tracker starts as not complete."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -88,14 +82,14 @@ class TestJobTrackerBasicInit:
             suspend_path=None,
         )
 
-        assert tracker.complete == False
+        assert not tracker.complete
 
     def test_init_creates_results_dict(self, mpi_comm):
         """Verify results_dict is initialized for all depths."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         max_depth = 4
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=max_depth,
             time_limit=None,
@@ -111,10 +105,10 @@ class TestJobTrackerBasicInit:
 
     def test_init_with_seed(self, mpi_comm):
         """Verify seed is properly stored."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         seed = 42
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -132,9 +126,9 @@ class TestJobTrackerGetJob:
 
     def test_get_job_returns_first_job(self, mpi_comm):
         """Verify get_job returns the first job."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -150,9 +144,9 @@ class TestJobTrackerGetJob:
 
     def test_get_job_consistent_across_ranks(self, mpi_comm):
         """Verify all ranks get the same job."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -178,9 +172,9 @@ class TestJobTrackerUpdate:
 
     def test_update_advances_job_index(self, mpi_comm):
         """Verify update() moves to next job."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -203,9 +197,9 @@ class TestJobTrackerUpdate:
 
     def test_update_stores_result(self, mpi_comm):
         """Verify update() stores the result in results_dict."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -226,10 +220,10 @@ class TestJobTrackerUpdate:
 
     def test_update_increments_seed(self, mpi_comm):
         """Verify update() increments the seed."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         initial_seed = 10
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -245,12 +239,12 @@ class TestJobTrackerUpdate:
 
     def test_complete_after_all_jobs(self, mpi_comm):
         """Verify tracker is complete after all jobs processed."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         repeats = 2
         max_depth = 2
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=repeats,
             max_depths=max_depth,
             time_limit=None,
@@ -261,11 +255,11 @@ class TestJobTrackerUpdate:
 
         # Process all jobs
         for _ in range(repeats * max_depth):
-            assert tracker.complete == False
+            assert not tracker.complete
             tracker.get_job()
             tracker.update({"fun": 1.0})
 
-        assert tracker.complete == True
+        assert tracker.complete
 
 
 @pytest.mark.mpi
@@ -274,10 +268,10 @@ class TestJobTrackerGetSeed:
 
     def test_get_seed_returns_current_seed(self, mpi_comm):
         """Verify get_seed returns the current seed value."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         seed = 123
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -290,10 +284,10 @@ class TestJobTrackerGetSeed:
 
     def test_get_seed_after_updates(self, mpi_comm):
         """Verify get_seed reflects updates."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         seed = 0
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=3,
             max_depths=1,
             time_limit=None,
@@ -314,9 +308,9 @@ class TestJobTrackerGetResults:
 
     def test_get_results_returns_dict(self, mpi_comm):
         """Verify get_results returns the results dictionary."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -333,9 +327,9 @@ class TestJobTrackerGetResults:
 
     def test_get_results_after_jobs(self, mpi_comm):
         """Verify get_results contains completed job results."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=1,
             time_limit=None,
@@ -364,12 +358,12 @@ class TestJobTrackerSuspendResume:
 
     def test_suspend_path_creates_file(self, mpi_comm):
         """Verify suspend creates a file when time_limit is set."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         with tempfile.TemporaryDirectory() as tmpdir:
             suspend_path = os.path.join(tmpdir, "test_suspend")
 
-            tracker = job_tracker(
+            tracker = JobTracker(
                 repeats=2,
                 max_depths=2,
                 time_limit=3600,  # 1 hour - won't trigger suspend
@@ -391,12 +385,12 @@ class TestJobTrackerSuspendResume:
 
     def test_suspend_file_contains_state(self, mpi_comm):
         """Verify suspend file contains tracker state."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         with tempfile.TemporaryDirectory() as tmpdir:
             suspend_path = os.path.join(tmpdir, "test_suspend")
 
-            tracker = job_tracker(
+            tracker = JobTracker(
                 repeats=2,
                 max_depths=2,
                 time_limit=3600,
@@ -422,12 +416,12 @@ class TestJobTrackerSuspendResume:
 
     def test_no_suspend_without_time_limit(self, mpi_comm):
         """Verify no suspend file is created without time_limit."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         with tempfile.TemporaryDirectory() as tmpdir:
             suspend_path = os.path.join(tmpdir, "test_suspend")
 
-            tracker = job_tracker(
+            tracker = JobTracker(
                 repeats=2,
                 max_depths=2,
                 time_limit=None,  # No time limit
@@ -453,12 +447,12 @@ class TestJobTrackerJobProgression:
 
     def test_progression_order(self, mpi_comm):
         """Verify jobs progress in correct order: all repeats at depth 1, then depth 2, etc."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         repeats = 3
         max_depth = 2
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=repeats,
             max_depths=max_depth,
             time_limit=None,
@@ -487,9 +481,9 @@ class TestJobTrackerJobProgression:
 
     def test_single_repeat_single_depth(self, mpi_comm):
         """Test minimal case: 1 repeat, 1 depth."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=1,
             max_depths=1,
             time_limit=None,
@@ -498,22 +492,22 @@ class TestJobTrackerJobProgression:
             suspend_path=None,
         )
 
-        assert tracker.complete == False
+        assert not tracker.complete
 
         job = tracker.get_job()
         assert job == [1, 1]
 
         tracker.update({"fun": 1.0})
-        assert tracker.complete == True
+        assert tracker.complete
 
     def test_many_depths_few_repeats(self, mpi_comm):
         """Test with many depths but few repeats."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         repeats = 1
         max_depth = 5
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=repeats,
             max_depths=max_depth,
             time_limit=None,
@@ -537,12 +531,12 @@ class TestJobTrackerEdgeCases:
 
     def test_large_repeats(self, mpi_comm):
         """Test with many repeats."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
         repeats = 10
         max_depth = 1
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=repeats,
             max_depths=max_depth,
             time_limit=None,
@@ -561,9 +555,9 @@ class TestJobTrackerEdgeCases:
 
     def test_results_accessible_during_run(self, mpi_comm):
         """Verify results can be accessed while tracker is running."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=3,
             max_depths=2,
             time_limit=None,
@@ -585,9 +579,9 @@ class TestJobTrackerEdgeCases:
 
     def test_seed_unique_per_job(self, mpi_comm):
         """Verify each job gets a unique seed."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=3,
             max_depths=2,
             time_limit=None,
@@ -614,9 +608,9 @@ class TestJobTrackerMPIConsistency:
 
     def test_job_index_consistent(self, mpi_comm):
         """Verify job_index is consistent across ranks."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=2,
             max_depths=2,
             time_limit=None,
@@ -639,9 +633,9 @@ class TestJobTrackerMPIConsistency:
 
     def test_complete_flag_consistent(self, mpi_comm):
         """Verify complete flag is consistent across ranks."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=1,
             max_depths=1,
             time_limit=None,
@@ -658,13 +652,13 @@ class TestJobTrackerMPIConsistency:
         all_complete = mpi_comm.gather(local_complete, root=0)
 
         if mpi_comm.Get_rank() == 0:
-            assert all(c == True for c in all_complete)
+            assert all(c for c in all_complete)
 
     def test_seed_consistent_across_ranks(self, mpi_comm):
         """Verify seed is consistent across ranks after updates."""
-        from quop_mpi._utils._tracker import job_tracker
+        from quop_mpi._utils._tracker import JobTracker
 
-        tracker = job_tracker(
+        tracker = JobTracker(
             repeats=3,
             max_depths=1,
             time_limit=None,

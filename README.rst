@@ -6,7 +6,7 @@ A Parallel Framework for Quantum Variational Algorithms
 
 QuOp_MPI is a Python 3 module designed for parallel, distributed-memory simulation of Quantum Variational Algorithms (QVAs) with arbitrary phase-shift and mixing operators.
 
-**Current Version:** 1.5.0
+**Current Version:** 1.6.0
 
 For an in-depth discussion on design, usage, and performance, see the `Journal of Computational Science paper <https://doi.org/10.1016/j.jocs.2022.101711>`_ (also available on `arXiv <https://arxiv.org/abs/2110.03963>`_).
 
@@ -72,7 +72,7 @@ First, install the following build dependencies:
 .. code-block:: bash
 
     python -m pip install --upgrade pip setuptools
-    python -m pip install scikit-build cmake ninja
+    python -m pip install scikit-build-core cmake ninja
 
 Next, choose one of the following build methods:
 
@@ -84,14 +84,6 @@ To install from source (ensure that all build prerequisites are set), run:
 
     python -m pip install .
 
-.. note::
-
-    If you encounter installation issues on a repeated build, try removing the `_skbuild` directory:
-
-    .. code-block:: bash
-
-       rm -rf _skbuild
-
 **Development Build:**
 
 For development or modifying QuOp_MPI, use the following steps:
@@ -101,6 +93,22 @@ For development or modifying QuOp_MPI, use the following steps:
     cmake -B build -S .
     cmake --build build --target install
     python -m pip install -e .
+
+**Environment Build:**
+
+For a fully automated setup including virtual-environment creation, on specific platforms,
+use the installer script with the appropriate profile and backend options:
+
+.. code-block:: bash
+
+    bash environments/install.sh -p macos -b mpi --prefix ./.quop-install              # macOS with Homebrew
+    bash environments/install.sh -p generic -b mpi --prefix ./.quop-install            # generic Linux
+    bash environments/install.sh -p pawsey-setonix -b wavefront --prefix /scratch/$USER/quop  # Pawsey Setonix GPU
+
+Available profiles live under ``environments/profiles/``.
+Run ``./environments/install.sh --help`` for the full list of options.
+Use ``--clean`` to clear the install cache under the chosen prefix, or
+``--veryclean`` to clear both the cache and the fetched dependency tree.
 
 Optional Dependencies
 ---------------------
@@ -120,6 +128,50 @@ Alternatively, install only what you need:
    python -m pip install '.[test]'      # Run the test suite
    python -m pip install '.[nlopt]'     # Enable NLopt optimizer support
 
+Backend Selection
+-----------------
+
+QuOp_MPI selects its compiled backend at process startup through the
+``QUOP_BACKEND`` environment variable.
+
+- Supported values are ``mpi`` and ``wavefront``.
+- If ``QUOP_BACKEND`` is unset or invalid, QuOp_MPI defaults to ``mpi``.
+- ``QUOP_BACKEND`` is read once, when ``quop_mpi`` is first imported.
+- Changing ``QUOP_BACKEND`` after import has no effect.
+- Mixed-backend use in a single Python process is unsupported.
+
+Set the backend before importing ``quop_mpi``:
+
+.. code-block:: bash
+
+    QUOP_BACKEND=mpi python -m pytest tests/
+    QUOP_BACKEND=wavefront python -m pytest tests/ --backend wavefront
+
+The wavefront backend must also be built into the current installation. A
+default build only guarantees the MPI backend; wavefront extensions are only
+available when QuOp_MPI is configured and built with ``-DWAVEFRONT_BACKEND=ON``
+and its required GPU dependencies.
+
+Running Tests
+=============
+
+Install test dependencies with ``python -m pip install '.[test]'``, then:
+
+.. code-block:: bash
+
+    ./run_tests.sh              # all tests (unit + MPI + examples), 2 MPI processes
+    ./run_tests.sh 4            # same, with 4 MPI processes
+    ./run_tests.sh 1 unit       # unit tests only (serial)
+    ./run_tests.sh 2 mpi        # MPI tests only
+    ./run_tests.sh 2 mpi-full   # MPI + parallel-Jacobian tests (12 processes)
+
+The ``all`` mode (default) also runs example tests, which execute the
+example scripts and check that optimisation results match the expected bounds
+in ``tests/examples/expected_results.json``.
+
+To select the wavefront backend, set ``QUOP_BACKEND=wavefront`` before
+running.  On Cray systems the script auto-detects ``srun``.
+
 Usage Examples
 --------------
 
@@ -137,7 +189,7 @@ After installing ``.[docs]``, build the documentation with:
 
 .. code-block:: bash
 
-    python setup.py build_sphinx
+    python -m sphinx -b html docs/source docs/build/html
 
 Building FFTW3 and HDF5 From Source
 ===================================

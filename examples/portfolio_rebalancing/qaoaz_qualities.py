@@ -17,9 +17,7 @@ def qaoaz_portfolio(
 
     if MPI_COMM.rank == 0:
         if int(2**n_qubits) != int(system_size):
-            raise ValueError(
-                "System size does not correspond to qubit Hilbert dimension"
-            )
+            raise ValueError("System size does not correspond to qubit Hilbert dimension")
         data = get_stock_data(n_stocks, start_date, end_date, stocks)
         stock_ret = data.pct_change()
         mean_returns = stock_ret.mean()
@@ -65,8 +63,6 @@ def qaoaz_portfolio(
 
         portfolio_return[k] = np.dot(mean_returns, binary)
         portfolio_std_dev[k] = np.dot(binary.T, np.dot(cov_matrix, binary))
-        costfunc[k] = 250 * (
-            risk * portfolio_std_dev[k] - (1 - risk) * portfolio_return[k]
-        )
+        costfunc[k] = 250 * (risk * portfolio_std_dev[k] - (1 - risk) * portfolio_return[k])
 
     return costfunc

@@ -1,7 +1,14 @@
 Portfolio Rebalancing using the QWOA and QAOAz
 ==============================================
 
-This example makes use of pandas-datareader which requires an internet connection.
+Force fallback CSV data (skip Yahoo Finance)
+-------------------------------------------
+
+Set `QUOP_PORTFOLIO_USE_SAMPLE_DATA=1` at runtime to force bundled CSV data:
+
+> QUOP_PORTFOLIO_USE_SAMPLE_DATA=1 python3 qwoa_qualities.py
+>
+> QUOP_PORTFOLIO_USE_SAMPLE_DATA=1 mpiexec -N 2 python3 qaoaz_portfolio.py
 
 QWOA
 ----

@@ -1,0 +1,42 @@
+# QuOp_QUISA fprettify configuration
+# See FORTRAN_STYLE.md for rationale.
+
+# 4-space indentation (Section 5.1)
+indent=4
+
+# Target line length 120 characters (Section 5.2)
+line-length=120
+
+# Whitespace preset 2: operators (except arithmetic), print/read (Section 5.3)
+whitespace=2
+
+# Enable whitespace around commas (Section 5.3)
+whitespace-comma=true
+
+# Enable whitespace around assignments
+whitespace-assignment=true
+
+# Enable whitespace around relational operators
+whitespace-relational=true
+
+# Enable whitespace around logical operators
+whitespace-logical=true
+
+# Enable whitespace around plus/minus
+whitespace-plusminus=true
+
+# Enable whitespace around multiply/divide
+whitespace-multdiv=true
+
+# Strictly impose indentation for nested loops
+strict-indent=true
+
+# Replace legacy relational operators: .lt. -> <, .gt. -> >, etc. (Section 5.4)
+enable-replacements=true
+c-relations=true
+
+# Lowercase keywords (Section 1.1)
+case=[1, 0, 1, 0]
+
+# Strip trailing whitespace before comments (Section 5.3)
+strip-comments=true

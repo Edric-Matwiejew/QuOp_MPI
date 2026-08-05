@@ -1,0 +1,4 @@
+# Align cmakelint with standards/CMAKE_STYLE.md:
+# wrapped argument lists may use vertical alignment, so disable the
+# indentation rule that assumes fixed continuation spacing.
+filter=-whitespace/indent

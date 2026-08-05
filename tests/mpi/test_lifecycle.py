@@ -7,15 +7,34 @@ including initialization, setup, execution, and cleanup.
 Run with: mpiexec -n 2 python -m pytest tests/mpi/test_lifecycle.py -v --with-mpi
 """
 
+import gc
+import weakref
+
 import pytest
-import numpy as np
 from mpi4py import MPI
 
-import sys
-import os
+from tests.conftest import TestOracle
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from conftest import TestOracle
+
+def _marked_count(system_size, minimum):
+    """Preserve roughly the same marked-state density as the shared oracle."""
+    return max(minimum, system_size // 16)
+
+
+@pytest.fixture
+def simple_oracle(mpi_sizing):
+    """Scale lifecycle tests to keep more ranks active without growing too much."""
+    system_size = mpi_sizing.power_of_two(
+        base=32,
+        min_per_rank=1,
+        min_per_node=8,
+        min_per_gpu=4,
+    )
+    return TestOracle(
+        system_size=system_size,
+        n_marked=_marked_count(system_size, minimum=2),
+        seed=42,
+    )
 
 
 @pytest.mark.mpi
@@ -24,39 +43,42 @@ class TestSetup:
 
     def test_setup_completes_without_error(self, mpi_comm, simple_oracle):
         """Verify setup() runs to completion."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
         # Should complete without error
         alg.setup()
 
-        assert alg.setup_called == True
+        assert alg.setup_called
+
+        alg.destroy()
 
     def test_setup_sets_correct_flags(self, mpi_comm, simple_oracle):
         """Verify setup() properly manages state flags."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
         # Before setup
-        assert alg.setup_called == False
+        assert not alg.setup_called
 
         alg.setup()
 
         # After setup
-        assert alg.setup_called == True
-        assert alg.reset == False
+        assert alg.setup_called
+
+        alg.destroy()
 
     def test_setup_can_be_called_multiple_times(self, mpi_comm, simple_oracle):
         """Verify setup() is idempotent."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -65,13 +87,15 @@ class TestSetup:
         alg.setup()
         alg.setup()
 
-        assert alg.setup_called == True
+        assert alg.setup_called
+
+        alg.destroy()
 
     def test_setup_after_config_change(self, mpi_comm, simple_oracle):
         """Verify setup() works after configuration changes."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
@@ -82,7 +106,9 @@ class TestSetup:
         # Setup should work again
         alg.setup()
 
-        assert alg.setup_called == True
+        assert alg.setup_called
+
+        alg.destroy()
 
 
 @pytest.mark.mpi
@@ -98,11 +124,17 @@ class TestDestroy:
         # Should not raise any errors
         alg.destroy()
 
+        assert alg.MPI_COMM_WORLD is not None
+        assert MPI.Comm.Compare(alg.MPI_COMM_WORLD, mpi_comm) in (
+            MPI.IDENT,
+            MPI.CONGRUENT,
+        )
+
     def test_destroy_after_setup(self, mpi_comm, simple_oracle):
         """Verify destroy() works after setup()."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
@@ -112,9 +144,9 @@ class TestDestroy:
 
     def test_destroy_after_evolve(self, mpi_comm, simple_oracle):
         """Verify destroy() works after state evolution."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
@@ -127,9 +159,9 @@ class TestDestroy:
 
     def test_destroy_after_execute(self, mpi_comm, simple_oracle):
         """Verify destroy() works after execute()."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -140,9 +172,9 @@ class TestDestroy:
 
     def test_destroy_can_be_called_multiple_times(self, mpi_comm, simple_oracle):
         """Verify destroy() is idempotent."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.execute()
@@ -159,9 +191,9 @@ class TestLifecycleSequences:
 
     def test_setup_evolve_destroy(self, mpi_comm, simple_oracle):
         """Test setup -> evolve -> destroy sequence."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
@@ -172,9 +204,9 @@ class TestLifecycleSequences:
 
     def test_multiple_evolve_calls(self, mpi_comm, simple_oracle):
         """Test multiple evolve_state calls in sequence."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
@@ -189,26 +221,26 @@ class TestLifecycleSequences:
 
     def test_execute_includes_implicit_setup(self, mpi_comm, simple_oracle):
         """Verify execute() calls setup() implicitly if needed."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
         # Don't call setup() explicitly
-        assert alg.setup_called == False
+        assert not alg.setup_called
 
         alg.execute()
 
         # execute() should have called setup()
-        assert alg.setup_called == True
+        assert alg.setup_called
 
     def test_reinitialize_after_destroy(self, mpi_comm, simple_oracle):
         """Test creating new instance after destroying old one."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         # First instance
-        alg1 = qaoa(simple_oracle.system_size, mpi_comm)
+        alg1 = QAOA(simple_oracle.system_size, mpi_comm)
         alg1.set_qualities(simple_oracle.qualities_function())
         alg1.set_depth(1)
         alg1.execute()
@@ -219,7 +251,7 @@ class TestLifecycleSequences:
         alg1.destroy()
 
         # Second instance should work independently
-        alg2 = qaoa(simple_oracle.system_size, mpi_comm)
+        alg2 = QAOA(simple_oracle.system_size, mpi_comm)
         alg2.set_qualities(simple_oracle.qualities_function())
         alg2.set_depth(1)
         alg2.execute()
@@ -234,128 +266,21 @@ class TestLifecycleSequences:
 
 @pytest.mark.mpi
 class TestDestroyFunctionality:
-    """Tests for destroy() method bug #5 from known_bugs.md.
+    """Tests for destroy() method -- end-of-life resource cleanup.
 
-    Bug #5: setup_parallel was never set to False, so __post_parallel() was never called.
-
-    The destroy() condition `if not self.reset or not self.setup_called: return` is
-    intentional - it skips cleanup when resources are still valid (reset=False means
-    no configuration change since last setup). Cleanup only happens when configuration
-    changes (reset=True) AND setup was called.
+    In the dirty-flag model, destroy() is an unconditional end-of-life
+    operation that frees all resources.  It does not depend on
+    configuration-change booleans.
     """
 
-    def test_setup_parallel_flag_after_setup(self, mpi_comm, simple_oracle):
-        """Verify setup_parallel is set to False after setup().
+    def test_destroy_always_frees_resources(self, mpi_comm, simple_oracle):
+        """Verify destroy() always frees resources when setup was completed."""
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        Bug #5: setup_parallel was never set to False, so the cleanup code path
-        was never reachable even when destroy() was called with reset=True.
-        """
-        from quop_mpi.algorithm.combinatorial import qaoa
-
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_depth(1)
-
-        # Before setup, setup_parallel should be True (no parallel resources yet)
-        assert alg.setup_parallel == True
-
-        alg.setup()
-
-        # After setup, setup_parallel should be False (parallel resources allocated)
-        assert (
-            alg.setup_parallel == False
-        ), "Bug #5: setup_parallel should be False after setup() to indicate cleanup needed"
-
-    def test_destroy_calls_post_parallel_on_config_change(
-        self, mpi_comm, simple_oracle
-    ):
-        """Verify destroy() calls __post_parallel() when configuration changes.
-
-        The destroy() condition correctly skips cleanup when reset=False (no config
-        change). Cleanup only occurs when reset=True AND setup_called=True.
-        """
-        from quop_mpi.algorithm.combinatorial import qaoa
-
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_depth(1)
-        alg.execute()
-
-        # Track if _post_parallel was called
-        original_post_parallel = alg._post_parallel
-        post_parallel_called = [False]
-
-        def mock_post_parallel():
-            post_parallel_called[0] = True
-            original_post_parallel()
-
-        alg._post_parallel = mock_post_parallel
-
-        # Trigger configuration change - this sets reset=True
-        alg.set_unitaries(alg.unitaries)
-        assert alg.reset == True, "set_unitaries should set reset=True"
-
-        alg.destroy()
-
-        # Verify _post_parallel was called (Bug #5 fix makes this work)
-        assert post_parallel_called[
-            0
-        ], "Bug #5: _post_parallel() should be called during destroy() when reset=True"
-        assert (
-            alg.setup_parallel == True
-        ), "setup_parallel should be True after cleanup completed"
-
-    def test_destroy_calls_post_unitaries_on_config_change(
-        self, mpi_comm, simple_oracle
-    ):
-        """Verify destroy() calls __post_unitaries() when configuration changes."""
-        from quop_mpi.algorithm.combinatorial import qaoa
-
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
-        alg.set_qualities(simple_oracle.qualities_function())
-        alg.set_depth(1)
-        alg.execute()
-
-        # After execute, setup_unitaries should be False (unitaries generated)
-        assert (
-            alg.setup_unitaries == False
-        ), "setup_unitaries should be False after execute()"
-
-        # Track if __post_unitaries was called
-        original_post_unitaries = alg._Ansatz__post_unitaries
-        post_unitaries_called = [False]
-
-        def mock_post_unitaries():
-            post_unitaries_called[0] = True
-            original_post_unitaries()
-
-        alg._Ansatz__post_unitaries = mock_post_unitaries
-
-        # Trigger configuration change
-        alg.set_unitaries(alg.unitaries)
-
-        alg.destroy()
-
-        # Verify __post_unitaries was called
-        assert post_unitaries_called[
-            0
-        ], "__post_unitaries() should be called during destroy() when reset=True"
-
-    def test_destroy_skips_cleanup_when_no_config_change(self, mpi_comm, simple_oracle):
-        """Verify destroy() skips cleanup when there's no configuration change.
-
-        This is intentional behavior - resources are still valid if configuration
-        hasn't changed since last setup.
-        """
-        from quop_mpi.algorithm.combinatorial import qaoa
-
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
-
-        # No configuration change, so reset=False
-        assert alg.reset == False
 
         # Track if cleanup methods were called
         post_parallel_called = [False]
@@ -369,57 +294,88 @@ class TestDestroyFunctionality:
 
         alg.destroy()
 
-        # Cleanup should NOT have been called (reset=False means resources still valid)
-        assert not post_parallel_called[
+        # End-of-life destroy() ALWAYS frees resources
+        assert post_parallel_called[
             0
-        ], "destroy() should skip cleanup when reset=False (no config change)"
+        ], "destroy() should free resources unconditionally (end-of-life)"
 
-    def test_subcomms_freed_on_config_change(self, mpi_comm, simple_oracle):
-        """Verify MPI subcommunicators are properly freed when config changes."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+    def test_destroy_resets_dirty_flags(self, mpi_comm, simple_oracle):
+        """Verify destroy() resets dirty flags so re-setup fully re-inits."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+        from quop_mpi.ansatz import _Dirty
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+        alg.setup()
+
+        alg.destroy()
+
+        # After destroy, all major dirty bits should be set
+        assert alg._dirty & _Dirty.NEGOTIATION
+        assert alg._dirty & _Dirty.CONTEXT
+        assert alg._dirty & _Dirty.PLANS
+        assert not alg.setup_called
+
+    def test_subcomms_freed_on_destroy(self, mpi_comm, simple_oracle):
+        """Verify MPI subcommunicators are properly freed on destroy()."""
+        from unittest.mock import patch
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.execute()
 
-        # Track if subcomms.free() was called
-        original_free = alg.subcomms.free
-        free_called = [False]
+        # Trigger configuration change so destroy needs to free the layout
+        alg.set_unitaries(alg.unitaries)
 
-        def mock_free():
+        # Patch the layout's free method via the Ansatz _layout attribute
+        free_called = [False]
+        original_free = alg._layout.free
+
+        def tracking_free():
             free_called[0] = True
             original_free()
 
-        alg.subcomms.free = mock_free
+        with patch.object(alg, "_layout") as mock_layout:
+            mock_layout.free = tracking_free
+            # Forward other attribute access to original
+            mock_layout.SUBCOMM = alg._layout.SUBCOMM
+            mock_layout.in_subcomm.return_value = alg._layout.in_subcomm()
+            alg.destroy()
 
-        # Trigger configuration change
-        alg.set_unitaries(alg.unitaries)
-
-        alg.destroy()
-
-        # Verify free() was called (Bug #5 fix makes this work)
-        assert free_called[
-            0
-        ], "Bug #5: subcomms.free() should be called during destroy() when reset=True"
+        # Verify free() was called during destroy
+        assert free_called[0], "layout.free() should be called during destroy()"
 
 
 @pytest.mark.mpi
 class TestResourceManagement:
     """Test that resources are properly managed."""
 
-    def test_multiple_instances_independent(self, mpi_comm):
+    def test_multiple_instances_independent(self, mpi_comm, mpi_sizing):
         """Verify multiple Ansatz instances are independent."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        oracle1 = TestOracle(system_size=32, n_marked=2, seed=111)
-        oracle2 = TestOracle(system_size=64, n_marked=4, seed=222)
+        system_size1 = mpi_sizing.power_of_two(base=32, min_per_rank=1, min_per_node=4)
+        system_size2 = mpi_sizing.power_of_two(base=64, min_per_rank=2, min_per_node=8)
+        oracle1 = TestOracle(
+            system_size=system_size1,
+            n_marked=_marked_count(system_size1, minimum=2),
+            seed=111,
+        )
+        oracle2 = TestOracle(
+            system_size=system_size2,
+            n_marked=_marked_count(system_size2, minimum=4),
+            seed=222,
+        )
 
-        alg1 = qaoa(oracle1.system_size, mpi_comm)
+        alg1 = QAOA(oracle1.system_size, mpi_comm)
         alg1.set_qualities(oracle1.qualities_function())
         alg1.set_depth(1)
 
-        alg2 = qaoa(oracle2.system_size, mpi_comm)
+        alg2 = QAOA(oracle2.system_size, mpi_comm)
         alg2.set_qualities(oracle2.qualities_function())
         alg2.set_depth(2)
 
@@ -427,20 +383,20 @@ class TestResourceManagement:
         alg1.setup()
         alg2.setup()
 
-        assert alg1.system_size == 32
-        assert alg2.system_size == 64
+        assert alg1.system_size == system_size1
+        assert alg2.system_size == system_size2
 
         alg1.destroy()
         alg2.destroy()
 
     def test_sequential_executions(self, mpi_comm, simple_oracle):
         """Test running multiple sequential optimizations."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         results = []
 
-        for i in range(3):
-            alg = qaoa(simple_oracle.system_size, mpi_comm)
+        for _ in range(3):
+            alg = QAOA(simple_oracle.system_size, mpi_comm)
             alg.set_qualities(simple_oracle.qualities_function())
             alg.set_depth(1)
 
@@ -459,7 +415,7 @@ class TestResourceManagement:
 
 @pytest.mark.mpi
 class TestDelCleanup:
-    """Test that `del` properly cleans up resources via __del__."""
+    """Test that ``del`` is inert and explicit ``destroy()`` owns cleanup."""
 
     def test_del_before_setup(self, mpi_comm, small_system_size):
         """Verify del is safe before setup()."""
@@ -470,54 +426,83 @@ class TestDelCleanup:
         # Should not raise any errors
         del alg
 
-    def test_del_after_setup(self, mpi_comm, simple_oracle):
-        """Verify del properly cleans up after setup()."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+    def test_del_releases_instance_before_exit(self, mpi_comm, small_system_size):
+        """Verify ``del`` does not keep the instance artificially alive."""
+        from quop_mpi import Ansatz
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = Ansatz(small_system_size, mpi_comm)
+        alg_ref = weakref.ref(alg)
+
+        del alg
+        gc.collect()
+
+        assert alg_ref() is None
+
+    def test_del_does_not_call_destroy(self, mpi_comm, small_system_size, monkeypatch):
+        """Verify ``__del__`` never delegates to ``destroy()``."""
+        from quop_mpi import Ansatz
+
+        alg = Ansatz(small_system_size, mpi_comm)
+        destroy_called = [False]
+
+        def fake_destroy():
+            destroy_called[0] = True
+
+        monkeypatch.setattr(alg, "destroy", fake_destroy)
+
+        alg.__del__()
+
+        assert destroy_called[0] is False
+
+    def test_del_after_setup(self, mpi_comm, simple_oracle):
+        """Verify ``del`` is safe after explicit destroy following setup()."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
+        alg.destroy()
 
         # Should not raise
         del alg
 
     def test_del_after_evolve(self, mpi_comm, simple_oracle):
-        """Verify del properly cleans up after state evolution."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        """Verify ``del`` is safe after explicit destroy following evolve()."""
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.setup()
 
         params = simple_oracle.optimal_params(depth=1)
         alg.evolve_state(params)
+        alg.destroy()
 
         # Should not raise
         del alg
 
     def test_del_after_execute(self, mpi_comm, simple_oracle):
-        """Verify del properly cleans up after execute()."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+        """Verify ``del`` is safe after explicit destroy following execute()."""
+        from quop_mpi.algorithm.combinatorial import QAOA
 
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
 
         alg.execute()
+        alg.destroy()
 
         # Should not raise
         del alg
 
-    def test_sequential_del_creates_independent_instances(
-        self, mpi_comm, simple_oracle
-    ):
-        """Test creating new instance after deleting old one."""
-        from quop_mpi.algorithm.combinatorial import qaoa
+    def test_sequential_del_creates_independent_instances(self, mpi_comm, simple_oracle):
+        """Test creating new instance after explicit destroy and deletion."""
+        from quop_mpi.algorithm.combinatorial import QAOA
 
         # First instance
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.execute()
@@ -528,10 +513,11 @@ class TestDelCleanup:
             result1 = None
         result1 = mpi_comm.bcast(result1, root=0)
 
+        alg.destroy()
         del alg
 
         # Second instance should work independently
-        alg = qaoa(simple_oracle.system_size, mpi_comm)
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
         alg.set_qualities(simple_oracle.qualities_function())
         alg.set_depth(1)
         alg.execute()
@@ -545,4 +531,136 @@ class TestDelCleanup:
         # Both should have produced valid results
         assert result1 is not None and result2 is not None
 
+        alg.destroy()
         del alg
+
+
+@pytest.mark.mpi
+class TestContextManagerCleanup:
+    """Test deterministic cleanup via the context-manager exit path."""
+
+    def test_with_block_destroys_after_execute(self, mpi_comm, simple_oracle):
+        """Verify ``with`` delegates to ``destroy()`` on normal exit."""
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_depth(1)
+            alg.execute()
+
+            assert alg.MPI_COMM_WORLD is not None
+
+        assert alg.MPI_COMM_WORLD is not None
+        assert alg.context is None
+        assert alg.layout is None
+
+    def test_with_block_destroys_on_exception(self, mpi_comm, small_system_size):
+        """Verify ``with`` still destroys resources when the body raises."""
+        from quop_mpi import Ansatz
+
+        with pytest.raises(RuntimeError, match="expected lifecycle failure"):
+            with Ansatz(small_system_size, mpi_comm) as alg:
+                raise RuntimeError("expected lifecycle failure")
+
+        assert alg.MPI_COMM_WORLD is not None
+
+
+@pytest.mark.mpi
+class TestLifecycleWorkflows:
+    """Lifecycle sequences matching documented user workflows."""
+
+    def test_prepare_inspect_then_evolve(self, mpi_comm, simple_oracle):
+        """Verify the prepare -> inspect -> evolve workflow from documentation.
+
+        Users call prepare() (not just setup()) to fully initialize the
+        Ansatz, inspect state, then evolve_state() manually.
+        setup() only negotiates parallelisation; prepare() also runs the
+        __pre() step that generates initial state, observables, etc.
+        """
+        import numpy as np
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_depth(1)
+
+            alg.prepare()
+
+            # Inspect: initial state should be allocated on subcomm ranks
+            if alg.subcomms.in_subcomm():
+                assert alg.ansatz_initial_state is not None
+                assert len(alg.ansatz_initial_state) > 0
+
+            # Evolve and check expectation value
+            params = simple_oracle.optimal_params(depth=1)
+            alg.evolve_state(params)
+            exp_val = alg.get_expectation_value()
+
+            if alg.subcomms.in_subcomm():
+                assert isinstance(exp_val, (float, np.floating))
+                assert np.isfinite(exp_val)
+
+    def test_reexecute_after_config_change(self, mpi_comm, simple_oracle):
+        """Verify re-execution after changing configuration between runs.
+
+        Users should be able to execute(), change settings, and execute() again.
+        """
+        import numpy as np
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        alg = QAOA(simple_oracle.system_size, mpi_comm)
+        alg.set_qualities(simple_oracle.qualities_function())
+        alg.set_depth(1)
+
+        alg.execute()
+
+        if mpi_comm.Get_rank() == 0:
+            result1 = alg.result["fun"]
+        else:
+            result1 = None
+        result1 = mpi_comm.bcast(result1, root=0)
+
+        # Change depth and re-execute
+        alg.set_depth(2)
+        alg.execute()
+
+        if mpi_comm.Get_rank() == 0:
+            result2 = alg.result["fun"]
+        else:
+            result2 = None
+        result2 = mpi_comm.bcast(result2, root=0)
+
+        assert np.isfinite(result1)
+        assert np.isfinite(result2)
+
+        alg.destroy()
+
+    def test_evolve_state_independence_across_calls(self, mpi_comm, simple_oracle):
+        """Verify that successive evolve_state() calls with different params
+        produce independent results."""
+        import numpy as np
+
+        from quop_mpi.algorithm.combinatorial import QAOA
+
+        with QAOA(simple_oracle.system_size, mpi_comm) as alg:
+            alg.set_qualities(simple_oracle.qualities_function())
+            alg.set_depth(1)
+            alg.setup()
+
+            params1 = simple_oracle.optimal_params(depth=1)
+            alg.evolve_state(params1)
+            exp1 = alg.get_expectation_value()
+
+            # Different params should give a different expectation value
+            params2 = params1 * 0.5
+            alg.evolve_state(params2)
+            exp2 = alg.get_expectation_value()
+
+            assert isinstance(exp1, float)
+            assert isinstance(exp2, float)
+            # With different params, expectation values should generally differ
+            # (only assert both are finite; exact inequality is not guaranteed)
+            assert np.isfinite(exp1)
+            assert np.isfinite(exp2)

@@ -13,7 +13,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, os.path.abspath("../../src"))
 
 
 # -- Project information -----------------------------------------------------
@@ -25,7 +25,7 @@ author = "Edric Matwiejew"
 autodoc_mock_imports = ["mpi4py", "h5py", "nlopt", "quop_mpi._lib"]
 
 # The full version, including alpha/beta/rc tags
-release = "1.5.0"
+release = "1.6.0"
 
 
 # -- General configuration ---------------------------------------------------
@@ -38,6 +38,7 @@ extensions = [
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",
     "sphinxcontrib.bibtex",
+    "sphinxcontrib.mermaid",
 ]
 mathjax3_config = {
     "tex": {
@@ -52,6 +53,7 @@ mathjax3_config = {
 bibtex_bibfiles = ["bibliography.bib"]
 autosummary_generate = False
 numpydoc_show_class_members = False
+autodoc_typehints = "none"
 
 # Enable numbered figures and equations for :numref: references
 numfig = True

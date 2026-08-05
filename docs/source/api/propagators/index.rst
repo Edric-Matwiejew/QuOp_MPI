@@ -6,6 +6,8 @@ Propagators
 
 Propagators implement the unitary time evolution for different types of operators. Choose the appropriate propagator based on your operator's structure.
 
+.. automodule:: quop_mpi.propagator
+
 .. list-table:: Propagator Selection Guide
    :header-rows: 1
    :widths: 20 40 40
@@ -24,7 +26,7 @@ Propagators implement the unitary time evolution for different types of operator
      - QAOA, custom Hamiltonians
    * - :doc:`composite`
      - Operator is a Cartesian sum of circulant operators mixing over subregisters
-     - Discretised continuous multivariable optimisation, combinatorial problems with decision variables of arity ≥ 3
+     - Discretised continuous multivariable optimisation, combinatorial problems with decision variables of arity >= 3
    * - :doc:`momentum`
      - State evolves in momentum space
      - Gradient-descent search inspired by continuous-variable photonic quantum computing
