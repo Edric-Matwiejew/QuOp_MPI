@@ -6,7 +6,6 @@ set(_depends
     wavefront_context
     wavefront_diagonal
     hip_kernels
-    wavefront_utils
     wf_communicators
     wf_partitions
     wf_transfer

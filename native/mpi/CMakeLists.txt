@@ -1,15 +1,19 @@
 configure_file(${CMAKE_SOURCE_DIR}/cmake/downloadFindFFTW.cmake.in findFFTW-download/CMakeLists.txt)
-execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/findFFTW-download )
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+  RESULT_VARIABLE result
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/findFFTW-download
+)
 if(result)
-    message(FATAL_ERROR "CMake step for findFFTW failed: ${result}")
+  message(FATAL_ERROR "CMake step for findFFTW failed: ${result}")
 endif()
-execute_process(COMMAND ${CMAKE_COMMAND} --build .
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/findFFTW-download )
+execute_process(
+  COMMAND ${CMAKE_COMMAND} --build .
+  RESULT_VARIABLE result
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/findFFTW-download
+)
 if(result)
-    message(FATAL_ERROR "Build step for findFFTW failed: ${result}")
+  message(FATAL_ERROR "Build step for findFFTW failed: ${result}")
 endif()
 
 set(_findFFTW_DIR ${CMAKE_CURRENT_BINARY_DIR}/findFFTW-src)
@@ -30,9 +34,9 @@ add_dependencies(mpi_context comm_info_mod)
 # ci_gpu_topology, ci_communicators, and ci_partitions. All f2py targets
 # that include comm_info_mod must also link these object libraries.
 if(WAVEFRONT_BACKEND)
-    set(_COMM_INFO_EXTRA ci_gpu_topology ci_communicators ci_partitions)
+  set(_COMM_INFO_EXTRA ci_gpu_topology ci_communicators ci_partitions)
 else()
-    set(_COMM_INFO_EXTRA "")
+  set(_COMM_INFO_EXTRA "")
 endif()
 
 set(_depends mpi_context comm_info_mod ${_COMM_INFO_EXTRA})

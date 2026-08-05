@@ -10,6 +10,7 @@ include(QuOpContextExtension)
 # Ninja and Make.
 
 set(PROPAGATOR_WRAPPER ${CMAKE_CURRENT_SOURCE_DIR}/propagator_wrapper.f90)
+set(SPARSE_PROPAGATORS_SRC ${CMAKE_CURRENT_SOURCE_DIR}/sparse_propagators/src)
 
 add_subdirectory(comm_info)
 add_subdirectory(io)

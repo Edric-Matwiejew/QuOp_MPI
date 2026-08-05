@@ -1,7 +1,7 @@
 set(TF_KERNELS_SRC ${CMAKE_CURRENT_SOURCE_DIR}/kernels)
 
 # HIP kernel compilation
-if(HIP_PLATFORM STREQUAL nvidia)
+if(HIP_PLATFORM STREQUAL "nvidia")
   set_source_files_properties(
     ${TF_KERNELS_SRC}/hip_transverse_field_kernels.cpp PROPERTIES LANGUAGE CUDA
   )
@@ -47,7 +47,6 @@ set(_depends
     hip_kernels
     transverse_field_common
     wavefront_context
-    wavefront_utils
     wf_communicators
     wf_partitions
     wf_transfer

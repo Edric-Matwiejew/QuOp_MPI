@@ -4,7 +4,6 @@ compile_and_link_hipfort_mpi(wavefront_composite)
 add_dependencies(
   wavefront_composite
   wavefront_context
-  wavefront_utils
   wf_gpu_topology
   wf_communicators
   wf_partitions
@@ -22,7 +21,6 @@ compile_and_link_hipfort_mpi(wavefront_momentum)
 add_dependencies(
   wavefront_momentum
   wavefront_context
-  wavefront_utils
   wf_gpu_topology
   wf_communicators
   wf_partitions
@@ -40,7 +38,7 @@ if(_shafft_inc)
   target_include_directories(wavefront_momentum PRIVATE ${_shafft_inc})
 endif()
 
-if(HIP_PLATFORM STREQUAL nvidia)
+if(HIP_PLATFORM STREQUAL "nvidia")
   target_link_libraries(
     wavefront_composite PUBLIC ${CUDA_PATH}/lib64/libcufft.so ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03
                                shafft::shafftc++
@@ -49,7 +47,7 @@ if(HIP_PLATFORM STREQUAL nvidia)
     wavefront_momentum PUBLIC ${CUDA_PATH}/lib64/libcufft.so ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03
                               shafft::shafftc++
   )
-elseif(HIP_PLATFORM STREQUAL amd)
+elseif(HIP_PLATFORM STREQUAL "amd")
   target_link_libraries(wavefront_composite PUBLIC ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03 shafft::shafftc++)
   target_link_libraries(wavefront_momentum PUBLIC ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03 shafft::shafftc++)
 endif()
@@ -58,7 +56,6 @@ set(_depends
     wavefront_context
     wavefront_composite
     hip_kernels
-    wavefront_utils
     wf_communicators
     wf_partitions
     wf_transfer
@@ -136,7 +133,6 @@ set(_momentum_depends
     wavefront_context
     wavefront_momentum
     hip_kernels
-    wavefront_utils
     wf_communicators
     wf_partitions
     wf_transfer

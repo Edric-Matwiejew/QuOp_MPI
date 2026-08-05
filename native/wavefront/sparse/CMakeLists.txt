@@ -1,7 +1,6 @@
-set(SPARSE_PROPAGATORS_SRC ${CMAKE_SOURCE_DIR}/native/sparse_propagators/src)
 set(SPARSE_KERNELS_SRC ${SPARSE_PROPAGATORS_SRC}/kernels)
 
-if(HIP_PLATFORM STREQUAL nvidia)
+if(HIP_PLATFORM STREQUAL "nvidia")
   set_source_files_properties(
     ${SPARSE_KERNELS_SRC}/hip_vector_kernels.cpp ${SPARSE_KERNELS_SRC}/hip_spmv_kernels.cpp
     ${SPARSE_KERNELS_SRC}/hip_chebyshev_kernels.cpp ${SPARSE_KERNELS_SRC}/hip_reduction_kernels.cpp PROPERTIES LANGUAGE
@@ -88,7 +87,6 @@ set(_depends
     sparse_expm_kernels
     hip_kernels
     wavefront_context
-    wavefront_utils
     wf_communicators
     wf_partitions
     wf_transfer

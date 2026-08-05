@@ -1,5 +1,5 @@
-# Source files in sparse_propagators directory
-set(SPARSE_PROPAGATORS_SRC ${CMAKE_SOURCE_DIR}/native/sparse_propagators/src)
+# Source files in sparse_propagators directory (SPARSE_PROPAGATORS_SRC is
+# defined at the native/ scope so MPI and wavefront builds share it).
 set(_sparse_pp_defs "")
 if(GPU_AWARE_MPI)
   list(APPEND _sparse_pp_defs QUOP_GPU_AWARE_MPI)
