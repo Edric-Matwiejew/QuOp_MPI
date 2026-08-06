@@ -263,7 +263,7 @@ class TestSaveDatasets:
         alg.destroy()
 
     def test_save_contains_variational_params(self, mpi_comm, simple_oracle, temp_h5_file):
-        """Verify saved file contains initial_phases (variational parameters)."""
+        """Verify saved file contains initial_parameters (variational parameters)."""
         import h5py
 
         from quop_mpi.algorithm.combinatorial import QWOA
@@ -284,8 +284,8 @@ class TestSaveDatasets:
 
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
-                # Verify the initial_phases dataset exists
-                assert "initial_phases" in f[config_name], "initial_phases dataset not found"
+                # Verify the initial_parameters dataset exists
+                assert "initial_parameters" in f[config_name], "initial_parameters dataset not found"
 
         alg.destroy()
 
