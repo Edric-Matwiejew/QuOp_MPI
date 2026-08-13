@@ -365,7 +365,7 @@ contains
         end do
 
         do i_global = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
-            call get_index(int(i_global, int32), int(n_dim, int32), self%Ns, self%strides, inds(1:n_dim))
+            call get_index(i_global, int(n_dim, int32), self%Ns, self%strides, inds(1:n_dim))
 
             grid_point(1:n_dim) = self%minsk(1:n_dim) + (inds(1:n_dim) - 1.0_real64) * self%deltask(1:n_dim)
             self%phase_k(i_global - ci_local_i_offset) = exp(-cI * sum(grid_point(1:n_dim) * self%minsq(1:n_dim)))
@@ -407,7 +407,7 @@ contains
         end if
 
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
-            call get_index(int(i, int32), n_dim, self%Ns, self%strides, inds)
+            call get_index(i, n_dim, self%Ns, self%strides, inds)
             self%context%state(i - ci_local_i_offset) = &
                 ((-1.0_real64)**real(sum(inds - 1), real64)) * self%context%state(i - ci_local_i_offset)
         end do
@@ -419,7 +419,7 @@ contains
 
         self%mixer = cmplx(0.0_real64, 0.0_real64, real64)
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
-            call get_index(int(i, int32), n_dim, self%Ns, self%strides, inds)
+            call get_index(i, n_dim, self%Ns, self%strides, inds)
             do j = 1, n_dim
                 self%mixer(i - ci_local_i_offset) = self%mixer(i - ci_local_i_offset) &
                                                     + t_temp(j) * self%eigenvalues(int(inds(j)), j)
@@ -430,7 +430,7 @@ contains
             exp(-cI * self%mixer) * self%context%state(1:ci_local_i)
 
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
-            call get_index(int(i, int32), n_dim, self%Ns, self%strides, inds)
+            call get_index(i, n_dim, self%Ns, self%strides, inds)
             self%context%state(i - ci_local_i_offset) = &
                 ((-1.0_real64)**real(sum(inds - 1), real64)) * self%context%state(i - ci_local_i_offset)
         end do
