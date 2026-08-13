@@ -379,7 +379,7 @@ contains
 
         self%mixer = 0
         do i = ci_local_i_offset + 1, ci_local_i + ci_local_i_offset
-            call get_index(int(i, int32), n_dim, self%Ns, self%strides, inds)
+            call get_index(i, n_dim, self%Ns, self%strides, inds)
             do j = 1, n_dim
                 self%mixer(i - ci_local_i_offset) = &
                     self%mixer(i - ci_local_i_offset) &
