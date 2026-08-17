@@ -23,12 +23,13 @@ contains
 
         integer(int32) :: rank, flock
         integer(int32), dimension(:), allocatable :: counts, disps
+        integer(int64) :: global_i
         integer(int32) :: i, ierr
 
         local_nnz = 0
 
-        do i = local_i_offset + 1, local_i_offset + local_i
-            if (abs(dense_array(i)) > epsilon(1.0_real64)) then
+        do global_i = local_i_offset + 1_int64, local_i_offset + local_i
+            if (abs(dense_array(global_i)) > epsilon(1.0_real64)) then
                 local_nnz = local_nnz + 1
             end if
         end do
@@ -37,11 +38,11 @@ contains
 
         local_nnz = 0
 
-        do i = local_i_offset + 1, local_i_offset + local_i
-            if (abs(dense_array(i)) > epsilon(1.0_real64)) then
+        do global_i = local_i_offset + 1_int64, local_i_offset + local_i
+            if (abs(dense_array(global_i)) > epsilon(1.0_real64)) then
                 local_nnz = local_nnz + 1
-                local_indexes(local_nnz) = i
-                local_values(local_nnz) = dense_array(i)
+                local_indexes(local_nnz) = global_i
+                local_values(local_nnz) = dense_array(global_i)
             end if
         end do
 

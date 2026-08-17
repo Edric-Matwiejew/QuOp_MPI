@@ -74,8 +74,8 @@ contains
         character(len=512), intent(in) :: dataset_name
         character(len=1), intent(in) :: access_type
         integer(int64), intent(in) :: N
-        integer(int32), intent(in) :: local_i
-        integer(int32), intent(in) :: local_i_offset
+        integer(int64), intent(in) :: local_i
+        integer(int64), intent(in) :: local_i_offset
         complex(real64), dimension(local_i), intent(in) :: complex_array
         integer(int32), intent(in) :: MPI_communicator
 
@@ -84,8 +84,8 @@ contains
 !f2py  character*512 intent(in) :: dataset_name
 !f2py  character*1 intent(in) :: access_type
 !f2py  integer(kind=int64) intent(in) :: n
-!f2py  integer(kind=int32), optional,intent(in),check(shape(complex_array, 0) == local_i),depend(complex_array) :: local_i=shape(complex_array, 0)
-!f2py  integer(kind=int32) intent(in) :: local_i_offset
+!f2py  integer(kind=int64), optional,intent(in),check(shape(complex_array, 0) == local_i),depend(complex_array) :: local_i=shape(complex_array, 0)
+!f2py  integer(kind=int64) intent(in) :: local_i_offset
 !f2py  complex(kind=real64) dimension(local_i),intent(in) :: complex_array
 !f2py  integer(kind=int32) intent(in) :: mpi_communicator
 
@@ -289,8 +289,8 @@ contains
         character(len=512), intent(in) :: dataset_name
         character(len=1), intent(in) :: access_type
         integer(int64), intent(in) :: N
-        integer(int32), intent(in) :: local_i
-        integer(int32), intent(in) :: local_i_offset
+        integer(int64), intent(in) :: local_i
+        integer(int64), intent(in) :: local_i_offset
         real(real64), dimension(local_i), intent(in) :: real_array
         integer(int32), intent(in) :: MPI_communicator
 
@@ -299,8 +299,8 @@ contains
 !f2py  character*512 intent(in) :: dataset_name
 !f2py  character*1 intent(in) :: access_type
 !f2py  integer(kind=int64) intent(in) :: n
-!f2py  integer(kind=int32), optional,intent(in),check(shape(real_array, 0) == local_i),depend(real_array) :: local_i=shape(real_array, 0)
-!f2py  integer(kind=int32) intent(in) :: local_i_offset
+!f2py  integer(kind=int64), optional,intent(in),check(shape(real_array, 0) == local_i),depend(real_array) :: local_i=shape(real_array, 0)
+!f2py  integer(kind=int64) intent(in) :: local_i_offset
 !f2py  real(kind=real64) dimension(local_i) :: real_array
 !f2py  integer(kind=int32) intent(in) :: mpi_communicator
 
