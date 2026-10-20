@@ -41,11 +41,13 @@ def simple_oracle(mpi_sizing):
 class TestParameterMapWithExecute:
     """Tests for set_parameter_map() used with execute()."""
 
-    def test_execute_with_parameter_map(self, mpi_comm, simple_oracle):
+    @pytest.mark.parametrize("leader_only", [False, True])
+    @pytest.mark.parametrize("small_system", [False, True])
+    def test_execute_with_parameter_map(self, mpi_comm, simple_oracle, leader_only, small_system):
         """Verify execute() works with a parameter map."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
-        oracle = simple_oracle
+        oracle = TestOracle(system_size=2, n_marked=1, seed=42) if small_system else simple_oracle
 
         alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
@@ -60,9 +62,13 @@ class TestParameterMapWithExecute:
 
         # Execute with free parameters (2 params, not 2)
         initial_params = np.array([np.pi, oracle.optimal_walk_time])
+        if leader_only:
+            alg.setup()
+            if not alg.subcomms.is_optimiser_leader():
+                initial_params = None
         alg.execute(initial_params)
 
-        if mpi_comm.Get_rank() == 0:
+        if alg.subcomms.is_optimiser_leader():
             assert alg.result is not None
             assert "x" in alg.result
             # Result should have 2 free params
@@ -71,7 +77,8 @@ class TestParameterMapWithExecute:
 
         alg.destroy()
 
-    def test_execute_param_map_requires_initial_params(self, mpi_comm, simple_oracle):
+    @pytest.mark.parametrize("n_workers", [1, 2])
+    def test_execute_param_map_requires_initial_params(self, mpi_comm, simple_oracle, n_workers):
         """Verify execute() raises error when param map set but no initial params."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
@@ -85,6 +92,10 @@ class TestParameterMapWithExecute:
 
         alg.set_parameter_map(2, parameter_map)
         alg.set_depth(1)
+        if n_workers > 1:
+            if mpi_comm.Get_size() < n_workers:
+                pytest.skip("Need at least 2 MPI processes")
+            alg.set_parallel_jacobian(n_workers=n_workers, method="forward")
 
         # Should raise error without initial_parameters
         with pytest.raises(ValueError, match="[Pp]arameter map"):
