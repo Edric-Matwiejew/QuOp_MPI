@@ -27,7 +27,7 @@ dependencies = [
 
 [build-system]
 requires = [
-    "scikit-build-core>=0.10",
+    "scikit-build-core==0.12.2",
     "numpy>=2.0",
 ]
 build-backend = "scikit_build_core.build"
