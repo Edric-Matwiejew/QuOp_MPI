@@ -134,7 +134,11 @@ def array(
 
 
 def serial(
-    partition_table: list[int], MPI_COMM: Intracomm, function: Callable, *args, **kwargs  # noqa: N803
+    partition_table: list[int],
+    MPI_COMM: Intracomm,
+    function: Callable,
+    *args,
+    **kwargs,  # noqa: N803
 ) -> np.ndarray[np.complex128]:
     """Generate the :term:`initial state` using a serial Python function.
 

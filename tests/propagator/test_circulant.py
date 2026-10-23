@@ -17,7 +17,6 @@ Run with wavefront backend:
 import numpy as np
 import pytest
 
-
 # =============================================================================
 # Tests for Circulant Propagator via QWOA
 # =============================================================================

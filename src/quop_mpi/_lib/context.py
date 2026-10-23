@@ -145,28 +145,25 @@ class Context:
         rationale.
         """
         if self.initialised:
-            observables, error_code = self.context_wrapper.get_observables(
-                self._ctx
-            )
+            observables, error_code = self.context_wrapper.get_observables(self._ctx)
             self._raise_context_status(
                 "fetch context observables",
                 error_code,
                 {
                     1: (
                         RuntimeError,
-                        "Cannot fetch context observables:"
-                    " host buffer is smaller than local_i",
+                        "Cannot fetch context observables:" " host buffer is smaller than local_i",
                     ),
                     2: (
                         RuntimeError,
                         "Cannot fetch context observables:"
-                    " native buffers or transfer metadata"
-                    " are unavailable",
+                        " native buffers or transfer metadata"
+                        " are unavailable",
                     ),
                     3: (
                         RuntimeError,
                         "Cannot fetch context observables:"
-                    " host buffer exceeds internal allocation",
+                        " host buffer exceeds internal allocation",
                     ),
                 },
             )
@@ -184,8 +181,7 @@ class Context:
             {
                 1: (
                     RuntimeError,
-                    "Cannot update context observables:"
-                    " host buffer is smaller than local_i",
+                    "Cannot update context observables:" " host buffer is smaller than local_i",
                 ),
                 2: (
                     RuntimeError,
@@ -195,8 +191,7 @@ class Context:
                 ),
                 3: (
                     RuntimeError,
-                    "Cannot update context observables:"
-                    " host buffer exceeds internal allocation",
+                    "Cannot update context observables:" " host buffer exceeds internal allocation",
                 ),
             },
         )

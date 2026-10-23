@@ -11,7 +11,9 @@ from ._qaoa_base import _QAOABase
 class QAOASparse(_QAOABase):
     """Simulate QAOA using the sparse hypercube mixer."""
 
-    def __init__(self, system_size: int, MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD) -> None:  # noqa: N803
+    def __init__(
+        self, system_size: int, MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD
+    ) -> None:  # noqa: N803
         """Initialise a sparse-mixer QAOA instance."""
         super().__init__(system_size, MPI_communicator)
 

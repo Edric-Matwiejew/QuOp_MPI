@@ -164,9 +164,9 @@ class TestPartitionTableAgreement:
             pt = alg.partition_table
             # 1-based convention: pt[0]=1, pt[-1]=system_size+1
             span = int(pt[-1]) - int(pt[0])
-            assert span == sparse_medium_system_size, (
-                f"partition_table spans {span}, expected {sparse_medium_system_size}"
-            )
+            assert (
+                span == sparse_medium_system_size
+            ), f"partition_table spans {span}, expected {sparse_medium_system_size}"
         alg.destroy()
 
     def test_partition_table_matches_local_i(self, mpi_comm, sparse_medium_system_size):
@@ -198,9 +198,7 @@ class TestPartitionTableAgreement:
             )
         alg.destroy()
 
-    def test_partition_table_monotonically_increasing(
-        self, mpi_comm, sparse_medium_system_size
-    ):
+    def test_partition_table_monotonically_increasing(self, mpi_comm, sparse_medium_system_size):
         """partition_table values must be strictly increasing."""
         alg = _create_qaoa(sparse_medium_system_size, mpi_comm)
 

@@ -143,9 +143,7 @@ def mpi_check(
                 e = pickle.loads(blob)
                 lines.append(f"  rank {r}: {type(e).__name__}: {e}")
             except Exception as unpickle_err:  # noqa: BLE001
-                lines.append(
-                    f"  rank {r}: <unpickle failed: {unpickle_err!r}>"
-                )
+                lines.append(f"  rank {r}: <unpickle failed: {unpickle_err!r}>")
         sys.stderr.write("\n".join(lines) + "\n")
         sys.stderr.flush()
 

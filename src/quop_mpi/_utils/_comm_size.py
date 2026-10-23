@@ -93,8 +93,7 @@ class QuopMpiLayout:
                 status = int(_ciw.init_wavefront_layout(obj.handle))
                 if status != 0:
                     raise RuntimeError(
-                        "Fortran init_wavefront_layout failed with status "
-                        f"{status}"
+                        "Fortran init_wavefront_layout failed with status " f"{status}"
                     )
             obj.set_partitioning(int(local_i), int(local_i_offset))
             if alloc_local is None:
@@ -696,11 +695,7 @@ class QuopMpiLayout:
         action that should happen exactly once on the optimiser-owning
         rank, regardless of where it sits in ``MPI_COMM_WORLD``.
         """
-        return (
-            self._worker_id == 0
-            and self.subcomm is not None
-            and self.subcomm.Get_rank() == 0
-        )
+        return self._worker_id == 0 and self.subcomm is not None and self.subcomm.Get_rank() == 0
 
     def optimiser_leader_world_rank(self):
         """World rank of the optimiser leader.

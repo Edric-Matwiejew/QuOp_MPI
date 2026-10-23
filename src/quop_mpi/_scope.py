@@ -125,9 +125,7 @@ _SCOPE_CHECKS: dict[str, Callable] = {
 _SCOPE_COMMS: dict[str, Callable] = {
     "world": lambda self: getattr(self, "MPI_COMM_WORLD", None),
     "subcomm": lambda self: (
-        self.subcomms.SUBCOMM
-        if self.subcomms is not None and self.subcomms.in_subcomm()
-        else None
+        self.subcomms.SUBCOMM if self.subcomms is not None and self.subcomms.in_subcomm() else None
     ),
     "jaccomm": lambda self: (
         self.subcomms.JACCOMM

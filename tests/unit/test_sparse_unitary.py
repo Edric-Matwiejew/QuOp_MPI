@@ -58,9 +58,7 @@ class TestSparsePropagatorCompliance:
         col_indexes = np.array([0, 1, 1, 2], dtype=np.int64)
         values = np.array([1, 2, 3, 4], dtype=np.complex128)
 
-        propagator.gen_operator(
-            [row_starts, col_indexes, values], prepare_sparse_csr=True
-        )
+        propagator.gen_operator([row_starts, col_indexes, values], prepare_sparse_csr=True)
 
         # Compliant fast path: the wrapper retains the *exact* caller arrays
         # (no copy) so the native backend's borrowed pointers remain valid.
@@ -81,15 +79,11 @@ class TestSparsePropagatorCompliance:
         original_values = values.copy()
 
         with pytest.deprecated_call():
-            propagator.gen_operator(
-                [row_starts, col_indexes, values], prepare_sparse_csr=True
-            )
+            propagator.gen_operator([row_starts, col_indexes, values], prepare_sparse_csr=True)
 
         held = propagator._native_pinned_buffers[-1]
         normalized_row_starts, normalized_col_indexes, normalized_values = held
-        np.testing.assert_array_equal(
-            normalized_row_starts, np.array([0, 2, 4], dtype=np.int64)
-        )
+        np.testing.assert_array_equal(normalized_row_starts, np.array([0, 2, 4], dtype=np.int64))
         np.testing.assert_array_equal(
             normalized_col_indexes, np.array([1, 2, 0, 3], dtype=np.int64)
         )
@@ -116,12 +110,8 @@ class TestSparsePropagatorCompliance:
         second_col = np.array([0], dtype=np.int64)
         second_vals = np.array([2], dtype=np.complex128)
 
-        propagator.gen_operator(
-            [first_row, first_col, first_vals], prepare_sparse_csr=True
-        )
-        propagator.gen_operator(
-            [second_row, second_col, second_vals], prepare_sparse_csr=True
-        )
+        propagator.gen_operator([first_row, first_col, first_vals], prepare_sparse_csr=True)
+        propagator.gen_operator([second_row, second_col, second_vals], prepare_sparse_csr=True)
 
         # Both buffer sets must remain referenced; the native backend may
         # still hold raw pointers from the earlier gen_operator call.
@@ -137,9 +127,7 @@ class TestSparsePropagatorCompliance:
         col_indexes = np.array([0], dtype=np.int64)
         values = np.array([1], dtype=np.complex128)
 
-        propagator.gen_operator(
-            [row_starts, col_indexes, values], prepare_sparse_csr=True
-        )
+        propagator.gen_operator([row_starts, col_indexes, values], prepare_sparse_csr=True)
         propagator.destroy()
 
         assert propagator._native_pinned_buffers is None

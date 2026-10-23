@@ -16,7 +16,6 @@ Usage
 import csv
 import re
 import sys
-from pathlib import Path
 from typing import Dict, List, Optional
 
 # ─── Dump file parser ───────────────────────────────────────────────────────
@@ -40,18 +39,18 @@ DUMP_COL_MAP = {
     12: "dc_s",
     13: "dn_r",
     14: "dn_s",
-    15: "assigned_device_id",   # GPU column
-    16: "my_gpu_index",         # phys column
-    17: "gpu_devcomm_flag",     # gpu? column
-    18: "cpu_numa_node",        # cpuNm column
-    19: "rank_within_cpu_numa", # rCpuN column
-    20: "rank_within_gpu",      # rGpu column
-    21: "gpu_slot_ordinal",     # slot column
-    22: "is_gpu_rank",          # igpu column
-    23: "ranks_per_gpu",        # rpg column
-    24: "node_id",              # node column
-    25: "worker_id",            # wid column
-    26: "n_workers",            # nwk column
+    15: "assigned_device_id",  # GPU column
+    16: "my_gpu_index",  # phys column
+    17: "gpu_devcomm_flag",  # gpu? column
+    18: "cpu_numa_node",  # cpuNm column
+    19: "rank_within_cpu_numa",  # rCpuN column
+    20: "rank_within_gpu",  # rGpu column
+    21: "gpu_slot_ordinal",  # slot column
+    22: "is_gpu_rank",  # igpu column
+    23: "ranks_per_gpu",  # rpg column
+    24: "node_id",  # node column
+    25: "worker_id",  # wid column
+    26: "n_workers",  # nwk column
 }
 
 
@@ -131,8 +130,7 @@ def read_expected_csv(path: str) -> List[Dict]:
     with open(path) as f:
         reader = csv.DictReader(f)
         return [
-            {k: int(v) if v.lstrip("-").isdigit() else v for k, v in row.items()}
-            for row in reader
+            {k: int(v) if v.lstrip("-").isdigit() else v for k, v in row.items()} for row in reader
         ]
 
 
@@ -140,19 +138,34 @@ def read_expected_csv(path: str) -> List[Dict]:
 
 # Fields to compare exactly between expected CSV and dump.
 COMPARE_FIELDS = [
-    "node_id", "sc_r", "sc_s", "nc_r", "nc_s",
-    "dc_r", "dc_s", "dn_r", "dn_s",
-    "is_gpu_rank", "my_gpu_index", "gpu_devcomm_flag",
-    "rank_within_gpu", "gpu_slot_ordinal",
-    "worker_id", "n_workers",
+    "node_id",
+    "sc_r",
+    "sc_s",
+    "nc_r",
+    "nc_s",
+    "dc_r",
+    "dc_s",
+    "dn_r",
+    "dn_s",
+    "is_gpu_rank",
+    "my_gpu_index",
+    "gpu_devcomm_flag",
+    "rank_within_gpu",
+    "gpu_slot_ordinal",
+    "worker_id",
+    "n_workers",
 ]
 
 # Layer 2 (data partitioning) fields — compared when the expected CSV
 # contains them.  These are exact for diagonal-only ansatz with a
 # system_size that divides evenly by both SUBCOMM and DEVCOMM sizes.
 LAYER2_FIELDS = [
-    "li", "li_off", "alloc",
-    "d_li", "d_off", "d_alc",
+    "li",
+    "li_off",
+    "alloc",
+    "d_li",
+    "d_off",
+    "d_alc",
 ]
 
 # Map expected-CSV column names to dump column names.
@@ -175,19 +188,13 @@ def compare_expected_vs_actual(
 
     Returns list of human-readable difference strings.
     """
-    expected = {
-        int(r["mpi_rank"]): r
-        for r in expected_rows
-        if r["test_id"] == test_id
-    }
+    expected = {int(r["mpi_rank"]): r for r in expected_rows if r["test_id"] == test_id}
     actual = {r["mpi_rank"]: r for r in actual_ranks}
 
     diffs: List[str] = []
 
     if len(expected) != len(actual):
-        diffs.append(
-            f"Rank count mismatch: expected {len(expected)}, got {len(actual)}"
-        )
+        diffs.append(f"Rank count mismatch: expected {len(expected)}, got {len(actual)}")
 
     for mpi_rank in sorted(set(expected) & set(actual)):
         exp = expected[mpi_rank]
@@ -197,8 +204,7 @@ def compare_expected_vs_actual(
             act_val = act[field]
             if exp_val != act_val:
                 diffs.append(
-                    f"Rank {mpi_rank:>3}, {field:<20s}: "
-                    f"expected {exp_val:>4}, got {act_val:>4}"
+                    f"Rank {mpi_rank:>3}, {field:<20s}: " f"expected {exp_val:>4}, got {act_val:>4}"
                 )
 
         # Layer 2 fields (present when the expected CSV includes them).
@@ -225,10 +231,14 @@ def compare_expected_vs_actual(
 # of N=2048 across 128 ranks gives work to only 32 of them; or composite n-D
 # constrains comm size to divide leading_dim).
 _SIDELINED_SENTINELS = {
-    "sc_r": -1, "sc_s": 0,
-    "nc_r": -1, "nc_s": 0,
-    "dc_r": -1, "dc_s": 0,
-    "dn_r": -1, "dn_s": 0,
+    "sc_r": -1,
+    "sc_s": 0,
+    "nc_r": -1,
+    "nc_s": 0,
+    "dc_r": -1,
+    "dc_s": 0,
+    "dn_r": -1,
+    "dn_s": 0,
     "is_gpu_rank": 0,
     "gpu_devcomm_flag": 0,
     "gpu_slot_ordinal": -1,
@@ -306,25 +316,17 @@ def check_topology_consistency(
     # 1. GPU / DEVCOMM membership consistency.
     for r in gpu_ranks:
         if r["gpu_devcomm_flag"] != 1:
-            issues.append(
-                f"Rank {r['mpi_rank']}: is_gpu_rank=1 but gpu_devcomm_flag=0"
-            )
+            issues.append(f"Rank {r['mpi_rank']}: is_gpu_rank=1 but gpu_devcomm_flag=0")
     for r in non_gpu_ranks:
         if r["gpu_devcomm_flag"] != 0:
-            issues.append(
-                f"Rank {r['mpi_rank']}: is_gpu_rank=0 but gpu_devcomm_flag=1"
-            )
+            issues.append(f"Rank {r['mpi_rank']}: is_gpu_rank=0 but gpu_devcomm_flag=1")
 
     # 5. Non-GPU ranks excluded from device communicators.
     for r in non_gpu_ranks:
         if r["dc_r"] != -1 or r["dc_s"] != 0:
-            issues.append(
-                f"Rank {r['mpi_rank']}: non-GPU but dc_r={r['dc_r']}, dc_s={r['dc_s']}"
-            )
+            issues.append(f"Rank {r['mpi_rank']}: non-GPU but dc_r={r['dc_r']}, dc_s={r['dc_s']}")
         if r["dn_r"] != -1 or r["dn_s"] != 0:
-            issues.append(
-                f"Rank {r['mpi_rank']}: non-GPU but dn_r={r['dn_r']}, dn_s={r['dn_s']}"
-            )
+            issues.append(f"Rank {r['mpi_rank']}: non-GPU but dn_r={r['dn_r']}, dn_s={r['dn_s']}")
 
     # 6. rank_within_gpu in [0, rpg-1] for GPU ranks.
     for r in gpu_ranks:
@@ -356,16 +358,13 @@ def check_topology_consistency(
             gpu_counts[g] = gpu_counts.get(g, 0) + 1
         for g, count in sorted(gpu_counts.items()):
             if count > rpg:
-                issues.append(
-                    f"Node {nid}, GPU {g}: {count} ranks > rpg={rpg}"
-                )
+                issues.append(f"Node {nid}, GPU {g}: {count} ranks > rpg={rpg}")
 
     # 12. Non-GPU gpu_slot_ordinal should be -1.
     for r in non_gpu_ranks:
         if r["gpu_slot_ordinal"] != -1:
             issues.append(
-                f"Rank {r['mpi_rank']}: non-GPU but gpu_slot_ordinal="
-                f"{r['gpu_slot_ordinal']}"
+                f"Rank {r['mpi_rank']}: non-GPU but gpu_slot_ordinal=" f"{r['gpu_slot_ordinal']}"
             )
 
     # 13. rank_within_cpu_numa >= 0 when cpu_numa_node >= 0.
@@ -387,9 +386,7 @@ def check_topology_consistency(
         wids = set(r["worker_id"] for r in active_ranks)
         for wid in wids:
             if not (0 <= wid < nwk):
-                issues.append(
-                    f"worker_id={wid} outside [0, {nwk - 1}]"
-                )
+                issues.append(f"worker_id={wid} outside [0, {nwk - 1}]")
 
     # ── Per-worker checks (SUBCOMM/NODECOMM/DEVCOMM are per-worker) ──
 
@@ -405,17 +402,14 @@ def check_topology_consistency(
                 issues.append(f"{pfx}Inconsistent DEVCOMM sizes: {dc_sizes}")
             elif list(dc_sizes)[0] != len(w_gpu):
                 issues.append(
-                    f"{pfx}DEVCOMM size {list(dc_sizes)[0]} "
-                    f"!= GPU rank count {len(w_gpu)}"
+                    f"{pfx}DEVCOMM size {list(dc_sizes)[0]} " f"!= GPU rank count {len(w_gpu)}"
                 )
 
         # 3. DEVCOMM ranks dense [0, n_gpu-1].
         if w_gpu:
             dc_ranks = sorted(r["dc_r"] for r in w_gpu)
             if dc_ranks != list(range(len(w_gpu))):
-                issues.append(
-                    f"{pfx}DEVCOMM ranks not contiguous 0..{len(w_gpu)-1}"
-                )
+                issues.append(f"{pfx}DEVCOMM ranks not contiguous 0..{len(w_gpu)-1}")
 
         # 4. Per-node DEVCOMM_NODE consistency.
         for nid in w_nodes:
@@ -424,9 +418,7 @@ def check_topology_consistency(
                 continue
             dn_sizes = set(r["dn_s"] for r in node_gpu)
             if len(dn_sizes) > 1:
-                issues.append(
-                    f"{pfx}Node {nid}: inconsistent DEVCOMM_NODE sizes: {dn_sizes}"
-                )
+                issues.append(f"{pfx}Node {nid}: inconsistent DEVCOMM_NODE sizes: {dn_sizes}")
             elif list(dn_sizes)[0] != len(node_gpu):
                 issues.append(
                     f"{pfx}Node {nid}: DEVCOMM_NODE size {list(dn_sizes)[0]} "
@@ -441,9 +433,7 @@ def check_topology_consistency(
             node_ranks = [r for r in group if r["node_id"] == nid]
             nc_sizes = set(r["nc_s"] for r in node_ranks)
             if len(nc_sizes) > 1:
-                issues.append(
-                    f"{pfx}Node {nid}: inconsistent NODECOMM sizes: {nc_sizes}"
-                )
+                issues.append(f"{pfx}Node {nid}: inconsistent NODECOMM sizes: {nc_sizes}")
             elif list(nc_sizes)[0] != len(node_ranks):
                 issues.append(
                     f"{pfx}Node {nid}: NODECOMM size {list(nc_sizes)[0]} "
@@ -456,8 +446,7 @@ def check_topology_consistency(
             issues.append(f"{pfx}Inconsistent SUBCOMM sizes: {sc_sizes}")
         elif list(sc_sizes)[0] != len(group):
             issues.append(
-                f"{pfx}SUBCOMM size {list(sc_sizes)[0]} "
-                f"!= worker rank count {len(group)}"
+                f"{pfx}SUBCOMM size {list(sc_sizes)[0]} " f"!= worker rank count {len(group)}"
             )
 
         # 11. SUBCOMM ranks dense [0, n-1].
@@ -470,17 +459,13 @@ def check_topology_consistency(
             gpu_by_dc = sorted(w_gpu, key=lambda r: r["dc_r"])
             sc_order = [r["sc_r"] for r in gpu_by_dc]
             if sc_order != sorted(sc_order):
-                issues.append(
-                    f"{pfx}DEVCOMM rank order does not match SUBCOMM rank order"
-                )
+                issues.append(f"{pfx}DEVCOMM rank order does not match SUBCOMM rank order")
 
         # 17. SUBCOMM sizes consistent within worker (already implied by 10,
         #     but kept for explicit per-worker validation).
         sc_sizes_w = set(r["sc_s"] for r in group)
         if len(sc_sizes_w) > 1:
-            issues.append(
-                f"{pfx}inconsistent SUBCOMM sizes: {sc_sizes_w}"
-            )
+            issues.append(f"{pfx}inconsistent SUBCOMM sizes: {sc_sizes_w}")
 
     return issues
 

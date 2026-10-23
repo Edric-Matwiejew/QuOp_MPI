@@ -196,9 +196,9 @@ class TestContextFromLayout:
             # layouts do not build that hierarchy, so verify the buffer
             # round-trip on MPI only.
             if config.backend == "mpi":
-                test_state = (
-                    np.arange(padded_alloc_local, dtype=np.float64) + 1.0 + 0.5j
-                ).astype(np.complex128)
+                test_state = (np.arange(padded_alloc_local, dtype=np.float64) + 1.0 + 0.5j).astype(
+                    np.complex128
+                )
                 ctx.state = test_state
 
                 retrieved = ctx.state
@@ -339,9 +339,7 @@ class TestContextStateRoundTrip:
         ctx.destroy()
         layout.destroy()
 
-    def test_state_view_aliases_native_buffer(
-        self, mpi_comm, context_regular_system_size
-    ):
+    def test_state_view_aliases_native_buffer(self, mpi_comm, context_regular_system_size):
         """The Python ``ctx.state`` view aliases the native host buffer.
 
         Zero-copy contract (asserted on every backend): the ndarray

@@ -94,6 +94,7 @@ def _timed_barrier(comm, timeout_seconds: int = 30, label: str = "") -> None:
             MPI.COMM_WORLD.Abort(1)
         time.sleep(0.1)
 
+
 def _system_tmp_is_shared() -> bool:
     """Return True if the system temp directory is writable AND on a shared filesystem.
 

@@ -40,9 +40,7 @@ class Unitary(UnitaryBase):
                 "The transverse_field propagator is not implemented for this backend."
             ) from exc
 
-        self.propagators = [
-            Propagator(self.propagator_module.transverse_field_propagator_wrapper)
-        ]
+        self.propagators = [Propagator(self.propagator_module.transverse_field_propagator_wrapper)]
 
     def gen_operator(self) -> None:
         """Plan the native propagator.

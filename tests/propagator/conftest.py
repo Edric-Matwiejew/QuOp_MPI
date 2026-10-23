@@ -11,6 +11,7 @@ import os
 
 import pytest
 from mpi4py import MPI
+
 from quop_mpi import config
 
 # Set OMP_NUM_THREADS=1 to prevent OpenMP thread contention with MPI

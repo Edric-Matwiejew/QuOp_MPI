@@ -285,7 +285,9 @@ class TestSaveDatasets:
         if mpi_comm.Get_rank() == 0:
             with h5py.File(temp_h5_file + ".h5", "r") as f:
                 # Verify the initial_parameters dataset exists
-                assert "initial_parameters" in f[config_name], "initial_parameters dataset not found"
+                assert (
+                    "initial_parameters" in f[config_name]
+                ), "initial_parameters dataset not found"
 
         alg.destroy()
 

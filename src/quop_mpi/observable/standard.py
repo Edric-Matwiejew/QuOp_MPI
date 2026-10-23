@@ -17,7 +17,11 @@ if TYPE_CHECKING:
 
 
 def serial(
-    partition_table: list[int], MPI_COMM: Intracomm, function: Callable, *args, **kwargs  # noqa: N803
+    partition_table: list[int],
+    MPI_COMM: Intracomm,
+    function: Callable,
+    *args,
+    **kwargs,  # noqa: N803
 ) -> np.ndarray[np.float64]:
     """Generate :term:`observables` using a serial python function.
 
@@ -72,7 +76,9 @@ def serial(
     return terms
 
 
-def csv(partition_table: list[int], MPI_COMM: Intracomm, *args, **kwargs) -> np.ndarray[np.float64]:  # noqa: N803
+def csv(
+    partition_table: list[int], MPI_COMM: Intracomm, *args, **kwargs
+) -> np.ndarray[np.float64]:  # noqa: N803
     """Load :term:`observables` from a :literal:`*.csv` using `pandas
     <https://pandas.pydata.org/>`_.
 

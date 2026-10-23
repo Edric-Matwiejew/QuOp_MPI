@@ -683,9 +683,7 @@ class TestFullWorkflow:
         _ciw.destroy(ci2)
 
     @pytest.mark.requires_nprocs(2)
-    def test_multiple_system_sizes(
-        self, mpi_comm, mpi_rank, mpi_size, wrapper_system_size_ladder
-    ):
+    def test_multiple_system_sizes(self, mpi_comm, mpi_rank, mpi_size, wrapper_system_size_ladder):
         """Re-use a layout with different system sizes (re-partition)."""
         ci = _create_layout_handle()
 

@@ -14,10 +14,10 @@ from ._scope import scope
 from ._utils._interface import Interface
 
 if TYPE_CHECKING:
+    from quop_mpi import UnitaryBase
+
     from ._lib.context import Context
     from ._utils._comm_size import QuopMpiLayout
-
-    from quop_mpi import UnitaryBase
 
 
 ParsedFunctionDict = dict[str, list[Any] | dict[str, Any]]
@@ -46,7 +46,9 @@ class Sampling:
         unitaries: list[UnitaryBase] | None
         MPI_COMM_WORLD: MPI.Intracomm
 
-        def __parse_function_dict__(self, function_dict: dict[str, Any] | None, attribute_name: str) -> None: ...
+        def __parse_function_dict__(
+            self, function_dict: dict[str, Any] | None, attribute_name: str
+        ) -> None: ...
 
     def _init_sampling(self):
         """Initialize sampling-related instance variables.

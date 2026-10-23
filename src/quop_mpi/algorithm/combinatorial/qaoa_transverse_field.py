@@ -31,7 +31,9 @@ class QAOATransverseField(_QAOABase):
     constraints.
     """
 
-    def __init__(self, system_size: int, MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD) -> None:  # noqa: N803
+    def __init__(
+        self, system_size: int, MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD
+    ) -> None:  # noqa: N803
         """Initialise a transverse-field-mixer QAOA instance."""
         super().__init__(system_size, MPI_communicator)
 
