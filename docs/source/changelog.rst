@@ -4,6 +4,30 @@
 Changelog
 =========
 
+Version 1.7.0 (Unreleased)
+==========================
+
+Added
+-----
+
+- :func:`~quop_mpi.parameter_maps.linear_ramp` creates a three-parameter linear
+  schedule, with optional normalisation weighted by initial-state probabilities.
+- The multivariable Rastrigin example demonstrates optimisation of the linear
+  schedule parameters.
+
+Changed
+-------
+
+- :meth:`~quop_mpi.ansatz.set_parameter_map` now infers the number of free
+  parameters from the vector supplied to ``execute()`` or ``evolve_state()``.
+  Replace ``set_parameter_map(n_free_params, mapping_fn, mapping_dict)`` with
+  ``set_parameter_map(mapping_fn, mapping_dict)``; ``mapping_dict`` remains
+  optional. Reading ``n_free_params`` before supplying a vector now raises
+  ``RuntimeError``.
+- :meth:`~quop_mpi.ansatz.benchmark` requires an explicit ``initial_parameters``
+  vector when a parameter map is set, instead of generating random free
+  parameters. Mapped ``execute()`` calls continue to require an initial vector.
+
 Version 1.6.2 (Unreleased)
 ==========================
 
