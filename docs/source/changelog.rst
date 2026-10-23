@@ -4,8 +4,8 @@
 Changelog
 =========
 
-Version 1.6.1 (Unreleased)
-=====================
+Version 1.6.1
+=============
 
 Added
 -----
@@ -31,7 +31,7 @@ Fixed
 - NUMA detection and worker splitting fixes improve mixed CPU/GPU wavefront setups
 - Single-rank and backend-specific MPI paths corrected for FFTW planning and ``MPI_IN_PLACE`` handling
 
-Version 1.6.0 (Unreleased)
+Version 1.6.1 (Unreleased)
 ==========================
 
 Added

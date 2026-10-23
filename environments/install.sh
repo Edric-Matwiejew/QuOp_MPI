@@ -146,7 +146,7 @@ ensure_python_build_requirements() {
         setuptools \
         wheel \
         build \
-        "scikit-build-core>=0.10" \
+        "scikit-build-core==0.12.2" \
         ninja \
         "cmake>=3.25,<4" \
         "numpy>=2.0"

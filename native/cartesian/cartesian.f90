@@ -38,9 +38,9 @@ contains
         complex(real64), intent(inout) :: vec(local_i)
 
         real(real64), dimension(n_dim) :: grid_point
-        integer(int32) :: i, j
+        integer(int64) :: i
 
-        do i = local_i_offset + 1, local_i + local_i_offset
+        do i = local_i_offset + 1_int64, local_i + local_i_offset
             call get_index(i, n_dim, Ns, strides, grid_point)
             grid_point = mins + (grid_point - 1.0_real64) * deltas
 !f2py (callback) f
@@ -60,7 +60,7 @@ contains
         complex(real64), parameter :: cI = cmplx(0.0_real64, 1.0_real64, real64)
         real(real64), parameter :: pi = 4.0_real64 * atan(1.0_real64)
 
-        integer(int32), intent(in) :: i
+        integer(int64), intent(in) :: i
         integer(int32), intent(in) :: n_dim
         integer(int32), intent(in) :: Ns(n_dim)
         integer(int64), intent(in) :: strides(n_dim)
@@ -102,9 +102,9 @@ contains
         real(real64), intent(out) :: local_grid(local_i, n_dim)
 
         real(real64) :: grid_point(n_dim)
-        integer(int32) :: i
+        integer(int64) :: i
 
-        do i = local_i_offset + 1, local_i + local_i_offset
+        do i = local_i_offset + 1_int64, local_i + local_i_offset
             call get_index(i, n_dim, Ns, strides, grid_point)
             local_grid(i - local_i_offset, :) = mins + (grid_point - 1.0_real64) * deltas
         end do

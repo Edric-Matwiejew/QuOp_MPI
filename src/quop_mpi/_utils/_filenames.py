@@ -30,7 +30,7 @@ def ensure_uniqueness(filepath, extension, MPI_COMM, add_time):  # noqa: N803
 
 def ensure_extension(filepath, extension):
     if len(filepath) > len(extension) + 1:
-        has_extension = filepath[-len(extension) :] == extension
+        has_extension = filepath.endswith(f".{extension}")
     else:
         has_extension = False
     if not has_extension:

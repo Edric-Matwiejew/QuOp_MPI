@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25...4.0)
 
 project(
   QuOp_MPI
-  VERSION 1.6.0
+  VERSION 1.6.1
   DESCRIPTION "QuOp_MPI extension modules."
   LANGUAGES C Fortran
 )

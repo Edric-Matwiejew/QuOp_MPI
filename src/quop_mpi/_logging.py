@@ -174,80 +174,84 @@ class Logging:
     def _post_log(self) -> None:
         """Close the results log file on simulation completion."""
 
-        if (
-            self.subcomms is not None
-            and self.subcomms.is_optimiser_leader()
-            and self.log
-        ):
+        if self.subcomms is not None and self.subcomms.is_optimiser_leader() and self.log:
             self.logfile.close()
 
     @scope("subcomm", returns="none")
-    def save(self, file_name: str, config_name: str, action: str = "a") -> None:
-        """Write the :term:`final state`, :term:`observables` and results
-        summary to a HDf5 file.
+    def save(
+        self,
+        file_name: str,
+        config_name: str,
+        action: str = "a",
+        *,
+        problem_name: str | None = None,
+        save_initial_state: bool = True,
+        save_observables: bool = True,
+        save_final_state: bool = True,
+    ) -> None:
+        """Write ansatz states, observables and result metadata to HDF5.
 
         Parameters
         ----------
         file_name : str
-            file path to saved data
+            Path to the saved data.
         config_name : str
-            simulation identifier
+            Simulation identifier.
         action : {'a', 'w'}, optional
-            'a' to append or 'w' to overwrite, by default 'a'
+            ``'a'`` to append or ``'w'`` to overwrite, by default ``'a'``.
+        problem_name : str, optional
+            Problem-instance identifier. Group ``config_name`` together with
+            other configurations assumed to share the same ``initial_state``
+            and ``observables``.
+        save_initial_state : bool, optional
+            Ensure that the algorithm-level initial state is saved, by default
+            ``True``.
+        save_observables : bool, optional
+            Ensure that the observables vector is saved, by default ``True``.
+        save_final_state : bool, optional
+            Save the final state, by default ``True``.
 
         Notes
         -----
-
-        Data is saved into a :literal:`*.h5` file with the following structure.
-
-        ::
+        Without ``problem_name``, the HDF5 group layout is ::
 
             config_name/
+                initial_parameters
                 initial_state
                 final_state
                 observables
+
+        With ``problem_name``, shared problem data and run-specific data are
+        separated::
+
+            problems/
+                problem_name/
+                    initial_state
+                    observables
+                    configs/
+                        config_name/
+                            initial_parameters
+                            final_state
+
+        When ``problem_name`` is supplied, ``save_initial_state=True`` and
+        ``save_observables=True``, if a requested dataset is already present with the
+        expected one-dimensional shape, it is not written again. If its shape
+        is incompatible with ``system_size``, a :class:`ValueError` is raised.
 
         The saved ``initial_state`` and ``final_state`` datasets are the
         algorithm-level ansatz states: ``initial_state`` comes from
         :attr:`ansatz_initial_state`, and ``final_state`` comes from the current
         context state after evolution. They are not backend work buffers.
 
-        The minimization result is saved in the 'minimize_result' attribute of
-        'config_name' as a formatted string.
+        The minimization result is stored as the ``minimize_result`` attribute
+        of the configuration group.
 
-        Multiple configurations with a unique config_name can be stored in the
-        same .h5 file. HDF5 files are supported in python by the `h5py
-        <https://www.h5py.org/>`_ package. With it, a saved configuration can be
-        accessed as follows:
-
-        .. code-block:: python
-
-            import h5py
-
-            config_name = "my_simulation"
-
-            f = h5py.File(file_name + ".h5", "r")
-            initial_state = np.array(f[config_name]["initial_state"]).view(np.complex128)
-            final_state = np.array(f[config_name]["final_state"]).view(np.complex128)
-            observables = np.array(f[config_name]["observables"]).view(np.float64)
-
-            print(f["my_simulation"].attrs["minimize_result"])
-
-        .. warning::
-
-            The :literal:`"final_state"` and :literal:`"observables"`
-            datasets are saved using Fortran subroutines which make
-            use of parallel HDF5.
-
-            The complex values of the final_state array are saved as a compound
-            datatype consisting of contiguous double precision reals. This is
-            equivalent to the np.complex128 NumPy datatype. To access this data
-            without a loss of precision in python, the user must set the
-            **view** of the NumPy array to np.complex128, rather than casting it
-            to np.complex128 using the dtype keyword.
-
-            Similarly, the observables array, which is saved as an array of
-            double-precision reals, should have its view set to np.float64.
+        The distributed datasets are written using Fortran subroutines and
+        parallel HDF5. Complex arrays are stored as compound double-precision
+        values equivalent to ``np.complex128``. When reading them with NumPy,
+        use ``.view(np.complex128)`` rather than casting with ``dtype``.
+        Observables are stored as double-precision real values and can be read
+        with ``.view(np.float64)``.
         """
 
         if self.subcomms.get_subcomm_index() != 0:
@@ -256,6 +260,12 @@ class Logging:
         from quop_mpi._lib import parallel_io
 
         file_name = ensure_path_and_extension(file_name, "h5")
+        config_path: str | None = None
+        shared_path: str | None = None
+        validation_error: str | None = None
+
+        write_initial_state = save_initial_state
+        write_observables = save_observables
 
         if self.subcomms.SUBCOMM.Get_rank() == 0:
 
@@ -264,28 +274,82 @@ class Logging:
             self.config_name = config_name
 
             with h5py.File(file_name, action) as h5_file:
-                # If the config_name already exists in the target file, add an underscore.
-                duplicate = True
-                while duplicate:
-                    if self.config_name in h5_file:
+                if problem_name is None:
+                    # Configuration names are top-level.
+                    config_parent = h5_file
+                    while self.config_name in config_parent:
                         self.config_name += "_"
+
+                    config = config_parent.create_group(self.config_name)
+                    shared_group = config
+                else:
+                    # Problem names are top level.
+                    # Create intermediate groups.
+                    problems = h5_file.require_group("problems")
+                    shared_group = problems.require_group(problem_name)
+                    configs = shared_group.require_group("configs")
+
+                    expected_shape = (self.system_size,)
+                    validation_errors: list[str] = []
+
+                    if save_initial_state and "initial_state" in shared_group:
+                        existing = shared_group["initial_state"]
+                        if not isinstance(existing, h5py.Dataset):
+                            validation_errors.append(
+                                f"Existing object "
+                                f"{shared_group.name}/initial_state is not a dataset."
+                            )
+                        elif existing.shape != expected_shape:
+                            validation_errors.append(
+                                f"Existing initial_state for problem "
+                                f"{problem_name!r} has shape {existing.shape}; "
+                                f"expected {expected_shape}."
+                            )
+                        else:
+                            write_initial_state = False
+
+                    if save_observables and "observables" in shared_group:
+                        existing = shared_group["observables"]
+                        if not isinstance(existing, h5py.Dataset):
+                            validation_errors.append(
+                                f"Existing object "
+                                f"{shared_group.name}/observables is not a dataset."
+                            )
+                        elif existing.shape != expected_shape:
+                            validation_errors.append(
+                                f"Existing observables for problem "
+                                f"{problem_name!r} has shape {existing.shape}; "
+                                f"expected {expected_shape}."
+                            )
+                        else:
+                            write_observables = False
+
+                    if validation_errors:
+                        validation_error = " ".join(validation_errors)
                     else:
-                        duplicate = False
+                        # Configuration names need only be unique within a problem
+                        while self.config_name in configs:
+                            self.config_name += "_"
 
-                config = h5_file.create_group(self.config_name)
+                        config = configs.create_group(self.config_name)
+                        config.attrs["problem_name"] = problem_name
 
-                if self.result is not None:
-                    config.attrs["minimize_result"] = str(self.result)
+                shared_path = shared_group.name.lstrip("/")
 
-                h5_file.create_dataset(
-                    f"{self.config_name}/initial_phases",
-                    data=self.variational_parameters,
-                    dtype=np.float64,
-                )
+                if validation_error is None:
+                    config_path = config.name.lstrip("/")
+
+                    if self.result is not None:
+                        config.attrs["minimize_result"] = str(self.result)
+
+                    config.create_dataset(
+                        "initial_parameters",
+                        data=self.variational_parameters,
+                        dtype=np.float64,
+                    )
+
                 h5_file.flush()
 
-                # Make the serial metadata update durable before the subcomm
-                # reopens the file via parallel HDF5.
                 try:
                     file_handle = h5_file.id.get_vfd_handle()
                 except (AttributeError, OSError, ValueError):
@@ -299,36 +363,56 @@ class Logging:
         self.subcomms.SUBCOMM.barrier()
         file_name = self.subcomms.SUBCOMM.bcast(file_name, root=0)
         self.config_name = self.subcomms.SUBCOMM.bcast(self.config_name, root=0)
-
-        parallel_io.io.save_dist_complex(
-            file_name,
-            f"{self.config_name}/",
-            "final_state",
-            "a",
-            self.system_size,
-            self.local_i_offset,
-            self.context.state[: self.local_i],
-            self.subcomms.SUBCOMM.py2f(),
+        config_path = self.subcomms.SUBCOMM.bcast(config_path, root=0)
+        shared_path = self.subcomms.SUBCOMM.bcast(shared_path, root=0)
+        write_initial_state = self.subcomms.SUBCOMM.bcast(
+            write_initial_state,
+            root=0,
+        )
+        write_observables = self.subcomms.SUBCOMM.bcast(
+            write_observables,
+            root=0,
+        )
+        validation_error = self.subcomms.SUBCOMM.bcast(
+            validation_error,
+            root=0,
         )
 
-        parallel_io.io.save_dist_complex(
-            file_name,
-            f"{self.config_name}/",
-            "initial_state",
-            "a",
-            self.system_size,
-            self.local_i_offset,
-            self.ansatz_initial_state[: self.local_i],
-            self.subcomms.SUBCOMM.py2f(),
-        )
+        if validation_error is not None:
+            raise ValueError(validation_error)
 
-        parallel_io.io.save_dist_real(
-            file_name,
-            f"{self.config_name}/",
-            "observables",
-            "a",
-            self.system_size,
-            self.local_i_offset,
-            self.local_observables[: self.local_i],
-            self.subcomms.SUBCOMM.py2f(),
-        )
+        if save_final_state:
+            parallel_io.io.save_dist_complex(
+                file_name,
+                f"{config_path}/",
+                "final_state",
+                "a",
+                self.system_size,
+                self.local_i_offset,
+                self.context.state[: self.local_i],
+                self.subcomms.SUBCOMM.py2f(),
+            )
+
+        if write_initial_state:
+            parallel_io.io.save_dist_complex(
+                file_name,
+                f"{shared_path}/",
+                "initial_state",
+                "a",
+                self.system_size,
+                self.local_i_offset,
+                self.ansatz_initial_state[: self.local_i],
+                self.subcomms.SUBCOMM.py2f(),
+            )
+
+        if write_observables:
+            parallel_io.io.save_dist_real(
+                file_name,
+                f"{shared_path}/",
+                "observables",
+                "a",
+                self.system_size,
+                self.local_i_offset,
+                self.local_observables[: self.local_i],
+                self.subcomms.SUBCOMM.py2f(),
+            )

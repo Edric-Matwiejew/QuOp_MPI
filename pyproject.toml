@@ -1,6 +1,6 @@
 [project]
 name = "QuOp_MPI"
-version = "1.6.0"
+version = "1.6.1"
 requires-python = "~=3.11"
 authors = [
     {name = "Edric Matwiejew", email = "edric_matwiejew@CSIRO.au"}
@@ -27,7 +27,7 @@ dependencies = [
 
 [build-system]
 requires = [
-    "scikit-build-core>=0.10",
+    "scikit-build-core==0.12.2",
     "numpy>=2.0",
 ]
 build-backend = "scikit_build_core.build"

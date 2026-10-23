@@ -1471,7 +1471,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         ----------
         variational_parameters : list[float] or ndarray[float]
             1-D :literal:`(ansatz_depth * total_params,)` real array of
-            :term:`variational parameters`
+            :term:`variational parameters`.
         """
 
         if not self.benchmarking:
@@ -1480,13 +1480,6 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
             self.__pre()
 
-            # Early check: parameter map requires explicit initial parameters
-            if variational_parameters is None and self._has_param_map:
-                raise ValueError(
-                    "Parameter map function is set, initial parameters must be supplied to execute."
-                )
-
-            # Broadcast parameters over SUBCOMM only (excluded ranks skip)
             if self.subcomms.in_subcomm():
                 broadcast_parameters = self.subcomms.SUBCOMM.bcast(variational_parameters, root=0)
                 self.variational_parameters = (
@@ -1496,6 +1489,18 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 )
             else:
                 self.variational_parameters = None
+
+            if self._has_param_map:
+                # Jacobian workers receive parameters later through JACCOMM.
+                missing_parameters = (
+                    self.subcomms.get_subcomm_index() == 0
+                    and self.variational_parameters is None
+                )
+
+                if self.MPI_COMM_WORLD.allreduce(missing_parameters, op=MPI.LOR):
+                    raise ValueError(
+                        "Parameter map function is set, initial parameters must be supplied to execute."
+                    )
 
             if self.subcomms.in_subcomm() and self.variational_parameters is None:
                 self.variational_parameters = self.gen_initial_params(self.ansatz_depth)
