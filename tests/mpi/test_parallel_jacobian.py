@@ -1412,7 +1412,8 @@ class TestParallelJacobianCombinations:
             ["fun", "nfev"],
         )
 
-        initial_params = np.array([1.0, 0.5])
+        alg.setup()
+        initial_params = np.array([1.0, 0.5]) if alg.subcomms.is_optimiser_leader() else None
         alg.execute(initial_params)
 
         mpi_comm.barrier()
