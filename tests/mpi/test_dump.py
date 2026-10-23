@@ -131,9 +131,7 @@ class TestDumpToDirectory:
 
 @pytest.mark.mpi
 class TestDumpDisabled:
-    def test_no_dump_when_unset(
-        self, mpi_comm, mpi_shared_work_dir, monkeypatch, dump_system_size
-    ):
+    def test_no_dump_when_unset(self, mpi_comm, mpi_shared_work_dir, monkeypatch, dump_system_size):
         """T7.8 -- With QUOP_DUMP_COMM_INFO unset, no dump files are created."""
         work_dir = str(mpi_shared_work_dir)
 

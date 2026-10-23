@@ -11,7 +11,6 @@ from pathlib import Path
 import pytest
 
 from .run_example_tests import (
-    _build_launch_cmd,
     _example_test_env,
     run_example,
     validate_result,
@@ -47,16 +46,12 @@ def test_example(test_name, tmp_path, nprocs, launcher):
             text=True,
             timeout=60,
         )
-        assert setup_result.returncode == 0, (
-            f"Setup script failed:\n{setup_result.stderr}"
-        )
+        assert setup_result.returncode == 0, f"Setup script failed:\n{setup_result.stderr}"
 
-    result = run_example(
-        config["script"], work_dir, nprocs=nprocs, launcher=launcher
-    )
+    result = run_example(config["script"], work_dir, nprocs=nprocs, launcher=launcher)
     errors = validate_result(result, config)
 
-    assert result["success"], (
-        f"Example failed (returncode={result['returncode']})\n{result['output']}"
-    )
+    assert result[
+        "success"
+    ], f"Example failed (returncode={result['returncode']})\n{result['output']}"
     assert not errors, "\n".join(errors)

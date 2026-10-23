@@ -192,7 +192,7 @@ class TestSetupPhase:
             assert any(all_in_subcomm), f"No ranks in subcomm: {all_in_subcomm}"
             # All active ranks should be in subcomm index 0
             active_indices = [
-                idx for idx, active in zip(all_subcomm_index, all_in_subcomm) if active
+                idx for idx, active in zip(all_subcomm_index, all_in_subcomm, strict=True) if active
             ]
             assert all(
                 idx == 0 for idx in active_indices
@@ -372,9 +372,7 @@ class TestPartitionTable:
                 # Partition table should account for all elements
                 # partition_table uses 1-based Fortran indexing with cumsum + 1
                 # So partition_table[-1] = system_size + 1
-                assert (
-                    valid_tables[0][-1] == simple_oracle.system_size + 1
-                ), (
+                assert valid_tables[0][-1] == simple_oracle.system_size + 1, (
                     f"Partition table end {valid_tables[0][-1]} "
                     f"!= system size + 1 ({simple_oracle.system_size + 1})"
                 )

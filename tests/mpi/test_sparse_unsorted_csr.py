@@ -38,16 +38,20 @@ def _unshuffle_csr(matrix):
 
 def _make_sorted_operator(csr):
     """Operator function returning sorted CSR (reference)."""
+
     def _op():
         return [csr]
+
     return _op
 
 
 def _make_unsorted_operator(csr):
     """Operator function returning unsorted CSR."""
     unsorted = _unshuffle_csr(csr)
+
     def _op():
         return [unsorted]
+
     return _op
 
 
@@ -67,9 +71,7 @@ def _create_ansatz(system_size, mpi_comm, operator_fn):
     alg.set_unitaries([phase, mixer])
 
     def qualities(local_i, local_i_offset):
-        return np.sin(
-            np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64)
-        )
+        return np.sin(np.arange(local_i_offset, local_i_offset + local_i, dtype=np.float64))
 
     alg.set_observables(qualities)
     alg.set_depth(1)
@@ -97,9 +99,9 @@ class TestSparseUnsortedCSR:
 
         probs = alg.get_probabilities()
         if mpi_comm.Get_rank() == 0:
-            assert np.all(np.isfinite(probs)), (
-                "Sparse propagator produced NaN/Inf with unsorted CSR columns"
-            )
+            assert np.all(
+                np.isfinite(probs)
+            ), "Sparse propagator produced NaN/Inf with unsorted CSR columns"
         alg.destroy()
 
     def test_unsorted_csr_preserves_normalization(self, mpi_comm, cycle_system_size):

@@ -48,13 +48,13 @@ def main():
         idx = sys.argv.index("--workers")
         n_workers = int(sys.argv[idx + 1])
 
-    UQ = DiagonalUnitary(
+    uq = DiagonalUnitary(
         diag_serial,
         operator_dict={"args": [zero_diagonal, system_size]},
     )
 
     alg = Ansatz(system_size)
-    alg.set_unitaries([UQ])
+    alg.set_unitaries([uq])
     alg.set_observables(obs_serial, {"args": [zero_observable, system_size]})
     alg.set_depth(1)
 

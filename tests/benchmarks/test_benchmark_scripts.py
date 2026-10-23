@@ -35,7 +35,12 @@ def test_qmoa_benchmark_metadata_uses_size_spec_and_tensor_dims():
     assert bench.size_spec("qmoa", [3, 3, 3]) == "3x3x3"
     assert bench.tensor_dims_spec("qmoa", [3, 3, 3]) == "8x8x8"
     result = bench.csv_filename(
-        "qmoa", "mpi", 512, "3x3x3", 64, "intra",
+        "qmoa",
+        "mpi",
+        512,
+        "3x3x3",
+        64,
+        "intra",
     )
     assert result == "qmoa_mpi_512_3x3x3_intra_64.csv"
 
@@ -47,7 +52,12 @@ def test_non_qmoa_benchmark_metadata_keeps_legacy_filename_shape():
     assert bench.size_spec("qaoa_sparse", [1024]) == "1024"
     assert bench.tensor_dims_spec("qaoa_sparse", [1024]) == ""
     result = bench.csv_filename(
-        "qaoa_sparse", "mpi", 1024, "1024", 16, "multi",
+        "qaoa_sparse",
+        "mpi",
+        1024,
+        "1024",
+        16,
+        "multi",
     )
     assert result == "qaoa_sparse_mpi_1024_multi_16.csv"
 
@@ -55,7 +65,12 @@ def test_non_qmoa_benchmark_metadata_keeps_legacy_filename_shape():
     assert bench.size_spec("qaoa_transverse_field", [1024]) == "1024"
     assert bench.tensor_dims_spec("qaoa_transverse_field", [1024]) == ""
     result = bench.csv_filename(
-        "qaoa_transverse_field", "mpi", 1024, "1024", 16, "multi",
+        "qaoa_transverse_field",
+        "mpi",
+        1024,
+        "1024",
+        16,
+        "multi",
     )
     assert result == "qaoa_transverse_field_mpi_1024_multi_16.csv"
 
@@ -94,7 +109,7 @@ def test_parse_args_phase_and_verify_flags(monkeypatch):
 
 
 def test_algorithm_classes_expose_get_state_norm():
-    bench = load_bench_module()
+    load_bench_module()
 
     import quop_mpi.ansatz as ansatz
 
@@ -117,6 +132,7 @@ def test_csv_header_includes_profile_column():
 
     # Inspect the source to confirm the header includes 'profile'
     import inspect
+
     source = inspect.getsource(bench.main)
     assert "profile" in source
     for col in expected_header.split(","):

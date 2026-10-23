@@ -17,9 +17,8 @@ import inspect
 import numpy as np
 import pytest
 
-from tests.conftest import TestOracle
-
 from quop_mpi._scope import get_returns, get_scope
+from tests.conftest import TestOracle
 
 
 def _scaled_power_of_two_system_size(mpi_sizing, base):
@@ -41,6 +40,7 @@ def simple_oracle(mpi_sizing):
         n_marked=_marked_count_from_ratio(system_size, denominator=16, minimum=4),
         seed=42,
     )
+
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -604,8 +604,8 @@ class TestEdgeCases:
         partition_table = create_partition_table(scatter_large_system_size, mpi_comm.Get_size())
 
         if rank == 0:
-            full_array = np.random.default_rng(42).random(scatter_large_system_size).astype(
-                np.float64
+            full_array = (
+                np.random.default_rng(42).random(scatter_large_system_size).astype(np.float64)
             )
         else:
             full_array = None

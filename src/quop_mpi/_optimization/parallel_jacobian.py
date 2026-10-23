@@ -41,6 +41,8 @@ class Jacobian:
         subcomms: QuopMpiLayout | None
         variational_parameters: np.ndarray | None
         n_free_params: int
+        _has_param_map: bool
+        _n_free_params: int | None
         record_objective: bool
         n_evolutions: int
         stop: bool
@@ -116,19 +118,26 @@ class Jacobian:
 
     @scope("world")
     def _update_var_map(self) -> None:
-        """Queries :literal:`Unitary` instances passed to the
-        :class:`~quop_mpi.ansatz` instance via the
-        :meth:`~quop_mpi.ansatz.set_unitaries` methods to determine the
-        number and ordering of QVA variational parameters.
-        """
-        if self.subcomms.get_n_subcomms() > 1:
-            self.var_map = [[] for _ in range(self.subcomms.get_n_subcomms())]
-            if self.subcomms.in_subcomm():
-                n_params = self.n_free_params
-                for var in range(n_params):
-                    self.var_map[1:][var % (self.subcomms.get_n_subcomms() - 1)].append(var)
-        else:
+        """Assign free parameters to workers once their number is known."""
+        if self._has_param_map and self._n_free_params is None:
+            # Preparation can precede the initial vector. A mapped ansatz's
+            # expanded parameter count does not determine its gradient size.
             self.var_map = None
+            return
+
+        self._assign_gradient_work(self.n_free_params)
+
+    def _assign_gradient_work(self, n_params: int) -> None:
+        """Assign each parameter to one worker without MPI collectives."""
+        n_subcomms = self.subcomms.get_n_subcomms()
+        if n_subcomms <= 1:
+            self.var_map = None
+            return
+
+        self.var_map = [[] for _ in range(n_subcomms)]
+        if self.subcomms.in_subcomm():
+            for worker_id in range(1, n_subcomms):
+                self.var_map[worker_id] = list(range(worker_id - 1, n_params, n_subcomms - 1))
 
     @scope("subcomm")
     def _parse_jacobian(self) -> None:
@@ -249,6 +258,15 @@ class Jacobian:
 
         x = np.asarray(self.subcomms.JACCOMM.bcast(x, 0), dtype=np.float64)
 
+        n_params = x.size
+        if self._has_param_map:
+            self._n_free_params = n_params
+        # Direct Jacobian calls can follow prepare() before an initial vector
+        # establishes the mapped parameter count. Every JACCOMM rank now has
+        # the same vector, so assignments can be made locally without a world
+        # collective (the other optimiser ranks are not in this call).
+        self._assign_gradient_work(n_params)
+
         if rank != 0:
             # When a parameter map is set, x contains the free parameters.
             # We keep variational_parameters as the free params so that
@@ -265,14 +283,12 @@ class Jacobian:
                 partials.append(self.jacobian.call())
 
         if rank == 0:
-            jacobian = np.zeros(self.n_free_params, dtype=np.float64)
+            jacobian = np.zeros(n_params, dtype=np.float64)
             roots = self.subcomms.get_subcomm_roots()
             # roots[0] is the optimizer leader (this rank); skip it when
             # collecting partials.  Use the worker index, not the world rank
             # value, since a worker leader can legitimately be at world rank 0.
-            for worker_id, (root, mapping) in enumerate(
-                zip(roots, self.var_map, strict=True)
-            ):
+            for worker_id, (root, mapping) in enumerate(zip(roots, self.var_map, strict=True)):
                 if worker_id == 0:
                     continue
                 for var in mapping:

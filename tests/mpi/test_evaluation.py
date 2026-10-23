@@ -223,9 +223,10 @@ class TestGetExpectationValue:
             ), f"State should be normalized, got norm {computed_norm}"
         else:
             # Excluded ranks: get_state_norm() should return None
-            assert (
-                computed_norm is None
-            ), f"get_state_norm() should return None on ranks outside of subcomm, got {computed_norm}"
+            assert computed_norm is None, (
+                "get_state_norm() should return None on ranks outside of subcomm, "
+                f"got {computed_norm}"
+            )
 
         alg.destroy()
 

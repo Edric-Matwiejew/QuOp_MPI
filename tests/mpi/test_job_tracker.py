@@ -17,6 +17,7 @@ import tempfile
 
 import pytest
 
+
 @pytest.mark.mpi
 class TestJobTrackerBasicInit:
     """Tests for basic JobTracker initialization."""

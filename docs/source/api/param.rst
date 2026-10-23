@@ -4,7 +4,8 @@
 Param
 =====
 
-Functions for generating and managing variational parameters.
+Functions for generating initial variational parameters. Predefined parameter
+maps are documented in :mod:`quop_mpi.parameter_maps`.
 
 .. currentmodule:: quop_mpi.param
 

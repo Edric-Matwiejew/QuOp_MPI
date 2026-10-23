@@ -634,7 +634,7 @@ class TestSamplingCombinations:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         initial_params = np.array([np.pi, oracle.optimal_walk_time])

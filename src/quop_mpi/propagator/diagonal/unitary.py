@@ -7,30 +7,23 @@ from types import ModuleType
 from typing import Any
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from quop_mpi._lib.propagator import Propagator
 from quop_mpi.unitary import UnitaryBase
 
 
-def _ensure_diagonal_compliant(operator: Any, term_index: int | None = None) -> np.ndarray:
+def _ensure_diagonal_compliant(operator: ArrayLike, term_index: int | None = None) -> np.ndarray:
     """Coerce a diagonal-operator term to a contiguous float64 array.
 
     Issues a :class:`RuntimeWarning` if a copy is required because the
     caller-supplied buffer is not already a contiguous ``float64`` array.
     """
     arr = np.asarray(operator)
-    compliant = (
-        arr.dtype == np.float64
-        and arr.flags.c_contiguous
-        and not np.iscomplexobj(arr)
-    )
+    compliant = arr.dtype == np.float64 and arr.flags.c_contiguous and not np.iscomplexobj(arr)
     if compliant:
         return arr
-    label = (
-        "diagonal operator"
-        if term_index is None
-        else f"diagonal operator term {term_index}"
-    )
+    label = "diagonal operator" if term_index is None else f"diagonal operator term {term_index}"
     warnings.warn(
         f"{label} is not a contiguous ndarray[float64]; a local copy will "
         "be made. Return contiguous float64 arrays from the operator function "

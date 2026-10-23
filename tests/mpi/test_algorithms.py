@@ -107,9 +107,7 @@ class TestQAOAVariants:
 
         alg.destroy()
 
-    def test_qaoa_transverse_field_matches_sparse_probabilities(
-        self, mpi_comm, small_system_size
-    ):
+    def test_qaoa_transverse_field_matches_sparse_probabilities(self, mpi_comm, small_system_size):
         """The transverse-field QAOA variant should preserve QAOA parameter semantics."""
         from mpi4py import MPI
 
@@ -132,9 +130,7 @@ class TestQAOAVariants:
         transverse_field_alg.evolve_state(params)
         transverse_field_probs = transverse_field_alg.get_probabilities()
 
-        did_compare = int(
-            sparse_probs is not None and transverse_field_probs is not None
-        )
+        did_compare = int(sparse_probs is not None and transverse_field_probs is not None)
 
         if sparse_probs is not None and transverse_field_probs is not None:
             np.testing.assert_allclose(
@@ -177,9 +173,7 @@ class TestQAOAVariants:
         transverse_field_alg.evolve_state(params)
         transverse_field_probs = transverse_field_alg.get_probabilities()
 
-        did_compare = int(
-            sparse_probs is not None and transverse_field_probs is not None
-        )
+        did_compare = int(sparse_probs is not None and transverse_field_probs is not None)
 
         if sparse_probs is not None and transverse_field_probs is not None:
             np.testing.assert_allclose(

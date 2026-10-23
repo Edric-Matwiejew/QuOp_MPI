@@ -58,7 +58,7 @@ class _Dirty(IntFlag):
     OBJECTIVE = auto()  # objective function changed
     SAMPLING = auto()  # sampling configuration changed
     LOG = auto()  # log configuration changed
-    PARAM_MAP_BIND = auto()  # param map needs Interface binding after SUBCOMM creation
+    PARAM_MAP_BIND = auto()  # param map needs reset/binding after input or SUBCOMM changes
 
 
 ###################
@@ -264,7 +264,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         self._param_map_raw: Callable[..., Any] = lambda x, *a, **k: x
         self._param_map_parsed: Interface | None = None
         self.param_map_dict: ParsedFunctionDict = {"args": [], "kwargs": {}}
-        self._n_free_params: int | None = None  # set when param map is configured
+        self._n_free_params: int | None = None  # inferred from the supplied free vector
         self.free_vec: np.ndarray | None = None  # bound by Interface for param map
 
         # -- Scope-nesting validation stack ----------------------
@@ -355,22 +355,21 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
     @scope("world")
     def set_parameter_map(
         self,
-        n_free_params: int,
-        mapping_fn: Callable[[np.ndarray], np.ndarray],
+        mapping_fn: Callable[..., np.ndarray],
         mapping_dict: dict | None = None,
     ) -> None:
-        """Register a mapping from a subset of optimisable parameters to the full
-        set of variational parameters.
+        """Define a mapping from :term:`free parameters` to
+        :term:`variational parameters`.
 
         Parameters
         ----------
-        n_free_params : int
-            The number of free parameters in the reduced parameter vector.
-            This is the dimensionality of the optimization problem.
         mapping_fn : callable
             ``mapping_fn(free_vec, *args, **kwargs) -> full_vec``.
             *free_vec* is the vector presented to the optimiser;
             *full_vec* must have length ``ansatz_depth * total_params``.
+            The number of free parameters is inferred from the vector supplied
+            to :meth:`~quop_mpi.ansatz.evolve_state` or
+            :meth:`~quop_mpi.ansatz.execute`.
         mapping_dict : FunctionDict, optional
             FunctionDict supplying extra positional and keyword arguments
             to the mapping function.
@@ -378,9 +377,34 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         self._has_param_map = True
         self._param_map_raw = mapping_fn
-        self._n_free_params = n_free_params
+        self._n_free_params = None
+        self.var_map = None
         self.__parse_function_dict__(mapping_dict, "param_map_dict")
         self._dirty |= _Dirty.PARAM_MAP_BIND
+
+    @scope("world")
+    def _broadcast_mapped_parameters(
+        self,
+        parameters: list[float] | np.ndarray | None,
+        caller: str,
+    ) -> np.ndarray:
+        """Synchronise mapped input and its dimension before gradient setup."""
+        leader = self.subcomms.optimiser_leader_world_rank()
+        parameters = self.MPI_COMM_WORLD.bcast(
+            parameters if self.MPI_COMM_WORLD.Get_rank() == leader else None,
+            root=leader,
+        )
+        if parameters is None:
+            raise ValueError(f"{caller}() requires initial parameters when a parameter map is set")
+        parameters = np.asarray(parameters, dtype=np.float64)
+        if parameters.ndim != 1 or parameters.size == 0:
+            raise ValueError(
+                f"Expected a non-empty 1-D array of free parameters, got shape {parameters.shape}"
+            )
+        if not np.all(np.isfinite(parameters)):
+            raise ValueError("Free parameters must not contain NaN or infinity")
+        self._n_free_params = parameters.size
+        return parameters
 
     @scope("subcomm")
     def __to_full(self, vec: np.ndarray) -> np.ndarray:
@@ -401,6 +425,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             return vec
 
         # otherwise, map the parameters
+        if vec.ndim != 1:
+            raise ValueError(f"Expected a 1-D array of free parameters, got shape {vec.shape}")
+        self._n_free_params = vec.size
         self.free_vec = vec
         self._param_map_parsed.update_parameters()
         full_vec = self._param_map_parsed.call(
@@ -410,11 +437,9 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         full_vec = np.asarray(full_vec, dtype=np.float64)
         if full_vec.size != full_len:
             raise ValueError(
-                f"Parameter mapping returned {full_vec.size} parameters."
-                f" Expected {full_len} variational parameters"
+                f"Parameter map returned {full_vec.size} parameters; expected {full_len}"
                 f" (ansatz_depth={self.ansatz_depth},"
-                f" total_params={self.total_params}),"
-                f" got {vec.size}"
+                f" total_params={self.total_params})"
             )
         return full_vec
 
@@ -464,6 +489,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self._dirty & _Dirty.OBSERVABLES:
             self.__gen_observables()
             self._dirty &= ~_Dirty.OBSERVABLES
+            if self._has_param_map:
+                self._dirty |= _Dirty.PARAM_MAP_BIND
 
         if self._dirty & _Dirty.PLANS:
             self.__gen_unitaries()
@@ -472,6 +499,8 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         if self._dirty & _Dirty.INITIAL_STATE:
             self.__gen_initial_state()
             self._dirty &= ~_Dirty.INITIAL_STATE
+            if self._has_param_map:
+                self._dirty |= _Dirty.PARAM_MAP_BIND
 
         if self._dirty & _Dirty.OBJECTIVE:
             self.__gen_objective()
@@ -493,6 +522,10 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
             if self.subcomms.in_subcomm():
 
+                reset_cache = getattr(self._param_map_raw, "_reset_cache", None)
+                if callable(reset_cache):
+                    reset_cache()
+
                 self._param_map_parsed = Interface(
                     [self],
                     self._param_map_raw,
@@ -508,17 +541,18 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
             method()
 
     @scope("subcomm")
-    def __populate_quop_result(self) -> None:
+    def __populate_quop_result(self, mapped_parameters: np.ndarray) -> None:
         """Populate fields of the :attr:`~quop_mpi.ansatz.quop_result` dictionary.
 
-        Called by rank 0 in :attr:`~quop_mpi.ansatz.MPI_COMM_WORLD` only.
+        Called only by the optimiser leader, after ``mapped_parameters`` has
+        been computed collectively over its subcommunicator.
         """
         self.quop_result["fun"] = copy(self.result["fun"])
         self.quop_result["qubits"] = copy(np.log2(self.system_size))
         self.quop_result["system size"] = copy(self.system_size)
         self.quop_result["ansatz_depth"] = copy(self.ansatz_depth)
         self.quop_result["variational_parameters"] = deepcopy(self.result["x"])
-        self.quop_result["mapped_parameters"] = deepcopy(self.__to_full(self.result["x"]))
+        self.quop_result["mapped_parameters"] = deepcopy(mapped_parameters)
         self.quop_result["final state norm"] = copy(self.state_norm)
         self.quop_result["execution time"] = copy(self.time)
 
@@ -527,19 +561,21 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 self.quop_result[key] = copy(self.result[key])
 
     @scope("world")
-    def __post(self) -> None:
-        """Calls post-simulation methods."""
+    def __post(self, *, update_result: bool = False) -> None:
+        """Run post-simulation methods and optionally finalise optimisation results."""
 
-        if self.subcomms.get_subcomm_index() == 0:
+        if self.subcomms.in_subcomm() and self.subcomms.get_subcomm_index() == 0:
             self.state_norm = self.__get_state_norm()
-
-        if (
-            self.subcomms.in_subcomm()
-            and self.subcomms.get_subcomm_index() == 0
-            and self.subcomms.SUBCOMM.Get_rank() == 0
-            and self.result is not None
-        ):
-            self.__populate_quop_result()
+            if update_result:
+                is_root = self.subcomms.SUBCOMM.Get_rank() == 0
+                final_parameters = self.result["x"] if is_root and self.result is not None else None
+                final_parameters = self.subcomms.SUBCOMM.bcast(final_parameters, root=0)
+                if final_parameters is not None:
+                    # Parameter maps may perform reductions over the subcomm, so
+                    # every active rank must participate in final result mapping.
+                    mapped_parameters = self.__to_full(final_parameters)
+                    if is_root:
+                        self.__populate_quop_result(mapped_parameters)
 
         # Only ranks in the subcomm have a valid SUBCOMM to call barrier on
         if self.subcomms.in_subcomm():
@@ -998,12 +1034,19 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
     @property
     def n_free_params(self) -> int:
-        """Number of free parameters presented to the optimizer.
+        """Number of :term:`free parameters`.
 
-        Without a parameter map, this equals n_variational_parameters.
-        With a parameter map, this is the size of the reduced parameter vector.
+        With a parameter map, this is inferred from the vector supplied to
+        :meth:`~quop_mpi.ansatz.execute` or
+        :meth:`~quop_mpi.ansatz.evolve_state`. Raises ``RuntimeError`` before
+        parameters are supplied. Otherwise, equals ``n_variational_parameters``.
         """
-        if self._has_param_map and self._n_free_params is not None:
+        if self._has_param_map:
+            if self._n_free_params is None:
+                raise RuntimeError(
+                    "n_free_params is not available before parameters are supplied "
+                    "to execute() or evolve_state()"
+                )
             return self._n_free_params
         if self.n_variational_parameters is None:
             raise RuntimeError("n_variational_parameters is not available before setup.")
@@ -1367,10 +1410,16 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
         ----------
         variational_parameters : list[float] or ndarray[float]
             1-D :literal:`(ansatz_depth * total_params,)` real array of
-            :term:`variational parameters`.
+            :term:`variational parameters`. With a parameter map, supply the
+            :term:`free parameters` instead. Their number is inferred from
+            this vector.
         """
 
         self.setup()
+        if self._has_param_map:
+            variational_parameters = self._broadcast_mapped_parameters(
+                variational_parameters, "evolve_state"
+            )
         self.__pre()
 
         self.__evolve_state(variational_parameters)
@@ -1465,45 +1514,45 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
 
         If :literal:`variational_parameters` is :literal:`None`, initial parameter values are
         generated using the :term:`Parameter Function` of the corresponding
-        :literal:`unitary` instances.
+        :literal:`unitary` instances. With a parameter map, an initial
+        vector of :term:`free parameters` must be supplied.
 
         Parameters
         ----------
         variational_parameters : list[float] or ndarray[float]
             1-D :literal:`(ansatz_depth * total_params,)` real array of
-            :term:`variational parameters`.
+            :term:`variational parameters`. With a parameter map, supply the
+            :term:`free parameters` instead. Their number is inferred from
+            this vector.
         """
 
         if not self.benchmarking:
 
             self.setup()
 
+            if self._has_param_map:
+                parameters = self._broadcast_mapped_parameters(variational_parameters, "execute")
+                self.variational_parameters = parameters if self.subcomms.in_subcomm() else None
+
             self.__pre()
 
-            if self.subcomms.in_subcomm():
+            if not self._has_param_map and self.subcomms.in_subcomm():
                 broadcast_parameters = self.subcomms.SUBCOMM.bcast(variational_parameters, root=0)
                 self.variational_parameters = (
                     None
                     if broadcast_parameters is None
                     else np.asarray(broadcast_parameters, dtype=np.float64)
                 )
-            else:
+            elif not self.subcomms.in_subcomm():
                 self.variational_parameters = None
-
-            if self._has_param_map:
-                # Jacobian workers receive parameters later through JACCOMM.
-                missing_parameters = (
-                    self.subcomms.get_subcomm_index() == 0
-                    and self.variational_parameters is None
-                )
-
-                if self.MPI_COMM_WORLD.allreduce(missing_parameters, op=MPI.LOR):
-                    raise ValueError(
-                        "Parameter map function is set, initial parameters must be supplied to execute."
-                    )
 
             if self.subcomms.in_subcomm() and self.variational_parameters is None:
                 self.variational_parameters = self.gen_initial_params(self.ansatz_depth)
+
+        elif self._has_param_map:
+            parameters = self._broadcast_mapped_parameters(self.variational_parameters, "benchmark")
+            self.variational_parameters = parameters if self.subcomms.in_subcomm() else None
+            self._update_var_map()
 
         if self.subcomms.in_subcomm():
 
@@ -1524,7 +1573,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                         while not self.stop:
                             self.__objective(None)
 
-                    self.__post()
+                    self.__post(update_result=True)
 
                     if self.log:
                         self._log_update()
@@ -1537,7 +1586,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                         # separate ROOTCOMM command relay.
                         self._mpi_jacobian(None)
 
-                    self.__post()
+                    self.__post(update_result=True)
 
                 # Broadcast results to all active ranks via SUBCOMM
                 self.result = self.subcomms.SUBCOMM.bcast(self.result, root=0)

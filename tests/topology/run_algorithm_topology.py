@@ -51,18 +51,18 @@ def run_qwoa(system_size, n_workers=1):
     alg.execute()
 
 
-def run_qmoa(Ns, n_workers=1):
+def run_qmoa(ns, n_workers=1):
     """QMOA with diagonal phase + composite mixer."""
     from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
 
-    n_dims = len(Ns)
+    n_dims = len(ns)
     bounds = n_dims * [[-1.0, 1.0]]
-    deltas, mins = setup_cartesian(Ns, bounds)
+    deltas, mins = setup_cartesian(ns, bounds)
 
     def zero_function(x):
         return np.zeros(x.shape[0], dtype=np.float64)
 
-    alg = QMOA(Ns)
+    alg = QMOA(ns)
     alg.set_qualities(cartesian, {"args": [deltas, mins, zero_function]})
     alg.set_depth(1)
     if n_workers > 1:
@@ -98,8 +98,8 @@ def main():
     elif algorithm == "qwoa":
         run_qwoa(int(args[1]), n_workers)
     elif algorithm == "qmoa":
-        Ns = [int(x) for x in args[1:]]
-        run_qmoa(Ns, n_workers)
+        ns = [int(x) for x in args[1:]]
+        run_qmoa(ns, n_workers)
     else:
         print(f"Unknown algorithm: {algorithm}", file=sys.stderr)
         print(USAGE.format(prog=sys.argv[0]), file=sys.stderr)

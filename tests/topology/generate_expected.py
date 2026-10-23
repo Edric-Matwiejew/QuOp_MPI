@@ -21,15 +21,15 @@ from typing import Dict, List, Tuple
 # ─── Setonix hardware constants ─────────────────────────────────────────────
 
 SETONIX_GPU = {
-    "n_physical_gpus": 8,           # 4 × MI250X = 8 GCDs
-    "visible_device_count": 8,      # all GCDs visible (no --gpu-bind)
-    "backend_flag": 1,              # wavefront backend
+    "n_physical_gpus": 8,  # 4 × MI250X = 8 GCDs
+    "visible_device_count": 8,  # all GCDs visible (no --gpu-bind)
+    "backend_flag": 1,  # wavefront backend
 }
 
 SETONIX_WORK = {
     "n_physical_gpus": 0,
     "visible_device_count": 0,
-    "backend_flag": 0,              # MPI backend
+    "backend_flag": 0,  # MPI backend
 }
 
 # ─── Test configuration ─────────────────────────────────────────────────────
@@ -38,14 +38,14 @@ SETONIX_WORK = {
 @dataclass
 class TestConfig:
     test_id: str
-    partition: str          # "gpu" or "work"
+    partition: str  # "gpu" or "work"
     n_nodes: int
     ranks_per_node: int
-    binding_mode: str       # "sequential", "auto", "numa"
+    binding_mode: str  # "sequential", "auto", "numa"
     ranks_per_gpu: int
-    system_size: int        # state-vector dimension (2^n_qubits)
+    system_size: int  # state-vector dimension (2^n_qubits)
     description: str
-    n_workers: int = 1      # parallel jacobian workers
+    n_workers: int = 1  # parallel jacobian workers
 
 
 #    ID   Part  Nodes  RPN  Mode          RPG  SysSize  Description
@@ -55,49 +55,60 @@ class TestConfig:
 # predictions (local_i, device_local_i, ...) exact and NUMA-independent.
 CONFIGS: List[TestConfig] = [
     # ── Sequential binding on GPU partition ──────────────────────────────
-    TestConfig("T01", "gpu", 1,  8,  "sequential", 1,  128,
-               "saturated: 8 ranks = 8 GPUs × rpg=1"),
-    TestConfig("T02", "gpu", 1,  4,  "sequential", 1,   64,
-               "under-sat: 4 ranks on 8 GPUs"),
-    TestConfig("T03", "gpu", 1, 16,  "sequential", 1,  256,
-               "over-sat: 8 GPU + 8 non-GPU"),
-    TestConfig("T04", "gpu", 1, 16,  "sequential", 2,  256,
-               "saturated: 16 ranks = 8 GPUs × rpg=2"),
-    TestConfig("T05", "gpu", 1, 64,  "sequential", 8, 1024,
-               "full: 64 ranks = 8 GPUs × rpg=8"),
-    TestConfig("T06", "gpu", 1, 64,  "sequential", 1, 1024,
-               "extreme over: 8 GPU + 56 non-GPU"),
-    TestConfig("T07", "gpu", 1,  1,  "sequential", 1,   16,
-               "minimal: 1 rank on GPU 0"),
-    TestConfig("T08", "gpu", 2,  8,  "sequential", 1,  256,
-               "2-node saturated"),
-    TestConfig("T09", "gpu", 2, 16,  "sequential", 2,  512,
-               "2-node × rpg=2 saturated"),
-    TestConfig("T10", "gpu", 2,  4,  "sequential", 1,  128,
-               "2-node under-sat"),
-    TestConfig("T11", "gpu", 1, 32,  "sequential", 4,  512,
-               "32 ranks = 8 GPUs × rpg=4"),
-    TestConfig("T12", "gpu", 1,  2,  "sequential", 1,   32,
-               "2 ranks, GPUs 0-1 only"),
-
+    TestConfig("T01", "gpu", 1, 8, "sequential", 1, 128, "saturated: 8 ranks = 8 GPUs × rpg=1"),
+    TestConfig("T02", "gpu", 1, 4, "sequential", 1, 64, "under-sat: 4 ranks on 8 GPUs"),
+    TestConfig("T03", "gpu", 1, 16, "sequential", 1, 256, "over-sat: 8 GPU + 8 non-GPU"),
+    TestConfig("T04", "gpu", 1, 16, "sequential", 2, 256, "saturated: 16 ranks = 8 GPUs × rpg=2"),
+    TestConfig("T05", "gpu", 1, 64, "sequential", 8, 1024, "full: 64 ranks = 8 GPUs × rpg=8"),
+    TestConfig("T06", "gpu", 1, 64, "sequential", 1, 1024, "extreme over: 8 GPU + 56 non-GPU"),
+    TestConfig("T07", "gpu", 1, 1, "sequential", 1, 16, "minimal: 1 rank on GPU 0"),
+    TestConfig("T08", "gpu", 2, 8, "sequential", 1, 256, "2-node saturated"),
+    TestConfig("T09", "gpu", 2, 16, "sequential", 2, 512, "2-node × rpg=2 saturated"),
+    TestConfig("T10", "gpu", 2, 4, "sequential", 1, 128, "2-node under-sat"),
+    TestConfig("T11", "gpu", 1, 32, "sequential", 4, 512, "32 ranks = 8 GPUs × rpg=4"),
+    TestConfig("T12", "gpu", 1, 2, "sequential", 1, 32, "2 ranks, GPUs 0-1 only"),
     # ── Work partition (MPI backend, no GPUs) ────────────────────────────
-    TestConfig("T13", "work", 1,   4, "auto", 1,   64, "basic CPU-only"),
-    TestConfig("T14", "work", 2,   4, "auto", 1,  128, "2-node CPU-only"),
+    TestConfig("T13", "work", 1, 4, "auto", 1, 64, "basic CPU-only"),
+    TestConfig("T14", "work", 2, 4, "auto", 1, 128, "2-node CPU-only"),
     TestConfig("T15", "work", 1, 128, "auto", 1, 2048, "full CPU node"),
 ]
 
 # ─── CSV field order ────────────────────────────────────────────────────────
 
 FIELD_NAMES = [
-    "test_id", "partition", "n_nodes", "ranks_per_node", "binding_mode",
-    "ranks_per_gpu", "system_size", "mpi_rank", "node_id",
-    "sc_r", "sc_s", "nc_r", "nc_s",
-    "dc_r", "dc_s", "dn_r", "dn_s", "is_gpu_rank", "my_gpu_index",
-    "gpu_devcomm_flag", "rank_within_gpu", "gpu_slot_ordinal",
-    "n_physical_gpus", "visible_device_count", "backend_flag",
-    "worker_id", "n_workers",
-    "local_i", "local_i_offset", "alloc_local",
-    "device_local_i", "device_local_i_offset", "device_alloc_local",
+    "test_id",
+    "partition",
+    "n_nodes",
+    "ranks_per_node",
+    "binding_mode",
+    "ranks_per_gpu",
+    "system_size",
+    "mpi_rank",
+    "node_id",
+    "sc_r",
+    "sc_s",
+    "nc_r",
+    "nc_s",
+    "dc_r",
+    "dc_s",
+    "dn_r",
+    "dn_s",
+    "is_gpu_rank",
+    "my_gpu_index",
+    "gpu_devcomm_flag",
+    "rank_within_gpu",
+    "gpu_slot_ordinal",
+    "n_physical_gpus",
+    "visible_device_count",
+    "backend_flag",
+    "worker_id",
+    "n_workers",
+    "local_i",
+    "local_i_offset",
+    "alloc_local",
+    "device_local_i",
+    "device_local_i_offset",
+    "device_alloc_local",
     "n_processes",
 ]
 
@@ -146,9 +157,10 @@ def gpu_aware_worker_split(
             if nid < node_remainder * (nodes_per_worker + 1):
                 color = nid // (nodes_per_worker + 1)
             else:
-                color = node_remainder + (
-                    nid - node_remainder * (nodes_per_worker + 1)
-                ) // nodes_per_worker
+                color = (
+                    node_remainder
+                    + (nid - node_remainder * (nodes_per_worker + 1)) // nodes_per_worker
+                )
             worker_ids.append(color)
         return worker_ids
 
@@ -202,9 +214,7 @@ def gpu_aware_worker_split(
     return worker_ids
 
 
-def mpi_backend_worker_split(
-    n_workers: int, total_ranks: int
-) -> List[int]:
+def mpi_backend_worker_split(n_workers: int, total_ranks: int) -> List[int]:
     """Replicate rank-based round-robin split for MPI backend."""
     if n_workers <= 1:
         return [0] * total_ranks
@@ -224,9 +234,7 @@ def mpi_backend_worker_split(
 # ─── Oracle: sequential GPU assignment ──────────────────────────────────────
 
 
-def sequential_assignment(
-    n_ranks: int, n_gpus: int, rpg: int
-) -> List[Tuple[int, bool]]:
+def sequential_assignment(n_ranks: int, n_gpus: int, rpg: int) -> List[Tuple[int, bool]]:
     """Replicate ``apply_sequential_assignment`` from gpu_topology.f90.
 
     Assumes all GPUs visible to every rank (Setonix without --gpu-bind).
@@ -284,7 +292,7 @@ def compute_gpu_slot_ordinal(
 
     # Count active GPU ranks per physical GPU.
     active = [0] * n_gpus
-    for g, is_gpu in zip(assigned_indices, is_gpu_ranks):
+    for g, is_gpu in zip(assigned_indices, is_gpu_ranks, strict=True):
         if is_gpu and g >= 0:
             active[g] += 1
 
@@ -305,9 +313,7 @@ def compute_expected(cfg: TestConfig) -> List[Dict]:
 
     # Per-node GPU assignment (same for every node on Setonix).
     if cfg.partition == "gpu" and n_gpus > 0:
-        node_assignment = sequential_assignment(
-            cfg.ranks_per_node, n_gpus, cfg.ranks_per_gpu
-        )
+        node_assignment = sequential_assignment(cfg.ranks_per_node, n_gpus, cfg.ranks_per_gpu)
     else:
         node_assignment = [(-1, False)] * cfg.ranks_per_node
 
@@ -338,9 +344,7 @@ def compute_expected(cfg: TestConfig) -> List[Dict]:
             is_gpu = is_gpu_ranks[nr]
             my_gpu = assigned_indices[nr]
             rwg = compute_rank_within_gpu(assigned_indices, nr)
-            slot = compute_gpu_slot_ordinal(
-                assigned_indices, is_gpu_ranks, nr, max(n_gpus, 1)
-            )
+            slot = compute_gpu_slot_ordinal(assigned_indices, is_gpu_ranks, nr, max(n_gpus, 1))
 
             if is_gpu:
                 dc_r = global_gpu_mpi_ranks.index(mpi_rank)
@@ -427,8 +431,10 @@ def write_csv(rows: List[Dict], path: str) -> None:
 
 
 def print_list() -> None:
-    hdr = (f"{'ID':<5} {'Part':<5} {'Nodes':>5} {'RPN':>5} {'Mode':<12} "
-           f"{'RPG':>4} {'SysSize':>7}  Description")
+    hdr = (
+        f"{'ID':<5} {'Part':<5} {'Nodes':>5} {'RPN':>5} {'Mode':<12} "
+        f"{'RPG':>4} {'SysSize':>7}  Description"
+    )
     print(hdr)
     print("-" * len(hdr))
     for c in CONFIGS:
@@ -455,27 +461,28 @@ def print_jobs() -> None:
         if c.partition == "gpu":
             n_gpus = min(c.ranks_per_node, 8)
             print(f"#SBATCH --gres=gpu:{n_gpus}")
-        print(f"export QUOP_DUMP_COMM_INFO=1")
+        print("export QUOP_DUMP_COMM_INFO=1")
         if c.partition == "gpu":
             print(f"export QUOP_GPU_BINDING_MODE={c.binding_mode}")
             print(f"export QUOP_RANKS_PER_GPU={c.ranks_per_gpu}")
-            print(f"export MPICH_GPU_SUPPORT_ENABLED=1")
+            print("export MPICH_GPU_SUPPORT_ENABLED=1")
         print(f"srun -N{c.n_nodes} -n{total} python run_diagonal_topology.py {c.system_size}")
         print()
 
 
 # ─── Algorithm-class integration tests (consistency checks only) ────────────
 
+
 @dataclass
 class AlgorithmTestConfig:
     test_id: str
-    algorithm: str          # "qaoa", "qwoa", "qmoa"
+    algorithm: str  # "qaoa", "qwoa", "qmoa"
     partition: str
     n_nodes: int
     ranks_per_node: int
     binding_mode: str
     ranks_per_gpu: int
-    algo_args: str          # CLI args for run_algorithm_topology.py
+    algo_args: str  # CLI args for run_algorithm_topology.py
     description: str
 
 
@@ -487,38 +494,48 @@ class AlgorithmTestConfig:
 # QMOA: composite mixer uses FFTW (MPI) or SHAFFT (wavefront).
 ALGO_CONFIGS: List[AlgorithmTestConfig] = [
     # ── QAOA on GPU partition ────────────────────────────────────────────
-    AlgorithmTestConfig("A01", "qaoa", "gpu", 1,  8, "sequential", 1,
-                        "qaoa 128", "QAOA saturated 8 GPUs"),
-    AlgorithmTestConfig("A02", "qaoa", "gpu", 1, 16, "sequential", 1,
-                        "qaoa 256", "QAOA over-sat 8 GPU + 8 non-GPU"),
-    AlgorithmTestConfig("A03", "qaoa", "gpu", 2,  8, "sequential", 1,
-                        "qaoa 256", "QAOA 2-node saturated"),
-    AlgorithmTestConfig("A04", "qaoa", "work", 1,  4, "auto", 1,
-                        "qaoa 64", "QAOA CPU-only"),
+    AlgorithmTestConfig(
+        "A01", "qaoa", "gpu", 1, 8, "sequential", 1, "qaoa 128", "QAOA saturated 8 GPUs"
+    ),
+    AlgorithmTestConfig(
+        "A02", "qaoa", "gpu", 1, 16, "sequential", 1, "qaoa 256", "QAOA over-sat 8 GPU + 8 non-GPU"
+    ),
+    AlgorithmTestConfig(
+        "A03", "qaoa", "gpu", 2, 8, "sequential", 1, "qaoa 256", "QAOA 2-node saturated"
+    ),
+    AlgorithmTestConfig("A04", "qaoa", "work", 1, 4, "auto", 1, "qaoa 64", "QAOA CPU-only"),
     # ── QWOA on GPU partition ────────────────────────────────────────────
-    AlgorithmTestConfig("A05", "qwoa", "gpu", 1,  8, "sequential", 1,
-                        "qwoa 128", "QWOA saturated 8 GPUs"),
-    AlgorithmTestConfig("A06", "qwoa", "gpu", 1, 16, "sequential", 1,
-                        "qwoa 256", "QWOA over-sat 8 GPU + 8 non-GPU"),
-    AlgorithmTestConfig("A07", "qwoa", "gpu", 2,  8, "sequential", 1,
-                        "qwoa 256", "QWOA 2-node saturated"),
-    AlgorithmTestConfig("A08", "qwoa", "work", 1,  4, "auto", 1,
-                        "qwoa 64", "QWOA CPU-only"),
+    AlgorithmTestConfig(
+        "A05", "qwoa", "gpu", 1, 8, "sequential", 1, "qwoa 128", "QWOA saturated 8 GPUs"
+    ),
+    AlgorithmTestConfig(
+        "A06", "qwoa", "gpu", 1, 16, "sequential", 1, "qwoa 256", "QWOA over-sat 8 GPU + 8 non-GPU"
+    ),
+    AlgorithmTestConfig(
+        "A07", "qwoa", "gpu", 2, 8, "sequential", 1, "qwoa 256", "QWOA 2-node saturated"
+    ),
+    AlgorithmTestConfig("A08", "qwoa", "work", 1, 4, "auto", 1, "qwoa 64", "QWOA CPU-only"),
     # ── QMOA on GPU partition ────────────────────────────────────────────
-    AlgorithmTestConfig("A09", "qmoa", "gpu", 1,  8, "sequential", 1,
-                        "qmoa 4 4", "QMOA 2D (2^4×2^4=256) saturated"),
-    AlgorithmTestConfig("A10", "qmoa", "gpu", 1, 16, "sequential", 1,
-                        "qmoa 4 4", "QMOA 2D over-sat"),
-    AlgorithmTestConfig("A11", "qmoa", "gpu", 2,  8, "sequential", 1,
-                        "qmoa 4 4", "QMOA 2D 2-node saturated"),
-    AlgorithmTestConfig("A12", "qmoa", "work", 1,  4, "auto", 1,
-                        "qmoa 3 3", "QMOA 2D (2^3×2^3=64) CPU-only"),
+    AlgorithmTestConfig(
+        "A09", "qmoa", "gpu", 1, 8, "sequential", 1, "qmoa 4 4", "QMOA 2D (2^4×2^4=256) saturated"
+    ),
+    AlgorithmTestConfig(
+        "A10", "qmoa", "gpu", 1, 16, "sequential", 1, "qmoa 4 4", "QMOA 2D over-sat"
+    ),
+    AlgorithmTestConfig(
+        "A11", "qmoa", "gpu", 2, 8, "sequential", 1, "qmoa 4 4", "QMOA 2D 2-node saturated"
+    ),
+    AlgorithmTestConfig(
+        "A12", "qmoa", "work", 1, 4, "auto", 1, "qmoa 3 3", "QMOA 2D (2^3×2^3=64) CPU-only"
+    ),
 ]
 
 
 def print_algo_list() -> None:
-    hdr = (f"{'ID':<5} {'Algo':<5} {'Part':<5} {'Nodes':>5} {'RPN':>5} "
-           f"{'Mode':<12} {'RPG':>4}  Description")
+    hdr = (
+        f"{'ID':<5} {'Algo':<5} {'Part':<5} {'Nodes':>5} {'RPN':>5} "
+        f"{'Mode':<12} {'RPG':>4}  Description"
+    )
     print(hdr)
     print("-" * len(hdr))
     for c in ALGO_CONFIGS:
@@ -545,11 +562,11 @@ def print_algo_jobs() -> None:
         if c.partition == "gpu":
             n_gpus = min(c.ranks_per_node, 8)
             print(f"#SBATCH --gres=gpu:{n_gpus}")
-        print(f"export QUOP_DUMP_COMM_INFO=1")
+        print("export QUOP_DUMP_COMM_INFO=1")
         if c.partition == "gpu":
             print(f"export QUOP_GPU_BINDING_MODE={c.binding_mode}")
             print(f"export QUOP_RANKS_PER_GPU={c.ranks_per_gpu}")
-            print(f"export MPICH_GPU_SUPPORT_ENABLED=1")
+            print("export MPICH_GPU_SUPPORT_ENABLED=1")
         print(f"srun -N{c.n_nodes} -n{total} python run_algorithm_topology.py {c.algo_args}")
         print()
 

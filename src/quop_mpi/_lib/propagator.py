@@ -78,9 +78,7 @@ def _normalize_sparse_csr_operator_args(operator_args):
 
     row_starts = np.ascontiguousarray(raw_row_starts, dtype=np.int64)
     col_indexes = np.ascontiguousarray(raw_col_indexes, dtype=np.int64)
-    values = None if raw_values is None else np.ascontiguousarray(
-        raw_values, dtype=np.complex128
-    )
+    values = None if raw_values is None else np.ascontiguousarray(raw_values, dtype=np.complex128)
 
     # Ensure copies (ascontiguousarray returns the input when types/layout
     # already match) so we never mutate caller buffers.
@@ -98,14 +96,11 @@ def _normalize_sparse_csr_operator_args(operator_args):
 
     monotone = bool(np.all(np.diff(row_starts) >= 0)) if row_starts.size > 0 else True
     lengths_match = (
-        int(row_starts[-1]) == col_indexes.size
-        if row_starts.size > 0
-        else col_indexes.size == 0
+        int(row_starts[-1]) == col_indexes.size if row_starts.size > 0 else col_indexes.size == 0
     )
     if not (monotone and lengths_match):
         raise ValueError(
-            "Sparse CSR row_starts must be monotone and terminate at the "
-            "local nnz count"
+            "Sparse CSR row_starts must be monotone and terminate at the " "local nnz count"
         )
 
     # Sort columns within each row to satisfy the kernel precondition.
@@ -119,11 +114,7 @@ def _normalize_sparse_csr_operator_args(operator_args):
         if values is not None:
             values[lo:hi] = values[lo:hi][order]
 
-    normalized = (
-        [row_starts, col_indexes]
-        if values is None
-        else [row_starts, col_indexes, values]
-    )
+    normalized = [row_starts, col_indexes] if values is None else [row_starts, col_indexes, values]
     return normalized, False
 
 

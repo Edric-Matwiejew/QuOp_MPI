@@ -191,8 +191,8 @@ class TestSetObjectiveWithFunctionDict:
 
         # Objective that uses extra argument and does proper MPI reduction
         def objective_with_offset(
-            local_probabilities, local_observables, MPI_COMM, offset
-        ):  # noqa: N803
+            local_probabilities, local_observables, MPI_COMM, offset  # noqa: N803
+        ):
             local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return global_exp + offset
@@ -223,8 +223,8 @@ class TestSetObjectiveWithFunctionDict:
         alg.set_qualities(oracle.qualities_function())
 
         def objective_with_weight(
-            local_probabilities, local_observables, MPI_COMM, weight=1.0
-        ):  # noqa: N803
+            local_probabilities, local_observables, MPI_COMM, weight=1.0  # noqa: N803
+        ):
             local_exp = np.dot(local_probabilities, local_observables)
             global_exp = MPI_COMM.allreduce(local_exp, op=MPI.SUM)
             return weight * global_exp
@@ -435,7 +435,7 @@ class TestSetObjectiveWithParameterMap:
         alg = QWOA(oracle.system_size, mpi_comm)
         alg.set_qualities(oracle.qualities_function())
         alg.set_objective(penalized_objective)
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         initial_params = np.array([np.pi, oracle.optimal_walk_time])

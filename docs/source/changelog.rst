@@ -4,6 +4,72 @@
 Changelog
 =========
 
+Version 1.7.0 (Unreleased)
+==========================
+
+Added
+-----
+
+- :func:`~quop_mpi.parameter_maps.linear_ramp` creates a three-parameter linear
+  schedule, with optional normalisation weighted by initial-state probabilities.
+- The multivariable Rastrigin example demonstrates optimisation of the linear
+  schedule parameters.
+
+Changed
+-------
+
+- :meth:`~quop_mpi.ansatz.set_parameter_map` now infers the number of free
+  parameters from the vector supplied to ``execute()`` or ``evolve_state()``.
+  Replace ``set_parameter_map(n_free_params, mapping_fn, mapping_dict)`` with
+  ``set_parameter_map(mapping_fn, mapping_dict)``; ``mapping_dict`` remains
+  optional. Reading ``n_free_params`` before supplying a vector now raises
+  ``RuntimeError``.
+- :meth:`~quop_mpi.ansatz.benchmark` requires an explicit ``initial_parameters``
+  vector when a parameter map is set, instead of generating random free
+  parameters. Mapped ``execute()`` calls continue to require an initial vector.
+
+Fixed
+-----
+
+- Calling ``evolve_state()`` after ``execute()`` preserves the current free
+  parameter vector and count, and retains the previous optimisation results.
+
+Version 1.6.2 (Unreleased)
+==========================
+
+This entry collects user-facing maintenance changes made after the original
+1.6.1 changelog was prepared. These changes are already included in the
+published ``v1.6.1`` tag. Version 1.6.2 synchronises the maintenance branch
+with that code and updates the package, build and documentation version metadata.
+
+Added
+-----
+
+- ``Ansatz.save()`` accepts ``problem_name`` to group runs for the same problem
+  in HDF5, sharing initial-state and observable datasets across configurations.
+- New ``save_initial_state``, ``save_observables`` and ``save_final_state`` options
+  allow callers to choose which HDF5 datasets to write.
+
+Changed
+-------
+
+- The HDF5 dataset containing starting variational parameters is now named
+  ``initial_parameters`` instead of ``initial_phases``. Update readers that
+  access this dataset by name.
+
+Fixed
+-----
+
+- Prevent MPI deadlocks when using a parameter map with initial parameters
+  supplied only on the optimiser root. Missing input is now reported collectively.
+- Use 64-bit indices, partition sizes and offsets in Cartesian grids, sparse
+  vectors, multivariable propagation and parallel HDF5 writes, avoiding 32-bit
+  truncation for large problems.
+- Stabilise source builds by pinning ``scikit-build-core`` to ``0.12.2`` and
+  correcting the transverse-field Fortran module include configuration.
+- Correct output filename extension detection to check the complete suffix,
+  including its leading dot, before deciding whether to append an extension.
+
 Version 1.6.1
 =============
 

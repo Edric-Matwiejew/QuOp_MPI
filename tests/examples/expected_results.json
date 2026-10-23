@@ -18,10 +18,10 @@
   "rastrigin": {
     "example_dir": "multivariable",
     "script": "rastrigin_function.py",
-    "description": "Rastrigin function QMOA",
-    "fun_min": 0,
-    "fun_max": 160.0,
-    "norm_min": 0.99
+    "description": "Rastrigin function QMOA with linear_ramp parameter map",
+    "fun_min": 131.49325,
+    "fun_max": 131.49328,
+    "norm_min": 0.9999999999
   },
   "qwoa_portfolio": {
     "example_dir": "portfolio_rebalancing",

@@ -76,6 +76,7 @@ def parse_args_list_of_lists(self: Swarm, args: Sequence, kwargs: dict) -> tuple
 
 def iterate_subcomms_1(method: Callable) -> Callable:
     """Decorate a method to dispatch arguments per subcommunicator."""
+
     @wraps(method)
     def wrapped_method(self: Swarm, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         if self.swarm_comms.in_subcomm():
@@ -91,6 +92,7 @@ def iterate_subcomms_1(method: Callable) -> Callable:
 
 def iterate_subcomms_2(name: str, self: Swarm) -> Callable:
     """Return a wrapper that forwards calls to ``self.ansatz.<name>`` per subcommunicator."""
+
     def wrapped_method(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         if self.swarm_comms.in_subcomm():
             if is_list_of_lists(args):
@@ -528,6 +530,7 @@ class Swarm:
         self.set_seed(self.swarm_comms.get_subcomm_index())
 
         first = True
+        optimal_x = None
 
         results = []
 
@@ -554,7 +557,7 @@ class Swarm:
                     first = False
                 else:
                     params_list = [
-                        np.concatenate([optimal_x, self.ansatz.gen_initial_params(1)])  # noqa: F821 — set in previous iteration
+                        np.concatenate([optimal_x, self.ansatz.gen_initial_params(1)])
                         for _ in range(repeats)
                     ]
 

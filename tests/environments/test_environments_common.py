@@ -9,7 +9,6 @@ import tempfile
 import tomllib
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 COMMON_SH = PROJECT_ROOT / "environments" / "lib" / "common.sh"
 ACTIVATION_LIB = PROJECT_ROOT / "environments" / "lib" / "activation.sh"
@@ -30,7 +29,9 @@ GENERIC_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "generic" / "hooks.
 MACOS_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "macos" / "hooks.sh"
 UBUNTU_24_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "hooks.sh"
 PAWSEY_HOOKS = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "hooks.sh"
-PAWSEY_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "mpi" / "config.toml"
+PAWSEY_CONFIG = (
+    PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "mpi" / "config.toml"
+)
 MACOS_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "macos" / "mpi" / "config.toml"
 UBUNTU_24_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "mpi" / "config.toml"
 GENERIC_CONFIG = PROJECT_ROOT / "environments" / "profiles" / "generic" / "mpi" / "config.toml"
@@ -137,8 +138,7 @@ def test_find_rocm_path_prefers_hipconfig_prefix_over_wrapper_location():
 
         hipconfig = tmpbin / "hipconfig"
         hipconfig.write_text(
-            "#!/usr/bin/env bash\n"
-            f"printf '%s\\n' {shlex.quote(str(tmprocm))}\n"
+            "#!/usr/bin/env bash\n" f"printf '%s\\n' {shlex.quote(str(tmprocm))}\n"
         )
         os.chmod(hipconfig, 0o755)
 
@@ -324,6 +324,7 @@ def test_native_cmakelists_keeps_wavefront_placeholders_for_direct_builds():
     assert "add_custom_target(wavefront_context_wrapper)" in native_cmake_text
     assert "add_custom_target(wavefront_sparse_propagator_f2py)" in native_cmake_text
 
+
 def test_top_level_cmake_uses_native_subdir_for_compiled_sources():
     cmake_lists_text = CMAKE_LISTS.read_text()
 
@@ -337,6 +338,7 @@ def test_top_level_cmake_requires_mpi_fortran_but_not_mpi_cxx():
     assert "find_package(MPI REQUIRED COMPONENTS Fortran)" in cmake_lists_text
     assert "find_package(MPI REQUIRED COMPONENTS CXX)" not in cmake_lists_text
 
+
 def test_fortran_barrier_helper_is_shared_by_f2py_and_wavefront_context():
     preprocess_text = FORTRAN_PREPROCESS_CMAKE.read_text()
     hipfort_dependency_text = HIPFORT_DEPENDENCY_CMAKE.read_text()
@@ -348,14 +350,15 @@ def test_fortran_barrier_helper_is_shared_by_f2py_and_wavefront_context():
     assert re.search(
         r"if\(NOT HIPFORT_COMPILER\)\s+set\(HIPFORT_COMPILER\s+"
         r'"\$\{CMAKE_Fortran_COMPILER\}"\s+CACHE STRING '
-        r'"Fortran compiler for hipfort build \(e\.g\., ftn for Cray, mpifort for others\)" FORCE\s+\)\s+endif\(\)',
+        r'"Fortran compiler for hipfort build \(e\.g\., ftn for Cray, mpifort for others\)" '
+        r"FORCE\s+\)\s+endif\(\)",
         cmake_lists_text,
         re.MULTILINE,
     )
     assert "set(HIPFORT_COMPILER ${CMAKE_Fortran_COMPILER})" not in cmake_lists_text
     assert "-DHIPFORT_COMPILER=${HIPFORT_COMPILER}" in hipfort_dependency_text
     assert "-DHIPFORT_COMPILER=${CMAKE_Fortran_COMPILER}" not in hipfort_dependency_text
-    assert '${CMAKE_SOURCE_DIR}/native/.f2py_f2cmap' in add_f2py_text
+    assert "${CMAKE_SOURCE_DIR}/native/.f2py_f2cmap" in add_f2py_text
     assert "quop_add_fortran_source_barrier(" in add_f2py_text
     assert "quop_add_fortran_source_barrier(" in wavefront_context_text
     assert "QUOP_F2PY_TARGETS" not in add_f2py_text
@@ -372,8 +375,12 @@ def test_build_uses_standard_cmake_build_type_everywhere():
     # Per-backend config files: MPI config is the default, wavefront checked separately.
     ubuntu_24_mpi_config_text = UBUNTU_24_CONFIG.read_text()
     pawsey_mpi_config_text = PAWSEY_CONFIG.read_text()
-    ubuntu_24_wf_config = PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "wavefront" / "config.toml"
-    pawsey_wf_config = PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "wavefront" / "config.toml"
+    ubuntu_24_wf_config = (
+        PROJECT_ROOT / "environments" / "profiles" / "ubuntu-24" / "wavefront" / "config.toml"
+    )
+    pawsey_wf_config = (
+        PROJECT_ROOT / "environments" / "profiles" / "pawsey-setonix" / "wavefront" / "config.toml"
+    )
     ubuntu_24_wf_config_text = ubuntu_24_wf_config.read_text()
     pawsey_wf_config_text = pawsey_wf_config.read_text()
 
@@ -385,8 +392,8 @@ def test_build_uses_standard_cmake_build_type_everywhere():
         cmake_lists_text,
         re.MULTILINE,
     )
-    assert "if(CMAKE_BUILD_TYPE STREQUAL \"Debug\")" in cmake_lists_text
-    assert "elseif(CMAKE_BUILD_TYPE STREQUAL \"Release\")" in cmake_lists_text
+    assert 'if(CMAKE_BUILD_TYPE STREQUAL "Debug")' in cmake_lists_text
+    assert 'elseif(CMAKE_BUILD_TYPE STREQUAL "Release")' in cmake_lists_text
 
     assert "-DBUILD=" not in generic_hooks_text
     assert "-DBUILD=" not in macos_hooks_text
@@ -422,22 +429,28 @@ def test_build_and_inspect_wheel_keeps_stdout_for_wheel_path_only():
 
     assert 'WHEEL_PATH="$(build_and_inspect_wheel)"' in install_text
     assert 'python -m build --wheel --no-isolation --outdir "$wheel_dir" >&2' in wheel_text
-    assert 'echo "Error: expected exactly one wheel in $wheel_dir, found ${#wheel_files[@]}" >&2' in wheel_text
-    assert 'printf \'  %s\\n\' "${wheel_files[@]}" >&2' in wheel_text
-    assert 'printf \'%s\\n\' "$final_wheel"' in wheel_text
+    assert (
+        'echo "Error: expected exactly one wheel in $wheel_dir, found ${#wheel_files[@]}" >&2'
+        in wheel_text
+    )
+    assert "printf '  %s\\n' \"${wheel_files[@]}\" >&2" in wheel_text
+    assert "printf '%s\\n' \"$final_wheel\"" in wheel_text
 
 
 def test_install_script_repairs_linux_wavefront_wheels_with_auditwheel():
     install_text = INSTALL_SH.read_text()
     wheel_text = WHEEL_LIB.read_text()
 
-    assert 'python -m pip install --upgrade auditwheel' in install_text
-    assert 'collect_auditwheel_excludes()' in wheel_text
-    assert 'assert_wheel_supported_by_current_python()' in wheel_text
-    assert 'repair_linux_wheel()' in wheel_text
+    assert "python -m pip install --upgrade auditwheel" in install_text
+    assert "collect_auditwheel_excludes()" in wheel_text
+    assert "assert_wheel_supported_by_current_python()" in wheel_text
+    assert "repair_linux_wheel()" in wheel_text
     assert 'run_auditwheel "$auditwheel_ld_path" show "$wheel_path" >&2 || return 1' in wheel_text
     assert 'final_wheel="$(repair_linux_wheel "${wheel_files[0]}")" || return 1' in wheel_text
-    assert 'REQUIRED_WHEEL_MEMBER_SUBSTRING="libshafft" inspect_built_wheel "$final_wheel" >/dev/null || return 1' in wheel_text
+    assert (
+        'REQUIRED_WHEEL_MEMBER_SUBSTRING="libshafft" '
+        'inspect_built_wheel "$final_wheel" >/dev/null || return 1' in wheel_text
+    )
     assert 'assert_wheel_supported_by_current_python "${wheel_files[0]}" || return 1' in wheel_text
 
 
@@ -460,25 +473,39 @@ def test_install_script_uses_common_environment_helpers():
     assert "export_profile_cmake_args" in install_text
     assert "cleanup_install_state" in install_text
     assert "ensure_python_build_requirements" in install_text
-    assert 'ensure_path_within_root "$INSTALL_ROOT" "$VENV_DIR" "virtual environment"' in install_text
-    assert 'ensure_path_within_root "$INSTALL_ROOT" "$PROFILE_WORK_DIR" "profile work directory"' in install_text
-    assert 'ensure_path_within_root "$INSTALL_ROOT" "$ACTIVATION_SCRIPT" "activation script"' in install_text
+    assert (
+        'ensure_path_within_root "$INSTALL_ROOT" "$VENV_DIR" "virtual environment"' in install_text
+    )
+    assert (
+        'ensure_path_within_root "$INSTALL_ROOT" "$PROFILE_WORK_DIR" "profile work directory"'
+        in install_text
+    )
+    assert (
+        'ensure_path_within_root "$INSTALL_ROOT" "$ACTIVATION_SCRIPT" "activation script"'
+        in install_text
+    )
 
 
 def test_install_script_builds_docs_in_separate_venv_from_pyproject_metadata():
     install_text = INSTALL_SH.read_text()
     post_install_text = POST_INSTALL_LIB.read_text()
-    install_tail = install_text[install_text.index('step "Copying examples and benchmarks"'):]
+    install_tail = install_text[install_text.index('step "Copying examples and benchmarks"') :]
 
     assert 'DOCS_VENV_DIR="$PROFILE_WORK_DIR/docs-venv"' in install_text
-    assert 'ensure_path_within_root "$INSTALL_ROOT" "$DOCS_VENV_DIR" "documentation virtual environment"' in install_text
-    assert '"$CONFIG_PYTHON" "$PYPROJECT_DEPS_HELPER" docs-build "$PYPROJECT_TOML"' in post_install_text
+    assert (
+        'ensure_path_within_root "$INSTALL_ROOT" "$DOCS_VENV_DIR" '
+        '"documentation virtual environment"' in install_text
+    )
+    assert (
+        '"$CONFIG_PYTHON" "$PYPROJECT_DEPS_HELPER" docs-build "$PYPROJECT_TOML"'
+        in post_install_text
+    )
     assert '"$CONFIG_PYTHON" -m venv "$DOCS_VENV_DIR"' in post_install_text
     assert 'local docs_python="$DOCS_VENV_DIR/bin/python"' in post_install_text
     assert '"$docs_python" -m sphinx -b html "$src_docs/source" "$dst_docs"' in post_install_text
     assert "docs/requirements.txt" not in install_text
     assert "docs/requirements.txt" not in post_install_text
-    assert install_tail.index('build_docs') < install_tail.index('write_manifest')
+    assert install_tail.index("build_docs") < install_tail.index("write_manifest")
 
 
 def test_install_script_help_mentions_prefix_option():
@@ -522,13 +549,16 @@ def test_install_script_stages_activation_runtime_inside_prefix():
     install_text = INSTALL_SH.read_text()
     activation_text = ACTIVATION_LIB.read_text()
 
-    assert 'prepare_activation_runtime' in install_text
+    assert "prepare_activation_runtime" in install_text
     assert 'cp "$COMMON_LIB" "$ACTIVATION_COMMON_LIB"' in activation_text
     assert 'cp "$CONFIG_RENDERER" "$ACTIVATION_CONFIG_RENDERER"' in activation_text
     assert 'cp "$PATH_HELPER" "$ACTIVATION_PATH_HELPER"' in activation_text
-    assert 'quop_shell_source_path() {' in activation_text
-    assert 'if ! quop_shell_is_sourced; then' in activation_text
-    assert 'INSTALL_ROOT="\\$(cd -- "\\$(dirname -- "\\$(quop_shell_source_path)")" && pwd)"' in activation_text
+    assert "quop_shell_source_path() {" in activation_text
+    assert "if ! quop_shell_is_sourced; then" in activation_text
+    assert (
+        'INSTALL_ROOT="\\$(cd -- "\\$(dirname -- "\\$(quop_shell_source_path)")" && pwd)"'
+        in activation_text
+    )
     assert 'CONFIG_PYTHON="\\$VENV_DIR/bin/python"' in activation_text
 
 
@@ -581,7 +611,8 @@ printf 'CMAKE_ARGS_ARRAY=%s\\n' "${{CMAKE_ARGS_ARRAY[*]}}"
     assert result.returncode == 0, result.stderr or result.stdout
     assert result.stdout.splitlines() == [
         "CMAKE_ARGS=-DBUILD_TESTING=ON -DWAVEFRONT_BACKEND=ON -DCMAKE_PREFIX_PATH=/tmp/a;/tmp/b",
-        "CMAKE_ARGS_ARRAY=-DBUILD_TESTING=ON -DWAVEFRONT_BACKEND=ON -DCMAKE_PREFIX_PATH=/tmp/a;/tmp/b",
+        "CMAKE_ARGS_ARRAY=-DBUILD_TESTING=ON -DWAVEFRONT_BACKEND=ON "
+        "-DCMAKE_PREFIX_PATH=/tmp/a;/tmp/b",
     ]
 
 
@@ -627,7 +658,9 @@ printf '%s\\n' '#!/usr/bin/env bash' \
     'if [[ "$1" == "--exists" && "$2" == "hdf5" ]]; then exit 1; fi' \
     'exit 1' >"$tmpbin/pkg-config"
 printf '%s\\n' '#!/usr/bin/env bash' \
-    'if [[ "$1" == "--showme:compile" ]]; then printf "%s\\n" "-I/fake/mpi/include"; fi' >"$tmpbin/mpicc"
+    'if [[ "$1" == "--showme:compile" ]]; then' \
+    '    printf "%s\\n" "-I/fake/mpi/include"' \
+    'fi' >"$tmpbin/mpicc"
 printf '%s\\n' '#!/usr/bin/env bash' \
     'env | grep "^HDF5" | sort' >"$tmpbin/python"
 chmod +x "$tmpbin/pkg-config" "$tmpbin/mpicc" "$tmpbin/python"
@@ -655,7 +688,9 @@ tmpbin="$(mktemp -d)"
 trap 'rm -rf "$tmpbin"' EXIT
 printf '%s\\n' '#!/usr/bin/env bash' 'exit 1' >"$tmpbin/pkg-config"
 printf '%s\\n' '#!/usr/bin/env bash' \
-    'if [[ "$1" == "--showme:compile" ]]; then printf "%s\\n" "-I/fake/mpi/include"; fi' >"$tmpbin/mpicc"
+    'if [[ "$1" == "--showme:compile" ]]; then' \
+    '    printf "%s\\n" "-I/fake/mpi/include"' \
+    'fi' >"$tmpbin/mpicc"
 printf '%s\\n' '#!/usr/bin/env bash' \
     'env | grep "^HDF5" | sort' >"$tmpbin/python"
 chmod +x "$tmpbin/pkg-config" "$tmpbin/mpicc" "$tmpbin/python"
@@ -699,7 +734,7 @@ def test_activation_script_rehydrates_profile_cmake_args():
 
     assert 'source "\\$COMMON_LIB" || return 1' in activation_text
     assert 'source "\\$VENV_DIR/bin/activate" || return 1' in activation_text
-    assert 'export_profile_cmake_args || return 1' in activation_text
+    assert "export_profile_cmake_args || return 1" in activation_text
 
 
 def test_generated_activation_script_works_in_zsh():
@@ -709,7 +744,8 @@ def test_generated_activation_script_works_in_zsh():
     script = f"""
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
-mkdir -p "$tmpdir/.venv_generic_mpi/bin" "$tmpdir/.cache/quop/generic/mpi/deps" "$tmpdir/.cache/quop/generic/mpi/skbuild"
+mkdir -p "$tmpdir/.venv_generic_mpi/bin" \
+    "$tmpdir/.cache/quop/generic/mpi/deps" "$tmpdir/.cache/quop/generic/mpi/skbuild"
 printf '%s\\n' 'export VIRTUAL_ENV="$VENV_DIR"' >"$tmpdir/.venv_generic_mpi/bin/activate"
 source {shlex.quote(str(COMMON_SH))}
 source {shlex.quote(str(ACTIVATION_LIB))}
@@ -801,7 +837,9 @@ def test_validate_install_accepts_extension_suffix_matches():
         extension_file = extension_dir / f"context_wrapper{validator.EXTENSION_SUFFIXES[0]}"
         extension_file.write_text("")
 
-        assert validator.has_extension_module(package_root, "quop_mpi/_lib/wavefront/context_wrapper")
+        assert validator.has_extension_module(
+            package_root, "quop_mpi/_lib/wavefront/context_wrapper"
+        )
 
 
 def test_validate_install_reports_missing_required_extensions():
@@ -810,7 +848,9 @@ def test_validate_install_reports_missing_required_extensions():
     with tempfile.TemporaryDirectory() as tmpdir:
         package_root = Path(tmpdir) / "quop_mpi"
         (package_root / "_lib" / "mpi").mkdir(parents=True)
-        (package_root / "_lib" / f"comm_info_wrapper{validator.EXTENSION_SUFFIXES[0]}").write_text("")
+        (package_root / "_lib" / f"comm_info_wrapper{validator.EXTENSION_SUFFIXES[0]}").write_text(
+            ""
+        )
 
         try:
             validator.ensure_required_extensions(package_root, "mpi")
@@ -978,17 +1018,15 @@ def test_all_profile_configs_have_benchmark_section():
     at least a scheduler key and per-algorithm args_intra sub-tables."""
     profiles_dir = PROJECT_ROOT / "environments" / "profiles"
     found_configs = list(profiles_dir.glob("*/*/config.toml"))
-    assert len(found_configs) >= 4, (
-        f"Expected at least 4 per-backend config files, found {len(found_configs)}"
-    )
+    assert (
+        len(found_configs) >= 4
+    ), f"Expected at least 4 per-backend config files, found {len(found_configs)}"
     for config_path in found_configs:
         data = tomllib.loads(config_path.read_text())
         benchmarks = data.get("benchmarks", {})
-        assert "scheduler" in benchmarks, (
-            f"Missing scheduler in [benchmarks] in {config_path}"
-        )
+        assert "scheduler" in benchmarks, f"Missing scheduler in [benchmarks] in {config_path}"
         for algo in ("qaoa", "qwoa", "qmoa"):
             algo_table = benchmarks.get(algo, {})
-            assert "args_intra" in algo_table, (
-                f"Missing args_intra in [benchmarks.{algo}] in {config_path}"
-            )
+            assert (
+                "args_intra" in algo_table
+            ), f"Missing args_intra in [benchmarks.{algo}] in {config_path}"

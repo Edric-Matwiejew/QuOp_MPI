@@ -52,10 +52,10 @@ class Interface:
         objs,
         function,
         function_name,
-        MPI_COMM,
+        MPI_COMM,  # noqa: N803
         call_args=None,
         call_kwargs=None,
-    ):  # noqa: N803
+    ):
 
         self.function_name = function_name
         self.rank = MPI_COMM.Get_rank()

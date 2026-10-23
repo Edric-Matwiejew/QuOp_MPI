@@ -99,7 +99,11 @@ def serial(
 
 
 def csv(
-    partition_table: list[int], MPI_COMM: Intracomm, filename: Callable, *args, **kwargs  # noqa: N803
+    partition_table: list[int],
+    MPI_COMM: Intracomm,  # noqa: N803
+    filename: Callable,
+    *args,
+    **kwargs,
 ) -> np.ndarray[np.float64]:
     """Load the diagonal of a :term:`phase-shift unitary` using
     `pandas <https://pandas.pydata.org/>`_.

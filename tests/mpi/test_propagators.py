@@ -390,9 +390,7 @@ class TestTransverseFieldPropagator:
 
         alg.destroy()
 
-    def test_transverse_field_preserves_normalization(
-        self, mpi_comm, propagator_small_system_size
-    ):
+    def test_transverse_field_preserves_normalization(self, mpi_comm, propagator_small_system_size):
         """The transverse-field layer should remain unitary."""
         system_size = propagator_small_system_size
 

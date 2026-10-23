@@ -17,7 +17,6 @@ Run with wavefront backend:
 import numpy as np
 import pytest
 
-
 # =============================================================================
 # Tests for Composite Propagator via QMOA
 # =============================================================================
@@ -168,13 +167,13 @@ class TestCompleteGraphMixing:
 
         if mpi_comm.Get_rank() == 0:
             total = np.sum(probs, dtype=np.float64)
-            assert np.isclose(total, 1.0, atol=1e-8), (
-                f"[{backend_name}] Normalization lost after mixing"
-            )
+            assert np.isclose(
+                total, 1.0, atol=1e-8
+            ), f"[{backend_name}] Normalization lost after mixing"
             assert probs[0] < 1.0 - 1e-6, f"[{backend_name}] Mixer left the state fully localized"
-            assert np.count_nonzero(probs > 1e-8) > 1, (
-                f"[{backend_name}] Mixer failed to spread amplitude beyond one basis state"
-            )
+            assert (
+                np.count_nonzero(probs > 1e-8) > 1
+            ), f"[{backend_name}] Mixer failed to spread amplitude beyond one basis state"
 
         alg.destroy()
 
