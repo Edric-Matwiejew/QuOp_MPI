@@ -804,8 +804,8 @@ class TestBenchmarkWithParameterMap:
         with QWOA(system_size, mpi_comm) as alg:
             alg.set_qualities(_make_single_marked_oracle(marked_state))
 
-            # Set up parameter map - n_free_params=2 for [gamma, t]
-            alg.set_parameter_map(2, parameter_map)
+            # Map the supplied [gamma, t] vector to the ansatz parameters
+            alg.set_parameter_map(parameter_map)
 
             # Initial guess: gamma near pi, t around 0.5
             initial_params = np.array([np.pi, 0.5])
@@ -846,7 +846,7 @@ class TestBenchmarkWithParameterMap:
             alg.set_qualities(_make_single_marked_oracle(marked_state))
 
             # ansatz_depth is automatically bound from Ansatz.ansatz_depth
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
             initial_params = np.array([np.pi, 0.5])
 
@@ -890,7 +890,7 @@ class TestBenchmarkWithParameterMap:
         with QWOA(system_size, mpi_comm) as alg:
             alg.set_qualities(_make_single_marked_oracle(marked_state))
 
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
             # Start near optimal: gamma close to pi, t reasonably sized
             initial_params = np.array([np.pi * 0.9, 0.4])
@@ -909,10 +909,10 @@ class TestBenchmarkWithParameterMap:
                 uniform_expectation = (system_size - 1) / system_size
                 assert alg.result["fun"] < uniform_expectation
 
-    def test_benchmark_param_map_auto_generates_initial_params(
+    def test_benchmark_param_map_requires_initial_params(
         self, mpi_comm, benchmark_param_map_system_size
     ):
-        """Verify benchmark auto-generates initial params when n_free_params is set."""
+        """A mapped benchmark requires a vector to determine its free parameter count."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
         system_size = benchmark_param_map_system_size
@@ -926,19 +926,14 @@ class TestBenchmarkWithParameterMap:
 
         with QWOA(system_size, mpi_comm) as alg:
             alg.set_qualities(grover_oracle)
-            # Specify n_free_params=2, so benchmark can auto-generate
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
-            # Should work without initial_parameters
-            alg.benchmark(
-                ansatz_depths=[1],
-                repeats=1,
-                verbose=False,
-            )
-
-            if mpi_comm.Get_rank() == 0:
-                assert alg.result is not None
-                assert len(alg.result["x"]) == 2
+            with pytest.raises(ValueError, match="[Pp]arameter map"):
+                alg.benchmark(
+                    ansatz_depths=[1],
+                    repeats=1,
+                    verbose=False,
+                )
 
 
 def _ranks_per_gpu_for_workers(mpi_comm, n_workers):
@@ -1057,7 +1052,7 @@ class TestBenchmarkWithParallelJacobian:
                 return np.tile([gamma, t], ansatz_depth)
 
             # This should not raise
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
             # Verify both are configured
             assert alg._has_param_map
@@ -1075,7 +1070,7 @@ class TestBenchmarkWithParallelJacobian:
                 gamma, t = free_vec
                 return np.tile([gamma, t], ansatz_depth)
 
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
             # Now set parallel jacobian - should work now
             alg.set_parallel_jacobian(
@@ -1112,7 +1107,7 @@ class TestBenchmarkWithParallelJacobian:
                 gamma, t = free_vec
                 return np.tile([gamma, t], ansatz_depth)
 
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
             alg.set_parallel_jacobian(
                 n_workers=benchmark_parallel_jacobian_workers,
                 method="forward",
@@ -1159,7 +1154,7 @@ class TestBenchmarkWithParallelJacobian:
                 gamma, t = free_vec
                 return np.tile([gamma, t], ansatz_depth)
 
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
             alg.set_parallel_jacobian(
                 n_workers=benchmark_parallel_jacobian_workers,
                 method="forward",
@@ -1202,7 +1197,8 @@ class TestBenchmarkWithParallelJacobian:
                 # Allow significant tolerance since we only run 1 repeat
                 assert final_objective < 0.6, (
                     f"Expected significant probability on marked state. "
-                    f"Got objective {final_objective:.4f}, theoretical ~= {theoretical_expectation:.4f}"
+                    f"Got objective {final_objective:.4f}, "
+                    f"theoretical ~= {theoretical_expectation:.4f}"
                 )
 
 
@@ -1237,7 +1233,7 @@ class TestBenchmarkWithSamplingAndParameterMap:
             alg.set_sampling(sample_block_size=100)
 
             # Set parameter map
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
             initial_params = np.array([np.pi, 0.5])
 
@@ -1276,11 +1272,12 @@ class TestBenchmarkWithSamplingAndParameterMap:
         with QWOA(system_size, mpi_comm) as alg:
             alg.set_qualities(qualities)
             alg.set_sampling(sample_block_size=50)
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
             alg.benchmark(
                 ansatz_depths=[1, 2],
                 repeats=2,
+                initial_parameters=np.array([1.0, 0.5]),
                 param_persist=True,
                 verbose=False,
             )
@@ -1321,7 +1318,7 @@ class TestBenchmarkWithSamplingAndParameterMap:
                 function=custom_sampling,
                 max_sample_iterations=5,
             )
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
 
             initial_params = np.array([1.0, 0.5])
 

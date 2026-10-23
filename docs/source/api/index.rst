@@ -48,5 +48,6 @@ Modules for state preparation, observables, parameters, and utilities:
    state
    observable
    param
+   parameter_maps
    meta
    toolkit

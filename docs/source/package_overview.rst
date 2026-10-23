@@ -65,6 +65,10 @@ The :meth:`~quop_mpi.ansatz.set_parameter_map` method enables flexible control o
 * Custom mappings from a reduced parameter space to the full variational parameter vector
 * Improved optimisation efficiency for problems with inherent symmetries
 
+The :func:`~quop_mpi.parameter_maps.linear_ramp` function creates a map that
+generates a complete schedule from ``gamma``, ``t`` and ``beta``. See
+:ref:`linear-ramp-parameter-map` for the schedule and configuration options.
+
 Optimiser Support
 ^^^^^^^^^^^^^^^^^
 

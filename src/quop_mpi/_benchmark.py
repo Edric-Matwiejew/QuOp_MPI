@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
-from collections.abc import Iterable
 
 import numpy as np
 from mpi4py import MPI
@@ -41,7 +41,6 @@ class Benchmark:
         quop_result: dict[str, Any]
         tracker: JobTracker | None
         _has_param_map: bool
-        _n_free_params: int | None
 
         def setup(self) -> None: ...
         def set_seed(self, seed: int) -> None: ...
@@ -51,6 +50,10 @@ class Benchmark:
         def save(self, filename: str, label: str, action: str) -> None: ...
         def _Ansatz__pre(self) -> None: ...  # noqa: N802
         def _Ansatz__gen_initial_params(self, depth: int = None) -> np.ndarray: ...  # noqa: N802
+
+        def _broadcast_mapped_parameters(
+            self, parameters: list[float] | np.ndarray | None, caller: str
+        ) -> np.ndarray: ...
 
     def _init_benchmark(self) -> None:
         """Initialize benchmark-related instance variables.
@@ -85,9 +88,10 @@ class Benchmark:
         repeats : int
             number of repeats at each ansatz depth
         initial_parameters: list[float] or ndarray[float], optional
-            ** Must be defined if a parameter mapping function is set. **
-            initial variational parameter values, if not present these are generated
-            using the default parameter generation methods of the ansatz unitaries.
+            Initial :term:`variational parameters`. Required when using
+            :meth:`~quop_mpi.ansatz.set_parameter_map`; supply the map's
+            :term:`free parameters`. Otherwise, omitted values are generated
+            using the unitaries' :term:`Parameter Functions <Parameter Function>`.
         param_persist : bool, optional
             if True the optimised variational parameter values which achieved
             the lowest objective function value for all repeats at ansatz_depth
@@ -111,10 +115,9 @@ class Benchmark:
             path to the suspend file if time_limit is not None
         """
 
-        if self._has_param_map and initial_parameters is None:
-            # Auto-generate random initial parameters for the free vector
-            rng = np.random.default_rng(self.seed)
-            initial_parameters = rng.uniform(0, 2 * np.pi, self._n_free_params)
+        self.setup()
+        if self._has_param_map:
+            initial_parameters = self._broadcast_mapped_parameters(initial_parameters, "benchmark")
 
         best_obj = np.inf
         previous_params = None
@@ -122,7 +125,6 @@ class Benchmark:
         if initial_parameters is not None:
             self.variational_parameters = np.asarray(initial_parameters, dtype=np.float64)
 
-        self.setup()
         ansatz_depth_temp = deepcopy(self.ansatz_depth)
         self.benchmarking = True
         suspend_path = "suspend" if suspend_path is None else suspend_path
@@ -139,7 +141,6 @@ class Benchmark:
         while not self.tracker.complete:
             repeat, depth = self.tracker.get_job()
             self.set_seed(self.tracker.get_seed())
-            self.ansatz_depth = depth
             self.set_depth(depth)
 
             if repeat == 1 or first:
@@ -251,4 +252,4 @@ class Benchmark:
                 self.tracker.update(None)
 
         self.benchmarking = False
-        self.ansatz_depth = ansatz_depth_temp
+        self.set_depth(ansatz_depth_temp)

@@ -130,7 +130,7 @@ Sampling, and Objective Functions:
    * - ``partition_table``
      - ndarray[int]
      - Array where ``partition_table[rank+1] - partition_table[rank] = local_i``
-   * - ``observables``
+   * - ``local_observables``
      - ndarray[float64]
      - Local partition of observable values (available after setup)
    * - ``ansatz_initial_state``
@@ -145,6 +145,9 @@ Sampling, and Objective Functions:
    * - ``variational_parameters``
      - ndarray[float64]
      - Current variational parameter values
+   * - ``free_vec``
+     - ndarray[float64]
+     - Current vector of free parameters (Parameter Map Functions)
    * - ``ansatz_depth``
      - int
      - Number of ansatz iterations (layers)
@@ -331,33 +334,41 @@ bound from the :class:`quop_mpi.unitary` instance:
                 return initial_state
 
     Parameter Map Function
-        Defines a mapping from a reduced "free" parameter vector to the full
-        variational-parameter vector used by a :term:`QVA`.  This allows you to
-        optimise over a smaller parameter space while the mapping function
-        reconstructs the complete vector internally.
+        Maps a vector of :term:`free parameters` to the
+        :term:`variational parameters` used by a :term:`QVA`.
 
-        Passed to :meth:`quop_mpi.ansatz.set_parameter_map` together with the
-        number of free parameters and an optional :term:`FunctionDict`.
+        Passed to :meth:`quop_mpi.ansatz.set_parameter_map` with an optional
+        :term:`FunctionDict`. The number of free parameters is inferred from
+        the initial vector supplied to :meth:`~quop_mpi.ansatz.execute` or
+        :meth:`~quop_mpi.ansatz.evolve_state`.
+        :meth:`~quop_mpi.ansatz.benchmark` requires an explicit
+        ``initial_parameters`` vector when using a parameter map.
 
         **Method signature:**
 
         .. code-block:: python
 
             ansatz.set_parameter_map(
-                n_free_params,   # int: dimensionality of the optimisation problem
                 mapping_fn,      # callable: your mapping function
-                mapping_dict     # optional FunctionDict for extra arguments
+                mapping_dict=None  # optional FunctionDict for extra arguments
             )
 
         **Parameters:**
 
-        The first positional parameter always receives the free parameter vector
-        from the optimiser. Additional parameters depend on your mapping logic:
+        Positional parameters bind to ansatz attributes by name, including
+        ``free_vec`` for the vector supplied to
+        :meth:`~quop_mpi.ansatz.evolve_state` or
+        :meth:`~quop_mpi.ansatz.execute`. Commonly used parameters are:
 
-        * ``ansatz_depth`` -- number of ansatz iterations (for computing output size)
-        * ``total_params`` -- parameters per iteration (for computing output size)
-        * ``observables`` -- for normalising parameters by observable statistics
+        * ``free_vec`` -- current vector of free parameters
+        * ``ansatz_depth`` -- number of ansatz iterations
+        * ``total_params`` -- variational parameters per iteration
+        * ``local_observables`` -- for normalising parameters by observable statistics
         * ``MPI_COMM`` -- for computing global statistics across ranks
+
+        The :func:`~quop_mpi.parameter_maps.linear_ramp` function creates a map
+        for a three-parameter linear schedule. See :ref:`linear-ramp-parameter-map`
+        for its formula and usage.
 
         **Typical structure:**
 
@@ -378,32 +389,20 @@ bound from the :class:`quop_mpi.unitary` instance:
                 # ... your mapping logic ...
                 return full_vec
 
-        **Factory pattern example:**
+        **Example:**
 
-        For Parameter Map Functions, the factory pattern conveniently returns
-        both ``n_free_params`` and the mapping function together:
+        This example shares the same parameters across all ansatz iterations:
 
         .. code-block:: python
 
-            def create_linear_schedule(scale: float):
-                """Factory returning (n_free_params, mapping_fn)."""
-                n_free_params = 3
-                _cache = {}
+            def shared_parameters(free_vec, ansatz_depth):
+                return np.tile(free_vec, ansatz_depth)
 
-                def mapping_fn(free_vec, ansatz_depth, observables, MPI_COMM):
-                    if "sigma" not in _cache:
-                        _cache["sigma"] = compute_global_std(observables, MPI_COMM)
-                    # ... build full_vec from free_vec ...
-                    return full_vec
+            # For an ansatz with two parameters per iteration:
+            ansatz.set_parameter_map(shared_parameters)
+            ansatz.execute([0.8, 0.4])
 
-                return n_free_params, mapping_fn
-
-            # Usage:
-            n_free, param_map = create_linear_schedule(scale=1.0)
-            ansatz.set_parameter_map(n_free, param_map)
-
-        See :term:`QuOp Function` for the general implementation patterns
-        (factory/closure vs callable class).
+        See :term:`QuOp Function` for general implementation patterns.
 
     Sampling Function
         Returns an :term:`objective function` value computed from batches of

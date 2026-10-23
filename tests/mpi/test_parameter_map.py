@@ -57,7 +57,7 @@ class TestParameterMapWithExecute:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         # Execute with free parameters (2 params, not 2)
@@ -90,7 +90,7 @@ class TestParameterMapWithExecute:
         def parameter_map(ansatz_depth, total_params, free_vec):
             return np.tile(free_vec, ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
         if n_workers > 1:
             if mpi_comm.Get_size() < n_workers:
@@ -116,7 +116,7 @@ class TestParameterMapWithExecute:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         # Start away from optimal
@@ -149,7 +149,7 @@ class TestParameterMapWithExecute:
         for depth in [1, 2, 3]:
             alg = QWOA(oracle.system_size, mpi_comm)
             alg.set_qualities(oracle.qualities_function())
-            alg.set_parameter_map(2, parameter_map)
+            alg.set_parameter_map(parameter_map)
             alg.set_depth(depth)
 
             initial_params = np.array([np.pi * 0.8, 0.3])
@@ -186,7 +186,7 @@ class TestParameterMapDifferentMappings:
             # gamma = theta, t = theta/pi
             return np.tile([theta, theta / np.pi], ansatz_depth)
 
-        alg.set_parameter_map(1, single_param_map)
+        alg.set_parameter_map(single_param_map)
         alg.set_depth(1)
 
         initial_params = np.array([2.0])
@@ -217,7 +217,7 @@ class TestParameterMapDifferentMappings:
                 full[layer * total_params + 1] = t_base * scale
             return full
 
-        alg.set_parameter_map(2, layer_scaled_map)
+        alg.set_parameter_map(layer_scaled_map)
         alg.set_depth(2)
 
         initial_params = np.array([np.pi, 0.5])
@@ -249,7 +249,7 @@ class TestParameterMapDifferentMappings:
             gamma = free_vec[0]
             return np.tile([gamma, fixed_t], ansatz_depth)
 
-        alg.set_parameter_map(1, gamma_only_map)
+        alg.set_parameter_map(gamma_only_map)
         alg.set_depth(1)
 
         initial_params = np.array([2.0])
@@ -284,7 +284,7 @@ class TestParameterMapWithFunctionDict:
             return np.tile([gamma * scale_factor, t], ansatz_depth)
 
         scale = 0.5
-        alg.set_parameter_map(2, scaled_map, {"args": [scale]})
+        alg.set_parameter_map(scaled_map, {"args": [scale]})
         alg.set_depth(1)
 
         initial_params = np.array([np.pi, 0.4])
@@ -311,7 +311,7 @@ class TestParameterMapWithFunctionDict:
             return np.tile([gamma + gamma_offset, t], ansatz_depth)
 
         offset = 0.5
-        alg.set_parameter_map(2, map_with_offset, {"kwargs": {"gamma_offset": offset}})
+        alg.set_parameter_map(map_with_offset, {"kwargs": {"gamma_offset": offset}})
         alg.set_depth(1)
 
         initial_params = np.array([np.pi, 0.4])
@@ -343,7 +343,7 @@ class TestParameterMapValidation:
         def bad_map(ansatz_depth, total_params, free_vec):
             return np.array([1.0])  # Wrong size
 
-        alg.set_parameter_map(2, bad_map)
+        alg.set_parameter_map(bad_map)
         alg.set_depth(1)
 
         initial_params = np.array([np.pi, 0.4])
@@ -373,7 +373,7 @@ class TestParameterMapValidation:
             return np.tile([gamma, t], ansatz_depth)
 
         n_free = 2
-        alg.set_parameter_map(n_free, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(3)  # 3 layers = 6 full params, but only 2 free
 
         initial_params = np.array([np.pi, 0.4])
@@ -406,7 +406,7 @@ class TestParameterMapWithEvolveState:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         # evolve_state with free parameters
@@ -435,7 +435,7 @@ class TestParameterMapWithEvolveState:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         # Optimal free parameters
@@ -471,7 +471,7 @@ class TestParameterMapWithEvolveState:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         free_params = np.array([np.pi, oracle.optimal_walk_time])
@@ -506,7 +506,7 @@ class TestParameterMapWithEvaluate:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
         alg.prepare()
 
@@ -540,7 +540,7 @@ class TestParameterMapWithInitialState:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_depth(1)
 
         initial_params = np.array([np.pi, oracle.optimal_walk_time])
@@ -558,8 +558,8 @@ class TestParameterMapWithInitialState:
 class TestParameterMapGenInitialParams:
     """Tests for gen_initial_params() with a parameter map active."""
 
-    def test_gen_initial_params_with_param_map(self, mpi_comm, simple_oracle):
-        """Verify gen_initial_params() returns n_free_params when a parameter map is set."""
+    def test_gen_initial_params_does_not_infer_mapped_count(self, mpi_comm, simple_oracle):
+        """Unitary initializers generate full parameters without resolving map inputs."""
         from quop_mpi.algorithm.combinatorial import QWOA
 
         oracle = simple_oracle
@@ -571,17 +571,21 @@ class TestParameterMapGenInitialParams:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
-        alg.set_depth(1)
+        alg.set_parameter_map(parameter_map)
+        alg.set_depth(3)
 
+        with pytest.raises(RuntimeError):
+            _ = alg.n_free_params
         alg.prepare()
+        with pytest.raises(RuntimeError):
+            _ = alg.n_free_params
 
         params = alg.gen_initial_params()
 
         if alg.subcomms.in_subcomm():
             assert params is not None
-            assert (
-                len(params) == 2
-            ), f"gen_initial_params() should return n_free_params={2}, got {len(params)}"
+            assert len(params) == 6
+        with pytest.raises(RuntimeError):
+            _ = alg.n_free_params
 
         alg.destroy()

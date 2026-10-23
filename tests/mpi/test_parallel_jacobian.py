@@ -1054,9 +1054,9 @@ class TestJacobianCorrectness:
         alg.destroy()
 
         if is_leader:
-            assert parallel_gradient is not None, (
-                "Optimiser leader should receive the gathered jacobian"
-            )
+            assert (
+                parallel_gradient is not None
+            ), "Optimiser leader should receive the gathered jacobian"
             assert np.all(np.isfinite(parallel_gradient)), parallel_gradient
             assert np.all(np.isfinite(reference_gradient)), reference_gradient
             np.testing.assert_allclose(
@@ -1403,7 +1403,7 @@ class TestParallelJacobianCombinations:
             gamma, t = free_vec
             return np.tile([gamma, t], ansatz_depth)
 
-        alg.set_parameter_map(2, parameter_map)
+        alg.set_parameter_map(parameter_map)
         alg.set_parallel_jacobian(n_workers=2, method="forward")
 
         alg.set_optimiser(
