@@ -96,6 +96,12 @@ def linear_ramp(weight_by_initial_state: bool = False) -> Callable[..., NDArray[
 
     Notes
     -----
+    Typical choices are ``gamma < 0``, with ``abs(gamma)`` of order one,
+    ``t > 0``, and ``0 < beta < 1`` [1]_. The scale of ``t`` depends on
+    the mixing unitaries. These ranges are not enforced by the map, so use
+    of an appropriately configured optimiser is recommended (see
+    :meth:`~quop_mpi.ansatz.set_optimiser`).
+
     For :term:`ansatz depth` ``p > 1`` and iteration ``l = 1, ..., p``, let
     ``x = (l - 1) / (p - 1)``:
 

@@ -1,6 +1,7 @@
 import numpy as np
 
 from quop_mpi.algorithm.multivariable import QMOA, cartesian, setup_cartesian
+from quop_mpi.parameter_maps import linear_ramp
 
 
 def rastrigin(x):
@@ -17,5 +18,10 @@ alg.verbose_objective = True
 alg.set_qualities(cartesian, {"args": [deltas, mins, rastrigin]})
 alg.set_log("multivariable", "rastrigin", "w")
 alg.set_depth(5)
-alg.execute()
+alg.set_parameter_map(linear_ramp())
+alg.set_optimiser(
+    "scipy",
+    {"method": "L-BFGS-B", "bounds": [(None, 0.0), (0.0, None), (0.0, 1.0)]},
+)
+alg.execute([-1.0, 0.1, 0.1])  # gamma, t, beta
 alg.print_result()
