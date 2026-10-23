@@ -1,5 +1,7 @@
 """Distributed normalization and ansatz integration for the linear-ramp map."""
 
+from copy import deepcopy
+
 import numpy as np
 import pytest
 
@@ -287,5 +289,48 @@ def test_linear_ramp_execute_records_final_mapped_parameters(mpi_comm, mpi_sizin
                 time * beta,
             ]
             np.testing.assert_allclose(algorithm.quop_result["mapped_parameters"], expected)
+    finally:
+        algorithm.destroy()
+
+
+@pytest.mark.parametrize("n_workers", [1, 2])
+def test_linear_ramp_evolve_preserves_last_optimization(mpi_comm, mpi_sizing, n_workers):
+    """Evolution updates mapped inputs without remapping a previous optimizer result."""
+    from quop_mpi.algorithm.combinatorial import QWOA
+
+    if mpi_comm.Get_size() < n_workers:
+        pytest.skip(f"Need at least {n_workers} MPI processes")
+    system_size = mpi_sizing.power_of_two(base=16, min_per_rank=1)
+    observables = np.linspace(-2.0, 3.0, system_size) ** 2
+    sigma = np.std(observables)
+
+    def qualities(local_i, local_i_offset):
+        return observables[local_i_offset : local_i_offset + local_i]
+
+    def probe_optimiser(fun, x, **kwargs):
+        return {"x": x.copy(), "fun": fun(x), "success": True, "nfev": 1}
+
+    algorithm = QWOA(system_size, mpi_comm)
+    try:
+        algorithm.set_qualities(qualities)
+        algorithm.set_depth(1)
+        algorithm.set_parameter_map(linear_ramp())
+        if n_workers > 1:
+            algorithm.set_parallel_jacobian(n_workers=n_workers, method="forward")
+        algorithm.set_optimiser(probe_optimiser)
+
+        algorithm.execute(np.array([0.9, 0.6, 0.2]))
+        previous_result = deepcopy(algorithm.result)
+        previous_quop_result = deepcopy(algorithm.quop_result)
+
+        free_vec = np.array([0.4, 0.3])
+        algorithm.evolve_state(free_vec)
+
+        assert mpi_comm.allgather(algorithm.n_free_params) == [2] * mpi_comm.Get_size()
+        if algorithm.subcomms.in_subcomm():
+            np.testing.assert_array_equal(algorithm.free_vec, free_vec)
+            np.testing.assert_allclose(algorithm.last_evaluated, [free_vec[0] / sigma, free_vec[1]])
+        np.testing.assert_equal(algorithm.result, previous_result)
+        np.testing.assert_equal(algorithm.quop_result, previous_quop_result)
     finally:
         algorithm.destroy()

@@ -28,6 +28,12 @@ Changed
   vector when a parameter map is set, instead of generating random free
   parameters. Mapped ``execute()`` calls continue to require an initial vector.
 
+Fixed
+-----
+
+- Calling ``evolve_state()`` after ``execute()`` preserves the current free
+  parameter vector and count, and retains the previous optimisation results.
+
 Version 1.6.2 (Unreleased)
 ==========================
 

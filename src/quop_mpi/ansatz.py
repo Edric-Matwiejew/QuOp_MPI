@@ -561,20 +561,21 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                 self.quop_result[key] = copy(self.result[key])
 
     @scope("world")
-    def __post(self) -> None:
-        """Calls post-simulation methods."""
+    def __post(self, *, update_result: bool = False) -> None:
+        """Run post-simulation methods and optionally finalise optimisation results."""
 
         if self.subcomms.in_subcomm() and self.subcomms.get_subcomm_index() == 0:
             self.state_norm = self.__get_state_norm()
-            is_root = self.subcomms.SUBCOMM.Get_rank() == 0
-            final_parameters = self.result["x"] if is_root and self.result is not None else None
-            final_parameters = self.subcomms.SUBCOMM.bcast(final_parameters, root=0)
-            if final_parameters is not None:
-                # Parameter maps may perform reductions over the subcomm, so
-                # every active rank must participate in final result mapping.
-                mapped_parameters = self.__to_full(final_parameters)
-                if is_root:
-                    self.__populate_quop_result(mapped_parameters)
+            if update_result:
+                is_root = self.subcomms.SUBCOMM.Get_rank() == 0
+                final_parameters = self.result["x"] if is_root and self.result is not None else None
+                final_parameters = self.subcomms.SUBCOMM.bcast(final_parameters, root=0)
+                if final_parameters is not None:
+                    # Parameter maps may perform reductions over the subcomm, so
+                    # every active rank must participate in final result mapping.
+                    mapped_parameters = self.__to_full(final_parameters)
+                    if is_root:
+                        self.__populate_quop_result(mapped_parameters)
 
         # Only ranks in the subcomm have a valid SUBCOMM to call barrier on
         if self.subcomms.in_subcomm():
@@ -1572,7 +1573,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                         while not self.stop:
                             self.__objective(None)
 
-                    self.__post()
+                    self.__post(update_result=True)
 
                     if self.log:
                         self._log_update()
@@ -1585,7 +1586,7 @@ class Ansatz(Sampling, Logging, Communicator, Jacobian, Benchmark, Bindable):
                         # separate ROOTCOMM command relay.
                         self._mpi_jacobian(None)
 
-                    self.__post()
+                    self.__post(update_result=True)
 
                 # Broadcast results to all active ranks via SUBCOMM
                 self.result = self.subcomms.SUBCOMM.bcast(self.result, root=0)
