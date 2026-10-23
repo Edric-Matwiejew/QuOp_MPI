@@ -30,8 +30,10 @@ class QWOA(Ansatz):
     """
 
     def __init__(
-        self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD
-    ) -> None:  # noqa: N803
+        self,
+        system_size: int,
+        MPI_communicator: Intracomm = MPI.COMM_WORLD,  # noqa: N803
+    ) -> None:
         """Initialise a QWOA instance.
 
         Parameters

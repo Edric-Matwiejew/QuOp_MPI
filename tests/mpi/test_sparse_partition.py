@@ -251,6 +251,8 @@ class TestPartitionTableAgreement:
             if mpi_comm.Get_rank() == 0:
                 assert_probabilities_normalized(
                     probs,
-                    context=f"system_size={system_size}: sparse evolution should preserve normalization",
+                    context=(
+                        f"system_size={system_size}: sparse evolution should preserve normalization"
+                    ),
                 )
             alg.destroy()

@@ -292,7 +292,7 @@ def compute_gpu_slot_ordinal(
 
     # Count active GPU ranks per physical GPU.
     active = [0] * n_gpus
-    for g, is_gpu in zip(assigned_indices, is_gpu_ranks):
+    for g, is_gpu in zip(assigned_indices, is_gpu_ranks, strict=True):
         if is_gpu and g >= 0:
             active[g] += 1
 

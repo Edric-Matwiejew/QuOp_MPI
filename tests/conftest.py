@@ -139,7 +139,6 @@ def _configure_temp_fallback_if_needed(config):
     cwd = Path.cwd()
     fallback_root = cwd / ".quop_pytest_tmp"
     shared_root = fallback_root / "shared"
-    pytest_base = shared_root / "pytest_basetemp"
 
     shared_root.mkdir(parents=True, exist_ok=True)
 

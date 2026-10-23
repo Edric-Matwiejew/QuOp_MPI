@@ -12,12 +12,14 @@ class QAOASparse(_QAOABase):
     """Simulate QAOA using the sparse hypercube mixer."""
 
     def __init__(
-        self, system_size: int, MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD
-    ) -> None:  # noqa: N803
+        self,
+        system_size: int,
+        MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD,  # noqa: N803
+    ) -> None:
         """Initialise a sparse-mixer QAOA instance."""
         super().__init__(system_size, MPI_communicator)
 
-    def _build_mixer_unitary(self):
+    def _build_mixer_unitary(self) -> sparse.Unitary:
         """Create the legacy sparse hypercube mixer."""
         return sparse.Unitary(
             sparse.operator.hypercube,

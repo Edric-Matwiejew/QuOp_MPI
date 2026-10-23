@@ -474,7 +474,7 @@ class TestBackendConsistency:
         # First evolve to initialize state, then compute objective
         params = np.array([0.3, 0.4])
         alg.evolve_state(params)
-        obj1 = alg.objective(params)
+        alg.objective(params)
 
         eps = 1e-6
         forward_obj = alg.objective(params + np.array([eps, 0.0]))

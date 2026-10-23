@@ -138,7 +138,9 @@ class TestInterfaceWarnings:
 
         with pytest.raises(
             TypeError,
-            match="FunctionDict\\['kwargs'\\] cannot target positional-only parameter 'scale_factor'",
+            match=(
+                "FunctionDict\\['kwargs'\\] cannot target positional-only parameter 'scale_factor'"
+            ),
         ):
             Interface(
                 [_BoundAttrs()],
@@ -182,7 +184,9 @@ class TestInterfaceWarnings:
 
         with pytest.raises(
             TypeError,
-            match="bindable parameter 'variational_parameters' exists on a bound object but is None",
+            match=(
+                "bindable parameter 'variational_parameters' exists on a bound object but is None"
+            ),
         ):
             interface.update_parameters()
 

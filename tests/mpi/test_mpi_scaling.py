@@ -192,7 +192,7 @@ class TestSetupPhase:
             assert any(all_in_subcomm), f"No ranks in subcomm: {all_in_subcomm}"
             # All active ranks should be in subcomm index 0
             active_indices = [
-                idx for idx, active in zip(all_subcomm_index, all_in_subcomm) if active
+                idx for idx, active in zip(all_subcomm_index, all_in_subcomm, strict=True) if active
             ]
             assert all(
                 idx == 0 for idx in active_indices

@@ -29,9 +29,12 @@ from __future__ import annotations
 
 import pickle
 import sys
-from typing import Any, Callable
+from typing import Callable, ParamSpec, TypeVar
 
 from mpi4py import MPI
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
 
 
 class CollectiveError(RuntimeError):
@@ -74,10 +77,10 @@ def _earliest_failure(
 
 def mpi_check(
     comm: MPI.Intracomm | None,
-    fn: Callable[..., Any],
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
+    fn: Callable[_P, _T],
+    *args: _P.args,
+    **kwargs: _P.kwargs,
+) -> _T:
     """Run ``fn(*args, **kwargs)`` collectively on ``comm``.
 
     If ``fn`` raises on any rank of ``comm``, the exception is broadcast
@@ -115,7 +118,7 @@ def mpi_check(
         return fn(*args, **kwargs)
 
     local_exc: BaseException | None = None
-    local_result: Any = None
+    local_result: _T
     try:
         local_result = fn(*args, **kwargs)
     except BaseException as e:  # noqa: BLE001 -- intentional: propagate any failure

@@ -7,12 +7,13 @@ from types import ModuleType
 from typing import Any
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from quop_mpi._lib.propagator import Propagator
 from quop_mpi.unitary import UnitaryBase
 
 
-def _ensure_diagonal_compliant(operator: Any, term_index: int | None = None) -> np.ndarray:
+def _ensure_diagonal_compliant(operator: ArrayLike, term_index: int | None = None) -> np.ndarray:
     """Coerce a diagonal-operator term to a contiguous float64 array.
 
     Issues a :class:`RuntimeWarning` if a copy is required because the

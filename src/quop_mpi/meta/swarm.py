@@ -530,6 +530,7 @@ class Swarm:
         self.set_seed(self.swarm_comms.get_subcomm_index())
 
         first = True
+        optimal_x = None
 
         results = []
 
@@ -556,9 +557,7 @@ class Swarm:
                     first = False
                 else:
                     params_list = [
-                        np.concatenate(
-                            [optimal_x, self.ansatz.gen_initial_params(1)]
-                        )  # noqa: F821 — set in previous iteration
+                        np.concatenate([optimal_x, self.ansatz.gen_initial_params(1)])
                         for _ in range(repeats)
                     ]
 

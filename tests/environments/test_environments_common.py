@@ -350,7 +350,8 @@ def test_fortran_barrier_helper_is_shared_by_f2py_and_wavefront_context():
     assert re.search(
         r"if\(NOT HIPFORT_COMPILER\)\s+set\(HIPFORT_COMPILER\s+"
         r'"\$\{CMAKE_Fortran_COMPILER\}"\s+CACHE STRING '
-        r'"Fortran compiler for hipfort build \(e\.g\., ftn for Cray, mpifort for others\)" FORCE\s+\)\s+endif\(\)',
+        r'"Fortran compiler for hipfort build \(e\.g\., ftn for Cray, mpifort for others\)" '
+        r"FORCE\s+\)\s+endif\(\)",
         cmake_lists_text,
         re.MULTILINE,
     )
@@ -447,8 +448,8 @@ def test_install_script_repairs_linux_wavefront_wheels_with_auditwheel():
     assert 'run_auditwheel "$auditwheel_ld_path" show "$wheel_path" >&2 || return 1' in wheel_text
     assert 'final_wheel="$(repair_linux_wheel "${wheel_files[0]}")" || return 1' in wheel_text
     assert (
-        'REQUIRED_WHEEL_MEMBER_SUBSTRING="libshafft" inspect_built_wheel "$final_wheel" >/dev/null || return 1'
-        in wheel_text
+        'REQUIRED_WHEEL_MEMBER_SUBSTRING="libshafft" '
+        'inspect_built_wheel "$final_wheel" >/dev/null || return 1' in wheel_text
     )
     assert 'assert_wheel_supported_by_current_python "${wheel_files[0]}" || return 1' in wheel_text
 
@@ -492,8 +493,8 @@ def test_install_script_builds_docs_in_separate_venv_from_pyproject_metadata():
 
     assert 'DOCS_VENV_DIR="$PROFILE_WORK_DIR/docs-venv"' in install_text
     assert (
-        'ensure_path_within_root "$INSTALL_ROOT" "$DOCS_VENV_DIR" "documentation virtual environment"'
-        in install_text
+        'ensure_path_within_root "$INSTALL_ROOT" "$DOCS_VENV_DIR" '
+        '"documentation virtual environment"' in install_text
     )
     assert (
         '"$CONFIG_PYTHON" "$PYPROJECT_DEPS_HELPER" docs-build "$PYPROJECT_TOML"'
@@ -610,7 +611,8 @@ printf 'CMAKE_ARGS_ARRAY=%s\\n' "${{CMAKE_ARGS_ARRAY[*]}}"
     assert result.returncode == 0, result.stderr or result.stdout
     assert result.stdout.splitlines() == [
         "CMAKE_ARGS=-DBUILD_TESTING=ON -DWAVEFRONT_BACKEND=ON -DCMAKE_PREFIX_PATH=/tmp/a;/tmp/b",
-        "CMAKE_ARGS_ARRAY=-DBUILD_TESTING=ON -DWAVEFRONT_BACKEND=ON -DCMAKE_PREFIX_PATH=/tmp/a;/tmp/b",
+        "CMAKE_ARGS_ARRAY=-DBUILD_TESTING=ON -DWAVEFRONT_BACKEND=ON "
+        "-DCMAKE_PREFIX_PATH=/tmp/a;/tmp/b",
     ]
 
 
@@ -656,7 +658,9 @@ printf '%s\\n' '#!/usr/bin/env bash' \
     'if [[ "$1" == "--exists" && "$2" == "hdf5" ]]; then exit 1; fi' \
     'exit 1' >"$tmpbin/pkg-config"
 printf '%s\\n' '#!/usr/bin/env bash' \
-    'if [[ "$1" == "--showme:compile" ]]; then printf "%s\\n" "-I/fake/mpi/include"; fi' >"$tmpbin/mpicc"
+    'if [[ "$1" == "--showme:compile" ]]; then' \
+    '    printf "%s\\n" "-I/fake/mpi/include"' \
+    'fi' >"$tmpbin/mpicc"
 printf '%s\\n' '#!/usr/bin/env bash' \
     'env | grep "^HDF5" | sort' >"$tmpbin/python"
 chmod +x "$tmpbin/pkg-config" "$tmpbin/mpicc" "$tmpbin/python"
@@ -684,7 +688,9 @@ tmpbin="$(mktemp -d)"
 trap 'rm -rf "$tmpbin"' EXIT
 printf '%s\\n' '#!/usr/bin/env bash' 'exit 1' >"$tmpbin/pkg-config"
 printf '%s\\n' '#!/usr/bin/env bash' \
-    'if [[ "$1" == "--showme:compile" ]]; then printf "%s\\n" "-I/fake/mpi/include"; fi' >"$tmpbin/mpicc"
+    'if [[ "$1" == "--showme:compile" ]]; then' \
+    '    printf "%s\\n" "-I/fake/mpi/include"' \
+    'fi' >"$tmpbin/mpicc"
 printf '%s\\n' '#!/usr/bin/env bash' \
     'env | grep "^HDF5" | sort' >"$tmpbin/python"
 chmod +x "$tmpbin/pkg-config" "$tmpbin/mpicc" "$tmpbin/python"
@@ -738,7 +744,8 @@ def test_generated_activation_script_works_in_zsh():
     script = f"""
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
-mkdir -p "$tmpdir/.venv_generic_mpi/bin" "$tmpdir/.cache/quop/generic/mpi/deps" "$tmpdir/.cache/quop/generic/mpi/skbuild"
+mkdir -p "$tmpdir/.venv_generic_mpi/bin" \
+    "$tmpdir/.cache/quop/generic/mpi/deps" "$tmpdir/.cache/quop/generic/mpi/skbuild"
 printf '%s\\n' 'export VIRTUAL_ENV="$VENV_DIR"' >"$tmpdir/.venv_generic_mpi/bin/activate"
 source {shlex.quote(str(COMMON_SH))}
 source {shlex.quote(str(ACTIVATION_LIB))}

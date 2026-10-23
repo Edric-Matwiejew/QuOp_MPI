@@ -22,8 +22,10 @@ class _QAOABase(Ansatz):
     """Common QAOA setup shared by mixer-specific variants."""
 
     def __init__(
-        self, system_size: int, MPI_communicator: Intracomm = MPI.COMM_WORLD
-    ) -> None:  # noqa: N803
+        self,
+        system_size: int,
+        MPI_communicator: Intracomm = MPI.COMM_WORLD,  # noqa: N803
+    ) -> None:
         """Initialise a QAOA-like instance."""
         if system_size < 1 or (system_size & (system_size - 1)) != 0:
             raise ValueError(f"QAOA requires system_size = 2**n for integer n, got {system_size}.")

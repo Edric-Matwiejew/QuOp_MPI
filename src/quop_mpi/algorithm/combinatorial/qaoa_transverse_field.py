@@ -32,12 +32,14 @@ class QAOATransverseField(_QAOABase):
     """
 
     def __init__(
-        self, system_size: int, MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD
-    ) -> None:  # noqa: N803
+        self,
+        system_size: int,
+        MPI_communicator: MPI.Intracomm = MPI.COMM_WORLD,  # noqa: N803
+    ) -> None:
         """Initialise a transverse-field-mixer QAOA instance."""
         super().__init__(system_size, MPI_communicator)
 
-    def _build_mixer_unitary(self):
+    def _build_mixer_unitary(self) -> _QAOATransverseFieldMixer:
         """Create the transverse-field mixer with QAOA beta semantics."""
         return _QAOATransverseFieldMixer(
             parameter_function=self.param_function,

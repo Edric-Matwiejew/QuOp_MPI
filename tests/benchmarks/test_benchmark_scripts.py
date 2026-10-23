@@ -109,7 +109,7 @@ def test_parse_args_phase_and_verify_flags(monkeypatch):
 
 
 def test_algorithm_classes_expose_get_state_norm():
-    bench = load_bench_module()
+    load_bench_module()
 
     import quop_mpi.ansatz as ansatz
 
