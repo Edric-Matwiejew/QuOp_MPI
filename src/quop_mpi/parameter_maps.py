@@ -70,8 +70,9 @@ def linear_ramp(weight_by_initial_state: bool = False) -> Callable[..., NDArray[
     Pass the returned :term:`Parameter Map Function` to
     :meth:`~quop_mpi.ansatz.set_parameter_map` as
     ``alg.set_parameter_map(linear_ramp())``. Each ansatz iteration must contain
-    a :term:`phase-shift unitary` followed by one or more
-    :term:`mixing unitaries <mixing unitary>`, with one parameter per unitary.
+    one :term:`phase-shift unitary` parameter followed by one or more
+    :term:`mixing unitary` time parameters. Mixing unitaries may have multiple
+    time parameters; all receive the same value within an iteration.
 
     The observable standard deviation is computed once and reused by
     :meth:`~quop_mpi.ansatz.evolve_state` and :meth:`~quop_mpi.ansatz.execute`.
@@ -119,6 +120,22 @@ def linear_ramp(weight_by_initial_state: bool = False) -> Callable[..., NDArray[
     .. [1] T. Bennett, L. Noakes and J. B. Wang, "Analysis of the
        Non-variational Quantum Walk-based Optimisation Algorithm", 2024.
        https://arxiv.org/abs/2408.06368
+
+    Examples
+    --------
+    For an algorithm ``alg`` with observables, an initial state and compatible
+    unitaries configured:
+
+    .. code-block:: python
+
+        from quop_mpi.parameter_maps import linear_ramp
+
+        alg.set_depth(3)
+        alg.set_parameter_map(linear_ramp())
+        alg.evolve_state([-0.8, 0.4, 0.2])  # gamma, t, beta
+
+    Pass the same vector to :meth:`~quop_mpi.ansatz.execute` to optimise the
+    three schedule values.
     """
     return _LinearRampMap(weight_by_initial_state)
 

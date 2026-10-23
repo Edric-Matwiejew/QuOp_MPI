@@ -367,8 +367,7 @@ bound from the :class:`quop_mpi.unitary` instance:
         * ``MPI_COMM`` -- for computing global statistics across ranks
 
         The :func:`~quop_mpi.parameter_maps.linear_ramp` function creates a map
-        for a three-parameter linear schedule. See :ref:`linear-ramp-parameter-map`
-        for its formula and usage.
+        for a three-parameter linear schedule.
 
         **Typical structure:**
 
