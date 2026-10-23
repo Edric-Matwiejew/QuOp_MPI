@@ -4,6 +4,13 @@
 Changelog
 =========
 
+Version 1.6.2 (Unreleased)
+==========================
+
+This maintenance release synchronises the ``1.6.x`` branch with ``main`` at
+``v1.6.1``. Package, build and documentation version metadata now report
+``1.6.2``. Runtime code is unchanged from ``v1.6.1``.
+
 Version 1.6.1
 =============
 
