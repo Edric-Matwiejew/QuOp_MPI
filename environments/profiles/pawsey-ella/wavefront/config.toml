@@ -1,0 +1,60 @@
+[profile]
+description = "Pawsey Ella (GH200, CUDA and Open MPI)"
+wavefront_supported = true
+python_version = "3.11"
+
+[install]
+root = ".quop-install"
+venv_dir = ".venv_{profile}_{backend}"
+work_dir = ".cache/quop/{profile}/{backend}"
+
+[modules]
+# Set exact names from `module avail`, including any site hash suffixes.
+# GCC 13.3.1, CUDA-aware Open MPI 4.1.8/UCX, Python 3.11.6,
+# parallel HDF5 1.14.5 (+Fortran), FFTW 3.3.10 (+MPI), and numactl.
+# Empty lists use an already loaded environment.
+common = []
+# CUDA toolkit/NVCC, HIP (+cuda ~rocm), hipFFT and hipfort for NVIDIA.
+wavefront = []
+
+[build]
+hip_platform = "nvidia"
+offload_arch = "90"
+wavefront_build_type = "Release"
+# Start with host-staged MPI; enable after checking the loaded MPI's CUDA support.
+gpu_aware_mpi = false
+
+[compilers]
+cc = "gcc"
+cxx = "g++"
+fc = "gfortran"
+mpi_cc_wrapper = "mpicc"
+mpi_cxx_wrapper = "mpicxx"
+mpi_fc_wrapper = "mpifort"
+
+# Optional [paths] keys: hip_path, cuda_path, hipfort_path, shafft_path,
+# hdf5_dir, fftw_root, cmake_prefix_path (semicolon-separated prefixes).
+# Otherwise use the loaded modules' PAWSEY_*_HOME, PATH and CMAKE_PREFIX_PATH.
+
+[benchmarks]
+scheduler = "slurm"
+walltime = "00:20:00"
+# Set counts for the allocated Ella node type before scaling runs.
+ranks_per_gcd = 1
+gcds_per_node = 1
+intra_sequence = [1]
+multi_nodes = [1, 2]
+exports = []
+srun_extra_args = ""
+
+[benchmarks.qaoa]
+args_intra = [1024, 4096, 16384]
+args_multi = [16384]
+
+[benchmarks.qwoa]
+args_intra = [1024, 4096, 16384]
+args_multi = [16384]
+
+[benchmarks.qmoa]
+args_intra = ["2 2 2 2", "3 3 3"]
+args_multi = ["3 3 3"]
