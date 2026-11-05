@@ -10,8 +10,11 @@
 #   bash run_topology_tests.sh [OPTIONS]
 #
 # Options:
-#   --launcher CMD   MPI launcher command (default: "srun" if available,
-#                    else "mpirun")
+#   --launcher CMD   MPI launcher (default: srun on Cray, otherwise mpirun)
+#   --gpus-per-node N  Allocated GPUs per node (auto-detected when possible)
+#   --visibility MODE  all or masked (default: all). Masked uses invariant
+#                    checks; exact physical GPU mapping depends on the scheduler.
+#   QUOP_MPI_LAUNCHER_ARGS supplies additional launcher flags, e.g. GPU binding.
 #   --results DIR    Directory for dump files and results (default: ./topology_results)
 #   --phase PHASE    Which dump phase to verify: "init" or "locked" (default: locked)
 #   --tier N         Run only tier N (1 or 2).  Default: both.
@@ -29,7 +32,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # ── Defaults ─────────────────────────────────────────────────────────
-LAUNCHER=""
+LAUNCHER="${QUOP_MPI_LAUNCHER:-}"
+GPUS_PER_NODE=""
+VISIBILITY="all"
 RESULTS_DIR="./topology_results"
 PHASE="locked"
 TIER="both"
@@ -39,6 +44,8 @@ DRY_RUN=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --launcher)  LAUNCHER="$2";      shift 2 ;;
+        --gpus-per-node) GPUS_PER_NODE="$2"; shift 2 ;;
+        --visibility) VISIBILITY="$2"; shift 2 ;;
         --results)   RESULTS_DIR="$2";   shift 2 ;;
         --phase)     PHASE="$2";         shift 2 ;;
         --tier)      TIER="$2";          shift 2 ;;
@@ -53,7 +60,7 @@ done
 
 # Auto-detect launcher
 if [[ -z "$LAUNCHER" ]]; then
-    if command -v srun &>/dev/null; then
+    if command -v srun &>/dev/null && [[ -d /opt/cray ]]; then
         LAUNCHER="srun"
     elif command -v mpirun &>/dev/null; then
         LAUNCHER="mpirun"
@@ -62,6 +69,19 @@ if [[ -z "$LAUNCHER" ]]; then
         exit 1
     fi
 fi
+
+if [[ -z "$GPUS_PER_NODE" ]]; then
+    GPUS_PER_NODE="$(python "$SCRIPT_DIR/gpu_launch.py")"
+fi
+if [[ ! "$GPUS_PER_NODE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: Specify allocated GPUs with --gpus-per-node or QUOP_TEST_GPUS_PER_NODE." >&2
+    exit 1
+fi
+if [[ "$VISIBILITY" != "all" && "$VISIBILITY" != "masked" ]]; then
+    echo "ERROR: --visibility must be all or masked." >&2
+    exit 1
+fi
+read -r -a LAUNCHER_ARGS <<< "${QUOP_MPI_LAUNCHER_ARGS:-}"
 
 # ── Paths ────────────────────────────────────────────────────────────
 GENERATE="$SCRIPT_DIR/generate_expected.py"
@@ -88,20 +108,17 @@ log_skip() { echo -e "  ${YELLOW}SKIP${RESET} $1"; ((skip_count++)) || true; }
 log_info() { echo -e "${BOLD}$1${RESET}"; }
 
 # ── Detect available nodes ───────────────────────────────────────────
-if [[ "$LAUNCHER" == "srun" ]]; then
-    AVAILABLE_NODES="${SLURM_JOB_NUM_NODES:-1}"
-else
-    AVAILABLE_NODES=1
-fi
+AVAILABLE_NODES="${SLURM_JOB_NUM_NODES:-1}"
 
 # ── Helper: build launcher command ───────────────────────────────────
 # Usage: build_launch_cmd <n_nodes> <n_tasks> <tasks_per_node>
 build_launch_cmd() {
     local nodes="$1" ntasks="$2" tpn="$3"
-    if [[ "$LAUNCHER" == "srun" ]]; then
-        echo "srun -N${nodes} -n${ntasks} --ntasks-per-node=${tpn}"
+    if [[ "${LAUNCHER##*/}" == "srun" ]]; then
+        echo "$LAUNCHER -N${nodes} -n${ntasks} --ntasks-per-node=${tpn} ${LAUNCHER_ARGS[*]}"
     else
-        echo "mpirun -n ${ntasks}"
+        # OpenMPI must keep each logical test node on a physical node.
+        echo "$LAUNCHER -n ${ntasks} --map-by ppr:${tpn}:node ${LAUNCHER_ARGS[*]}"
     fi
 }
 
@@ -120,7 +137,7 @@ run_test() {
     # Build environment
     local env_vars="QUOP_DUMP_COMM_INFO=$test_dir"
     if [[ "$partition" == "gpu" ]]; then
-        env_vars="$env_vars QUOP_GPU_BINDING_MODE=$binding QUOP_RANKS_PER_GPU=$rpg"
+        env_vars="$env_vars QUOP_BACKEND=wavefront QUOP_GPU_BINDING_MODE=$binding QUOP_RANKS_PER_GPU=$rpg"
     else
         # Force MPI backend for CPU-only tests so GPU detection is skipped
         # even when running on a GPU-capable node.
@@ -207,7 +224,7 @@ run_tier1() {
 
     # Generate expected CSV
     log_info "Generating expected topology CSV..."
-    python "$GENERATE" "$EXPECTED_CSV"
+    python "$GENERATE" "$EXPECTED_CSV" --gpus-per-node "$GPUS_PER_NODE"
     echo ""
 
     for entry in "${TIER1_TESTS[@]}"; do
@@ -236,15 +253,15 @@ run_tier1() {
 
         # Run exact comparison
         local cmp_out
-        cmp_out="$(python "$VERIFY" compare "$EXPECTED_CSV" "$test_id" "$dump" 2>&1)" || true
-        if echo "$cmp_out" | grep -q "All.*match\|0 differences"; then
+        local verify_args=(compare "$EXPECTED_CSV" "$test_id" "$dump")
+        if [[ "$partition" == "gpu" && "$VISIBILITY" == "masked" ]]; then
+            verify_args=(check "$dump" --rpg "$rpg")
+        fi
+        if cmp_out="$(python "$VERIFY" "${verify_args[@]}" 2>&1)"; then
             log_pass "$test_id"
-        elif echo "$cmp_out" | grep -qi "mismatch\|difference\|expected"; then
+        else
             log_fail "$test_id"
             echo "$cmp_out" | head -20 | sed 's/^/    /'
-        else
-            # No mismatches reported
-            log_pass "$test_id"
         fi
     done
     echo ""
@@ -283,12 +300,11 @@ run_tier1_workers() {
 
         # Run consistency checks (no exact CSV comparison)
         local chk_out
-        chk_out="$(python "$VERIFY" check "$dump" --rpg "$rpg" 2>&1)" || true
-        if echo "$chk_out" | grep -qi "issue\|error\|fail"; then
+        if chk_out="$(python "$VERIFY" check "$dump" --rpg "$rpg" 2>&1)"; then
+            log_pass "$test_id"
+        else
             log_fail "$test_id"
             echo "$chk_out" | head -20 | sed 's/^/    /'
-        else
-            log_pass "$test_id"
         fi
     done
     echo ""
@@ -349,12 +365,11 @@ run_tier2() {
 
         # Run consistency checks
         local chk_out
-        chk_out="$(python "$VERIFY" check "$dump" --rpg "$rpg" 2>&1)" || true
-        if echo "$chk_out" | grep -qi "issue\|error\|fail"; then
+        if chk_out="$(python "$VERIFY" check "$dump" --rpg "$rpg" 2>&1)"; then
+            log_pass "$test_id"
+        else
             log_fail "$test_id"
             echo "$chk_out" | head -20 | sed 's/^/    /'
-        else
-            log_pass "$test_id"
         fi
     done
     echo ""
@@ -369,6 +384,7 @@ main() {
     log_info "Launcher: $LAUNCHER"
     log_info "Results:  $RESULTS_DIR"
     log_info "Phase:    $PHASE"
+    log_info "GPUs/node: $GPUS_PER_NODE ($VISIBILITY visibility)"
     echo ""
 
     mkdir -p "$RESULTS_DIR"

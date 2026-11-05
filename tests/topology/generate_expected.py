@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate expected comm_info topology CSV for Pawsey Setonix verification.
+"""Generate expected comm_info topology CSV for all-visible GPU verification.
 
 Replicates the GPU assignment logic in gpu_topology.f90
 (``apply_sequential_assignment``) and the communicator creation in
@@ -8,11 +8,12 @@ per-rank predictions for every field in the QUOP_DUMP_COMM_INFO output.
 
 Usage
 -----
-  python generate_expected.py expected_topology.csv   # write CSV
+  python generate_expected.py expected_topology.csv --gpus-per-node 1
   python generate_expected.py --list                   # show config matrix
   python generate_expected.py --jobs                   # show srun parameters
 """
 
+import argparse
 import csv
 import sys
 from dataclasses import dataclass
@@ -305,9 +306,13 @@ def compute_gpu_slot_ordinal(
 # ─── Expected per-rank rows ─────────────────────────────────────────────────
 
 
-def compute_expected(cfg: TestConfig) -> List[Dict]:
+def compute_expected(cfg: TestConfig, gpus_per_node: int = 8) -> List[Dict]:
     """Return expected per-rank topology rows for *cfg*."""
-    hw = SETONIX_GPU if cfg.partition == "gpu" else SETONIX_WORK
+    hw = (
+        {**SETONIX_GPU, "n_physical_gpus": gpus_per_node, "visible_device_count": gpus_per_node}
+        if cfg.partition == "gpu"
+        else SETONIX_WORK
+    )
     n_gpus = hw["n_physical_gpus"]
     total_ranks = cfg.n_nodes * cfg.ranks_per_node
 
@@ -445,7 +450,7 @@ def print_list() -> None:
         )
 
 
-def print_jobs() -> None:
+def print_jobs(gpus_per_node: int = 8) -> None:
     """Print srun parameters and env vars for each test configuration."""
     print("# Setonix topology test job parameters")
     print("# Set QUOP_DUMP_COMM_INFO=1 for all jobs.")
@@ -459,8 +464,7 @@ def print_jobs() -> None:
         print(f"#SBATCH --ntasks={total}")
         print(f"#SBATCH --ntasks-per-node={c.ranks_per_node}")
         if c.partition == "gpu":
-            n_gpus = min(c.ranks_per_node, 8)
-            print(f"#SBATCH --gres=gpu:{n_gpus}")
+            print(f"#SBATCH --gpus-per-node={gpus_per_node}")
         print("export QUOP_DUMP_COMM_INFO=1")
         if c.partition == "gpu":
             print(f"export QUOP_GPU_BINDING_MODE={c.binding_mode}")
@@ -546,7 +550,7 @@ def print_algo_list() -> None:
         )
 
 
-def print_algo_jobs() -> None:
+def print_algo_jobs(gpus_per_node: int = 8) -> None:
     """Print srun parameters for algorithm integration tests."""
     print("# Algorithm-class topology integration tests")
     print("# Set QUOP_DUMP_COMM_INFO=1 for all jobs.")
@@ -560,8 +564,7 @@ def print_algo_jobs() -> None:
         print(f"#SBATCH --ntasks={total}")
         print(f"#SBATCH --ntasks-per-node={c.ranks_per_node}")
         if c.partition == "gpu":
-            n_gpus = min(c.ranks_per_node, 8)
-            print(f"#SBATCH --gres=gpu:{n_gpus}")
+            print(f"#SBATCH --gpus-per-node={gpus_per_node}")
         print("export QUOP_DUMP_COMM_INFO=1")
         if c.partition == "gpu":
             print(f"export QUOP_GPU_BINDING_MODE={c.binding_mode}")
@@ -572,7 +575,13 @@ def print_algo_jobs() -> None:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--gpus-per-node", type=int, default=8,
+                        help="GPUs visible to every rank (default: 8, Setonix)")
+    options, args = parser.parse_known_args()
+    if options.gpus_per_node < 1:
+        parser.error("--gpus-per-node must be positive")
+    if not args:
         print(f"Usage: {sys.argv[0]} <output.csv>")
         print(f"       {sys.argv[0]} --list")
         print(f"       {sys.argv[0]} --jobs")
@@ -580,26 +589,26 @@ def main() -> None:
         print(f"       {sys.argv[0]} --algo-jobs")
         sys.exit(1)
 
-    if sys.argv[1] == "--list":
+    if args[0] == "--list":
         print_list()
         return
 
-    if sys.argv[1] == "--jobs":
-        print_jobs()
+    if args[0] == "--jobs":
+        print_jobs(options.gpus_per_node)
         return
 
-    if sys.argv[1] == "--algo-list":
+    if args[0] == "--algo-list":
         print_algo_list()
         return
 
-    if sys.argv[1] == "--algo-jobs":
-        print_algo_jobs()
+    if args[0] == "--algo-jobs":
+        print_algo_jobs(options.gpus_per_node)
         return
 
-    output_path = sys.argv[1]
+    output_path = args[0]
     all_rows: List[Dict] = []
     for cfg in CONFIGS:
-        rows = compute_expected(cfg)
+        rows = compute_expected(cfg, options.gpus_per_node)
         all_rows.extend(rows)
         print(f"  {cfg.test_id}: {len(rows):>3} ranks – {cfg.description}")
 
