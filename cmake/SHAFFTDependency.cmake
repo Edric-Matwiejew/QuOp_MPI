@@ -12,7 +12,7 @@ use a new install prefix or rerun the installer with ``--veryclean``.
 
 Requirements
 ^^^^^^^^^^^^
-- CMake 3.25 or later
+- CMake 3.28 or later
 - ROCm/HIP installation (for the hipFFT backend)
 - MPI
 - Fortran language enabled (SHAFFT Fortran interface is built)
@@ -36,7 +36,7 @@ Usage
 
 include_guard(GLOBAL)
 
-cmake_minimum_required(VERSION 3.25...4.0)
+cmake_minimum_required(VERSION 3.28...4.0)
 
 # =============================================================================
 # Configuration options
@@ -87,19 +87,20 @@ function(_shafft_set_include_dir)
   endforeach()
 endfunction()
 
+set(_shafft_cache_inputs
+    SHAFFT_GIT_TAG SHAFFT_GIT_REPO SHAFFT_SOURCE_URL SHAFFT_SOURCE_URL_HASH
+    OFFLOAD_ARCH CMAKE_BUILD_TYPE CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_Fortran_COMPILER
+    HIP_PLATFORM CMAKE_HIP_PLATFORM CMAKE_HIP_COMPILER CMAKE_HIP_HOST_COMPILER CMAKE_HIP_ARCHITECTURES
+    CMAKE_HIP_COMPILER_ROCM_ROOT
+    ROCM_PATH CUDA_PATH CUDAToolkit_ROOT CMAKE_PREFIX_PATH GPU_AWARE_MPI
+    MPI_C_COMPILER MPI_CXX_COMPILER MPI_Fortran_COMPILER
+)
+
 function(_shafft_write_cache_stamp stamp_file)
-  file(WRITE "${stamp_file}" "")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_GIT_TAG [==[${SHAFFT_GIT_TAG}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_GIT_REPO [==[${SHAFFT_GIT_REPO}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_SOURCE_URL [==[${SHAFFT_SOURCE_URL}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_SOURCE_URL_HASH [==[${SHAFFT_SOURCE_URL_HASH}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_OFFLOAD_ARCH [==[${OFFLOAD_ARCH}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_BUILD_TYPE [==[${CMAKE_BUILD_TYPE}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_C_COMPILER [==[${CMAKE_C_COMPILER}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_CXX_COMPILER [==[${CMAKE_CXX_COMPILER}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_Fortran_COMPILER [==[${CMAKE_Fortran_COMPILER}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_ROCM_PATH [==[${ROCM_PATH}]==])\n")
-  file(APPEND "${stamp_file}" "set(_QUOP_SHAFFT_GPU_AWARE_MPI [==[${GPU_AWARE_MPI}]==])\n")
+  file(WRITE "${stamp_file}" "set(_QUOP_SHAFFT_STAMP_VERSION 2)\n")
+  foreach(_input IN LISTS _shafft_cache_inputs)
+    file(APPEND "${stamp_file}" "set(_QUOP_${_input} [==[${${_input}}]==])\n")
+  endforeach()
 endfunction()
 
 function(_shafft_check_cache_stamp stamp_file result_var mismatch_var)
@@ -119,39 +120,14 @@ function(_shafft_check_cache_stamp stamp_file result_var mismatch_var)
 
   include("${stamp_file}")
 
-  if(NOT "${_QUOP_SHAFFT_GIT_TAG}" STREQUAL "${SHAFFT_GIT_TAG}")
-    list(APPEND _mismatches "SHAFFT_GIT_TAG")
+  if(NOT _QUOP_SHAFFT_STAMP_VERSION EQUAL 2)
+    list(APPEND _mismatches "cache stamp format")
   endif()
-  if(NOT "${_QUOP_SHAFFT_GIT_REPO}" STREQUAL "${SHAFFT_GIT_REPO}")
-    list(APPEND _mismatches "SHAFFT_GIT_REPO")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_SOURCE_URL}" STREQUAL "${SHAFFT_SOURCE_URL}")
-    list(APPEND _mismatches "SHAFFT_SOURCE_URL")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_SOURCE_URL_HASH}" STREQUAL "${SHAFFT_SOURCE_URL_HASH}")
-    list(APPEND _mismatches "SHAFFT_SOURCE_URL_HASH")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_OFFLOAD_ARCH}" STREQUAL "${OFFLOAD_ARCH}")
-    list(APPEND _mismatches "OFFLOAD_ARCH")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_BUILD_TYPE}" STREQUAL "${CMAKE_BUILD_TYPE}")
-    list(APPEND _mismatches "CMAKE_BUILD_TYPE")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_C_COMPILER}" STREQUAL "${CMAKE_C_COMPILER}")
-    list(APPEND _mismatches "CMAKE_C_COMPILER")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_CXX_COMPILER}" STREQUAL "${CMAKE_CXX_COMPILER}")
-    list(APPEND _mismatches "CMAKE_CXX_COMPILER")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_Fortran_COMPILER}" STREQUAL "${CMAKE_Fortran_COMPILER}")
-    list(APPEND _mismatches "CMAKE_Fortran_COMPILER")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_ROCM_PATH}" STREQUAL "${ROCM_PATH}")
-    list(APPEND _mismatches "ROCM_PATH")
-  endif()
-  if(NOT "${_QUOP_SHAFFT_GPU_AWARE_MPI}" STREQUAL "${GPU_AWARE_MPI}")
-    list(APPEND _mismatches "GPU_AWARE_MPI")
-  endif()
+  foreach(_input IN LISTS _shafft_cache_inputs)
+    if(NOT "${_QUOP_${_input}}" STREQUAL "${${_input}}")
+      list(APPEND _mismatches "${_input}")
+    endif()
+  endforeach()
 
   if(_mismatches)
     list(JOIN _mismatches ", " _joined_mismatches)
@@ -175,6 +151,28 @@ function(_shafft_check_cache_stamp stamp_file result_var mismatch_var)
       PARENT_SCOPE
   )
 endfunction()
+
+# Imported packages may set HIP_PLATFORM themselves. Keep QuOp's selected platform,
+# and reject mismatches before any of those imported targets are used.
+set(_shafft_expected_platform "${HIP_PLATFORM}")
+macro(_shafft_validate_package)
+  set(HIP_PLATFORM "${_shafft_expected_platform}")
+  if(NOT SHAFFT_BACKEND_HIPFFT)
+    message(FATAL_ERROR "SHAFFTDependency: SHAFFT must be built with the hipFFT GPU backend")
+  endif()
+  if(NOT "${SHAFFT_GPU_PLATFORM}" STREQUAL "${_shafft_expected_platform}")
+    message(FATAL_ERROR "SHAFFTDependency: SHAFFT GPU platform '${SHAFFT_GPU_PLATFORM}' does not match "
+                        "QuOp HIP_PLATFORM=${_shafft_expected_platform}. Rebuild SHAFFT for the selected platform.")
+  endif()
+  if(NOT SHAFFT_BUILD_FORTRAN OR NOT TARGET shafft::shafftf03 OR NOT TARGET shafft::shafftc++)
+    message(FATAL_ERROR "SHAFFTDependency: SHAFFT must provide its Fortran and C++ interfaces")
+  endif()
+  if(NOT DEFINED SHAFFT_GPU_AWARE_MPI
+     OR (GPU_AWARE_MPI AND NOT SHAFFT_GPU_AWARE_MPI)
+     OR (NOT GPU_AWARE_MPI AND SHAFFT_GPU_AWARE_MPI))
+    message(FATAL_ERROR "SHAFFTDependency: SHAFFT_GPU_AWARE_MPI must match QuOp GPU_AWARE_MPI=${GPU_AWARE_MPI}")
+  endif()
+endmacro()
 
 # =============================================================================
 # Ensure we have a valid base directory for dependencies
@@ -207,7 +205,18 @@ foreach(_libdir lib lib64)
   endif()
 endforeach()
 
-if(_shafft_cached_config)
+set(_shafft_use_cached TRUE)
+if(SHAFFT_PATH AND NOT SHAFFT_PATH STREQUAL _shafft_install_dir)
+  set(_shafft_use_cached FALSE)
+  if(shafft_DIR MATCHES "^${_shafft_install_dir}/")
+    unset(shafft_DIR CACHE)
+    unset(shafft_DIR)
+  endif()
+elseif(shafft_DIR AND NOT shafft_DIR MATCHES "^${_shafft_install_dir}/")
+  set(_shafft_use_cached FALSE)
+endif()
+
+if(_shafft_cached_config AND _shafft_use_cached)
   message(STATUS "Found cached SHAFFT in ${_shafft_install_dir}")
 
   _shafft_check_cache_stamp("${_shafft_stamp_file}" _shafft_cache_matches _shafft_cache_mismatches)
@@ -221,8 +230,10 @@ if(_shafft_cached_config)
   endif()
 
   find_package(shafft CONFIG QUIET PATHS "${_shafft_cached_cmake_dir}" NO_DEFAULT_PATH)
+  set(HIP_PLATFORM "${_shafft_expected_platform}")
 
   if(shafft_FOUND)
+    _shafft_validate_package()
     set(_shafft_skip_system TRUE)
     message(STATUS "Using cached SHAFFT ${shafft_VERSION}")
     set(SHAFFT_PROVIDER
@@ -255,8 +266,10 @@ if(NOT _shafft_skip_system)
   endif()
 
   find_package(shafft CONFIG QUIET)
+  set(HIP_PLATFORM "${_shafft_expected_platform}")
 
   if(shafft_FOUND)
+    _shafft_validate_package()
     message(STATUS "Found system SHAFFT ${shafft_VERSION} at ${shafft_DIR}")
     set(SHAFFT_PROVIDER
         "system"
@@ -337,15 +350,26 @@ else()
   list(APPEND _shafft_cmake_args -DSHAFFT_GPU_AWARE_MPI=OFF)
 endif()
 
-# GPU architectures
-if(OFFLOAD_ARCH)
-  list(APPEND _shafft_cmake_args "-DSHAFFT_GPU_ARCHITECTURES=${OFFLOAD_ARCH}")
-endif()
-
-# ROCm path - needed for find_package(hip), find_package(hipfft), etc.
+# ExternalProject's list separator keeps multi-prefix installs and architecture
+# lists as single -D arguments instead of splitting them into stray arguments.
+set(_shafft_prefixes ${CMAKE_PREFIX_PATH})
 if(ROCM_PATH)
-  list(APPEND _shafft_cmake_args "-DCMAKE_PREFIX_PATH=${ROCM_PATH}")
+  list(APPEND _shafft_prefixes "${ROCM_PATH}")
 endif()
+list(REMOVE_DUPLICATES _shafft_prefixes)
+string(REPLACE ";" "|" _shafft_prefixes_arg "${_shafft_prefixes}")
+list(APPEND _shafft_cmake_args "-DCMAKE_PREFIX_PATH=${_shafft_prefixes_arg}")
+string(REPLACE ";" "|" _shafft_architectures_arg "${OFFLOAD_ARCH}")
+list(APPEND _shafft_cmake_args "-DSHAFFT_GPU_ARCHITECTURES=${_shafft_architectures_arg}")
+list(APPEND _shafft_cmake_args "-DCMAKE_HIP_PLATFORM=${HIP_PLATFORM}")
+foreach(_input CMAKE_HIP_COMPILER CMAKE_HIP_HOST_COMPILER CMAKE_HIP_ARCHITECTURES CMAKE_HIP_COMPILER_ROCM_ROOT
+               CUDA_PATH CUDAToolkit_ROOT hip_DIR hipfft_DIR
+               MPI_C_COMPILER MPI_CXX_COMPILER MPI_Fortran_COMPILER)
+  if(DEFINED ${_input} AND NOT "${${_input}}" STREQUAL "")
+    string(REPLACE ";" "|" _value "${${_input}}")
+    list(APPEND _shafft_cmake_args "-D${_input}=${_value}")
+  endif()
+endforeach()
 
 # Fortran compiler - should match the parent project to ensure .mod compatibility
 if(CMAKE_Fortran_COMPILER)
@@ -383,6 +407,7 @@ externalproject_add(
   ${_fc_args}
   PREFIX "${FETCHCONTENT_BASE_DIR}/shafft-ep"
   INSTALL_DIR "${_shafft_install_dir}"
+  LIST_SEPARATOR "|"
   CMAKE_ARGS ${_shafft_cmake_args}
   BUILD_BYPRODUCTS "${_shafft_install_dir}/lib/libshafftc++.so" "${_shafft_install_dir}/lib/libshafftc.so"
                    "${_shafft_install_dir}/lib/libshafftf03.so"
