@@ -23,14 +23,7 @@ if(WITH_SHAFFT AND TARGET shafft_handler)
   add_dependencies(wavefront_circulant shafft_handler shafft_handler_base shafft_handler_1d)
 endif()
 
-if(HIP_PLATFORM STREQUAL "nvidia")
-  target_link_libraries(
-    wavefront_circulant PUBLIC ${CUDA_PATH}/lib64/libcufft.so ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03
-                               shafft::shafftc++
-  )
-elseif(HIP_PLATFORM STREQUAL "amd")
-  target_link_libraries(wavefront_circulant PUBLIC ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03 shafft::shafftc++)
-endif()
+target_link_libraries(wavefront_circulant PUBLIC shafft::shafftf03 shafft::shafftc++)
 
 set(_depends
     wavefront_context
@@ -89,15 +82,13 @@ add_f2py_library(
   ${NUMA_LIBRARY}
   shafft::shafftf03
   shafft::shafftc++
-  ${ROCM_PATH}/lib/libhipfft.so
 )
 
 add_dependencies(wavefront_circulant_propagatorwrapper circulant_propagator_wrapper_mod)
 add_dependencies(wavefront_circulant_propagatormodule circulant_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_circulant_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                                              ${ROCM_PATH}/lib/libamdhip64.so
+  wavefront_circulant_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
 )
 if(TARGET CrayGTL::CrayGTL)
   target_link_libraries(wavefront_circulant_propagator_f2py PRIVATE CrayGTL::CrayGTL)

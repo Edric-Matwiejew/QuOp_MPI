@@ -1,16 +1,8 @@
 set(TF_KERNELS_SRC ${CMAKE_CURRENT_SOURCE_DIR}/kernels)
 
-# HIP kernel compilation
-if(HIP_PLATFORM STREQUAL "nvidia")
-  set_source_files_properties(
-    ${TF_KERNELS_SRC}/hip_transverse_field_kernels.cpp PROPERTIES LANGUAGE CUDA
-  )
-endif()
-
 add_library(tf_hip_kernels OBJECT ${TF_KERNELS_SRC}/hip_transverse_field_kernels.cpp)
-target_include_directories(tf_hip_kernels PRIVATE ${TF_KERNELS_SRC} "${ROCM_PATH}/include")
-target_link_libraries(tf_hip_kernels hip::device)
-set_target_properties(tf_hip_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(tf_hip_kernels PRIVATE ${TF_KERNELS_SRC})
+quop_configure_gpu_kernels(tf_hip_kernels)
 
 # Fortran HIP kernel bindings
 add_library(hip_transverse_field_kernels OBJECT hip_transverse_field_kernels.f90)
@@ -96,8 +88,7 @@ add_dependencies(wavefront_transverse_field_propagatorwrapper wf_tf_propagator_w
 add_dependencies(wavefront_transverse_field_propagatormodule wf_tf_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_transverse_field_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                                                     ${ROCM_PATH}/lib/libamdhip64.so
+  wavefront_transverse_field_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
 )
 if(TARGET CrayGTL::CrayGTL)
   target_link_libraries(wavefront_transverse_field_propagator_f2py PRIVATE CrayGTL::CrayGTL)

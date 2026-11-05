@@ -38,19 +38,8 @@ if(_shafft_inc)
   target_include_directories(wavefront_momentum PRIVATE ${_shafft_inc})
 endif()
 
-if(HIP_PLATFORM STREQUAL "nvidia")
-  target_link_libraries(
-    wavefront_composite PUBLIC ${CUDA_PATH}/lib64/libcufft.so ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03
-                               shafft::shafftc++
-  )
-  target_link_libraries(
-    wavefront_momentum PUBLIC ${CUDA_PATH}/lib64/libcufft.so ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03
-                              shafft::shafftc++
-  )
-elseif(HIP_PLATFORM STREQUAL "amd")
-  target_link_libraries(wavefront_composite PUBLIC ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03 shafft::shafftc++)
-  target_link_libraries(wavefront_momentum PUBLIC ${ROCM_PATH}/lib/libhipfft.so shafft::shafftf03 shafft::shafftc++)
-endif()
+target_link_libraries(wavefront_composite PUBLIC shafft::shafftf03 shafft::shafftc++)
+target_link_libraries(wavefront_momentum PUBLIC shafft::shafftf03 shafft::shafftc++)
 
 set(_depends
     wavefront_context
@@ -114,15 +103,13 @@ add_f2py_library(
   ${NUMA_LIBRARY}
   shafft::shafftf03
   shafft::shafftc++
-  ${ROCM_PATH}/lib/libhipfft.so
 )
 
 add_dependencies(wavefront_composite_propagatorwrapper composite_propagator_wrapper_mod)
 add_dependencies(wavefront_composite_propagatormodule composite_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_composite_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                                              ${ROCM_PATH}/lib/libamdhip64.so
+  wavefront_composite_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
 )
 if(TARGET CrayGTL::CrayGTL)
   target_link_libraries(wavefront_composite_propagator_f2py PRIVATE CrayGTL::CrayGTL)
@@ -188,15 +175,13 @@ add_f2py_library(
   ${NUMA_LIBRARY}
   shafft::shafftf03
   shafft::shafftc++
-  ${ROCM_PATH}/lib/libhipfft.so
 )
 
 add_dependencies(wavefront_momentum_propagatorwrapper momentum_propagator_wrapper_mod)
 add_dependencies(wavefront_momentum_propagatormodule momentum_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_momentum_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                                             ${ROCM_PATH}/lib/libamdhip64.so
+  wavefront_momentum_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
 )
 if(TARGET CrayGTL::CrayGTL)
   target_link_libraries(wavefront_momentum_propagator_f2py PRIVATE CrayGTL::CrayGTL)

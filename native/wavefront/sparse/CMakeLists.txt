@@ -1,19 +1,12 @@
 set(SPARSE_KERNELS_SRC ${SPARSE_PROPAGATORS_SRC}/kernels)
 
-if(HIP_PLATFORM STREQUAL "nvidia")
-  set_source_files_properties(
-    ${SPARSE_KERNELS_SRC}/hip_vector_kernels.cpp ${SPARSE_KERNELS_SRC}/hip_spmv_kernels.cpp
-    ${SPARSE_KERNELS_SRC}/hip_chebyshev_kernels.cpp ${SPARSE_KERNELS_SRC}/hip_reduction_kernels.cpp PROPERTIES LANGUAGE
-                                                                                                               CUDA
-  )
-endif()
-
 add_library(
   sparse_expm_kernels OBJECT
   ${SPARSE_KERNELS_SRC}/hip_vector_kernels.cpp ${SPARSE_KERNELS_SRC}/hip_spmv_kernels.cpp
   ${SPARSE_KERNELS_SRC}/hip_chebyshev_kernels.cpp ${SPARSE_KERNELS_SRC}/hip_reduction_kernels.cpp
 )
 target_include_directories(sparse_expm_kernels PRIVATE ${SPARSE_KERNELS_SRC})
+quop_configure_gpu_kernels(sparse_expm_kernels)
 
 add_library(hip_sparse_expm_kernels OBJECT ${SPARSE_PROPAGATORS_SRC}/hip_sparse_expm_kernels.f90)
 compile_and_link_hipfort_mpi(hip_sparse_expm_kernels)
@@ -145,8 +138,7 @@ add_dependencies(wavefront_sparse_propagatorwrapper sparse_propagator_wrapper_mo
 add_dependencies(wavefront_sparse_propagatormodule sparse_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_sparse_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                                           ${ROCM_PATH}/lib/libamdhip64.so
+  wavefront_sparse_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
 )
 if(TARGET CrayGTL::CrayGTL)
   target_link_libraries(wavefront_sparse_propagator_f2py PRIVATE CrayGTL::CrayGTL)

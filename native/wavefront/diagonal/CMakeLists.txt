@@ -64,8 +64,7 @@ add_dependencies(wavefront_diagonal_propagatorwrapper diagonal_propagator_wrappe
 add_dependencies(wavefront_diagonal_propagatormodule diagonal_propagator_wrapper_mod)
 
 target_link_libraries(
-  wavefront_diagonal_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                                             ${ROCM_PATH}/lib/libamdhip64.so
+  wavefront_diagonal_propagator_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
 )
 if(TARGET CrayGTL::CrayGTL)
   target_link_libraries(wavefront_diagonal_propagator_f2py PRIVATE CrayGTL::CrayGTL)

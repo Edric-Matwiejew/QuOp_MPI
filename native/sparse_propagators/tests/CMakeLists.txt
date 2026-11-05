@@ -1,6 +1,8 @@
 # CMakeLists.txt for SparseExpm kernel unit tests
 #
-# Build instructions: mkdir build && cd build cmake .. -DCMAKE_CXX_COMPILER=hipcc make
+# Build instructions: cmake -S . -B build -DHIP_PLATFORM=amd -DOFFLOAD_ARCH=gfx1100
+# NVIDIA: cmake -S . -B build -DHIP_PLATFORM=nvidia -DOFFLOAD_ARCH=90 -DHIP_PATH=/path/to/hip
+# Then: cmake --build build
 #
 # To enable GPU-aware MPI (e.g., on Cray systems with GPU-aware transport): cmake .. -DCMAKE_CXX_COMPILER=hipcc
 # -DGPU_AWARE_MPI=ON
@@ -8,30 +10,28 @@
 # Run tests: ./test_vector_kernels ./test_reduction_kernels ./test_spmv_kernels ./test_chebyshev_kernels mpirun -np 1
 # ./test_sparse_gpu  # Integration tests
 
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.28)
 
-# Must set HIP compiler before project() call
-if(NOT DEFINED CMAKE_CXX_COMPILER)
-  find_program(HIPCC_EXECUTABLE hipcc PATHS /opt/rocm/bin /usr/bin)
-  if(HIPCC_EXECUTABLE)
-    set(CMAKE_CXX_COMPILER ${HIPCC_EXECUTABLE})
-  endif()
-endif()
-
-project(SparseExpm_Tests Fortran CXX)
+project(SparseExpm_Tests LANGUAGES C Fortran)
 
 # Add cmake module path from parent project
-set(QUOP_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+get_filename_component(QUOP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 list(APPEND CMAKE_MODULE_PATH "${QUOP_ROOT}/cmake")
 
-# Set ROCm path
-list(APPEND CMAKE_PREFIX_PATH "/opt/rocm")
-
-# GPU architecture
-set(GPU_TARGETS
-    "gfx1100"
-    CACHE STRING "GPU architectures to compile for"
-)
+set(HIP_PLATFORM "amd" CACHE STRING "GPU platform: amd or nvidia")
+set(ROCM_PATH "" CACHE PATH "ROCm installation")
+set(HIP_PATH "" CACHE PATH "HIP installation, including HIP-on-NVIDIA headers")
+set(CUDA_PATH "" CACHE PATH "CUDA toolkit installation")
+set(OFFLOAD_ARCH "" CACHE STRING "GPU architecture (gfx1100 for AMD, 90 for GH200)")
+if(NOT OFFLOAD_ARCH)
+  if(GPU_TARGETS)
+    set(OFFLOAD_ARCH "${GPU_TARGETS}" CACHE STRING "GPU architecture" FORCE)
+  elseif(HIP_PLATFORM STREQUAL "amd")
+    set(OFFLOAD_ARCH gfx1100 CACHE STRING "GPU architecture" FORCE)
+  endif()
+endif()
+set(GPU_TARGETS "${OFFLOAD_ARCH}" CACHE STRING "GPU architectures for hipfort")
+set(HIPFORT_COMPILER "${CMAKE_Fortran_COMPILER}" CACHE FILEPATH "Fortran compiler for hipfort")
 
 # Use parent project's FetchContent base dir to reuse hipfort build
 set(FETCHCONTENT_BASE_DIR
@@ -39,8 +39,8 @@ set(FETCHCONTENT_BASE_DIR
     CACHE PATH ""
 )
 
-# Find HIP
-find_package(hip REQUIRED)
+# Configure the same GPU language/runtime as the main project.
+include(QuOpGPU)
 
 # Find MPI
 find_package(MPI REQUIRED COMPONENTS Fortran)
@@ -64,9 +64,7 @@ add_library(
 
 target_include_directories(sparse_expm_kernels PRIVATE ${SPARSE_EXPM_SRC_DIR}/kernels)
 
-target_link_libraries(sparse_expm_kernels PRIVATE hip::device)
-
-set_target_properties(sparse_expm_kernels PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+quop_configure_gpu_kernels(sparse_expm_kernels)
 
 # Compile the Fortran interface module
 add_library(sparse_expm_fortran_interface ${SPARSE_EXPM_SRC_DIR}/hip_sparse_expm_kernels.f90)
@@ -94,7 +92,7 @@ add_library(sparse_module "${_test_sparse_src}")
 # Note: QUOP_GPU_AWARE_MPI is passed explicitly during preprocessing when enabled.
 
 target_link_libraries(
-  sparse_module PUBLIC sparse_expm_fortran_interface sparse_expm_kernels hipfort::hipfort hip::host MPI::MPI_Fortran
+  sparse_module PUBLIC sparse_expm_fortran_interface sparse_expm_kernels hipfort::hipfort quop_gpu_runtime MPI::MPI_Fortran
 )
 
 # Make sure the module files are found
@@ -114,7 +112,7 @@ quop_preprocess_fortran_source(
 add_library(chebyshev_module "${_test_chebyshev_src}")
 
 target_link_libraries(
-  chebyshev_module PUBLIC sparse_module sparse_expm_fortran_interface sparse_expm_kernels hipfort::hipfort hip::host
+  chebyshev_module PUBLIC sparse_module sparse_expm_fortran_interface sparse_expm_kernels hipfort::hipfort quop_gpu_runtime
                           MPI::MPI_Fortran
 )
 
@@ -133,7 +131,7 @@ function(add_kernel_test TEST_NAME)
   add_executable(${TEST_NAME} src/${TEST_NAME}.f90)
 
   target_link_libraries(
-    ${TEST_NAME} PRIVATE sparse_expm_fortran_interface sparse_expm_kernels test_utils hipfort::hipfort hip::host
+    ${TEST_NAME} PRIVATE sparse_expm_fortran_interface sparse_expm_kernels test_utils hipfort::hipfort quop_gpu_runtime
   )
 
   # Make sure the module files are found
@@ -151,7 +149,7 @@ function(add_mpi_test TEST_NAME)
   add_executable(${TEST_NAME} src/${TEST_NAME}.f90)
 
   target_link_libraries(
-    ${TEST_NAME} PRIVATE sparse_module sparse_expm_fortran_interface sparse_expm_kernels hipfort::hipfort hip::host
+    ${TEST_NAME} PRIVATE sparse_module sparse_expm_fortran_interface sparse_expm_kernels hipfort::hipfort quop_gpu_runtime
                          MPI::MPI_Fortran
   )
 
@@ -179,7 +177,7 @@ function(add_chebyshev_test TEST_NAME)
             sparse_expm_fortran_interface
             sparse_expm_kernels
             hipfort::hipfort
-            hip::host
+            quop_gpu_runtime
             MPI::MPI_Fortran
   )
 
