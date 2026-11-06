@@ -59,10 +59,13 @@ profile_post_modules_env() {
     fi
 }
 
+profile_configure_venv() {
+    VENV_ARGS+=(--system-site-packages)
+}
+
 profile_install_mpi4py() {
-    info "Building mpi4py against the loaded Open MPI"
-    MPI4PY_BUILD_MPICC="$MPI_CC_WRAPPER" \
-        python -m pip install --no-cache-dir --no-binary=mpi4py --no-deps mpi4py
+    info "Using mpi4py from the loaded py-mpi4py module"
+    python -c 'import mpi4py; print(f"mpi4py {mpi4py.__version__}: {mpi4py.__file__}")'
 }
 
 profile_install_h5py() {

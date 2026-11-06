@@ -17,6 +17,7 @@ common = [
     "fftw/3.3.10",
     "python/3.11.6",
     "py-pip/23.1.2-py3.11.6",
+    "py-mpi4py/4.0.1-py3.11.6",
     "cmake/3.31.7",
 ]
 wavefront = [
