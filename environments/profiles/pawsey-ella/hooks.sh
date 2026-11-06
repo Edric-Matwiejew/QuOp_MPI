@@ -9,12 +9,14 @@ WAVEFRONT_BUILD_TYPE="${WAVEFRONT_BUILD_TYPE:-${CFG_WAVEFRONT_BUILD_TYPE:-Releas
 OFFLOAD_ARCH="${OFFLOAD_ARCH:-${CFG_OFFLOAD_ARCH:-90}}"
 
 profile_post_modules_env() {
-    export CC="${CC:-$(resolve_command "${CFG_CC:-gcc}")}"
-    export CXX="${CXX:-$(resolve_command "${CFG_CXX:-g++}")}"
-    export FC="${FC:-$(resolve_command "${CFG_FC:-gfortran}")}"
-    export MPI_CC_WRAPPER="${MPI_CC_WRAPPER:-${CFG_MPI_CC_WRAPPER:-mpicc}}"
-    export MPI_CXX_WRAPPER="${MPI_CXX_WRAPPER:-${CFG_MPI_CXX_WRAPPER:-mpicxx}}"
-    export MPI_FC_WRAPPER="${MPI_FC_WRAPPER:-${CFG_MPI_FC_WRAPPER:-mpifort}}"
+    # The CUDA SDK can set CC/CXX/FC to NVIDIA compilers.
+    export CC="$(resolve_command "${CFG_CC:-${CC:-gcc}}")"
+    export CXX="$(resolve_command "${CFG_CXX:-${CXX:-g++}}")"
+    export FC="$(resolve_command "${CFG_FC:-${FC:-gfortran}}")"
+    export MPI_CC_WRAPPER="${CFG_MPI_CC_WRAPPER:-${MPI_CC_WRAPPER:-mpicc}}"
+    export MPI_CXX_WRAPPER="${CFG_MPI_CXX_WRAPPER:-${MPI_CXX_WRAPPER:-mpicxx}}"
+    export MPI_FC_WRAPPER="${CFG_MPI_FC_WRAPPER:-${MPI_FC_WRAPPER:-mpifort}}"
+    export OMPI_CC="$CC" OMPI_CXX="$CXX" OMPI_FC="$FC"
     local compiler
     for compiler in "$CC" "$CXX" "$FC" "$MPI_CC_WRAPPER" "$MPI_CXX_WRAPPER" "$MPI_FC_WRAPPER"; do
         require_command "$compiler" || return 1
