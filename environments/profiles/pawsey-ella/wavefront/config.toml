@@ -1,5 +1,5 @@
 [profile]
-description = "Pawsey Ella (GH200, CUDA and Open MPI)"
+description = "Pawsey Ella 2026.11 (GH200, CUDA and Open MPI)"
 wavefront_supported = true
 python_version = "3.11"
 
@@ -9,13 +9,23 @@ venv_dir = ".venv_{profile}_{backend}"
 work_dir = ".cache/quop/{profile}/{backend}"
 
 [modules]
-# Set exact names from `module avail`, including any site hash suffixes.
-# GCC 13.3.1, CUDA-aware Open MPI 4.1.8/UCX, Python 3.11.6,
-# parallel HDF5 1.14.5 (+Fortran), FFTW 3.3.10 (+MPI), and numactl.
-# Empty lists use an already loaded environment.
-common = []
-# CUDA toolkit/NVCC, HIP (+cuda ~rocm), hipFFT and hipfort for NVIDIA.
-wavefront = []
+common = [
+    "pawseyenv/2026.11",
+    "gcc/13.3.1",
+    "openmpi/5.0.11",
+    "hdf5/1.14.5-parallel-api-v112",
+    "fftw/3.3.10",
+    "python/3.11.6",
+    "py-pip/23.1.2-py3.11.6",
+    "cmake/3.31.7",
+]
+wavefront = [
+    # Use the SDK's CUDA toolkit without its bundled MPI implementation.
+    "nvhpc-nompi/26.1",
+    "hip/7.16.0",
+    "hipfft/10.1.0",
+    "hipfort/10.1.0",
+]
 
 [build]
 hip_platform = "nvidia"

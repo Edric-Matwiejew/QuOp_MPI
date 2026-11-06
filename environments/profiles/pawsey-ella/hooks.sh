@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ella GH200: GCC/GFortran host code, NVCC device code, CUDA-aware Open MPI.
-# Module names can carry site-specific hashes. Configure [modules] with names
-# from `module avail`, or preload the dependencies before running the installer.
+# The 2026.11 module lists are defined in the backend's config.toml and are
+# loaded by the shared installer and activation hooks.
 apply_profile_defaults
 
 MPI_BUILD_TYPE="${MPI_BUILD_TYPE:-${CFG_MPI_BUILD_TYPE:-Release}}"
