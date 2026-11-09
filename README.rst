@@ -104,6 +104,7 @@ use the installer script with the appropriate profile and backend options:
     bash environments/install.sh -p macos -b mpi --prefix ./.quop-install              # macOS with Homebrew
     bash environments/install.sh -p generic -b mpi --prefix ./.quop-install            # generic Linux
     bash environments/install.sh -p pawsey-setonix -b wavefront --prefix /scratch/$USER/quop  # Pawsey Setonix GPU
+    bash environments/install.sh -p pawsey-ella -b wavefront --prefix /scratch/$USER/quop-ella  # Ella GH200
 
 Available profiles live under ``environments/profiles/``.
 Run ``./environments/install.sh --help`` for the full list of options.

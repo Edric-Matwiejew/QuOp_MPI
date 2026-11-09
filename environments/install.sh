@@ -148,7 +148,7 @@ ensure_python_build_requirements() {
         build \
         "scikit-build-core==0.12.2" \
         ninja \
-        "cmake>=3.25,<4" \
+        "cmake>=3.28,<4" \
         "numpy>=2.0"
 
     if [[ "$(uname -s)" == "Linux" ]]; then

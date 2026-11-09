@@ -5,11 +5,7 @@
 if(WAVEFRONT_BACKEND)
     set(_COMM_INFO_DEPS comm_info_mod ci_gpu_topology ci_communicators ci_partitions
         MPI::MPI_Fortran ${QUOP_HIPFORT_TARGET})
-    if(HIP_PLATFORM STREQUAL "nvidia")
-        list(APPEND _COMM_INFO_DEPS ${CUDA_PATH}/lib64/libcudart.so)
-    elseif(HIP_PLATFORM STREQUAL "amd")
-        list(APPEND _COMM_INFO_DEPS ${ROCM_PATH}/lib/libamdhip64.so)
-    endif()
+    list(APPEND _COMM_INFO_DEPS quop_gpu_runtime)
 else()
     set(_COMM_INFO_DEPS comm_info_mod MPI::MPI_Fortran)
 endif()

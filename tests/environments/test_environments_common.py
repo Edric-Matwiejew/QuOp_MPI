@@ -173,9 +173,10 @@ print_available_profiles
 
     assert result.returncode == 0, result.stderr or result.stdout
     assert result.stdout.splitlines() == [
-        "generic, macos, pawsey-setonix, ubuntu-24",
+        "generic, macos, pawsey-ella, pawsey-setonix, ubuntu-24",
         "  generic",
         "  macos",
+        "  pawsey-ella",
         "  pawsey-setonix",
         "  ubuntu-24",
     ]

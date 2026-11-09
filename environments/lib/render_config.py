@@ -85,14 +85,19 @@ def main():
     emit_scalar("CFG_WORK_DIR_TEMPLATE", work_dir if work_dir is not None else build_dir)
 
     emit_scalar("CFG_SHAFFT_PATH", get_scalar("paths", paths, "shafft_path"))
+    for key in ("hip_path", "cuda_path", "hipfort_path", "hdf5_dir", "fftw_root", "cmake_prefix_path"):
+        emit_scalar(f"CFG_{key.upper()}", get_scalar("paths", paths, key))
 
     emit_scalar("CFG_OFFLOAD_ARCH", get_scalar("build", build, "offload_arch"))
+    emit_scalar("CFG_HIP_PLATFORM", get_scalar("build", build, "hip_platform"))
+    emit_scalar("CFG_GPU_AWARE_MPI", get_scalar("build", build, "gpu_aware_mpi"))
     emit_scalar("CFG_MPI_BUILD_TYPE", get_scalar("build", build, "mpi_build_type"))
     emit_scalar("CFG_WAVEFRONT_BUILD_TYPE", get_scalar("build", build, "wavefront_build_type"))
 
     emit_scalar("CFG_CC", get_scalar("compilers", compilers, "cc"))
     emit_scalar("CFG_CXX", get_scalar("compilers", compilers, "cxx"))
     emit_scalar("CFG_FC", get_scalar("compilers", compilers, "fc"))
+    emit_scalar("CFG_HIP_COMPILER", get_scalar("compilers", compilers, "hip_compiler"))
     emit_scalar("CFG_MPI_CC_WRAPPER", get_scalar("compilers", compilers, "mpi_cc_wrapper"))
     emit_scalar("CFG_MPI_CXX_WRAPPER", get_scalar("compilers", compilers, "mpi_cxx_wrapper"))
     emit_scalar("CFG_MPI_FC_WRAPPER", get_scalar("compilers", compilers, "mpi_fc_wrapper"))

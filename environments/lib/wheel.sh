@@ -69,6 +69,33 @@ print(PurePosixPath(wheel_path).name)
 PY
 }
 
+collect_auditwheel_dependency_files() {
+    if [[ -d "${SKBUILD_BUILD_DIR:-}" ]]; then
+        find "$SKBUILD_BUILD_DIR" -type f -name '*.so'
+    fi
+
+    # SHAFFT may be the only GPU dependency in QuOp's own DT_NEEDED entries.
+    # Inspect its installed libraries too, including the ExternalProject cache,
+    # and hipFFT wrappers whose CUDA dependencies must remain site-provided.
+    typeset -a dependency_prefixes=("${SHAFFT_PATH:-}")
+    if [[ -n "${FETCHCONTENT_BASE_DIR:-}" ]]; then
+        dependency_prefixes+=("${FETCHCONTENT_BASE_DIR}/shafft-install")
+    fi
+    local prefix
+    local libdir
+    {
+        for prefix in "${dependency_prefixes[@]}"; do
+            [[ -n "$prefix" ]] || continue
+            printf '%s\n' "${prefix}/lib" "${prefix}/lib64"
+        done
+        auditwheel_library_path | tr ':' '\n'
+    } | sort -u | while IFS= read -r libdir; do
+        [[ -d "$libdir" ]] || continue
+        find "$libdir" -maxdepth 1 \( -type f -o -type l \) \
+            \( -name 'libshafft*.so*' -o -name 'libhipfft*.so*' \)
+    done
+}
+
 collect_auditwheel_excludes() {
     typeset -a site_lib_prefixes=(
         libmpi
@@ -82,14 +109,22 @@ collect_auditwheel_excludes() {
         libcudart
         libcufft
         libcuda
+        libcublas
+        libcusparse
+        libcusolver
+        libcurand
+        libnvrtc
+        libnvJitLink
     )
     local so_path
     local needed
     local prefix
+    local auditwheel_ld_path
 
-    if ! command -v readelf >/dev/null 2>&1 || [[ ! -d "$SKBUILD_BUILD_DIR" ]]; then
+    if ! command -v readelf >/dev/null 2>&1; then
         return 0
     fi
+    auditwheel_ld_path="$(auditwheel_library_path)"
 
     while IFS= read -r so_path; do
         while IFS= read -r needed; do
@@ -99,8 +134,16 @@ collect_auditwheel_excludes() {
                     break
                 fi
             done
-        done < <(readelf -d "$so_path" 2>/dev/null | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p')
-    done < <(find "$SKBUILD_BUILD_DIR" -type f -name '*.so' | sort) | awk '!seen[$0]++'
+        done < <(
+            readelf -d "$so_path" 2>/dev/null | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p'
+            # ldd lists the complete resolved dependency closure, retaining
+            # SONAME major versions (for example libcufft.so.12 on CUDA 13).
+            if command -v ldd >/dev/null 2>&1; then
+                { LD_LIBRARY_PATH="$auditwheel_ld_path" ldd "$so_path" 2>/dev/null || true; } \
+                    | awk '/=>/ { print $1 }'
+            fi
+        )
+    done < <(collect_auditwheel_dependency_files | sort -u) | awk '!seen[$0]++'
 }
 
 auditwheel_library_path() {
@@ -111,12 +154,15 @@ auditwheel_library_path() {
         [[ -d "${SHAFFT_PATH}/lib" ]] && extra_paths+=("${SHAFFT_PATH}/lib")
         [[ -d "${SHAFFT_PATH}/lib64" ]] && extra_paths+=("${SHAFFT_PATH}/lib64")
     fi
-    if [[ -n "${ROCM_PATH:-}" && -d "${ROCM_PATH}/lib" ]]; then
-        extra_paths+=("${ROCM_PATH}/lib")
-    fi
-    if [[ -n "${CUDA_PATH:-}" && -d "${CUDA_PATH}/lib64" ]]; then
-        extra_paths+=("${CUDA_PATH}/lib64")
-    fi
+    local prefix
+    local libdir
+    for prefix in "${ROCM_PATH:-}" "${HIP_PATH:-}" "${CUDA_PATH:-}" \
+        "${HIPFORT_PATH:-}" "${PAWSEY_HIPFFT_HOME:-}"; do
+        [[ -n "$prefix" ]] || continue
+        for libdir in lib lib64 targets/sbsa-linux/lib; do
+            [[ -d "${prefix}/${libdir}" ]] && extra_paths+=("${prefix}/${libdir}")
+        done
+    done
 
     if [[ "${#extra_paths[@]}" -gt 0 ]]; then
         joined="$(IFS=:; echo "${extra_paths[*]}")"
@@ -223,12 +269,14 @@ repair_linux_wheel() {
         return 1
     fi
 
-    # Retag to linux_x86_64 so pip accepts the wheel on this platform.
+    # Retag to the native Linux platform so pip accepts this site-specific wheel.
     # auditwheel may produce a manylinux tag higher than what pip's sys_tags()
     # reports (e.g. manylinux_2_39 vs pip supporting up to manylinux_2_38 on
-    # SUSE/Cray). Since this is a profile-specific wheel, linux_x86_64 is correct.
-    step "Retagging repaired wheel to linux_x86_64" >&2
-    python -m wheel tags --remove --platform-tag linux_x86_64 "${wheel_files[0]}" >&2
+    # SUSE/Cray). Preserve the CPU architecture, including aarch64 on Grace.
+    local platform_tag
+    platform_tag="$(python -c 'import sysconfig; print(sysconfig.get_platform().replace("-", "_").replace(".", "_"))')"
+    step "Retagging repaired wheel to ${platform_tag}" >&2
+    python -m wheel tags --remove --platform-tag "$platform_tag" "${wheel_files[0]}" >&2
 
     # Re-find the wheel after retagging (filename changed)
     wheel_files=()

@@ -12,6 +12,8 @@
 # The first process count runs all MPI tests.  Additional counts run only
 # tests marked with @requires_nprocs (with --oversubscribe on non-Cray).
 # The backend is auto-detected from the QUOP_BACKEND environment variable.
+# QUOP_MPI_LAUNCHER overrides launcher detection; QUOP_MPI_LAUNCHER_ARGS adds
+# launcher flags. QUOP_TEST_GPUS_PER_NODE overrides GPU allocation discovery.
 # Pass --isolate to run each MPI test file in its own mpiexec invocation,
 # useful for debugging cross-file GPU / MPI communicator state issues.
 #
@@ -39,6 +41,13 @@ if command -v srun &>/dev/null && [[ -d /opt/cray ]] ; then
 else
     IS_CRAY=0
 fi
+LAUNCHER="${QUOP_MPI_LAUNCHER:-$(if [[ $IS_CRAY -eq 1 ]]; then echo srun; else echo mpiexec; fi)}"
+read -r -a LAUNCHER_ARGS <<< "${QUOP_MPI_LAUNCHER_ARGS:-}"
+GPUS_PER_NODE=""
+if [[ "$BACKEND" == "wavefront" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    GPUS_PER_NODE="$(python "$SCRIPT_DIR/tests/topology/gpu_launch.py")"
+fi
 
 echo "========================================"
 echo "QuOp_MPI Test Suite"
@@ -46,7 +55,7 @@ echo "========================================"
 echo "MPI Processes: ${NPROCS_ARRAY[*]}"
 echo "Test Type: $TEST_TYPE"
 echo "Backend: $BACKEND"
-echo "Launcher: $(if [[ $IS_CRAY -eq 1 ]]; then echo srun; else echo mpiexec; fi)"
+echo "Launcher: $LAUNCHER"
 echo "Isolate: $(if [[ $ISOLATE -eq 1 ]]; then echo yes; else echo no; fi)"
 echo "========================================"
 echo ""
@@ -58,15 +67,15 @@ _launch() {
     # Usage: _launch <nprocs> [extra_launcher_args...]
     local nprocs=$1
     shift
-    if [[ $IS_CRAY -eq 1 ]]; then
+    if [[ "${LAUNCHER##*/}" == "srun" ]]; then
         local gpu_args=()
-        if [[ "$BACKEND" == "wavefront" ]]; then
-            local ngpus=$(( nprocs < 8 ? nprocs : 8 ))
+        if [[ "$BACKEND" == "wavefront" && -n "$GPUS_PER_NODE" ]]; then
+            local ngpus=$(( nprocs < GPUS_PER_NODE ? nprocs : GPUS_PER_NODE ))
             gpu_args=(--gpus="$ngpus")
         fi
-        srun -N 1 -n "$nprocs" "${gpu_args[@]}" "$@"
+        "$LAUNCHER" -N 1 -n "$nprocs" "${gpu_args[@]}" "${LAUNCHER_ARGS[@]}" "$@"
     else
-        mpiexec -n "$nprocs" "$@"
+        "$LAUNCHER" -n "$nprocs" "${LAUNCHER_ARGS[@]}" "$@"
     fi
 }
 
@@ -117,12 +126,12 @@ run_mpi_tests() {
                 return 1
             fi
         else
-            if [[ $IS_CRAY -eq 1 ]]; then
+            if [[ "${LAUNCHER##*/}" == "srun" ]]; then
                 _launch "$nprocs" python -m pytest tests/mpi/ \
                     -v --tb=short --with-mpi $extra_args
             elif [[ -n "$extra_args" ]]; then
                 # Subsequent counts may exceed available slots; oversubscribe.
-                mpiexec --oversubscribe -n "$nprocs" python -m pytest tests/mpi/ \
+                _launch "$nprocs" --oversubscribe python -m pytest tests/mpi/ \
                     -v --tb=short --with-mpi $extra_args
             else
                 _launch "$nprocs" python -m pytest tests/mpi/ \
@@ -152,7 +161,7 @@ case $TEST_TYPE in
         echo "========================================"
         echo "Running example tests (4 MPI processes)..."
         echo "========================================"
-        if [[ $IS_CRAY -eq 1 ]]; then
+        if [[ "${LAUNCHER##*/}" == "srun" ]]; then
             OMP_NUM_THREADS=1 python -m pytest tests/examples/ \
                 -v --tb=short --nprocs 4 --launcher srun
         else

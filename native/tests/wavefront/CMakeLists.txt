@@ -11,8 +11,6 @@ find_library(NUMA_LIBRARY numa REQUIRED)
 # ============================================================================
 # Platform-specific configuration
 # ============================================================================
-set(ROCM_INCLUDE_DIR "${ROCM_PATH}/include")
-set(ROCM_LIB_DIR "${ROCM_PATH}/lib")
 
 # Wavefront module directory (where .mod files are generated)
 set(WAVEFRONT_MODULE_DIR "${CMAKE_BINARY_DIR}/modules")
@@ -30,30 +28,16 @@ add_library(wavefront_test_lib STATIC
 )
 
 target_include_directories(wavefront_test_lib PUBLIC
-    ${ROCM_INCLUDE_DIR}
     ${WAVEFRONT_MODULE_DIR}
 )
 
-target_link_directories(wavefront_test_lib PUBLIC
-    ${ROCM_LIB_DIR}
-)
-
 # Link using modern CMake target from HipfortDependency.cmake
-if(HIP_PLATFORM STREQUAL nvidia)
-    target_link_libraries(wavefront_test_lib PUBLIC
-        ${CUDA_PATH}/lib64/libcudart.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-else()
-    target_link_libraries(wavefront_test_lib PUBLIC
-        ${ROCM_PATH}/lib/libamdhip64.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-endif()
+target_link_libraries(wavefront_test_lib PUBLIC
+    quop_gpu_runtime
+    ${QUOP_HIPFORT_TARGET}
+    MPI::MPI_Fortran
+    ${NUMA_LIBRARY}
+)
 
 if(TARGET CrayGTL::CrayGTL)
     target_link_libraries(wavefront_test_lib PUBLIC CrayGTL::CrayGTL)
@@ -319,29 +303,15 @@ add_dependencies(wavefront_context_test_lib
 )
 
 target_include_directories(wavefront_context_test_lib PUBLIC
-    ${ROCM_INCLUDE_DIR}
     ${WAVEFRONT_MODULE_DIR}
 )
 
-target_link_directories(wavefront_context_test_lib PUBLIC
-    ${ROCM_LIB_DIR}
+target_link_libraries(wavefront_context_test_lib PUBLIC
+    quop_gpu_runtime
+    ${QUOP_HIPFORT_TARGET}
+    MPI::MPI_Fortran
+    ${NUMA_LIBRARY}
 )
-
-if(HIP_PLATFORM STREQUAL nvidia)
-    target_link_libraries(wavefront_context_test_lib PUBLIC
-        ${CUDA_PATH}/lib64/libcudart.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-else()
-    target_link_libraries(wavefront_context_test_lib PUBLIC
-        ${ROCM_PATH}/lib/libamdhip64.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-endif()
 
 if(TARGET CrayGTL::CrayGTL)
     target_link_libraries(wavefront_context_test_lib PUBLIC CrayGTL::CrayGTL)
@@ -415,29 +385,15 @@ add_dependencies(wavefront_transverse_field_test_lib
 )
 
 target_include_directories(wavefront_transverse_field_test_lib PUBLIC
-    ${ROCM_INCLUDE_DIR}
     ${WAVEFRONT_MODULE_DIR}
 )
 
-target_link_directories(wavefront_transverse_field_test_lib PUBLIC
-    ${ROCM_LIB_DIR}
+target_link_libraries(wavefront_transverse_field_test_lib PUBLIC
+    quop_gpu_runtime
+    ${QUOP_HIPFORT_TARGET}
+    MPI::MPI_Fortran
+    ${NUMA_LIBRARY}
 )
-
-if(HIP_PLATFORM STREQUAL nvidia)
-    target_link_libraries(wavefront_transverse_field_test_lib PUBLIC
-        ${CUDA_PATH}/lib64/libcudart.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-else()
-    target_link_libraries(wavefront_transverse_field_test_lib PUBLIC
-        ${ROCM_PATH}/lib/libamdhip64.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-endif()
 
 if(TARGET CrayGTL::CrayGTL)
     target_link_libraries(wavefront_transverse_field_test_lib PUBLIC CrayGTL::CrayGTL)
@@ -502,29 +458,15 @@ add_dependencies(wavefront_sparse_test_lib
 )
 
 target_include_directories(wavefront_sparse_test_lib PUBLIC
-    ${ROCM_INCLUDE_DIR}
     ${WAVEFRONT_MODULE_DIR}
 )
 
-target_link_directories(wavefront_sparse_test_lib PUBLIC
-    ${ROCM_LIB_DIR}
+target_link_libraries(wavefront_sparse_test_lib PUBLIC
+    quop_gpu_runtime
+    ${QUOP_HIPFORT_TARGET}
+    MPI::MPI_Fortran
+    ${NUMA_LIBRARY}
 )
-
-if(HIP_PLATFORM STREQUAL nvidia)
-    target_link_libraries(wavefront_sparse_test_lib PUBLIC
-        ${CUDA_PATH}/lib64/libcudart.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-else()
-    target_link_libraries(wavefront_sparse_test_lib PUBLIC
-        ${ROCM_PATH}/lib/libamdhip64.so
-        ${QUOP_HIPFORT_TARGET}
-        MPI::MPI_Fortran
-        ${NUMA_LIBRARY}
-    )
-endif()
 
 if(TARGET CrayGTL::CrayGTL)
     target_link_libraries(wavefront_sparse_test_lib PUBLIC CrayGTL::CrayGTL)

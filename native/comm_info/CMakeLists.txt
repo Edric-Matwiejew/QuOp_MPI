@@ -28,11 +28,7 @@ if(WAVEFRONT_BACKEND)
   add_library(ci_gpu_topology OBJECT "${_WF_CONTEXT_DIR}/numa_detect.f90" "${_WF_CONTEXT_DIR}/gpu_topology.f90")
   target_include_directories(ci_gpu_topology PUBLIC "${_CI_MOD_DIR}" "${CMAKE_Fortran_MODULE_DIRECTORY}")
   target_link_libraries(ci_gpu_topology PUBLIC MPI::MPI_Fortran ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY})
-  if(HIP_PLATFORM STREQUAL "nvidia")
-    target_link_libraries(ci_gpu_topology PUBLIC ${CUDA_PATH}/lib64/libcudart.so)
-  elseif(HIP_PLATFORM STREQUAL "amd")
-    target_link_libraries(ci_gpu_topology PUBLIC ${ROCM_PATH}/lib/libamdhip64.so)
-  endif()
+  target_link_libraries(ci_gpu_topology PUBLIC quop_gpu_runtime)
   set_target_properties(
     ci_gpu_topology PROPERTIES Fortran_MODULE_DIRECTORY "${_CI_MOD_DIR}" POSITION_INDEPENDENT_CODE ON
   )
@@ -40,11 +36,7 @@ if(WAVEFRONT_BACKEND)
   add_library(ci_communicators OBJECT "${_WF_CONTEXT_DIR}/communicators.f90")
   target_include_directories(ci_communicators PUBLIC "${_CI_MOD_DIR}" "${CMAKE_Fortran_MODULE_DIRECTORY}")
   target_link_libraries(ci_communicators PUBLIC MPI::MPI_Fortran ${QUOP_HIPFORT_TARGET})
-  if(HIP_PLATFORM STREQUAL "nvidia")
-    target_link_libraries(ci_communicators PUBLIC ${CUDA_PATH}/lib64/libcudart.so)
-  elseif(HIP_PLATFORM STREQUAL "amd")
-    target_link_libraries(ci_communicators PUBLIC ${ROCM_PATH}/lib/libamdhip64.so)
-  endif()
+  target_link_libraries(ci_communicators PUBLIC quop_gpu_runtime)
   add_dependencies(ci_communicators ci_gpu_topology)
   set_target_properties(
     ci_communicators PROPERTIES Fortran_MODULE_DIRECTORY "${_CI_MOD_DIR}" POSITION_INDEPENDENT_CODE ON
@@ -115,8 +107,7 @@ if(WAVEFRONT_BACKEND)
   )
 
   target_link_libraries(
-    comm_info_wrapper_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                                   ${ROCM_PATH}/lib/libamdhip64.so
+    comm_info_wrapper_f2py PRIVATE ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
   )
   if(TARGET CrayGTL::CrayGTL)
     target_link_libraries(comm_info_wrapper_f2py PRIVATE CrayGTL::CrayGTL)

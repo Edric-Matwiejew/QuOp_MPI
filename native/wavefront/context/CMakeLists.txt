@@ -78,6 +78,5 @@ add_context_extension(
   INSTALL_SUBDIR wavefront
   DEFINITIONS    ${_definitions}
   DEPENDS        ${_depends}
-  LIBRARIES      ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} hip::device
-                 ${ROCM_PATH}/lib/libamdhip64.so
+  LIBRARIES      ${QUOP_HIPFORT_TARGET} ${NUMA_LIBRARY} quop_gpu_runtime
 )

@@ -13,6 +13,7 @@ Usage:
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +22,9 @@ SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
 EXAMPLES_DIR = PROJECT_ROOT / "examples"
 EXPECTED_RESULTS_FILE = SCRIPT_DIR / "expected_results.json"
+
+sys.path.insert(0, str(PROJECT_ROOT / "tests" / "topology"))
+from gpu_launch import detect_gpus_per_node
 
 
 def load_expected_results():
@@ -37,12 +41,16 @@ def _example_test_env():
 
 def _build_launch_cmd(nprocs, launcher="mpiexec"):
     """Return the MPI launcher command prefix as a list."""
-    if launcher == "srun":
-        cmd = ["srun", "-N", "1", "-n", str(nprocs)]
+    launcher = os.environ.get("QUOP_MPI_LAUNCHER", launcher)
+    launcher_args = shlex.split(os.environ.get("QUOP_MPI_LAUNCHER_ARGS", ""))
+    if Path(launcher).name == "srun":
+        cmd = [launcher, "-N", "1", "-n", str(nprocs)]
         if os.environ.get("QUOP_BACKEND") == "wavefront":
-            cmd.append("--gpus=" + str(min(nprocs, 8)))
-        return cmd
-    return ["mpiexec", "-n", str(nprocs)]
+            gpu_count = detect_gpus_per_node()
+            if gpu_count is not None:
+                cmd.append("--gpus=" + str(min(nprocs, gpu_count)))
+        return cmd + launcher_args
+    return [launcher, "-n", str(nprocs)] + launcher_args
 
 
 def run_example(script_path, cwd, nprocs=4, timeout=300, launcher="mpiexec"):

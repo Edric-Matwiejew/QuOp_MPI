@@ -34,7 +34,7 @@ endif()
 
 # --- Backend Selection ---
 # MPI backend modules are always built; wavefront is optional.
-option(WAVEFRONT_BACKEND "Build the wavefront (GPU) backend for HIP/ROCm" OFF)
+option(WAVEFRONT_BACKEND "Build the wavefront (GPU) backend for HIP on AMD or NVIDIA" OFF)
 option(GPU_AWARE_MPI "Enable GPU-aware MPI (requires compatible MPI library)" OFF)
 
 # --- Build Configuration ---
@@ -58,7 +58,7 @@ set(HIP_PLATFORM
 set_property(CACHE HIP_PLATFORM PROPERTY STRINGS "amd" "nvidia")
 set(OFFLOAD_ARCH
     ""
-    CACHE STRING "Target GPU architecture (e.g., gfx90a for MI250X, sm_80 for A100)"
+    CACHE STRING "Target GPU architecture (e.g., gfx90a for MI250X, 90 for GH200)"
 )
 set(GPU_TARGETS
     ""
@@ -68,6 +68,7 @@ set(CUDA_PATH
     ""
     CACHE PATH "Path to CUDA installation (only for HIP_PLATFORM=nvidia)"
 )
+set(HIP_PATH "" CACHE PATH "Path to HIP installation (may be separate from ROCm on NVIDIA)")
 
 # --- Optional Components (for WAVEFRONT_BACKEND) ---
 option(WITH_SHAFFT "Build with SHAFFT support for multivariable operations" OFF)
@@ -95,7 +96,7 @@ set(HIPFORT_VERIFY_MOD_COMPAT
 # =============================================================================
 
 # Set sensible defaults for paths if not specified
-if(NOT ROCM_PATH)
+if(NOT ROCM_PATH AND HIP_PLATFORM STREQUAL "amd")
   if(EXISTS "/opt/rocm")
     set(ROCM_PATH
         "/opt/rocm"
@@ -162,7 +163,9 @@ if(GPU_AWARE_MPI)
   # target-scoping is not practical here.
   add_compile_definitions(QUOP_GPU_AWARE_MPI)
   message(STATUS "GPU-aware MPI enabled")
-  message(STATUS "NOTE: Set MPICH_GPU_SUPPORT_ENABLED=1 in your runtime environment for Cray MPICH")
+  if(DEFINED ENV{CRAYPE_VERSION})
+    message(STATUS "NOTE: Set MPICH_GPU_SUPPORT_ENABLED=1 in your runtime environment for Cray MPICH")
+  endif()
 else()
   message(STATUS "GPU-aware MPI disabled")
 endif()
@@ -170,63 +173,11 @@ endif()
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
 
 if(WAVEFRONT_BACKEND)
+  # SHAFFT and CMake's NVIDIA HIP language support require CMake 3.28.
+  cmake_minimum_required(VERSION 3.28...4.0)
   message(STATUS "Configuring wavefront (GPU) backend")
-
-  if(HIP_PLATFORM STREQUAL "nvidia")
-    set(HIP_PLATFORM_DEFINE "-D__HIP_PLATFORM_NVIDIA__")
-  else()
-    set(HIP_PLATFORM_DEFINE "-D__HIP_PLATFORM_AMD__")
-  endif()
-
-  if(NOT CMAKE_CXX_COMPILER OR CMAKE_CXX_COMPILER STREQUAL "/usr/bin/c++")
-    if(EXISTS "${ROCM_PATH}/bin/hipcc")
-      set(CMAKE_CXX_COMPILER
-          "${ROCM_PATH}/bin/hipcc"
-          CACHE FILEPATH "C++ compiler" FORCE
-      )
-    else()
-      message(FATAL_ERROR "HIP compiler not found at ${ROCM_PATH}/bin/hipcc")
-    endif()
-  endif()
-
-  set(CMAKE_CXX_COMPILER_WORKS 1)
-  enable_language(CXX)
-
-  message(CHECK_START "Checking HIP compiler")
-  file(
-    WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.cpp
-    "#include <hip/hip_runtime.h>
-    int main() {
-    hipDeviceProp_t prop;
-    hipGetDeviceProperties(&prop, 0);
-    return 0;
-  }"
-  )
-  try_compile(
-    HIP_TEST ${CMAKE_BINARY_DIR}
-    ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/test.cpp
-    CMAKE_FLAGS "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
-    COMPILE_DEFINITIONS "-I${ROCM_PATH}/include" "${HIP_PLATFORM_DEFINE}"
-    LINK_LIBRARIES "-L${ROCM_PATH}/lib" "-lamdhip64"
-    OUTPUT_VARIABLE OUTPUT
-  )
-  if(NOT HIP_TEST)
-    cmake_print_variables(OUTPUT)
-    cmake_print_variables(CXX)
-    cmake_print_variables(ROCM_PATH)
-    cmake_print_variables(HIP_PLATFORM)
-    if(HIP_PLATFORM STREQUAL "nvidia")
-      cmake_print_variables(CUDA_PATH)
-    endif()
-    message(FATAL_ERROR "HIP compiler ${CMAKE_CXX_COMPILER} is not configured correctly")
-  endif()
+  include(QuOpGPU)
   set(WAVEFRONT_CONFIGURED TRUE)
-
-  # Find HIP runtime - provides hip::device target for linking
-  find_package(hip REQUIRED CONFIG PATHS "${ROCM_PATH}")
-  if(NOT TARGET hip::device)
-    message(FATAL_ERROR "hip::device target not found - check your ROCm/HIP installation")
-  endif()
   message(STATUS "Found HIP: ${hip_DIR}")
 
   # Use HipfortDependency.cmake to find or fetch hipfort automatically This will create the hipfort::hipfort target and
