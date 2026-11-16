@@ -10,17 +10,17 @@ work_dir = ".cache/quop/{profile}/{backend}"
 
 [modules]
 common = [
-    "gcc-native/12.3",
-    "cray-mpich/8.1.32",
-    "cray-hdf5-parallel/1.14.3.7",
-    "fftw/3.3.10",
+    "gcc-native/14.2",
+    "cray-mpich/9.1.0",
+    "cray-hdf5-parallel/1.14.3.9",
+    "cray-fftw/3.3.10.11",
     "python/3.11.6",
     "py-pip/23.1.2-py3.11.6",
     "py-numpy/2.1.2",
-    "cmake/3.30.5",
+    "cmake/3.31.9",
 ]
 wavefront = [
-    "rocm/6.4.1",
+    "rocm/7.0.1",
     "craype-accel-amd-gfx90a",
 ]
 mpi_python = [
